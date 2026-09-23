@@ -1,0 +1,38 @@
+# ====================================================================
+# GITIGNORE FILE - CAR RENTAL SYSTEM (FULLSTACK SPRING BOOT + REACT.JS)
+# ====================================================================
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Backend (Java / Maven / Spring Boot)
+backend/target/
+backend/*.jar
+backend/*.war
+backend/.mvn/wrapper/maven-wrapper.jar
+backend/logs/
+
+# Frontend (Node.js / React)
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.pnp
+frontend/.pnp.js
+frontend/coverage/
+frontend/yarn-error.log*
+frontend/npm-debug.log*
+
+# Environment & Secrets
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+application-secret.yml
+
