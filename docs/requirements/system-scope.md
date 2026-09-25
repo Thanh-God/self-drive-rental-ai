@@ -145,11 +145,13 @@ Các mục sau là giả định thiết kế ban đầu, cần được chốt 
 3. **Cách tính ngày thuê:** đề xuất tính theo block 24 giờ, phần lẻ tính thêm một ngày; cần công bố rõ trong UI.
 4. **Giữ xe khi chờ xác nhận:** cần quyết định đơn `PENDING` có chiếm lịch ngay và hết hạn sau bao lâu.
 5. **Hợp đồng/hóa đơn:** cần chốt thời điểm tạo, ví dụ sau khi Staff xác nhận; dữ liệu hồ sơ phải giữ snapshot cần thiết.
-6. **Chi nhánh và điểm tham quan:** cần xác định có quản lý chi nhánh giao nhận riêng với catalog địa điểm hành trình hay không.
+6. **Chi nhánh và điểm tham quan — đã chốt ở Giai đoạn 2:** tách module `branch` quản lý chi nhánh giao nhận và `location` quản lý địa điểm tham quan; demo một chi nhánh, nhận/trả cùng chi nhánh. Chưa mở rộng điều chuyển xe giữa chi nhánh.
 7. **Hủy sát giờ:** đề xuất chuyển cho Staff/Admin xử lý thay vì tự tính phí tự động.
 8. **Map provider:** chọn nhà cung cấp theo khả năng sử dụng, chi phí, coverage và điều kiện tài khoản trước Phase tích hợp.
 
 ## 9. Tiêu chí hoàn thành Giai đoạn 1
+
+Kiến trúc tiếp nối đã được duyệt tại [Giai đoạn 2](../architecture/system-architecture.md). Danh sách quyết định và chính sách còn mở được theo dõi tại [sổ quyết định](../architecture/decisions.md); đặc biệt quyền AI của Guest vẫn chưa chốt. Công cụ phát triển thống nhất là VS Code cho Java và React, không thay đổi stack nghiệp vụ.
 
 - Bốn actor và trách nhiệm không chồng lấn đáng kể.
 - MVP và tính năng mở rộng được phân biệt.

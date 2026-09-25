@@ -2,27 +2,27 @@
 
 ## 1. Danh sách Use Case
 
-| ID | Use case | Actor chính | Mức ưu tiên |
-|---|---|---|---|
-| UC-G01 | Duyệt, tìm kiếm và lọc xe | Guest, User | MVP |
-| UC-G02 | Xem chi tiết xe và đánh giá | Guest, User | MVP |
-| UC-G03 | Đăng ký/đăng nhập | Guest | MVP |
-| UC-G04 | Nhận gợi ý xe | Guest/User | MVP |
-| UC-U01 | Quản lý hồ sơ cá nhân | User | MVP |
-| UC-U02 | Kiểm tra khả dụng và tạo đơn thuê | User | MVP |
-| UC-U03 | Xem lịch sử/chi tiết đơn, hợp đồng, hóa đơn | User | MVP |
-| UC-U04 | Hủy đơn thuê | User | MVP |
-| UC-U05 | Gửi đánh giá sau khi thuê | User | MVP |
-| UC-U06 | Tạo và quản lý hành trình cá nhân | User | MVP |
-| UC-S01 | Xem hàng đợi và xử lý đơn thuê | Staff | MVP |
-| UC-S02 | Bàn giao xe cho khách | Staff | MVP |
-| UC-S03 | Nhận xe trả và hoàn tất đơn | Staff | MVP |
-| UC-S04 | Cập nhật/báo tình trạng vận hành xe | Staff | MVP |
-| UC-A01 | Quản lý User và Staff | Admin | MVP |
-| UC-A02 | Quản lý xe, hãng, loại xe và tiện nghi | Admin | MVP |
-| UC-A03 | Quản lý địa điểm | Admin | MVP |
-| UC-A04 | Kiểm duyệt đánh giá | Admin | MVP |
-| UC-A05 | Xem thống kê và tình trạng tích hợp | Admin | Nên có |
+| ID     | Use case                                    | Actor chính | Mức ưu tiên |
+| ------ | ------------------------------------------- | ----------- | ----------- |
+| UC-G01 | Duyệt, tìm kiếm và lọc xe                   | Guest, User | MVP         |
+| UC-G02 | Xem chi tiết xe và đánh giá                 | Guest, User | MVP         |
+| UC-G03 | Đăng ký/đăng nhập                           | Guest       | MVP         |
+| UC-G04 | Nhận gợi ý xe                               | Guest/User  | MVP         |
+| UC-U01 | Quản lý hồ sơ cá nhân                       | User        | MVP         |
+| UC-U02 | Kiểm tra khả dụng và tạo đơn thuê           | User        | MVP         |
+| UC-U03 | Xem lịch sử/chi tiết đơn, hợp đồng, hóa đơn | User        | MVP         |
+| UC-U04 | Hủy đơn thuê                                | User        | MVP         |
+| UC-U05 | Gửi đánh giá sau khi thuê                   | User        | MVP         |
+| UC-U06 | Tạo và quản lý hành trình cá nhân           | User        | MVP         |
+| UC-S01 | Xem hàng đợi và xử lý đơn thuê              | Staff       | MVP         |
+| UC-S02 | Bàn giao xe cho khách                       | Staff       | MVP         |
+| UC-S03 | Nhận xe trả và hoàn tất đơn                 | Staff       | MVP         |
+| UC-S04 | Cập nhật/báo tình trạng vận hành xe         | Staff       | MVP         |
+| UC-A01 | Quản lý User và Staff                       | Admin       | MVP         |
+| UC-A02 | Quản lý xe, hãng, loại xe và tiện nghi      | Admin       | MVP         |
+| UC-A03 | Quản lý địa điểm                            | Admin       | MVP         |
+| UC-A04 | Kiểm duyệt đánh giá                         | Admin       | MVP         |
+| UC-A05 | Xem thống kê và tình trạng tích hợp         | Admin       | Nên có      |
 
 ## 2. UC-U02 — Kiểm tra khả dụng và tạo đơn thuê
 
@@ -141,17 +141,17 @@ Admin không được xem mật khẩu dạng rõ. Hệ thống chỉ lưu hash 
 
 ## 7. Quyền truy cập khái quát
 
-| Nghiệp vụ | Guest | User | Staff | Admin |
-|---|---:|---:|---:|---:|
-| Duyệt/tìm kiếm/xem xe | Có | Có | Có | Có |
-| Đặt xe | Không | Có | Không thay khách | Không thay khách theo mặc định |
-| Xem đơn | Không | Đơn của mình | Đơn vận hành được phép | Toàn bộ |
-| Hủy đơn | Không | Đơn của mình, theo chính sách | Hỗ trợ/xử lý theo quyền | Có quyền can thiệp |
-| Xác nhận, giao/nhận xe | Không | Không | Có | Có thể can thiệp |
-| Quản lý dữ liệu catalog | Không | Không | Cập nhật tình trạng vận hành theo quyền | Có |
-| Gửi đánh giá | Không | Khi đủ điều kiện | Không | Không |
-| Kiểm duyệt đánh giá | Không | Không | Không mặc định | Có |
-| Dùng AI | Preview nếu bật | Có, có thể lưu | Không phải nghiệp vụ chính | Có thể kiểm tra |
+| Nghiệp vụ               |           Guest |                          User |                                   Staff |                          Admin |
+| ----------------------- | --------------: | ----------------------------: | --------------------------------------: | -----------------------------: |
+| Duyệt/tìm kiếm/xem xe   |              Có |                            Có |                                      Có |                             Có |
+| Đặt xe                  |           Không |                            Có |                        Không thay khách | Không thay khách theo mặc định |
+| Xem đơn                 |           Không |                  Đơn của mình |                  Đơn vận hành được phép |                        Toàn bộ |
+| Hủy đơn                 |           Không | Đơn của mình, theo chính sách |                 Hỗ trợ/xử lý theo quyền |             Có quyền can thiệp |
+| Xác nhận, giao/nhận xe  |           Không |                         Không |                                      Có |               Có thể can thiệp |
+| Quản lý dữ liệu catalog |           Không |                         Không | Cập nhật tình trạng vận hành theo quyền |                             Có |
+| Gửi đánh giá            |           Không |              Khi đủ điều kiện |                                   Không |                          Không |
+| Kiểm duyệt đánh giá     |           Không |                         Không |                          Không mặc định |                             Có |
+| Dùng AI                 | Preview nếu bật |                Có, có thể lưu |              Không phải nghiệp vụ chính |                Có thể kiểm tra |
 
 ## 8. Các quyết định cần mang sang giai đoạn sau
 
@@ -159,4 +159,6 @@ Admin không được xem mật khẩu dạng rõ. Hệ thống chỉ lưu hash 
 - Staff làm nghiệp vụ đơn thuê/giao nhận; Admin quản trị tài khoản và catalog.
 - Backend là nguồn sự thật cho availability, giá và state transition.
 - AI và map là tích hợp bên ngoài qua backend adapter.
-- Chính sách Guest dùng AI, xác minh giấy phép lái xe, cách tính ngày thuê, thời hạn giữ xe, thời điểm tạo hợp đồng/hóa đơn và mô hình chi nhánh cần chốt trước khi triển khai module tương ứng.
+- Giai đoạn 2 đã chốt tách chi nhánh giao nhận (`branch`) và địa điểm tham quan (`location`), demo một chi nhánh với nhận/trả cùng chi nhánh.
+- Chính sách Guest dùng AI, xác minh giấy phép lái xe, cách tính ngày thuê, thời hạn giữ xe và thời điểm tạo hợp đồng/hóa đơn vẫn cần chốt trước khi triển khai module tương ứng; xem [sổ quyết định](../architecture/decisions.md).
+- Backend tổ chức theo nghiệp vụ, không có module dữ liệu riêng `staff`/`admin`; các quyền và use case của hai actor vẫn được giữ. Xem [ranh giới module](../architecture/module-boundaries.md).
