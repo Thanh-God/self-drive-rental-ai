@@ -2,9 +2,28 @@
 
 Frontend React/Vite được phát triển tiếp từ giao diện KDrive có sẵn. Giữ layout Guest/User/Staff/Admin, màu teal/slate, Navbar/Sidebar/Footer và route guard. Không triển khai backend, database hoặc API AI trong giai đoạn này.
 
+Trạng thái 27/09/2026: hoàn thành phạm vi UI demo desktop. Xem [bàn giao Giai đoạn 4](../docs/ui/phase-4-handoff.md) cho kết quả kiểm tra và phần chuyển sang tích hợp.
+
 ## Chạy local
 
 Trong thư mục `frontend`, chạy `npm ci` nếu chưa có dependency, sau đó `npm run dev -- --host 127.0.0.1`. Mở địa chỉ Vite thông báo (mặc định http://127.0.0.1:5173). `npm run build` kiểm tra bản build; `npm test` chạy các ca biên của mô phỏng demo bằng Node test runner, không cần thư viện test mới.
+
+PowerShell:
+
+```powershell
+cd E:\AI\BERT_Project\codepython\KLTN\frontend
+$env:VITE_DATA_MODE = "demo"
+npm run dev -- --host 127.0.0.1
+```
+
+Git Bash:
+
+```bash
+cd /e/AI/BERT_Project/codepython/KLTN/frontend
+VITE_DATA_MODE=demo npm run dev -- --host 127.0.0.1
+```
+
+Giữ terminal mở; Ctrl+C để dừng. Nếu cổng 5173 bận, dùng URL Vite thực tế thông báo. Khi đổi biến môi trường, dừng và chạy lại server. Build thành công không bảo đảm không có lỗi lúc render: cần mở các route và thử luồng demo bên dưới.
 
 ## Hai chế độ dữ liệu
 
@@ -43,7 +62,7 @@ Guard tách role; Admin không vào Staff/User. Route guard và mô phỏng quy�
 - `src/context/DemoContext.jsx`: dữ liệu phiên demo; `AuthContext.jsx`: tách phiên demo và phiên API.
 - `src/components/common/PageKit.jsx`: bố cục, field, thông báo, loading/empty/error gate; toolbar chọn tình huống demo. Đổi tình huống sẽ đặt lại biểu mẫu chưa lưu, dữ liệu đã lưu vẫn giữ.
 - Màn hình theo nhóm `VehicleScreens`, `BookingScreens`, `AiScreens`, `ManagementScreens`; các page cũ được giữ làm entrypoint để giữ cấu trúc quen thuộc.
-- Hình xe là icon minh họa có nhãn, chưa phải ảnh catalog thật. Hồ sơ có form đổi mật khẩu để thử validation bằng giá trị mẫu, không lưu/gửi mật khẩu. Ảnh nhiều góc, upload ảnh, đổi mật khẩu thật, API auth tích hợp, map tương tác và thao tác phát hành lại chưa được triển khai.
+- Có 8 ảnh minh họa cho 4 mẫu xe (ngoại thất/nội thất), gallery và nguồn/giấy phép theo ảnh đang chọn; xe mới chưa có ảnh dùng icon dự phòng. Ảnh minh họa có thể khác đời/phiên bản xe cho thuê, không phải ảnh kiểm định xe thực tế. Nguồn nằm trong `src/assets/images/vehicles/attributions.json`; `public/images/vehicles` phục vụ URL tĩnh của seed/hero. Hồ sơ có form đổi mật khẩu để thử validation bằng giá trị mẫu, không lưu/gửi mật khẩu. Upload ảnh, đổi mật khẩu thật, API auth tích hợp, map tương tác và thao tác phát hành lại chưa được triển khai.
 - Chưa bổ sung xóa cứng dữ liệu giao dịch, thanh toán online, trình chỉnh sửa itinerary hoặc quyền Admin giao nhận.
 - Các thông số còn mở theo `docs/database/database-design.md` và `docs/architecture/decisions.md`. Tài liệu Giai đoạn 3 không bị sửa trong công việc UI.
 
@@ -52,6 +71,6 @@ Guard tách role; Admin không vào Staff/User. Route guard và mô phỏng quy�
 - Guest vào route bảo vệ → login và giữ query; sai role → unauthorized; đường dẫn sai → 404.
 - Tạo đơn trùng lịch → thông báo lỗi; đơn hết hạn không xác nhận được; thao tác dùng version cũ bị từ chối trong demo.
 - Hợp đồng xuất hiện sau xác nhận, hóa đơn sau hoàn tất; giá catalog sửa không làm đổi snapshot đơn/hồ sơ cũ.
-- Modal giữ focus, Escape đóng và trả focus về nút mở. Kiểm tra mobile 390px và desktop 1440px.
+- Modal giữ focus, Escape đóng và trả focus về nút mở. Phạm vi bàn giao hiện tại ưu tiên web desktop 1366px và 1440px; không phát triển ứng dụng hoặc bộ thiết kế mobile riêng.
 - Loading/empty/error qua toolbar, trạng thái rỗng do bộ lọc, lỗi AI, tài nguyên không tồn tại; kiểm tra console không có lỗi.
 - Kết quả demo không chứng minh transaction chống đặt trùng, phân quyền server hoặc AI/Map đã hoạt động. Các phần này cần kiểm thử tích hợp riêng khi backend sẵn sàng.

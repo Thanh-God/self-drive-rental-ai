@@ -2,11 +2,17 @@
 
 ## Trạng thái dự án
 
-Giai đoạn 1 đã xác định phạm vi và use case. Giai đoạn 2 đã thống nhất kiến trúc. Giai đoạn 3 đã duyệt 20 bảng nghiệp vụ cơ sở và các chính sách được ghi tại [thiết kế database](docs/database/database-design.md); chưa có migration hoặc database được kiểm thử. Frontend đã có mã React/Vite do người dùng bổ sung; Giai đoạn 4 khảo sát UI/UX, màn hình và routing, chưa xác nhận tích hợp backend.
+Giai đoạn 1 đã xác định phạm vi và use case. Giai đoạn 2 đã thống nhất kiến trúc. Giai đoạn 3 đã duyệt 20 bảng nghiệp vụ cơ sở và các chính sách được ghi tại [thiết kế database](docs/database/database-design.md); chưa có migration hoặc database được kiểm thử. Giai đoạn 4 đã hoàn thành triển khai UI/UX web desktop, routing và luồng dữ liệu demo có nhãn ngày 27/09/2026. Xem [biên bản bàn giao và giới hạn](docs/ui/phase-4-handoff.md). Chưa triển khai nghiệp vụ backend hoặc tích hợp Gemini/Map thật.
+
+## Chạy demo giao diện
+
+Mở terminal tại `E:\AI\BERT_Project\codepython\KLTN\frontend`. Chạy `npm ci` nếu chưa cài thư viện, sau đó `npm run dev -- --host 127.0.0.1`. Mở URL Vite thông báo (mặc định http://127.0.0.1:5173). Không cần backend/MySQL cho chế độ demo.
+
+Chọn vai trò Guest/User/Staff/Admin ở thanh **DEMO UI**; bấm **Khôi phục mẫu** để đặt lại dữ liệu trong phiên trình duyệt. Xem [hướng dẫn frontend](frontend/README.md) để chọn đúng cú pháp PowerShell hoặc Git Bash.
 
 ## Tech Stack
 
-- **Frontend**: React.js (Vite), Axios; thư viện giao diện sẽ chốt khi triển khai
+- **Frontend**: React 19, Vite 6, React Router 6, Tailwind CSS 4, Lucide, Axios
 - **Backend**: Java Spring Boot 3.x, Spring Security, Spring Data JPA, Hibernate, JWT
 - **Database**: MySQL 8.x
 - **AI & External APIs**: Google Gemini API; Map provider còn chờ chọn
