@@ -11,11 +11,11 @@ export function VehicleVisual({
   customSrc = null,
   alt = "",
 }) {
-  const [imgError, setImgError] = useState(false);
+  const [failedSrc, setFailedSrc] = useState(null);
   const media = getVehicleMedia(vehicle);
   const imageSrc = customSrc || media?.main || vehicle?.image;
 
-  if (imageSrc && !imgError) {
+  if (imageSrc && failedSrc !== imageSrc) {
     return (
       <div
         className={`relative flex items-center justify-center overflow-hidden rounded-xl bg-slate-100 ${
@@ -27,7 +27,7 @@ export function VehicleVisual({
           alt={alt || vehicle?.name || "Ảnh xe"}
           className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
           loading="lazy"
-          onError={() => setImgError(true)}
+          onError={() => setFailedSrc(imageSrc)}
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/50 via-slate-900/10 to-transparent opacity-70" />
         <div className="absolute top-3 left-3 flex gap-1.5">

@@ -106,13 +106,7 @@ export function VehicleListScreen() {
     const matchTransmission = !transmission || v.transmission === transmission;
     const matchAvailable =
       !datesOK ||
-      available(
-        data.vehicles,
-        data.bookings,
-        v.id,
-        toUTC(start),
-        toUTC(end),
-      );
+      available(data.vehicles, data.bookings, v.id, toUTC(start), toUTC(end));
 
     return (
       matchQuery &&
@@ -173,7 +167,8 @@ export function VehicleListScreen() {
             id="vehicle-filters"
             className={`${filtersOpen ? "block" : "hidden"} space-y-4 lg:block`}
           >
-            <Field label="Tìm kiếm xe">
+            <label className="field">
+              <span>Tìm kiếm xe</span>
               <div className="relative">
                 <input
                   placeholder="Toyota, Vios, Xpander..."
@@ -186,7 +181,7 @@ export function VehicleListScreen() {
                   className="pointer-events-none absolute right-3 top-3.5 text-slate-400"
                 />
               </div>
-            </Field>
+            </label>
 
             <Field label="Loại xe">
               <select
@@ -384,7 +379,6 @@ export function VehicleDetailScreen() {
   const [params] = useSearchParams();
   const { data } = useDemo();
   const { user } = useAuth();
-  const [activeImageIndex, setActiveImageIndex] = useState(0);
 
   const vehicle = data.vehicles.find((v) => v.id === vehicleId);
 
@@ -396,6 +390,20 @@ export function VehicleDetailScreen() {
     );
   }
 
+  return (
+    <VehicleDetailContent
+      key={vehicleId}
+      vehicle={vehicle}
+      vehicleId={vehicleId}
+      params={params}
+      data={data}
+      user={user}
+    />
+  );
+}
+
+function VehicleDetailContent({ vehicle, vehicleId, params, data, user }) {
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
   const media = getVehicleMedia(vehicle);
   const galleryItems =
     media?.gallery ||
@@ -406,10 +414,14 @@ export function VehicleDetailScreen() {
       : [{ url: vehicle.image, label: "Ảnh ngoại thất" }]);
 
   const activeImage =
-    galleryItems[activeImageIndex]?.url || galleryItems[0]?.url || vehicle.image;
+    galleryItems[activeImageIndex]?.url ||
+    galleryItems[0]?.url ||
+    vehicle.image;
   const activeLabel =
     galleryItems[activeImageIndex]?.label || galleryItems[0]?.label || "Ảnh xe";
-  const attribution = vehicle.attribution || media?.attribution;
+  const attribution = media?.attribution?.images
+    ? media.attribution.images[activeImageIndex === 0 ? "main" : "interior"]
+    : media?.attribution || vehicle.attribution;
 
   const startParam = params.get("start") || "";
   const endParam = params.get("end") || "";
@@ -456,7 +468,10 @@ export function VehicleDetailScreen() {
       }
     >
       {/* BREADCRUMB */}
-      <nav aria-label="Breadcrumb" className="mb-4 flex items-center gap-2 text-xs text-slate-500">
+      <nav
+        aria-label="Breadcrumb"
+        className="mb-4 flex items-center gap-2 text-xs text-slate-500"
+      >
         <Link to="/" className="hover:text-teal-700">
           Trang chủ
         </Link>
@@ -488,6 +503,7 @@ export function VehicleDetailScreen() {
                     <button
                       key={item.url || index}
                       type="button"
+                      aria-pressed={isSelected}
                       onClick={() => setActiveImageIndex(index)}
                       className={`group flex items-center gap-2.5 rounded-xl border p-1.5 text-xs font-semibold transition ${
                         isSelected
@@ -503,7 +519,9 @@ export function VehicleDetailScreen() {
                         />
                       </div>
                       <div className="text-left pr-2">
-                        <p className="font-bold">{item.label || `Ảnh ${index + 1}`}</p>
+                        <p className="font-bold">
+                          {item.label || `Ảnh ${index + 1}`}
+                        </p>
                         <p className="text-[10px] text-slate-400 font-normal">
                           {index === 0 ? "Ngoại thất" : "Khoang lái"}
                         </p>
@@ -608,7 +626,7 @@ export function VehicleDetailScreen() {
                   <span>Nguồn & Giấy phép sử dụng hình ảnh</span>
                 </div>
                 <p className="mt-1.5 leading-relaxed">
-                  Hình ảnh minh họa bởi tác giả{" "}
+                  Ảnh {activeLabel.toLowerCase()} minh họa bởi tác giả{" "}
                   <strong>{attribution.author}</strong> trên{" "}
                   <strong>{attribution.source || "Wikimedia Commons"}</strong>{" "}
                   (Giấy phép{" "}
@@ -634,6 +652,10 @@ export function VehicleDetailScreen() {
                       Trang nguồn gốc <ExternalLink size={11} />
                     </a>
                   ) : null}
+                </p>
+                <p className="mt-1">
+                  Ảnh có thể khác đời hoặc phiên bản xe thuê. Bản hiển thị đã
+                  thu nhỏ/nén và có thể cắt khung.
                 </p>
               </div>
             ) : null}
@@ -671,7 +693,9 @@ export function VehicleDetailScreen() {
               <span className="text-3xl font-bold text-teal-800">
                 {money(vehicle.price)}
               </span>
-              <span className="text-sm font-medium text-slate-500">/ 24 giờ</span>
+              <span className="text-sm font-medium text-slate-500">
+                / 24 giờ
+              </span>
             </div>
             <p className="mt-1 text-xs text-slate-400">
               Biển số mẫu: <span className="font-mono">{vehicle.plate}</span> ·
@@ -739,14 +763,16 @@ export function VehicleDetailScreen() {
           {vehicle.status !== "ACTIVE" ? (
             <Notice error>
               Xe đang trong lịch{" "}
-              {vehicle.status === "MAINTENANCE" ? "bảo dưỡng" : "ngừng khai thác"}
+              {vehicle.status === "MAINTENANCE"
+                ? "bảo dưỡng"
+                : "ngừng khai thác"}
               , tạm thời không nhận đặt mới.
             </Notice>
           ) : user && user.role !== "USER" ? (
             <Notice>
-              Tài khoản hiện tại có vai trò <strong>{user.role}</strong>. Hãy đổi
-              sang vai trò <strong>User</strong> trong thanh công cụ Demo để tạo
-              đơn thuê xe.
+              Tài khoản hiện tại có vai trò <strong>{user.role}</strong>. Hãy
+              đổi sang vai trò <strong>User</strong> trong thanh công cụ Demo để
+              tạo đơn thuê xe.
             </Notice>
           ) : (
             <Link
