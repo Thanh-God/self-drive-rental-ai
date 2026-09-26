@@ -2,7 +2,7 @@
 
 ## Trạng thái dự án
 
-Giai đoạn 1 đã xác định phạm vi và use case. Giai đoạn 2 đã thống nhất kiến trúc và điều chỉnh cấu trúc giữ chỗ. Chưa có mã ứng dụng, cấu hình build hoặc database để chạy demo.
+Giai đoạn 1 đã xác định phạm vi và use case. Giai đoạn 2 đã thống nhất kiến trúc. Giai đoạn 3 đã duyệt 20 bảng nghiệp vụ cơ sở và các chính sách được ghi tại [thiết kế database](docs/database/database-design.md); chưa có migration hoặc database được kiểm thử. Frontend đã có mã React/Vite do người dùng bổ sung; Giai đoạn 4 khảo sát UI/UX, màn hình và routing, chưa xác nhận tích hợp backend.
 
 ## Tech Stack
 

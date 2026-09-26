@@ -1,5 +1,7 @@
 # Giai đoạn 1 — Actor và Use Case
 
+> Cập nhật 26/09/2026: chính sách được duyệt ở Giai đoạn 3 nằm tại [thiết kế database cơ sở](../database/database-design.md). Riêng itinerary MVP dừng/thử lại khi thiếu dữ liệu kiểm chứng, không lưu bản thiếu tuyến và chưa triển khai trình chỉnh sửa thủ công đầy đủ; các nhánh thay thế rộng hơn bên dưới là ý tưởng ban đầu, không thuộc MVP đã duyệt.
+
 ## 1. Danh sách Use Case
 
 | ID     | Use case                                    | Actor chính | Mức ưu tiên |

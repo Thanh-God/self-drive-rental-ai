@@ -27,4 +27,4 @@ Quy ước dự kiến: `V1__initial_schema.sql`, `V2__describe_change.sql`, s�
 
 ## Ngân sách bảng
 
-Tối đa 30 bảng, tính cả bảng kỹ thuật như lịch sử Flyway. Ước lượng 18–24 bảng nghiệp vụ chưa là ERD được duyệt. Ở bước thiết kế dữ liệu, phải liệt kê từng bảng, khóa/ràng buộc, chủ sở hữu module, snapshot và chỉ mục phục vụ overlap; nếu vượt ngân sách cần thu gọn phạm vi trước khi viết migration.
+Tối đa 30 bảng, tính cả bảng kỹ thuật như lịch sử Flyway. Ngày 26/09/2026 đã duyệt 20 bảng nghiệp vụ cơ sở, cộng lịch sử Flyway là 21 bảng; chưa thêm bảng tùy chọn. Xem [thiết kế cơ sở và chính sách đã duyệt](../docs/database/database-design.md). ERD chi tiết, từ điển dữ liệu và migration chưa hoàn tất; các thông số còn mở được ghi rõ trong thiết kế và sổ quyết định.

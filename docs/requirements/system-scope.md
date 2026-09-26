@@ -1,5 +1,7 @@
 # Giai đoạn 1 — Phạm vi và yêu cầu hệ thống
 
+> Cập nhật 26/09/2026: các giả định chính sách bên dưới là bản phân tích ban đầu. Phần đã duyệt ở Giai đoạn 3 và phần còn mở được xác định tại [thiết kế database cơ sở](../database/database-design.md) và [sổ quyết định](../architecture/decisions.md); dùng hai tài liệu này khi triển khai chính sách.
+
 **Đề tài:** Xây dựng hệ thống cho thuê xe tự lái tích hợp trí tuệ nhân tạo hỗ trợ lựa chọn phương tiện và lập kế hoạch hành trình cá nhân hóa  
 **Phiên bản:** 0.1 — Bản phân tích khởi đầu  
 **Phạm vi:** Khóa luận cá nhân, thời gian dự kiến khoảng 3 tháng

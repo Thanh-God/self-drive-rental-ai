@@ -1,6 +1,6 @@
 # Quyết định kiến trúc và vấn đề còn mở
 
-Cập nhật: 25/09/2026. Người dùng đã duyệt áp dụng kế hoạch Giai đoạn 2 và yêu cầu dùng VS Code cho cả Java/React. Duyệt kiến trúc không đồng nghĩa tự động chốt các chính sách đã được đánh dấu còn mở.
+Cập nhật: 26/09/2026. Người dùng đã duyệt 20 bảng nghiệp vụ cơ sở và yêu cầu dùng các phương án chính sách được đề xuất ở Giai đoạn 3. Phạm vi duyệt và các thông số chưa được đề xuất cụ thể được ghi tại [thiết kế cơ sở database](../database/database-design.md). Chưa có migration hoặc kết quả kiểm thử database.
 
 ## Đã chốt
 
@@ -14,7 +14,7 @@ Cập nhật: 25/09/2026. Người dùng đã duyệt áp dụng kế hoạch Gi
 | AD-06 | Tách branch và location | Điểm giao nhận khác điểm tham quan; demo một chi nhánh, nhận/trả cùng chi nhánh; chưa mở rộng điều chuyển xe |
 | AD-07 | Flyway chỉ ở backend/src/main/resources/db/migration | Schema có một lịch sử; database/docs chỉ hướng dẫn và thiết kế |
 | AD-08 | VS Code viết/chạy/debug cả backend và frontend | Giảm số công cụ phải học; build Java không phụ thuộc NetBeans |
-| AD-09 | Database tối đa 30 bảng | Mục tiêu sơ bộ 18–24 bảng nghiệp vụ, phải đếm lại cả bảng kỹ thuật ở ERD; chưa coi ước lượng là thiết kế |
+| AD-09 | Database tối đa 30 bảng; đã duyệt 20 bảng nghiệp vụ cơ sở | Cộng lịch sử Flyway là 21 bảng; chưa bổ sung bảng tùy chọn |
 | AD-10 | MVP không thanh toán online, không microservices | Tập trung luồng thuê xe và hai chức năng AI |
 
 ## Còn mở — phải chốt trước bước phụ thuộc
@@ -22,14 +22,14 @@ Cập nhật: 25/09/2026. Người dùng đã duyệt áp dụng kế hoạch Gi
 | ID | Nội dung | Phương án đang xem xét, chưa áp dụng | Chốt trước |
 |---|---|---|---|
 | OP-01 | Guest dùng AI | Giai đoạn 1 đề xuất preview; Giai đoạn 2 đề xuất chỉ User để giảm quota. Chưa chọn giữa hai phương án | API/UX AI |
-| OP-02 | Giấy phép lái xe | Staff kiểm tra thủ công, ghi kết quả, không lưu ảnh | ERD và giao nhận |
-| OP-03 | Ngày thuê/giá/cọc | Block 24 giờ làm tròn lên; mức cọc, cách làm tròn tiền và múi giờ cần xác định | Schema snapshot và booking |
-| OP-04 | PENDING/state machine | Có giữ lịch là hướng đề xuất; thời hạn giữ, hết hạn, sát giờ nhận, trả muộn và thời gian đệm chưa chốt | ERD và transaction booking |
-| OP-05 | Hợp đồng/hóa đơn | Hợp đồng khi xác nhận, hóa đơn khi hoàn tất là đề xuất; dữ liệu snapshot/phát hành lại cần rõ | Schema và luồng phát hành |
-| OP-06 | Hủy và Admin can thiệp | Mốc 24 giờ là đề xuất; quy trình sát giờ, lý do và thao tác Admin cụ thể cần chốt | Ma trận quyền chi tiết/state machine |
+| OP-02 | Giấy phép lái xe — chốt một phần | Đã duyệt Staff kiểm tra trước giao, lưu kết quả/người kiểm tra/thời điểm, không ảnh; chưa chốt lưu số GPLX/hạn/lịch sử riêng | ERD và giao nhận |
+| OP-03 | Ngày thuê/giá/cọc — chốt một phần | Đã duyệt block 24 giờ làm tròn lên, VND nguyên đồng, UTC lưu và Asia/Ho_Chi_Minh hiển thị; mức/ý nghĩa cọc và làm tròn khoản tính theo tỷ lệ còn mở | Schema snapshot và booking |
+| OP-04 | PENDING/state machine — chốt một phần | Đã duyệt giữ lịch 2 giờ không vượt giờ nhận và luồng PENDING → CONFIRMED → IN_PROGRESS → RETURNED → COMPLETED; còn quy tắc đệm, no-show, gia hạn, trả muộn/đơn kế tiếp | ERD và transaction booking |
+| OP-05 | Hợp đồng/hóa đơn — chốt một phần | Đã duyệt hợp đồng khi xác nhận, hóa đơn khi hoàn tất, lưu snapshot; chính sách sửa/phát hành lại và danh mục phụ phí còn mở | Schema và luồng phát hành |
+| OP-06 | Hủy và Admin can thiệp — chốt một phần | Đã duyệt User tự hủy trước giờ nhận ít nhất 24 giờ, sát giờ Staff xử lý và ghi lý do; Admin can thiệp hủy, không mặc định giao/nhận; điều kiện ngoại lệ chi tiết còn mở | Ma trận quyền chi tiết/state machine |
 | OP-07 | Map provider | Chọn theo tài khoản, coverage, quota và điều kiện sử dụng; không mặc định OpenStreetMap là một dịch vụ API đầy đủ | Adapter Map |
-| OP-08 | JWT/khóa tài khoản | Thời hạn, refresh/revoke, lưu token phía client, hiệu lực khóa tài khoản | Auth |
-| OP-09 | Fallback itinerary | Dừng và thử lại hoặc cho phép bản thiếu tuyến có nhãn; phạm vi chỉnh sửa thủ công chưa chốt | UI/API itinerary |
+| OP-08 | JWT/khóa tài khoản — chốt một phần | Đã duyệt access token ngắn hạn, không refresh, kiểm tra trạng thái và phiên bản token tại server, đăng xuất mọi phiên; thời hạn cụ thể và lưu phía client còn mở | Auth |
+| OP-09 | Fallback itinerary — đã chốt MVP | Không đủ dữ liệu kiểm chứng thì dừng/thử lại; không lưu bản thiếu tuyến, chưa triển khai trình chỉnh sửa thủ công đầy đủ | UI/API itinerary |
 | OP-10 | Môi trường/phiên bản | JDK/Spring Boot tương thích, MySQL Server, Maven Wrapper, thư viện UI và seed demo | Khởi tạo ứng dụng |
 
 Không tự mở rộng sang đa chi nhánh vận hành, phân quyền theo chi nhánh hoặc thanh toán để giải quyết các mục còn mở. Quyền Staff theo phạm vi dữ liệu phải được ghi rõ ở thiết kế API; chưa có cơ chế phân công Staff theo chi nhánh.
