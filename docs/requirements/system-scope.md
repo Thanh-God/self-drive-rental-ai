@@ -1,9 +1,9 @@
 # Giai đoạn 1 — Phạm vi và yêu cầu hệ thống
 
-> Cập nhật 26/09/2026: các giả định chính sách bên dưới là bản phân tích ban đầu. Phần đã duyệt ở Giai đoạn 3 và phần còn mở được xác định tại [thiết kế database cơ sở](../database/database-design.md) và [sổ quyết định](../architecture/decisions.md); dùng hai tài liệu này khi triển khai chính sách.
+> Cập nhật 29/09/2026: đã hợp nhất phạm vi đa chi nhánh, GPLX và sự cố duyệt ngày 28/09. Đây là yêu cầu, không phải danh sách chức năng hoàn thành. Chính sách chuẩn tại [sổ quyết định](../architecture/decisions.md), schema thực tại [thiết kế database](../database/database-design.md), sai lệch source tại [audit kiến trúc](../architecture/system-architecture.md#7-audit-hiện-trạng-ngày-29092026).
 
 **Đề tài:** Xây dựng hệ thống cho thuê xe tự lái tích hợp trí tuệ nhân tạo hỗ trợ lựa chọn phương tiện và lập kế hoạch hành trình cá nhân hóa  
-**Phiên bản:** 0.1 — Bản phân tích khởi đầu  
+**Phiên bản:** Baseline 29/09/2026 sau hợp nhất
 **Phạm vi:** Khóa luận cá nhân, thời gian dự kiến khoảng 3 tháng
 
 ## 1. Mục tiêu
@@ -16,7 +16,7 @@ Xây dựng ứng dụng web mô phỏng doanh nghiệp cho thuê xe tự lái. 
 - Backend: Java Spring Boot, REST API.
 - Database: MySQL, truy cập bằng Spring Data JPA/Hibernate.
 - Xác thực và phân quyền: Spring Security + JWT.
-- AI: Gemini API, chỉ được gọi từ backend.
+- AI: provider hoặc mô hình tự train chưa chốt; Gemini là phương án ban đầu. Chỉ tích hợp qua backend, sau khi core được hoàn thiện.
 - Bản đồ: một Map API được gọi qua adapter phía backend.
 - Ưu tiên modular monolith, có ranh giới module rõ ràng và phù hợp triển khai một cá nhân.
 
@@ -43,9 +43,12 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 4. Staff xác nhận/từ chối đơn, ghi nhận bàn giao/nhận xe và hoàn tất đơn.
 5. Tra cứu hợp đồng và hóa đơn gắn với đơn; chưa cần thanh toán online.
 6. User gửi rating/nội dung sau khi đơn hoàn thành; Admin kiểm duyệt trạng thái hiển thị.
-7. Recommendation: hard-filter xe bằng backend, chấm điểm/xếp hạng, Gemini hỗ trợ phân tích free text hoặc giải thích.
-8. Itinerary: lấy candidate location và ước tính tuyến bằng Map API, Gemini lập lịch từ dữ liệu đã cung cấp, backend kiểm tra và lưu kế hoạch.
+7. Recommendation: hard-filter xe bằng backend, chấm điểm/xếp hạng, AI hỗ trợ phân tích free text hoặc giải thích; công nghệ cuối cùng còn mở.
+8. Itinerary: lấy candidate location và ước tính tuyến bằng Map API, AI lập lịch từ dữ liệu được cấp, backend kiểm tra và lưu kế hoạch.
 9. Admin quản lý tài khoản, dữ liệu xe, hãng/loại xe và địa điểm.
+10. Nhận/trả khác chi nhánh được phép, Staff theo chi nhánh, phí tuyến snapshot và kiểm tra chuỗi vị trí xe.
+11. GPLX tương thích xe/hệ bằng/hạn chế/hạn dùng; Staff đối chiếu trước bàn giao, không lưu ảnh.
+12. Hồ sơ sự cố/vi phạm độc lập booking, căn cứ trách nhiệm và chi phí tách rõ; Staff đánh giá, Admin duyệt yêu cầu, khách phản hồi. Không tự khấu trừ cọc.
 
 ### 4.2 Nên có nếu còn thời gian
 
@@ -60,7 +63,7 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 - Cổng thanh toán trực tuyến, hoàn tiền tự động.
 - Thuê xe có tài xế.
 - Bảo hiểm tự động, GPS/IoT, quản lý bảo dưỡng nâng cao.
-- Huấn luyện LLM riêng hoặc hệ thống recommendation học từ dữ liệu lớn.
+- Huấn luyện LLM lớn từ đầu hoặc recommendation học từ dữ liệu lớn. Mô hình nhỏ tự train sẽ được đánh giá sau backend, chưa mặc định thuộc phần đã triển khai.
 - Microservices, phân quyền permission tùy biến phức tạp.
 - Email/SMS thương mại và báo cáo tài chính nâng cao.
 
@@ -87,6 +90,11 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 | FR-17 | Backend kiểm tra itinerary, lưu và cho User xem lại kế hoạch. |
 | FR-18 | Admin quản lý User/Staff, xe, hãng/loại xe, địa điểm và đánh giá. |
 | FR-19 | Lỗi/timeout/quota từ Gemini hoặc Map API được xử lý có thông báo; không làm sai dữ liệu nghiệp vụ. |
+| FR-20 | Chọn chi nhánh nhận/trả trong tuyến được mở; backend kiểm tra thời gian và chuỗi chi nhánh, snapshot phí tuyến; Staff thao tác đúng chi nhánh. |
+| FR-21 | Khai báo GPLX tương thích, còn hạn đến hết chuyến; Staff đối chiếu trước bàn giao và lưu kết quả. |
+| FR-22 | Ghi nhận sự cố/vi phạm kể cả báo muộn; thẩm định chứng cứ/căn cứ, chi trả bên khác, yêu cầu bồi thường và phản hồi, tách khỏi trạng thái booking. |
+
+FR-14/16/19 dùng Gemini theo phương án gốc; ranh giới chức năng giữ nguyên khi chốt provider/mô hình khác, chưa xem là tích hợp đã hoàn thành.
 
 ## 6. Yêu cầu phi chức năng
 
@@ -117,7 +125,7 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 - Xe `MAINTENANCE` hoặc `INACTIVE` không thể đặt.
 - `startAt < endAt`.
 - Hai đơn chiếm lịch của cùng xe không được overlap. Điều kiện overlap: `newStart < existingEnd AND newEnd > existingStart`.
-- Trạng thái chiếm lịch phải được chốt cùng state machine; dự kiến gồm đơn chờ xác nhận, đã xác nhận và đang thuê.
+- Trạng thái chiếm lịch: PENDING còn hạn, CONFIRMED và IN_PROGRESS. Giữ lịch tối đa 2 giờ, không vượt giờ nhận; xe đang thuê quá hạn không tự được trả.
 - Backend kiểm tra availability lại khi tạo đơn và có biện pháp chống hai yêu cầu đồng thời giữ cùng xe.
 - Giá và tổng tiền do backend tính; giá tại thời điểm đặt được lưu thành snapshot.
 - Không xóa cứng xe/tài khoản có dữ liệu giao dịch; dùng trạng thái ngừng hoạt động.
@@ -125,7 +133,7 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 ### Hủy, giao nhận và đánh giá
 
 - User chỉ hủy đơn của mình và chỉ khi thỏa chính sách hủy.
-- Chính sách đề xuất ban đầu: hủy miễn phí trước giờ nhận tối thiểu 24 giờ; đơn sát giờ nhận do Staff/Admin xử lý theo chính sách hiển thị.
+- User hủy trước giờ nhận tối thiểu 24 giờ khi đơn PENDING/CONFIRMED; sát giờ Staff/Admin xử lý theo quyền và lý do. Chưa có công thức phí hủy/cọc.
 - Staff ghi nhận giao/nhận xe; đơn chỉ hoàn tất sau khi xe được trả và được xử lý theo quy trình.
 - Chỉ User có đơn hoàn tất được đánh giá xe tương ứng; mỗi đơn tối đa một đánh giá; rating từ 1 đến 5.
 - Admin có thể ẩn đánh giá vi phạm nhưng không xóa lịch sử kiểm duyệt nếu sau này bật audit.
@@ -140,14 +148,14 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 
 ## 8. Giả định và điểm cần xác nhận ở giai đoạn sau
 
-Các mục sau là giả định thiết kế ban đầu, cần được chốt trước khi triển khai nghiệp vụ tương ứng:
+Các mục sau phân biệt phần đã chốt và phần còn mở; không dùng lại giả định một chi nhánh cũ:
 
 1. **Quyền dùng AI của Guest:** đề xuất cho Guest xem kết quả gợi ý/hành trình nhưng chỉ User mới lưu lịch sử.
-2. **Giấy phép lái xe:** cần quyết định hệ thống có ghi nhận thông tin giấy phép và Staff xác minh thủ công hay chỉ mô phỏng bước kiểm tra tại quầy. Không lưu ảnh giấy tờ nếu chưa thực sự cần.
-3. **Cách tính ngày thuê:** đề xuất tính theo block 24 giờ, phần lẻ tính thêm một ngày; cần công bố rõ trong UI.
-4. **Giữ xe khi chờ xác nhận:** cần quyết định đơn `PENDING` có chiếm lịch ngay và hết hạn sau bao lâu.
-5. **Hợp đồng/hóa đơn:** cần chốt thời điểm tạo, ví dụ sau khi Staff xác nhận; dữ liệu hồ sơ phải giữ snapshot cần thiết.
-6. **Chi nhánh và điểm tham quan — đã chốt ở Giai đoạn 2:** tách module `branch` quản lý chi nhánh giao nhận và `location` quản lý địa điểm tham quan; demo một chi nhánh, nhận/trả cùng chi nhánh. Chưa mở rộng điều chuyển xe giữa chi nhánh.
+2. **Giấy phép lái xe:** ghi nhận thông tin, tương thích xe, Staff xác minh thủ công; không ảnh, không tra cứu quốc gia. Lịch sử xác minh đầy đủ còn thiếu.
+3. **Cách tính ngày thuê:** đã duyệt block 24 giờ làm tròn lên, VND nguyên đồng.
+4. **Giữ xe khi chờ xác nhận:** PENDING chiếm lịch đến min(createdAt + 2 giờ, startAt).
+5. **Hợp đồng/hóa đơn:** phát hành lúc xác nhận/hoàn tất, giữ snapshot. Sửa/phát hành lại và phụ phí còn mở; hóa đơn không xác nhận thanh toán.
+6. **Chi nhánh và điểm tham quan:** `branch` riêng với `location`; cho phép nhận/trả khác chi nhánh trên tuyến mở, kiểm tra lịch lẫn vị trí. Chưa tự điều chuyển/gia hạn/no-show.
 7. **Hủy sát giờ:** đề xuất chuyển cho Staff/Admin xử lý thay vì tự tính phí tự động.
 8. **Map provider:** chọn nhà cung cấp theo khả năng sử dụng, chi phí, coverage và điều kiện tài khoản trước Phase tích hợp.
 

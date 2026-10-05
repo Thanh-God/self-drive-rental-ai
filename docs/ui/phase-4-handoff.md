@@ -9,7 +9,7 @@ Ngày: 27/09/2026. Trạng thái: hoàn thành triển khai và kiểm tra phạ
 - User: tạo đơn, quản lý đơn, hợp đồng/hóa đơn mẫu, đánh giá, hồ sơ, hành trình đã lưu/chi tiết.
 - Staff: hàng đợi, xác nhận/từ chối đơn, giao/nhận xe, hoàn tất, tình trạng đội xe và hồ sơ đơn.
 - Admin: dashboard, tài khoản, xe, danh mục/chi nhánh, địa điểm, đánh giá, đơn và hồ sơ. Admin thêm xe; không kế thừa tác vụ giao nhận của Staff.
-- Chế độ demo thay form xác thực bằng chọn vai trò; chế độ API có form xác thực và màn chờ tích hợp, không tự dùng dữ liệu giả khi API lỗi.
+- Ở lần bàn giao 27/09, demo thay form xác thực bằng chọn vai trò; API có form xác thực và màn chờ tích hợp. Phạm vi API mới ở mục cập nhật 29/09 bên dưới; không dùng kết quả QA cũ để nghiệm thu bản mới.
 - Thanh DEMO UI, dữ liệu phiên, khôi phục mẫu, loading/empty/error, 404, sai quyền và không tìm thấy tài nguyên.
 
 ## Sửa lỗi trong đợt chốt
@@ -41,14 +41,14 @@ Môi trường: Windows, Chromium qua Playwright có sẵn trên máy; không c�
 
 Build và test mô phỏng chạy bằng `npm run build`, `npm test` trong frontend. Kịch bản trình duyệt và ảnh QA đặt ngoài repository trong thư mục tạm của máy kiểm thử; bảng trên ghi kết quả lượt bàn giao, không phải bộ CI. Có thể tái kiểm tra thủ công theo luồng trong frontend/README.md. Kiểm tra này không chứng minh mọi tổ hợp dữ liệu, trình duyệt hay quy tắc backend đều đúng.
 
-## Giới hạn chuyển sang giai đoạn tiếp theo
+## Hiện trạng sau tích hợp (Audit 29/09/2026)
 
-- Backend Spring Boot, MySQL/Flyway, API DTO, xác thực thật và phân quyền server chưa triển khai. Dữ liệu demo không phải database thật.
-- Cần kiểm thử transaction chống đặt trùng, giá/hồ sơ bất biến, cập nhật đồng thời, bảo mật và API integration khi có backend.
-- Gemini/Map thật, tối ưu lịch trình, quota và quyền AI của Guest cần triển khai/chốt riêng. Không coi số liệu tuyến demo là tuyến đã kiểm chứng.
-- Ảnh đang dùng là minh họa công khai, không phải ảnh của một xe cụ thể; upload ảnh và xác minh hình ảnh xe thực tế thuộc bước triển khai sau. Nguồn ảnh được lưu ở manifest, UI ghi công theo ảnh; nguồn ngoại thất Xpander có trong danh mục Wikimedia nhưng trang chi tiết không truy cập được bằng công cụ web trong lượt rà soát này. Không tuyên bố đã kiểm toán bản quyền độc lập toàn bộ bộ ảnh.
-- Những chính sách còn mở như cọc/phụ phí, giao sớm/trả muộn, gia hạn/no-show và phát hành lại hồ sơ theo sổ quyết định; không tự đặt giá trị 0 hoặc bổ sung nghiệp vụ ngoài phạm vi.
-- Không phát triển mobile riêng trong giai đoạn này. Báo cáo, slide, triển khai và nghiệm thu học thuật không nằm trong mốc hoàn tất UI.
+- Backend có core API và Flyway V1, đang thực hiện; 6/6 test trên H2 pass không chứng minh core hoàn tất/MySQL concurrency đúng. Xem [audit hệ thống](../architecture/system-architecture.md#7-audit-hiện-trạng-ngày-29092026).
+- `src/pages/api` và AppRoutes đã có màn hình xe, báo giá/đơn đa chi nhánh, hợp đồng/hóa đơn, hồ sơ/GPLX, giao nhận, sự cố, tài khoản, xe/đội xe, chi nhánh/tuyến, đánh giá. Đây là kết nối source, chưa phải kết quả E2E trình duyệt trong lượt audit.
+- Form đặt xe đã chọn điểm nhận/trả; API lưu/kiểm tra GPLX, Staff có checkbox nhưng chưa hiển thị hồ sơ GPLX trả về để đối chiếu. Có form sự cố/căn cứ/đánh giá/phản hồi; còn lỗi biên thời gian/quyền khóa xe/lịch sử căn cứ ở backend.
+- Giữ hướng tái sử dụng chọn lọc UI Redesign theo decisions.md; không sao chép cả folder/store. Không mặc định mọi trang API hiện có đã được chuyển từ bản Redesign.
+- AI/Map chưa triển khai, chỉ xây sau core; công nghệ AI chưa chốt. Dashboard, locations và hành trình API đang chờ kết nối. `/admin/catalog` API hiện chỉ chi nhánh/tuyến, thiếu CRUD danh mục xe.
+- 29/09: frontend build và 6/6 demo tests pass; ESLint 0 errors/14 warnings. Chưa chạy lại 72 lượt browser QA cho code API mới. Không thay bảng QA 27/09 bằng kết luận chưa kiểm chứng.
 
 ## Cách nghiệm thu lại nhanh
 
@@ -58,3 +58,23 @@ Build và test mô phỏng chạy bằng `npm run build`, `npm test` trong front
 4. Đổi Staff để xác nhận/giao/nhận/hoàn tất; đổi User đánh giá; đổi Admin kiểm duyệt và thêm xe.
 5. Thử sai vai trò, URL không tồn tại, loading/empty/error và AI thiếu tuyến.
 6. Mở console kiểm tra lỗi, kiểm tra desktop 1366/1440px và chạy build/test trước commit.
+
+## Cập nhật tích hợp frontend API ngày 04/10/2026
+
+Phần dưới là cập nhật sau audit; không thay thế hoặc nâng cấp kết quả QA demo lịch sử phía trên.
+
+- N02: quote được gắn với snapshot xe, chi nhánh nhận/trả và thời gian; thay đổi input hoặc response không còn hiện hành thì không được xuất bản quote.
+- N03: chi tiết Staff lấy danh sách phân công từ `GET /api/v1/me/branches`; xác nhận/giao xe dùng chi nhánh nhận, nhận trả/hoàn tất dùng chi nhánh trả. Khi chưa tải được phân công, ẩn action và báo lỗi. GPLX của khách hiển thị độc lập với danh sách action. UI không tự suy diễn tương thích hạng GPLX; backend quote và giao xe vẫn là nguồn quyết định.
+- N04: `useApiData` gắn data/error với request key và chỉ nhận kết quả request hiện hành; đổi route/reload không hiển thị kết quả cũ.
+- L11: bảo vệ response 401 cũ không xóa token phiên mới; hydrate/login/logout có generation để chặn session cũ khôi phục state đã hết hiệu lực.
+- Audit sự cố dùng `GET /api/v1/incidents/{id}/events`; hiển thị thời điểm xảy ra và báo cáo riêng, cùng các trường căn cứ/trạng thái/số tiền nếu API trả. Form giới hạn thời điểm xảy ra theo biên bản giao/trả thực tế (hoặc hiện tại nếu chưa trả), cho phép khai báo muộn mà không dời thời điểm sự cố. Backend vẫn kiểm tra lại; form không kết luận trách nhiệm hoặc tự trừ cọc.
+- Regression frontend: `npm run lint` (0 warning), `npm test` (20 pass, 0 fail/skip), và build demo/API đều pass. Unit tests không thay thế nghiệm thu API.
+- Cập nhật nghiệm thu runtime ngày 04/10: trên MySQL 8.4.11 cô lập, Chromium API mode chạy PASS luồng User đặt xe → Staff đúng/sai chi nhánh xác nhận/giao/nhận/hoàn tất → User đánh giá → Admin từ chối giao nhận và kiểm duyệt review; hai thao tác sai chi nhánh và thao tác Admin trả HTTP 403. Booking `6510429c-aaf8-4623-a1d5-9a2c52cfab20`; ảnh/JSON bằng chứng được giữ ngoài repository trong `.runtime/phase5-rerun-20261004-1823/browser-artifacts/`. Đây là một luồng acceptance, không phải kiểm thử concurrency hay chứng nhận toàn bộ schema/dữ liệu production. QA demo 27/09 phía trên vẫn là lịch sử riêng.
+
+## Cập nhật nghiệm thu tiếp theo ngày 04/10/2026
+
+- Đóng gói lại backend từ source bàn giao vì JAR cũ có timestamp trước source/classes: `mvnw.cmd -DskipTests package` thành công. Khởi động trên schema KLTN hiện có; Flyway validate 2 migration, schema version 2 up-to-date; Hibernate `ddl-auto: validate` khởi tạo thành công. Seed tắt khi chạy lại, không xóa/khôi phục dữ liệu.
+- Browser API/MySQL thật chạy lại PASS trên booking mới `479804a3-32da-4eb0-acf9-0870bac4671f` (HN→ĐN): User quote/tạo đơn và lưu GPLX; Staff sai chi nhánh bị từ chối; Staff chi nhánh nhận xác nhận/giao; Staff chi nhánh trả nhận/hoàn tất; User đánh giá; Admin bị từ chối giao nhận và kiểm duyệt review. Hai ca Staff sai chi nhánh và ca Admin trả HTTP 403 đúng kỳ vọng. Bằng chứng JSON/screenshot riêng ở `.runtime/phase5-rerun-20261004-1823/browser-artifacts/copilot-20261004-2232/`.
+- Sửa hiển thị lịch sử incident: kết quả events được gắn với incident ID tương ứng; khi chọn incident khác không còn hiển thị lịch sử cũ trong lúc chờ, có loading/error riêng. Regression test bảo vệ trường hợp chọn incident khác.
+- Browser GET danh sách incident trên booking này trả HTTP 200 `[]`, UI hiển thị trạng thái rỗng. Không có incident records trong 6 booking test sẵn có; không tạo incident giả để kiểm thử event payload. Do đó render của từng event thực tế/các trường trách nhiệm vẫn **chưa nghiệm thu runtime**; đối chiếu tĩnh `GET /api/v1/incidents/{id}/events` với response JDBC snake_case và UI đã xác nhận tên trường, nhưng cần dữ liệu sự cố hợp lệ để E2E sâu hơn.
+- Regression mới: lint 0 warning; `npm test` 22/22 pass; build demo/API đều pass. Không thực hiện concurrency stress test hoặc kiểm tra dữ liệu production.

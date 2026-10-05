@@ -1,6 +1,6 @@
 # Giai đoạn 1 — Actor và Use Case
 
-> Cập nhật 26/09/2026: chính sách được duyệt ở Giai đoạn 3 nằm tại [thiết kế database cơ sở](../database/database-design.md). Riêng itinerary MVP dừng/thử lại khi thiếu dữ liệu kiểm chứng, không lưu bản thiếu tuyến và chưa triển khai trình chỉnh sửa thủ công đầy đủ; các nhánh thay thế rộng hơn bên dưới là ý tưởng ban đầu, không thuộc MVP đã duyệt.
+> Cập nhật 29/09/2026: các use case là yêu cầu, không phải chứng nhận source hoàn tất. Quyết định đa chi nhánh/GPLX/sự cố/AI tại [sổ quyết định](../architecture/decisions.md), trạng thái thực tại [audit](../architecture/system-architecture.md). Gemini trong các luồng dưới là phương án ban đầu, provider/mô hình cuối chưa chốt.
 
 ## 1. Danh sách Use Case
 
@@ -25,6 +25,9 @@
 | UC-A03 | Quản lý địa điểm                            | Admin       | MVP         |
 | UC-A04 | Kiểm duyệt đánh giá                         | Admin       | MVP         |
 | UC-A05 | Xem thống kê và tình trạng tích hợp         | Admin       | Nên có      |
+| UC-U07 | Khai báo GPLX, báo sự cố và phản hồi yêu cầu bồi thường | User | MVP |
+| UC-S05 | Đánh giá sự cố và căn cứ trách nhiệm theo đơn được phân quyền | Staff | MVP |
+| UC-A06 | Quản lý tuyến/phí/phân công Staff, duyệt yêu cầu bồi thường | Admin | MVP |
 
 ## 2. UC-U02 — Kiểm tra khả dụng và tạo đơn thuê
 
@@ -34,11 +37,11 @@
 
 ### Luồng chính
 
-1. User chọn xe, ngày/giờ nhận, ngày/giờ trả và điểm nhận xe.
+1. User khai báo GPLX, chọn xe, thời gian và chi nhánh nhận/trả trong tuyến được phép.
 2. Hệ thống kiểm tra dữ liệu ngày giờ.
 3. Backend tải dữ liệu xe và kiểm tra trạng thái khai thác.
-4. Backend kiểm tra các đơn đang chiếm lịch và xử lý trùng lịch.
-5. Backend tính thời lượng thuê, giá thuê, tiền cọc và tổng tiền theo chính sách.
+4. Backend khóa xe, kiểm tra các đơn chiếm lịch và chuỗi chi nhánh; không giả định điều chuyển ngoài hệ thống.
+5. Backend tính block 24 giờ và phí tuyến, lưu snapshot; không tự tính cọc/phụ phí chưa chốt.
 6. Backend tạo đơn ở trạng thái chờ xử lý và lưu snapshot giá.
 7. Hệ thống trả mã đơn và thông tin tổng kết cho User.
 8. Staff xem đơn trong hàng đợi, kiểm tra và xác nhận hoặc từ chối.
@@ -67,9 +70,9 @@
 1. Staff mở danh sách đơn mới/cần xử lý.
 2. Staff xem thời gian thuê, xe, User, điểm nhận và tổng tiền đã được backend tính.
 3. Staff xác nhận đơn hoặc từ chối kèm lý do.
-4. Khi đến thời gian nhận xe, Staff mở tác vụ bàn giao và ghi nhận thời gian/tình trạng xe.
+4. Đúng khoảng thuê, Staff chi nhánh nhận đối chiếu GPLX tương thích còn hạn, ghi nhận thời gian/tình trạng xe rồi bàn giao.
 5. Backend chuyển đơn sang trạng thái đang thuê khi điều kiện được đáp ứng.
-6. Khi xe trả, Staff ghi nhận thời gian trả và tình trạng xe.
+6. Staff chi nhánh trả ghi nhận thời gian/tình trạng xe, cập nhật vị trí thực tế; hiện chỉ trả tại chi nhánh đã đặt.
 7. Staff hoàn tất đơn hoặc báo xe cần bảo trì/xử lý thêm.
 8. User xem được trạng thái mới và đủ điều kiện đánh giá sau khi đơn hoàn tất.
 
@@ -124,10 +127,10 @@
 
 ### Luồng thay thế/lỗi
 
-- Không tìm thấy candidate phù hợp: yêu cầu User đổi vùng/sở thích hoặc chọn địa điểm thủ công.
-- Map API lỗi: không tự tạo khoảng cách; trả thông tin tuyến chưa khả dụng và cho phép tiếp tục theo lựa chọn rõ ràng của User.
-- Gemini lỗi/JSON không hợp lệ: không lưu lịch trình lỗi; cho User thử lại hoặc tự sắp xếp điểm.
-- Output dùng location ID ngoài danh sách: backend từ chối hoặc loại mục sai trước khi lưu.
+- Không tìm thấy candidate phù hợp: yêu cầu User đổi vùng/sở thích và thử lại; chưa có trình sắp xếp thủ công đầy đủ trong MVP.
+- Map API lỗi hoặc thiếu tuyến kiểm chứng: dừng và cho thử lại, không lưu bản thiếu tuyến.
+- AI lỗi/JSON không hợp lệ: không lưu, cho thử lại; chưa có trình chỉnh sửa thủ công đầy đủ trong MVP.
+- Output dùng location ID ngoài danh sách: từ chối trước khi lưu.
 
 ## 6. UC-A01 — Quản lý tài khoản và nhân viên
 
@@ -149,7 +152,7 @@ Admin không được xem mật khẩu dạng rõ. Hệ thống chỉ lưu hash 
 | Đặt xe                  |           Không |                            Có |                        Không thay khách | Không thay khách theo mặc định |
 | Xem đơn                 |           Không |                  Đơn của mình |                  Đơn vận hành được phép |                        Toàn bộ |
 | Hủy đơn                 |           Không | Đơn của mình, theo chính sách |                 Hỗ trợ/xử lý theo quyền |             Có quyền can thiệp |
-| Xác nhận, giao/nhận xe  |           Không |                         Không |                                      Có |               Có thể can thiệp |
+| Xác nhận, giao/nhận xe  |           Không |                         Không |                     Đúng chi nhánh nghiệp vụ | Không mặc định kế thừa |
 | Quản lý dữ liệu catalog |           Không |                         Không | Cập nhật tình trạng vận hành theo quyền |                             Có |
 | Gửi đánh giá            |           Không |              Khi đủ điều kiện |                                   Không |                          Không |
 | Kiểm duyệt đánh giá     |           Không |                         Không |                          Không mặc định |                             Có |
@@ -161,6 +164,10 @@ Admin không được xem mật khẩu dạng rõ. Hệ thống chỉ lưu hash 
 - Staff làm nghiệp vụ đơn thuê/giao nhận; Admin quản trị tài khoản và catalog.
 - Backend là nguồn sự thật cho availability, giá và state transition.
 - AI và map là tích hợp bên ngoài qua backend adapter.
-- Giai đoạn 2 đã chốt tách chi nhánh giao nhận (`branch`) và địa điểm tham quan (`location`), demo một chi nhánh với nhận/trả cùng chi nhánh.
-- Chính sách Guest dùng AI, xác minh giấy phép lái xe, cách tính ngày thuê, thời hạn giữ xe và thời điểm tạo hợp đồng/hóa đơn vẫn cần chốt trước khi triển khai module tương ứng; xem [sổ quyết định](../architecture/decisions.md).
+- Tách chi nhánh giao nhận (`branch`) và điểm tham quan (`location`); baseline hiện hỗ trợ nhận/trả khác chi nhánh, Staff được phân công.
+- Guest AI, mô hình/provider, Map provider, cọc, phụ phí, gia hạn/no-show vẫn còn mở; GPLX, block 24 giờ, hold 2 giờ và thời điểm phát hành đã chốt tại [sổ quyết định](../architecture/decisions.md).
 - Backend tổ chức theo nghiệp vụ, không có module dữ liệu riêng `staff`/`admin`; các quyền và use case của hai actor vẫn được giữ. Xem [ranh giới module](../architecture/module-boundaries.md).
+
+## 9. Sự cố và trách nhiệm
+
+User/Staff/Admin theo quyền báo sự cố của chuyến đã giao xe; có thể báo sau khi hoàn tất nhưng thời điểm xảy ra phải có căn cứ liên hệ thời gian khách giữ xe. Staff thẩm định thiệt hại, căn cứ trách nhiệm, khoản bảo hiểm/bên khác chi trả và khoản đề nghị; Admin duyệt gửi yêu cầu; User được phản hồi. Hồ sơ có nhật ký riêng, không sửa đơn COMPLETED thành một trạng thái sự cố. Không tự kết luận lỗi hoặc khấu trừ cọc. Source còn thiếu kiểm tra biên thời điểm/quyền khóa xe và lịch sử căn cứ đầy đủ; xem L01/L02/L09 trong audit.

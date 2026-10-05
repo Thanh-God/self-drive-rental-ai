@@ -4,7 +4,9 @@ import { X } from "lucide-react";
 export default function Modal({ open, title, children, onClose, footer }) {
   const dialogRef = useRef(null);
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
   const titleId = useId();
   useEffect(() => {
     if (!open) return undefined;

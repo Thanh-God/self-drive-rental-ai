@@ -11,6 +11,18 @@ export function homePathForRole(role) {
   return "/";
 }
 
+export function destinationForRole(role, requestedPath) {
+  const roleRoot = {
+    [ROLES.USER]: "/user",
+    [ROLES.STAFF]: "/staff",
+    [ROLES.ADMIN]: "/admin",
+  }[role];
+  return roleRoot &&
+    (requestedPath === roleRoot || requestedPath?.startsWith(`${roleRoot}/`))
+    ? requestedPath
+    : homePathForRole(role);
+}
+
 export function getErrorMessage(
   error,
   fallback = "Đã xảy ra lỗi. Vui lòng thử lại.",

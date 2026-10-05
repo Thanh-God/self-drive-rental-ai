@@ -287,7 +287,7 @@ function Timeline({ plan }) {
 export function ItineraryScreen() {
   const { data, update } = useDemo();
   const { user } = useAuth();
-  const [start, setStart] = useState(
+  const [start, setStart] = useState(() =>
     new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 10),
   );
   const [days, setDays] = useState(2),

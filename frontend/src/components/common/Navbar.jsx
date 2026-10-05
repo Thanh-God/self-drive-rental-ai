@@ -3,11 +3,16 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Car, ChevronDown, LogOut, Menu, UserRound, X } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import { homePathForRole } from "../../utils/roles";
+import { DEMO_MODE } from "../../demo/config";
 
 const publicLinks = [
   { to: "/vehicles", label: "Duyệt xe" },
-  { to: "/ai/recommend", label: "Gợi ý AI" },
-  { to: "/ai/itinerary", label: "Lập lịch trình AI" },
+  ...(DEMO_MODE
+    ? [
+        { to: "/ai/recommend", label: "Gợi ý AI" },
+        { to: "/ai/itinerary", label: "Lập lịch trình AI" },
+      ]
+    : []),
 ];
 
 const userMenuLinks = [

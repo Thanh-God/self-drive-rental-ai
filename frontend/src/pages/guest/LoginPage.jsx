@@ -1,20 +1,30 @@
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Link, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { getErrorMessage, homePathForRole } from "../../utils/roles";
+import {
+  destinationForRole,
+  getErrorMessage,
+} from "../../utils/roles";
 
 export default function LoginPage() {
   const { login, isAuthenticated, user, loading } = useAuth();
-  const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from;
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [authenticatedUserId, setAuthenticatedUserId] = useState(null);
 
   if (!loading && isAuthenticated && user) {
-    return <Navigate to={from || homePathForRole(user.role)} replace />;
+    if (!authenticatedUserId || authenticatedUserId === user.id) {
+      return (
+        <Navigate
+          to={destinationForRole(user.role, from)}
+          replace
+        />
+      );
+    }
   }
 
   const onChange = (event) => {
@@ -27,7 +37,7 @@ export default function LoginPage() {
     setSubmitting(true);
     try {
       const user = await login(form);
-      navigate(from || homePathForRole(user.role), { replace: true });
+      setAuthenticatedUserId(user.id);
     } catch (err) {
       setError(getErrorMessage(err, "Email hoặc mật khẩu không đúng."));
     } finally {

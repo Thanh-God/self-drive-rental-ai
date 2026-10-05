@@ -32,6 +32,23 @@ import { DEMO_MODE } from "../demo/config";
 import DemoAccess from "../pages/guest/DemoAccess";
 import NewBookingPage from "../pages/user/NewBookingPage";
 import {
+  ApiBookingDetailPage,
+  ApiBookingListPage,
+  ApiDocumentPage,
+  ApiHomePage,
+  ApiNewBookingPage,
+  ApiOperationPage,
+  ApiProfilePage,
+  ApiVehicleDetailPage,
+  ApiVehicleListPage,
+} from "../pages/api/ApiScreens";
+import {
+  ApiAccountsPage,
+  ApiBranchesPage,
+  ApiReviewsAdminPage,
+  ApiVehiclesAdminPage,
+} from "../pages/api/ApiManagementScreens";
+import {
   BookingDetailScreen,
   BookingListScreen,
   DocumentScreen,
@@ -39,17 +56,26 @@ import {
 } from "../pages/shared/BookingScreens";
 import { ItineraryDetailScreen } from "../pages/shared/AiScreens";
 
-const screen = (element) => <DataGate>{element}</DataGate>;
+const screen = (element, apiElement = null) =>
+  DEMO_MODE ? (
+    <DataGate>{element}</DataGate>
+  ) : apiElement || <DataGate>{element}</DataGate>;
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route element={<GuestLayout />}>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/vehicles" element={screen(<VehicleListPage />)} />
+        <Route path="/" element={DEMO_MODE ? <HomePage /> : <ApiHomePage />} />
+        <Route
+          path="/vehicles"
+          element={screen(<VehicleListPage />, <ApiVehicleListPage />)}
+        />
         <Route
           path="/vehicles/:vehicleId"
-          element={screen(<VehicleDetailPage />)}
+          element={screen(
+            <VehicleDetailPage />,
+            <ApiVehicleDetailPage />,
+          )}
         />
         <Route path="/ai/recommend" element={screen(<RecommendPage />)} />
         <Route
@@ -77,26 +103,47 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<Navigate to="bookings" replace />} />
-        <Route path="bookings" element={screen(<MyBookingsPage />)} />
-        <Route path="bookings/new" element={screen(<NewBookingPage />)} />
+        <Route
+          path="bookings"
+          element={screen(
+            <MyBookingsPage />,
+            <ApiBookingListPage area="user" />,
+          )}
+        />
+        <Route
+          path="bookings/new"
+          element={screen(<NewBookingPage />, <ApiNewBookingPage />)}
+        />
         <Route
           path="bookings/:bookingId"
-          element={screen(<BookingDetailScreen area="user" />)}
+          element={screen(
+            <BookingDetailScreen area="user" />,
+            <ApiBookingDetailPage area="user" />,
+          )}
         />
         <Route
           path="bookings/:bookingId/contract"
-          element={screen(<DocumentScreen area="user" kind="contract" />)}
+          element={screen(
+            <DocumentScreen area="user" kind="contract" />,
+            <ApiDocumentPage area="user" kind="contract" />,
+          )}
         />
         <Route
           path="bookings/:bookingId/invoice"
-          element={screen(<DocumentScreen area="user" kind="invoice" />)}
+          element={screen(
+            <DocumentScreen area="user" kind="invoice" />,
+            <ApiDocumentPage area="user" kind="invoice" />,
+          )}
         />
         <Route path="itineraries" element={screen(<SavedItinerariesPage />)} />
         <Route
           path="itineraries/:itineraryId"
           element={screen(<ItineraryDetailScreen />)}
         />
-        <Route path="profile" element={screen(<ProfilePage />)} />
+        <Route
+          path="profile"
+          element={screen(<ProfilePage />, <ApiProfilePage />)}
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
@@ -109,34 +156,70 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<Navigate to="queue" replace />} />
-        <Route path="queue" element={screen(<BookingQueuePage />)} />
+        <Route
+          path="queue"
+          element={screen(
+            <BookingQueuePage />,
+            <ApiBookingListPage area="staff" />,
+          )}
+        />
         <Route
           path="bookings"
           element={<Navigate to="/staff/queue" replace />}
         />
         <Route
           path="bookings/:bookingId"
-          element={screen(<BookingDetailScreen area="staff" />)}
+          element={screen(
+            <BookingDetailScreen area="staff" />,
+            <ApiBookingDetailPage area="staff" />,
+          )}
         />
         <Route
           path="bookings/:bookingId/contract"
-          element={screen(<DocumentScreen area="staff" kind="contract" />)}
+          element={screen(
+            <DocumentScreen area="staff" kind="contract" />,
+            <ApiDocumentPage area="staff" kind="contract" />,
+          )}
         />
         <Route
           path="bookings/:bookingId/invoice"
-          element={screen(<DocumentScreen area="staff" kind="invoice" />)}
+          element={screen(
+            <DocumentScreen area="staff" kind="invoice" />,
+            <ApiDocumentPage area="staff" kind="invoice" />,
+          )}
         />
-        <Route path="handover" element={screen(<HandoverPage />)} />
+        <Route
+          path="handover"
+          element={screen(
+            <HandoverPage />,
+            <ApiBookingListPage area="staff" mode="handover" />,
+          )}
+        />
         <Route
           path="handover/:bookingId"
-          element={screen(<OperationScreen kind="handover" />)}
+          element={screen(
+            <OperationScreen kind="handover" />,
+            <ApiOperationPage kind="handover" />,
+          )}
         />
-        <Route path="return" element={screen(<ReturnPage />)} />
+        <Route
+          path="return"
+          element={screen(
+            <ReturnPage />,
+            <ApiBookingListPage area="staff" mode="return" />,
+          )}
+        />
         <Route
           path="return/:bookingId"
-          element={screen(<OperationScreen kind="return" />)}
+          element={screen(
+            <OperationScreen kind="return" />,
+            <ApiOperationPage kind="return" />,
+          )}
         />
-        <Route path="fleet" element={screen(<FleetStatusPage />)} />
+        <Route
+          path="fleet"
+          element={screen(<FleetStatusPage />, <ApiVehiclesAdminPage fleet />)}
+        />
         <Route path="*" element={<NotFoundPage />} />
       </Route>
 
@@ -149,26 +232,50 @@ export default function AppRoutes() {
         }
       >
         <Route index element={screen(<DashboardPage />)} />
-        <Route path="accounts" element={screen(<AccountsPage />)} />
-        <Route path="vehicles" element={screen(<VehiclesManagePage />)} />
-        <Route path="catalog" element={screen(<CatalogPage />)} />
+        <Route
+          path="accounts"
+          element={screen(<AccountsPage />, <ApiAccountsPage />)}
+        />
+        <Route
+          path="vehicles"
+          element={screen(<VehiclesManagePage />, <ApiVehiclesAdminPage />)}
+        />
+        <Route
+          path="catalog"
+          element={screen(<CatalogPage />, <ApiBranchesPage />)}
+        />
         <Route path="locations" element={screen(<LocationsPage />)} />
-        <Route path="reviews" element={screen(<ReviewsModerationPage />)} />
+        <Route
+          path="reviews"
+          element={screen(<ReviewsModerationPage />, <ApiReviewsAdminPage />)}
+        />
         <Route
           path="bookings"
-          element={screen(<BookingListScreen area="admin" />)}
+          element={screen(
+            <BookingListScreen area="admin" />,
+            <ApiBookingListPage area="admin" />,
+          )}
         />
         <Route
           path="bookings/:bookingId"
-          element={screen(<BookingDetailScreen area="admin" />)}
+          element={screen(
+            <BookingDetailScreen area="admin" />,
+            <ApiBookingDetailPage area="admin" />,
+          )}
         />
         <Route
           path="bookings/:bookingId/contract"
-          element={screen(<DocumentScreen area="admin" kind="contract" />)}
+          element={screen(
+            <DocumentScreen area="admin" kind="contract" />,
+            <ApiDocumentPage area="admin" kind="contract" />,
+          )}
         />
         <Route
           path="bookings/:bookingId/invoice"
-          element={screen(<DocumentScreen area="admin" kind="invoice" />)}
+          element={screen(
+            <DocumentScreen area="admin" kind="invoice" />,
+            <ApiDocumentPage area="admin" kind="invoice" />,
+          )}
         />
         <Route path="*" element={<NotFoundPage />} />
       </Route>

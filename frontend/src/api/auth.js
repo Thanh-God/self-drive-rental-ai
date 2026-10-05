@@ -1,4 +1,5 @@
 import apiClient from "./client";
+import { getStoredToken } from "../utils/storage";
 
 function normalizeAuthPayload(data) {
   const token = data?.token ?? data?.accessToken ?? data?.jwt ?? null;
@@ -21,9 +22,13 @@ export async function fetchCurrentUser() {
   return data?.user ?? data;
 }
 
-export async function logoutRequest() {
+export async function logoutRequest(token = getStoredToken()) {
   try {
-    await apiClient.post("/auth/logout");
+    await apiClient.post(
+      "/auth/logout",
+      null,
+      token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+    );
   } catch (error) {
     // An expired token is already invalid. A network/server failure does not
     // prove that all sessions were revoked; let the UI offer a retry.

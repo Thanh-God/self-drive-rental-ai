@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { DEMO_MODE } from "../../demo/config";
 
 export default function Footer() {
   return (
@@ -7,8 +8,9 @@ export default function Footer() {
         <div>
           <p className="text-lg font-semibold text-white">KDrive</p>
           <p className="mt-2 text-sm leading-6">
-            Hệ thống cho thuê xe tự lái tích hợp AI hỗ trợ lựa chọn phương tiện
-            và lập kế hoạch hành trình cá nhân hóa.
+            {DEMO_MODE
+              ? "Hệ thống cho thuê xe tự lái với bản xem trước gợi ý xe và lập kế hoạch hành trình AI."
+              : "Hệ thống cho thuê xe tự lái; giá, khả dụng và đơn thuê được xác nhận từ API."}
           </p>
         </div>
         <div>
@@ -19,23 +21,28 @@ export default function Footer() {
                 Duyệt xe
               </Link>
             </li>
-            <li>
-              <Link to="/ai/recommend" className="hover:text-white">
-                Gợi ý AI
-              </Link>
-            </li>
-            <li>
-              <Link to="/ai/itinerary" className="hover:text-white">
-                Lập lịch trình AI
-              </Link>
-            </li>
+            {DEMO_MODE ? (
+              <>
+                <li>
+                  <Link to="/ai/recommend" className="hover:text-white">
+                    Gợi ý AI
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/ai/itinerary" className="hover:text-white">
+                    Lập lịch trình AI
+                  </Link>
+                </li>
+              </>
+            ) : null}
           </ul>
         </div>
         <div>
           <p className="text-sm font-semibold text-white">Lưu ý</p>
           <p className="mt-3 text-sm leading-6">
-            Nhận và trả xe tại cùng chi nhánh. Vui lòng kiểm tra khoảng thuê và
-            thông tin đơn trước khi gửi yêu cầu.
+            {DEMO_MODE
+              ? "Bản demo giữ các nghiệp vụ mẫu tách biệt với dữ liệu API."
+              : "Chọn chi nhánh nhận/trả theo tuyến được cấu hình. Kiểm tra báo giá và thông tin đơn trước khi gửi yêu cầu."}
           </p>
         </div>
       </div>

@@ -20,15 +20,18 @@ export function DemoProvider({ children }) {
   const ref = useRef(data);
   const [scenario, setScenario] = useState("ready");
   const [storageError, setStorageError] = useState("");
+  const storageErrorSet = useRef(false);
   useEffect(() => {
     if (!DEMO_MODE) return;
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, data }));
-      setStorageError("");
     } catch {
-      setStorageError(
-        "Trình duyệt không lưu được dữ liệu demo. Thay đổi chỉ giữ trong lần mở này.",
-      );
+      if (!storageErrorSet.current) {
+        storageErrorSet.current = true;
+        setStorageError(
+          "Trình duyệt không lưu được dữ liệu demo. Thay đổi chỉ giữ trong lần mở này.",
+        );
+      }
     }
   }, [data]);
   function update(recipe) {

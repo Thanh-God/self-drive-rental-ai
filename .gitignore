@@ -4,6 +4,8 @@
 
 # OS & IDE Files
 .DS_Store
+.runtime/
+backend/.env.local
 Thumbs.db
 *.log
 .idea/

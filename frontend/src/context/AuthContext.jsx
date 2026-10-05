@@ -5,6 +5,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
 } from "react";
 import {
   fetchCurrentUser,
@@ -20,6 +21,7 @@ import {
   setStoredToken,
   setStoredUser,
 } from "../utils/storage";
+import { createRequestGeneration } from "../utils/requestGeneration";
 
 const AuthContext = createContext(null);
 
@@ -40,6 +42,8 @@ export function AuthProvider({ children }) {
   );
   const [sessionError, setSessionError] = useState("");
   const [retry, setRetry] = useState(0);
+  const [sessionGeneration] = useState(createRequestGeneration);
+  const pendingLogout = useRef(null);
   const selectDemoRole = useCallback((role) => {
     if (!DEMO_MODE) return;
     setUser(demoActors[role] || null);
@@ -56,6 +60,16 @@ export function AuthProvider({ children }) {
     setToken(nextToken);
     setUser(nextUser);
   }, []);
+  const refreshUser = useCallback((nextUser) => {
+    const normalizedUser = {
+      id: nextUser.id,
+      fullName: nextUser.fullName,
+      email: nextUser.email,
+      role: nextUser.role,
+    };
+    setStoredUser(normalizedUser);
+    setUser(normalizedUser);
+  }, []);
 
   const logout = useCallback(
     async ({ callApi = true } = {}) => {
@@ -63,19 +77,36 @@ export function AuthProvider({ children }) {
         selectDemoRole("GUEST");
         return;
       }
-      if (callApi && getStoredToken()) {
-        await logoutRequest();
+      const generation = sessionGeneration.begin();
+      const tokenToRevoke = getStoredToken();
+      if (callApi && tokenToRevoke) {
+        const request = logoutRequest(tokenToRevoke);
+        pendingLogout.current = request;
+        try {
+          await request;
+        } catch (error) {
+          if (sessionGeneration.isCurrent(generation)) {
+            setLoading(false);
+          }
+          throw error;
+        } finally {
+          if (pendingLogout.current === request) pendingLogout.current = null;
+        }
       }
+      if (!sessionGeneration.isCurrent(generation)) return;
       clearSession();
       setToken(null);
       setUser(null);
+      setSessionError("");
+      setLoading(false);
     },
-    [selectDemoRole],
+    [selectDemoRole, sessionGeneration],
   );
 
   useEffect(() => {
     if (DEMO_MODE) return undefined;
     let cancelled = false;
+    const generation = sessionGeneration.begin();
 
     async function hydrate() {
       setSessionError("");
@@ -86,7 +117,12 @@ export function AuthProvider({ children }) {
       }
       try {
         const profile = await fetchCurrentUser();
-        if (!cancelled && profile) {
+        if (
+          !cancelled &&
+          sessionGeneration.isCurrent(generation) &&
+          getStoredToken() === storedToken &&
+          profile
+        ) {
           persistSession(storedToken, {
             id: profile.id,
             fullName: profile.fullName,
@@ -95,7 +131,11 @@ export function AuthProvider({ children }) {
           });
         }
       } catch (error) {
-        if (!cancelled) {
+        if (
+          !cancelled &&
+          sessionGeneration.isCurrent(generation) &&
+          getStoredToken() === storedToken
+        ) {
           if ([401, 403].includes(error.response?.status))
             await logout({ callApi: false });
           else {
@@ -106,36 +146,58 @@ export function AuthProvider({ children }) {
           }
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (
+          !cancelled &&
+          sessionGeneration.isCurrent(generation)
+        ) {
+          setLoading(false);
+        }
       }
     }
 
     hydrate();
     return () => {
       cancelled = true;
+      sessionGeneration.invalidate(generation);
     };
-  }, [persistSession, logout, retry]);
+  }, [persistSession, logout, retry, sessionGeneration]);
 
   const login = useCallback(
     async ({ email, password }) => {
       if (DEMO_MODE)
         throw new Error("Bản demo không nhận mật khẩu. Hãy chọn vai trò mẫu.");
-      const { token: nextToken, user: nextUser } = await loginRequest({
-        email,
-        password,
-      });
-      if (!nextToken || !nextUser) {
-        throw new Error("Phản hồi đăng nhập không hợp lệ.");
+      const generation = sessionGeneration.begin();
+      setLoading(true);
+      setSessionError("");
+      try {
+        if (pendingLogout.current) await pendingLogout.current;
+        if (!sessionGeneration.isCurrent(generation)) {
+          throw new Error("Yêu cầu đăng nhập đã bị thay thế.");
+        }
+        const { token: nextToken, user: nextUser } = await loginRequest({
+          email,
+          password,
+        });
+        if (!nextToken || !nextUser) {
+          throw new Error("Phản hồi đăng nhập không hợp lệ.");
+        }
+        if (!sessionGeneration.isCurrent(generation)) {
+          throw new Error("Yêu cầu đăng nhập đã bị thay thế.");
+        }
+        persistSession(nextToken, {
+          id: nextUser.id,
+          fullName: nextUser.fullName,
+          email: nextUser.email,
+          role: nextUser.role,
+        });
+        return nextUser;
+      } finally {
+        if (sessionGeneration.isCurrent(generation)) {
+          setLoading(false);
+        }
       }
-      persistSession(nextToken, {
-        id: nextUser.id,
-        fullName: nextUser.fullName,
-        email: nextUser.email,
-        role: nextUser.role,
-      });
-      return nextUser;
     },
-    [persistSession],
+    [persistSession, sessionGeneration],
   );
 
   const register = useCallback(
@@ -144,18 +206,34 @@ export function AuthProvider({ children }) {
         throw new Error(
           "Bản demo không tạo tài khoản thật. Hãy dùng vai trò User mẫu.",
         );
-      const result = await registerRequest(payload);
-      if (result.token && result.user) {
-        persistSession(result.token, {
-          id: result.user.id,
-          fullName: result.user.fullName,
-          email: result.user.email,
-          role: result.user.role,
-        });
+      const generation = sessionGeneration.begin();
+      setLoading(true);
+      setSessionError("");
+      try {
+        if (pendingLogout.current) await pendingLogout.current;
+        if (!sessionGeneration.isCurrent(generation)) {
+          throw new Error("Yêu cầu đăng ký đã bị thay thế.");
+        }
+        const result = await registerRequest(payload);
+        if (!sessionGeneration.isCurrent(generation)) {
+          throw new Error("Yêu cầu đăng ký đã bị thay thế.");
+        }
+        if (result.token && result.user) {
+          persistSession(result.token, {
+            id: result.user.id,
+            fullName: result.user.fullName,
+            email: result.user.email,
+            role: result.user.role,
+          });
+        }
+        return result;
+      } finally {
+        if (sessionGeneration.isCurrent(generation)) {
+          setLoading(false);
+        }
       }
-      return result;
     },
-    [persistSession],
+    [persistSession, sessionGeneration],
   );
 
   const value = useMemo(
@@ -173,6 +251,7 @@ export function AuthProvider({ children }) {
       login,
       register,
       logout,
+      refreshUser,
     }),
     [
       user,
@@ -181,6 +260,7 @@ export function AuthProvider({ children }) {
       login,
       register,
       logout,
+      refreshUser,
       selectDemoRole,
       sessionError,
     ],

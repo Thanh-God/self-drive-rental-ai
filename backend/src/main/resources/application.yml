@@ -1,0 +1,29 @@
+server:
+  port: ${PORT:8080}
+  error:
+    include-message: never
+    include-stacktrace: never
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/kdrive?connectionTimeZone=UTC}
+    username: ${DB_USER:kdrive}
+    password: ${DB_PASSWORD:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    locations: classpath:db/migration
+    validate-on-migrate: true
+    baseline-on-migrate: false
+    clean-disabled: true
+  jackson:
+    time-zone: UTC
+app:
+  jwt-secret: ${JWT_SECRET:}
+  token-minutes: ${TOKEN_MINUTES:30}
+  cors-origin: ${FRONTEND_ORIGIN:http://127.0.0.1:5173}
+  seed-enabled: ${SEED_ENABLED:false}
+  seed-password: ${SEED_PASSWORD:}

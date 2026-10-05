@@ -1,6 +1,6 @@
-# Cấu trúc thư mục Giai đoạn 2
+# Cấu trúc thư mục: mục tiêu và hiện trạng
 
-Các đường dẫn trong tài liệu tính từ thư mục gốc repository. Đây là cấu trúc module đã thống nhất; ứng dụng chưa có mã thực thi, `pom.xml`, `package.json` hoặc migration SQL.
+Audit 29/09/2026: đường dẫn tính từ repository. Đã có backend/pom.xml, frontend/package.json, code thực thi và V1__rental_schema.sql. Cây dưới là cấu trúc module mục tiêu ban đầu; thư mục giữ chỗ không được tính là module đã triển khai.
 
 ```text
 KLTN/
@@ -52,7 +52,32 @@ KLTN/
 └── README.md
 ```
 
-Các module CRUD hiện dùng `controller`, `dto`, `service`, `entity`, `repository`. `auth` chỉ cần controller/dto/service và dùng tài khoản của `user`. Chỉ thêm tầng khi có trách nhiệm thực tế; không sinh lớp rỗng để đủ mẫu. Test sẽ chia theo module khi có code.
+Quy ước module CRUD: controller/dto/service/entity/repository; auth dùng tài khoản của user. Source hiện dùng nested record ở controller/service, 7 entity/repository; contract/invoice/review dùng JdbcTemplate trực tiếp trong service. Đây là hiện trạng cần đối chiếu quy tắc phân tầng, không sinh lớp rỗng để đủ mẫu.
+
+## File/thư mục thực thi hiện có
+
+```text
+backend/
+  pom.xml                         # Java 21, Spring Boot 3.5.16
+  src/main/java/com/carrental/
+    KDriveApplication.java
+    config/ security/ exception/
+    modules/
+      auth/ user/ branch/ vehicle/ booking/ operation/ contract/ invoice/ review/
+  src/main/resources/application.yml
+  src/main/resources/db/migration/V1__rental_schema.sql
+  src/test/java/com/carrental/{PolicyTest,RentalIntegrationTest}.java
+frontend/
+  package.json package-lock.json eslint.config.js
+  src/
+    api/ context/ demo/ routes/ layouts/ components/ hooks/ utils/
+    pages/{guest,shared,user,staff,admin}/  # chủ yếu UI demo và auth
+    pages/api/{ApiScreens,ApiManagementScreens}.jsx
+docs/{requirements,architecture,database,diagrams,ui}/
+database/README.md
+```
+
+44 Java main files, 2 Java test files ở lượt audit. location/ai/integration chỉ giữ chỗ, chưa có Java triển khai. Chưa có Maven Wrapper. Frontend test hiện ở src/demo/model.test.js, chưa có test tự động cho màn hình API. Node_modules, target, dist, .runtime là dependency/build/cache, không thuộc kiến trúc source.
 
 ## Đối chiếu scaffold ban đầu
 
@@ -70,4 +95,4 @@ Các module CRUD hiện dùng `controller`, `dto`, `service`, `entity`, `reposit
 | `database/migrations` | Bỏ placeholder và thư mục trống | Tránh nguồn migration thứ hai |
 | `docs/architecture` | Thêm tài liệu kiến trúc/quy trình/quyết định | Cơ sở thiết kế chi tiết và báo cáo |
 
-Không có mã nghiệp vụ phải di chuyển ở giai đoạn này. Các file khởi tạo Spring Boot, Vite, Maven Wrapper và cấu hình chạy/debug VS Code chỉ bổ sung ở giai đoạn triển khai sau khi kiểm tra môi trường.
+Bảng đối chiếu trên ghi thay đổi lịch sử của Giai đoạn 2. Spring Boot/Vite đã được khởi tạo sau đó; Wrapper và quy trình debug portable còn thiếu. Sai lệch hiện tại theo audit trong system-architecture.md.

@@ -12,7 +12,7 @@ export function VehicleVisual({
   alt = "",
 }) {
   const [failedSrc, setFailedSrc] = useState(null);
-  const media = getVehicleMedia(vehicle);
+  const media = vehicle?.noLocalAsset ? null : getVehicleMedia(vehicle);
   const imageSrc = customSrc || media?.main || vehicle?.image;
 
   if (imageSrc && failedSrc !== imageSrc) {
@@ -58,7 +58,7 @@ export function VehicleVisual({
         className={large ? "h-40 w-64" : "h-28 w-44"}
       />
       <span className="absolute bottom-3 right-3 text-[10px] uppercase tracking-widest text-slate-500">
-        Minh họa · Demo
+        {vehicle?.noLocalAsset ? "Ảnh chưa cập nhật" : "Minh họa · Demo"}
       </span>
     </div>
   );
@@ -137,7 +137,9 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0 }) {
               Ước tính: {money(totalPrice)} ({rentalDays} ngày)
             </p>
           ) : (
-            <p className="text-[11px] text-slate-400">Giá mẫu niêm yết</p>
+            <p className="text-[11px] text-slate-400">
+              {vehicle.noLocalAsset ? "Giá niêm yết từ hệ thống" : "Giá mẫu niêm yết"}
+            </p>
           )}
         </div>
         <Link

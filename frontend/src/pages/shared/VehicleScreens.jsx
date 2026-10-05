@@ -2,7 +2,6 @@ import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useState, useMemo } from "react";
 import {
   Calendar,
-  Camera,
   Car,
   Check,
   ChevronRight,
@@ -16,7 +15,6 @@ import {
   RotateCcw,
   Search,
   ShieldCheck,
-  Sparkles,
   Users,
   X,
 } from "lucide-react";

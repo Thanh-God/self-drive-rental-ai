@@ -2,6 +2,8 @@
 
 Sơ đồ text dùng trong repository, có thể chuyển sang hình cho Chương II khi chuẩn bị báo cáo. Các khối bên trong Spring Boot là module trong cùng ứng dụng, không phải microservice.
 
+Cập nhật 29/09/2026: sơ đồ là kiến trúc mục tiêu. location, ai/recommendation, ai/itinerary và adapter AI/Map chưa có code thực thi; Gemini là phương án ban đầu, provider/mô hình cuối chưa chốt. Runtime hiện còn JdbcTemplate trong service và entity xuyên module, xem [audit](../architecture/system-architecture.md). Không dùng sự có mặt của khối trong sơ đồ để báo cáo tính năng đã hoàn thành.
+
 ```text
   Guest       User       Staff       Admin
     \           |          |           /
