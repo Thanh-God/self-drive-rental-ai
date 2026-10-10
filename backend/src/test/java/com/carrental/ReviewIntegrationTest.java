@@ -130,48 +130,50 @@ public class ReviewIntegrationTest {
         // First creation succeeds
         reviewService.create(userA, bookingId, 5, "Đánh giá lần 1");
 
-        // Sequential duplicate throws conflict or domain exception
-        assertThrows(Exception.class, () -> {
-            reviewService.create(userA, bookingId, 4, "Đánh giá lần 2 cố gắng ghi đè");
-        });
 
-        // Content must NOT be overwritten
-        Map<?,?> review = (Map<?,?>) reviewService.getForBooking(userA, bookingId);
-        assertEquals("Đánh giá lần 1", review.get("content"));
+        var beforeDuplicate=ReviewEvidence.snapshot(jdbc);
+        assertThrows(DataIntegrityViolationException.class,
+            () -> reviewService.create(userA,bookingId,4,"Overwrite"));
+        assertEquals(beforeDuplicate,ReviewEvidence.snapshot(jdbc));
 
-        // Concurrent test on fresh booking
-        String concurrentBookingId = createBooking(userA, vehicle1Id, "COMPLETED");
-        int threads = 2;
-        ExecutorService executor = Executors.newFixedThreadPool(threads);
-        CountDownLatch ready = new CountDownLatch(threads);
-        CountDownLatch start = new CountDownLatch(1);
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger failCount = new AtomicInteger(0);
-
-        List<Future<?>> futures = new ArrayList<>();
-        for (int i = 0; i < threads; i++) {
-            final int idx = i;
-            futures.add(executor.submit(() -> {
-                ready.countDown();
-                try {
-                    start.await();
-                    reviewService.create(userA, concurrentBookingId, 5, "Đánh giá luồng " + idx);
-                    successCount.incrementAndGet();
-                } catch (Exception e) {
-                    failCount.incrementAndGet();
-                }
-            }));
+        String fresh=createBooking(userA,vehicle1Id,"COMPLETED");
+        var executor=Executors.newFixedThreadPool(2);
+        var ready=new CountDownLatch(2);
+        var start=new CountDownLatch(1);
+        record Result(int index, boolean success) {}
+        List<Future<Result>> futures=new ArrayList<>();
+        try {
+            for (int i=0;i<2;i++) {
+                final int index=i;
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(start.await(5,TimeUnit.SECONDS));
+                    try {
+                        reviewService.create(userA,fresh,index+1,"Service winner "+index);
+                        return new Result(index,true);
+                    } catch (DataIntegrityViolationException expected) {
+                        return new Result(index,false);
+                    }
+                }));
+            }
+            assertTrue(ready.await(5,TimeUnit.SECONDS));
+            start.countDown();
+            var results=new ArrayList<Result>();
+            for (var future:futures) results.add(future.get(15,TimeUnit.SECONDS));
+            assertEquals(1,results.stream().filter(Result::success).count());
+            var winner=results.stream().filter(Result::success).findFirst().orElseThrow();
+            var rows=jdbc.queryForList("SELECT * FROM reviews WHERE booking_id=?",fresh);
+            assertEquals(1,rows.size());
+            assertEquals("Service winner "+winner.index(),rows.get(0).get("content"));
+            assertEquals(winner.index()+1,((Number)rows.get(0).get("rating")).intValue());
+            assertEquals(fresh,rows.get(0).get("booking_id"));
+            ReviewEvidence.record("service-race-winner",Map.of("winner",winner.index()),rows.get(0));
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS));
+            ReviewEvidence.record("service-executor",Map.of(),Map.of("terminated",executor.isTerminated()));
         }
-
-        ready.await();
-        start.countDown();
-        for (Future<?> f : futures) f.get();
-        executor.shutdown();
-
-        assertEquals(1, successCount.get(), "Chính xác 1 request tạo review thành công");
-        assertEquals(1, failCount.get(), "Request còn lại phải bị từ chối");
-        Integer finalRows = jdbc.queryForObject("SELECT count(*) FROM reviews WHERE booking_id=?", Integer.class, concurrentBookingId);
-        assertEquals(1, finalRows, "DB chỉ được có đúng 1 bản ghi review cho booking");
     }
 
     @Test
@@ -253,8 +255,9 @@ public class ReviewIntegrationTest {
 
         String reviewId = (String) publicVehicle1Before.get(0).get("id");
 
-        // Admin hides review
+        var beforeHidden=jdbc.queryForMap("SELECT * FROM reviews WHERE id=?",reviewId);
         reviewService.moderate(admin, reviewId, true, 0);
+        ReviewEvidence.moderation(beforeHidden,jdbc.queryForMap("SELECT * FROM reviews WHERE id=?",reviewId),true,admin.id(),clock.value);
 
         @SuppressWarnings("unchecked")
         List<Map<String,Object>> publicVehicle1Hidden = (List<Map<String,Object>>) reviewService.publicList(vehicle1Id);
@@ -274,7 +277,9 @@ public class ReviewIntegrationTest {
         assertEquals(true, dbRow.get("hidden"));
 
         // Admin shows review again (version is now 1)
+        var beforeShown=jdbc.queryForMap("SELECT * FROM reviews WHERE id=?",reviewId);
         reviewService.moderate(admin, reviewId, false, 1);
+        ReviewEvidence.moderation(beforeShown,jdbc.queryForMap("SELECT * FROM reviews WHERE id=?",reviewId),false,admin.id(),clock.value);
 
         @SuppressWarnings("unchecked")
         List<Map<String,Object>> publicVehicle1Shown = (List<Map<String,Object>>) reviewService.publicList(vehicle1Id);
@@ -299,16 +304,17 @@ public class ReviewIntegrationTest {
         // Admin 1 moderates using version 0 -> success
         reviewService.moderate(admin, reviewId, true, 0L);
 
+        var beforeStale=ReviewEvidence.snapshot(jdbc);
         // Admin 2 tries to moderate using stale version 0 -> throws 409 Conflict
         DomainException exConflict = assertThrows(DomainException.class, () -> {
             reviewService.moderate(admin, reviewId, false, 0L);
         });
         assertEquals(org.springframework.http.HttpStatus.CONFLICT, exConflict.status);
 
+        assertEquals(beforeStale,ReviewEvidence.snapshot(jdbc));
         // Verify full row state unchanged by failed attempt
         Map<String,Object> row = jdbc.queryForMap("SELECT hidden, version FROM reviews WHERE id=?", reviewId);
         assertEquals(true, row.get("hidden"));
         assertEquals(1L, ((Number) row.get("version")).longValue());
     }
 }
-

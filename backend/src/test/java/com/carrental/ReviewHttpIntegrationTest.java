@@ -115,335 +115,188 @@ public class ReviewHttpIntegrationTest {
         return jdbc.queryForObject("SELECT count(*) FROM reviews", Integer.class);
     }
 
+
+    private int probeSequence;
+
+    private String input(String booking, int rating, String content) throws Exception {
+        return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(
+            Map.of("bookingId", booking, "rating", rating, "content", content));
+    }
+
+    private void reject(org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder request,
+                        int expected, Class<?> cause) throws Exception {
+        var before = ReviewEvidence.snapshot(jdbc);
+        var result = mockMvc.perform(request).andExpect(status().is(expected)).andReturn();
+        if (cause != null) assertInstanceOf(cause, result.getResolvedException());
+        var after = ReviewEvidence.snapshot(jdbc);
+        ReviewEvidence.record("http-rejection-" + (++probeSequence) + "-" + UUID.randomUUID(), before, after);
+        assertEquals(before, after, "Every rejected request must preserve full fixture state");
+    }
+
+    private org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder create(String token, String body) {
+        return post("/api/v1/reviews").header("Authorization", token)
+            .contentType(MediaType.APPLICATION_JSON).content(body);
+    }
+
     @Test
     void testC6_04_RBAC_Http_Security_Endpoints() throws Exception {
-        String bookingId = createBooking(userId, vehicle1Id, "COMPLETED");
-        String createJson = "{\"bookingId\":\"" + bookingId + "\",\"rating\":5,\"content\":\"Dịch vụ tốt\"}";
-
-        // 1. Guest POST /api/v1/reviews -> 401 Unauthorized
-        mockMvc.perform(post("/api/v1/reviews")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(createJson))
-                .andExpect(status().isUnauthorized());
-
-        // 2. Staff POST /api/v1/reviews -> 403 Forbidden
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenStaff)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(createJson))
-                .andExpect(status().isForbidden());
-
-        // 3. Admin POST /api/v1/reviews -> 403 Forbidden
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenAdmin)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(createJson))
-                .andExpect(status().isForbidden());
-
-        // 4. Admin reviews listing:
-        // Guest GET /api/v1/admin/reviews -> 401
-        mockMvc.perform(get("/api/v1/admin/reviews"))
-                .andExpect(status().isUnauthorized());
-
-        // User GET /api/v1/admin/reviews -> 403
-        mockMvc.perform(get("/api/v1/admin/reviews")
-                .header("Authorization", tokenUser))
-                .andExpect(status().isForbidden());
-
-        // Staff GET /api/v1/admin/reviews -> 403
-        mockMvc.perform(get("/api/v1/admin/reviews")
-                .header("Authorization", tokenStaff))
-                .andExpect(status().isForbidden());
-
-        // Admin GET /api/v1/admin/reviews -> 200 OK
-        mockMvc.perform(get("/api/v1/admin/reviews")
-                .header("Authorization", tokenAdmin))
-                .andExpect(status().isOk());
-
-        // 5. Admin moderation:
-        // User PATCH /api/v1/admin/reviews/any -> 403
-        mockMvc.perform(patch("/api/v1/admin/reviews/any-id")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"hidden\":true,\"version\":0}"))
-                .andExpect(status().isForbidden());
-
-        // No review created during RBAC probes
-        assertEquals(0, countReviews());
+        String booking = createBooking(userId, vehicle1Id, "COMPLETED");
+        String body = input(booking, 5, "RBAC");
+        reject(post("/api/v1/reviews").contentType(MediaType.APPLICATION_JSON).content(body), 401, null);
+        reject(create(tokenStaff, body), 403, null);
+        reject(create(tokenAdmin, body), 403, null);
+        reject(get("/api/v1/admin/reviews"), 401, null);
+        reject(get("/api/v1/admin/reviews").header("Authorization", tokenUser), 403, null);
+        reject(get("/api/v1/admin/reviews").header("Authorization", tokenStaff), 403, null);
+        mockMvc.perform(get("/api/v1/admin/reviews").header("Authorization", tokenAdmin)).andExpect(status().isOk());
+        for (String token : List.of(tokenUser, tokenStaff)) {
+            reject(patch("/api/v1/admin/reviews/any-id").header("Authorization", token)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"hidden\":true,\"version\":0}"), 403, null);
+        }
     }
 
     @Test
     void testC6_01_User_Create_And_Readback_Http() throws Exception {
-        String bookingId = createBooking(userId, vehicle1Id, "COMPLETED");
-
-        // Before creation: GET /api/v1/bookings/{id}/review returns 200 with empty body (null)
-        mockMvc.perform(get("/api/v1/bookings/" + bookingId + "/review")
-                .header("Authorization", tokenUser))
-                .andExpect(status().isOk())
-                .andExpect(content().string(""));
-
-        // User creates review via HTTP POST
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + bookingId + "\",\"rating\":5,\"content\":\"   Xe sạch sẽ và êm ái.   \"}"))
-                .andExpect(status().isOk());
-
-        // After creation: readback via GET /api/v1/bookings/{id}/review
-        mockMvc.perform(get("/api/v1/bookings/" + bookingId + "/review")
-                .header("Authorization", tokenUser))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.booking_id").value(bookingId))
-                .andExpect(jsonPath("$.rating").value(5))
-                .andExpect(jsonPath("$.content").value("Xe sạch sẽ và êm ái.")) // content is trimmed
-                .andExpect(jsonPath("$.hidden").value(false))
-                .andExpect(jsonPath("$.version").value(0));
-
-        assertEquals(1, countReviews());
+        for (int rating : List.of(1, 5)) {
+            String booking = createBooking(userId, vehicle1Id, "COMPLETED");
+            String text = rating == 1 ? "D".repeat(1000) : "   Xe sạch sẽ và êm ái.   ";
+            mockMvc.perform(get("/api/v1/bookings/" + booking + "/review").header("Authorization", tokenUser))
+                .andExpect(status().isOk()).andExpect(content().string(""));
+            mockMvc.perform(create(tokenUser, input(booking, rating, text))).andExpect(status().isOk());
+            mockMvc.perform(get("/api/v1/bookings/" + booking + "/review").header("Authorization", tokenUser))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.booking_id").value(booking))
+                .andExpect(jsonPath("$.rating").value(rating)).andExpect(jsonPath("$.content").value(text.strip()))
+                .andExpect(jsonPath("$.hidden").value(false)).andExpect(jsonPath("$.version").value(0));
+            var row = jdbc.queryForMap("SELECT * FROM reviews WHERE booking_id=?", booking);
+            assertEquals(text.strip(), row.get("content"));
+            assertEquals(rating, ((Number) row.get("rating")).intValue());
+            ReviewEvidence.record("positive-" + rating, Map.of(), row);
+        }
     }
+
+    private record Outcome(int index, int status, Exception cause) {}
 
     @Test
     void testC6_02_Duplicate_Sequential_And_Concurrent_Http() throws Exception {
-        String bookingId = createBooking(userId, vehicle1Id, "COMPLETED");
+        String booking = createBooking(userId, vehicle1Id, "COMPLETED");
+        mockMvc.perform(create(tokenUser, input(booking, 5, "Winner content"))).andExpect(status().isOk());
+        reject(create(tokenUser, input(booking, 4, "Attempt overwrite")), 409,
+            org.springframework.dao.DataIntegrityViolationException.class);
 
-        // First POST succeeds
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + bookingId + "\",\"rating\":5,\"content\":\"Winner content\"}"))
-                .andExpect(status().isOk());
-
-        // Sequential duplicate POST fails with 409 Conflict
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + bookingId + "\",\"rating\":4,\"content\":\"Attempt overwrite\"}"))
-                .andExpect(status().isConflict());
-
-        // Winner content is NOT overwritten
-        Map<String,Object> row = jdbc.queryForMap("SELECT content, rating, version FROM reviews WHERE booking_id=?", bookingId);
-        assertEquals("Winner content", row.get("content"));
-        assertEquals(5, ((Number) row.get("rating")).intValue());
-        assertEquals(0L, ((Number) row.get("version")).longValue());
-
-        // Concurrency test on fresh booking via HTTP
-        String concurrentBookingId = createBooking(userId, vehicle1Id, "COMPLETED");
-        int threads = 2;
-        ExecutorService executor = Executors.newFixedThreadPool(threads);
-        CountDownLatch ready = new CountDownLatch(threads);
-        CountDownLatch start = new CountDownLatch(1);
-        AtomicInteger successCount = new AtomicInteger(0);
-        AtomicInteger conflictCount = new AtomicInteger(0);
-
-        List<Future<?>> futures = new ArrayList<>();
-        for (int i = 0; i < threads; i++) {
-            final int idx = i;
-            futures.add(executor.submit(() -> {
-                ready.countDown();
-                try {
-                    start.await();
-                    int status = mockMvc.perform(post("/api/v1/reviews")
-                            .header("Authorization", tokenUser)
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content("{\"bookingId\":\"" + concurrentBookingId + "\",\"rating\":5,\"content\":\"Concurrent thread " + idx + "\"}"))
-                            .andReturn().getResponse().getStatus();
-                    if (status == 200) successCount.incrementAndGet();
-                    else if (status == 409) conflictCount.incrementAndGet();
-                } catch (Exception ignored) {
-                }
-            }));
+        String fresh = createBooking(userId, vehicle1Id, "COMPLETED");
+        var executor = Executors.newFixedThreadPool(2);
+        var ready = new CountDownLatch(2);
+        var start = new CountDownLatch(1);
+        List<Future<Outcome>> futures = new ArrayList<>();
+        try {
+            for (int i=0; i<2; i++) {
+                final int index=i;
+                futures.add(executor.submit(() -> {
+                    ready.countDown();
+                    assertTrue(start.await(5, TimeUnit.SECONDS), "Start barrier timed out");
+                    var response=mockMvc.perform(create(tokenUser, input(fresh, index+1, "Concurrent " + index))).andReturn();
+                    return new Outcome(index, response.getResponse().getStatus(), response.getResolvedException());
+                }));
+            }
+            assertTrue(ready.await(5, TimeUnit.SECONDS));
+            start.countDown();
+            var outcomes = new ArrayList<Outcome>();
+            for (var future : futures) outcomes.add(future.get(15, TimeUnit.SECONDS));
+            assertEquals(List.of(200,409), outcomes.stream().map(Outcome::status).sorted().toList());
+            var winner=outcomes.stream().filter(o -> o.status()==200).findFirst().orElseThrow();
+            var loser=outcomes.stream().filter(o -> o.status()==409).findFirst().orElseThrow();
+            assertInstanceOf(org.springframework.dao.DataIntegrityViolationException.class, loser.cause());
+            var rows=jdbc.queryForList("SELECT * FROM reviews WHERE booking_id=?", fresh);
+            assertEquals(1, rows.size());
+            var row=rows.get(0);
+            assertEquals(fresh,row.get("booking_id"));
+            assertEquals("Concurrent " + winner.index(),row.get("content"));
+            assertEquals(winner.index()+1,((Number)row.get("rating")).intValue());
+            var relation=jdbc.queryForMap("SELECT user_id,vehicle_id FROM bookings WHERE id=?",fresh);
+            assertEquals(Map.of("user_id",userId,"vehicle_id",vehicle1Id),relation);
+            assertEquals(false,row.get("hidden"));
+            assertEquals(0L,((Number)row.get("version")).longValue());
+            ReviewEvidence.record("http-race-winner", Map.of("winner",winner.index(),"loser",loser.index(),"relation",relation),row);
+        } finally {
+            start.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5,TimeUnit.SECONDS), "HTTP executor did not terminate");
+            ReviewEvidence.record("http-executor",Map.of(),Map.of("terminated",executor.isTerminated()));
         }
-
-        ready.await();
-        start.countDown();
-        for (Future<?> f : futures) f.get(10, TimeUnit.SECONDS);
-        executor.shutdown();
-
-        assertEquals(1, successCount.get(), "Chính xác 1 HTTP request trả về 200 OK");
-        assertEquals(1, conflictCount.get(), "Request còn lại trả về 409 Conflict");
-        Integer finalRows = jdbc.queryForObject("SELECT count(*) FROM reviews WHERE booking_id=?", Integer.class, concurrentBookingId);
-        assertEquals(1, finalRows, "DB chỉ có đúng 1 row duy nhất cho booking");
     }
 
     @Test
     void testC6_03_Boundary_Input_And_State_Http_With_Invariance() throws Exception {
-        String completedId = createBooking(userId, vehicle1Id, "COMPLETED");
-
-        // Capture initial DB state
-        int initialReviews = countReviews();
-
-        // 1. Foreign booking: Other user attempts to review User's booking -> 404 NOT_FOUND
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenOtherUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + completedId + "\",\"rating\":5,\"content\":\"Đánh giá trái phép\"}"))
-                .andExpect(status().isNotFound());
-        assertEquals(initialReviews, countReviews());
-
-        // Other user attempts to read User's booking review -> 404 NOT_FOUND
-        mockMvc.perform(get("/api/v1/bookings/" + completedId + "/review")
-                .header("Authorization", tokenOtherUser))
-                .andExpect(status().isNotFound());
-
-        // 2. Booking status negative cases: all non-COMPLETED statuses must be rejected with 400 Bad Request
-        String[] nonCompletedStatuses = {"PENDING", "CONFIRMED", "IN_PROGRESS", "RETURNED", "CANCELLED", "EXPIRED"};
-        for (String st : nonCompletedStatuses) {
-            String bId = createBooking(userId, vehicle1Id, st);
-            mockMvc.perform(post("/api/v1/reviews")
-                    .header("Authorization", tokenUser)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content("{\"bookingId\":\"" + bId + "\",\"rating\":5,\"content\":\"Đánh giá đơn " + st + "\"}"))
-                    .andExpect(status().isBadRequest());
-            assertEquals(initialReviews, countReviews(), "Không được tạo review cho đơn ở trạng thái " + st);
+        String booking=createBooking(userId,vehicle1Id,"COMPLETED");
+        // Seed representative history/documents so no-write proof covers existing data, not empty counts.
+        jdbc.update("INSERT INTO booking_status_history(id,booking_id,next_status,actor_id,occurred_at,reason) VALUES(?,?,?,?,?,?)",
+            UUID.randomUUID().toString(),booking,"COMPLETED",userId,java.sql.Timestamp.from(clock.value),"F04 sentinel");
+        jdbc.update("INSERT INTO contracts(id,booking_id,issued_at,snapshot,terms_version) VALUES(?,?,?,?,?)",
+            UUID.randomUUID().toString(),booking,java.sql.Timestamp.from(clock.value),"{\"sentinel\":true}","v1");
+        String invoice=UUID.randomUUID().toString();
+        jdbc.update("INSERT INTO invoices(id,booking_id,issued_at,total,snapshot) VALUES(?,?,?,?,?)",
+            invoice,booking,java.sql.Timestamp.from(clock.value),123L,"{\"sentinel\":true}");
+        jdbc.update("INSERT INTO invoice_items(id,invoice_id,name,quantity,unit_price,amount) VALUES(?,?,?,?,?,?)",
+            UUID.randomUUID().toString(),invoice,"sentinel",1,123L,123L);
+        reject(create(tokenOtherUser,input(booking,5,"Foreign")),404,com.carrental.exception.DomainException.class);
+        reject(get("/api/v1/bookings/"+booking+"/review").header("Authorization",tokenOtherUser),404,com.carrental.exception.DomainException.class);
+        for (String state : List.of("PENDING","CONFIRMED","IN_PROGRESS","RETURNED","CANCELLED","EXPIRED")) {
+            String id=createBooking(userId,vehicle1Id,state);
+            reject(create(tokenUser,input(id,5,"Wrong state")),400,com.carrental.exception.DomainException.class);
         }
-
-        // 3. Rating boundary: 0 and 6 -> 400 Bad Request
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + completedId + "\",\"rating\":0,\"content\":\"Sao 0\"}"))
-                .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + completedId + "\",\"rating\":6,\"content\":\"Sao 6\"}"))
-                .andExpect(status().isBadRequest());
-        assertEquals(initialReviews, countReviews());
-
-        // 4. Content boundary: null, blank, > 1000 characters -> 400 Bad Request
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + completedId + "\",\"rating\":5,\"content\":null}"))
-                .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + completedId + "\",\"rating\":5,\"content\":\"     \"}"))
-                .andExpect(status().isBadRequest());
-        String tooLong = "C".repeat(1001);
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + completedId + "\",\"rating\":5,\"content\":\"" + tooLong + "\"}"))
-                .andExpect(status().isBadRequest());
-        assertEquals(initialReviews, countReviews());
-
-        // 5. Malformed JSON / missing fields -> 400 Bad Request
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{malformed-json"))
-                .andExpect(status().isBadRequest());
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rating\":5,\"content\":\"Thiếu bookingId\"}"))
-                .andExpect(status().isBadRequest());
-        assertEquals(initialReviews, countReviews());
-
-        // 6. Valid exact boundary: rating 1, 5 and 1000 chars -> 200 OK
-        String exact1000 = "D".repeat(1000);
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + completedId + "\",\"rating\":1,\"content\":\"" + exact1000 + "\"}"))
-                .andExpect(status().isOk());
-        assertEquals(initialReviews + 1, countReviews());
-        Map<String,Object> r = jdbc.queryForMap("SELECT rating, length(content) as len FROM reviews WHERE booking_id=?", completedId);
-        assertEquals(1, ((Number) r.get("rating")).intValue());
-        assertEquals(1000, ((Number) r.get("len")).intValue());
+        for (int rating : List.of(0,6)) reject(create(tokenUser,input(booking,rating,"Rating")),400,com.carrental.exception.DomainException.class);
+        for (String text : List.of("", "   ", "C".repeat(1001)))
+            reject(create(tokenUser,input(booking,5,text)),400,com.carrental.exception.DomainException.class);
+        for (String body : List.of(
+            "{\"bookingId\":\""+booking+"\",\"rating\":5,\"content\":null}",
+            "{\"rating\":5,\"content\":\"Missing\"}",
+            "{\"bookingId\":null,\"rating\":5,\"content\":\"Null\"}",
+            "{\"bookingId\":\""+booking+"\",\"content\":\"Missing rating\"}",
+            "{\"bookingId\":\""+booking+"\",\"rating\":null,\"content\":\"Null rating\"}"))
+            reject(create(tokenUser,body),400,com.carrental.exception.DomainException.class);
+        reject(create(tokenUser,input("missing-booking",5,"Missing")),404,com.carrental.exception.DomainException.class);
+        for (String body : List.of("{malformed-json", "{\"bookingId\":{},\"rating\":5,\"content\":\"Type\"}"))
+            reject(create(tokenUser,body),400,org.springframework.http.converter.HttpMessageNotReadableException.class);
     }
 
     @Test
     void testC6_05_And_06_Admin_Moderation_OptimisticLocking_Public_Http() throws Exception {
-        String bookingA = createBooking(userId, vehicle1Id, "COMPLETED");
-        String bookingB = createBooking(otherUserId, vehicle2Id, "COMPLETED");
-
-        // User A and User Other create reviews
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + bookingA + "\",\"rating\":5,\"content\":\"Xe 1 chạy tốt\"}"))
+        String booking=createBooking(userId,vehicle1Id,"COMPLETED");
+        String other=createBooking(otherUserId,vehicle2Id,"COMPLETED");
+        mockMvc.perform(create(tokenUser,input(booking,5,"Vehicle1"))).andExpect(status().isOk());
+        mockMvc.perform(create(tokenOtherUser,input(other,4,"Vehicle2"))).andExpect(status().isOk());
+        String id=jdbc.queryForObject("SELECT id FROM reviews WHERE booking_id=?",String.class,booking);
+        var before=jdbc.queryForMap("SELECT * FROM reviews WHERE id=?",id);
+        for (String body : List.of("{}", "{\"version\":0}", "{\"hidden\":true}",
+            "{\"hidden\":null,\"version\":0}", "{\"hidden\":true,\"version\":null}")) {
+            reject(patch("/api/v1/admin/reviews/"+id).header("Authorization",tokenAdmin)
+                .contentType(MediaType.APPLICATION_JSON).content(body),400,com.carrental.exception.DomainException.class);
+        }
+        for (String body : List.of("{\"hidden\":{},\"version\":0}","{\"hidden\":true,\"version\":\"invalid\"}"))
+            reject(patch("/api/v1/admin/reviews/"+id).header("Authorization",tokenAdmin)
+                .contentType(MediaType.APPLICATION_JSON).content(body),400,org.springframework.http.converter.HttpMessageNotReadableException.class);
+        reject(patch("/api/v1/admin/reviews/"+id).header("Authorization",tokenAdmin)
+            .contentType(MediaType.APPLICATION_JSON).content("{\"hidden\":true,\"version\":-1}"),409,com.carrental.exception.DomainException.class);
+        for (boolean hidden : List.of(true,false)) {
+            long version=((Number)before.get("version")).longValue();
+            clock.value=clock.value.plusSeconds(1);
+            mockMvc.perform(patch("/api/v1/admin/reviews/"+id).header("Authorization",tokenAdmin)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"hidden\":"+hidden+",\"version\":"+version+"}"))
                 .andExpect(status().isOk());
-        mockMvc.perform(post("/api/v1/reviews")
-                .header("Authorization", tokenOtherUser)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"bookingId\":\"" + bookingB + "\",\"rating\":4,\"content\":\"Xe 2 êm\"}"))
-                .andExpect(status().isOk());
-
-        // Public vehicle 1 has 1 review; verify no booking_id or user_id exposed
-        mockMvc.perform(get("/api/v1/vehicles/" + vehicle1Id + "/reviews"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].content").value("Xe 1 chạy tốt"))
-                .andExpect(jsonPath("$[0].booking_id").doesNotExist())
-                .andExpect(jsonPath("$[0].user_id").doesNotExist());
-
-        String reviewAId = jdbc.queryForObject("SELECT id FROM reviews WHERE booking_id=?", String.class, bookingA);
-        Map<String,Object> initialRow = jdbc.queryForMap("SELECT * FROM reviews WHERE id=?", reviewAId);
-
-        // Admin 1 hides review using version 0 -> 200 OK
-        mockMvc.perform(patch("/api/v1/admin/reviews/" + reviewAId)
-                .header("Authorization", tokenAdmin)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"hidden\":true,\"version\":0}"))
-                .andExpect(status().isOk());
-
-        // Public vehicle 1 now has 0 reviews
-        mockMvc.perform(get("/api/v1/vehicles/" + vehicle1Id + "/reviews"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
-
-        // Public vehicle 2 is completely isolated and unaffected
-        mockMvc.perform(get("/api/v1/vehicles/" + vehicle2Id + "/reviews"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].content").value("Xe 2 êm"));
-
-        // Admin 2 attempts moderation with stale version 0 -> 409 Conflict
-        Map<String,Object> beforeStale = jdbc.queryForMap("SELECT * FROM reviews WHERE id=?", reviewAId);
-        mockMvc.perform(patch("/api/v1/admin/reviews/" + reviewAId)
-                .header("Authorization", tokenAdmin)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"hidden\":false,\"version\":0}"))
-                .andExpect(status().isConflict());
-
-        // Invariance check: full row equality before and after stale attempt
-        Map<String,Object> afterStale = jdbc.queryForMap("SELECT * FROM reviews WHERE id=?", reviewAId);
-        assertEquals(beforeStale.get("hidden"), afterStale.get("hidden"));
-        assertEquals(beforeStale.get("version"), afterStale.get("version"));
-        assertEquals(beforeStale.get("moderated_by"), afterStale.get("moderated_by"));
-        assertEquals(beforeStale.get("moderated_at"), afterStale.get("moderated_at"));
-        assertEquals(beforeStale.get("created_at"), afterStale.get("created_at"));
-        assertEquals(beforeStale.get("content"), afterStale.get("content"));
-
-        // Admin moderation with null wrapper values -> 400 Bad Request
-        mockMvc.perform(patch("/api/v1/admin/reviews/" + reviewAId)
-                .header("Authorization", tokenAdmin)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"hidden\":null,\"version\":null}"))
-                .andExpect(status().isBadRequest());
-
-        // Admin shows review using valid version 1 -> 200 OK
-        mockMvc.perform(patch("/api/v1/admin/reviews/" + reviewAId)
-                .header("Authorization", tokenAdmin)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"hidden\":false,\"version\":1}"))
-                .andExpect(status().isOk());
-
-        // Public vehicle 1 sees review again
-        mockMvc.perform(get("/api/v1/vehicles/" + vehicle1Id + "/reviews"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].content").value("Xe 1 chạy tốt"));
-
-        // Owner still sees own review even when hidden or shown
-        mockMvc.perform(get("/api/v1/bookings/" + bookingA + "/review")
-                .header("Authorization", tokenUser))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(reviewAId))
-                .andExpect(jsonPath("$.version").value(2));
+            var after=jdbc.queryForMap("SELECT * FROM reviews WHERE id=?",id);
+            ReviewEvidence.moderation(before,after,hidden,adminId,clock.value);
+            ReviewEvidence.record("moderation-"+hidden,before,after);
+            mockMvc.perform(get("/api/v1/vehicles/"+vehicle1Id+"/reviews"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(hidden?0:1));
+            mockMvc.perform(get("/api/v1/vehicles/"+vehicle2Id+"/reviews"))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].booking_id").doesNotExist()).andExpect(jsonPath("$[0].user_id").doesNotExist());
+            mockMvc.perform(get("/api/v1/bookings/"+booking+"/review").header("Authorization",tokenUser))
+                .andExpect(status().isOk()).andExpect(jsonPath("$.id").value(id))
+                .andExpect(jsonPath("$.hidden").value(hidden)).andExpect(jsonPath("$.content").value("Vehicle1"));
+            reject(patch("/api/v1/admin/reviews/"+id).header("Authorization",tokenAdmin)
+                .contentType(MediaType.APPLICATION_JSON).content("{\"hidden\":"+(!hidden)+",\"version\":"+version+"}"),409,com.carrental.exception.DomainException.class);
+            before=after;
+        }
     }
 }
-
