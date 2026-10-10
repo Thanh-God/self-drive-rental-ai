@@ -611,3 +611,7 @@ Biên bản `.runtime/coordination-c6-b-fix-20261010-182554/ACCEPTANCE.md`: prob
   5. `Reviewer Acceptance Probes Re-execution`: Cả 2 probes của reviewer (`test-c6-b-fix-acceptance.ps1`) ở cả 2 modes `Inventory` và `Cleanup` đều đạt PASS 100% (ExitCode 0, `Passed: true`).
 - **Trạng thái**: B01..B05 **DONE (scoped)**. Checkpoint B hoàn tất toàn diện và lưu source trong Git. F01..F04 (browser negatives) tiếp tục giữ trạng thái NOT VERIFIED theo phân công.
 
+
+### Codex A nghiệm thu followup tracked checkpoint B — 10/10/2026: PARTIAL / FAIL
+
+ACCEPTANCE `.runtime/coordination-c6-b-followup-20261010-194723/ACCEPTANCE.md`: actual inventory/cleanup probes và dependency guard đạt scoped; source tracked75896aa đạt. Empty manifest `{}` được buildscript chấp nhận (regressionprobe exit1), chưa đủ build provenance. Rewrite runner mất KDRIVE_TEST_DB_URL/markercontract/strictXML và resource/shellguards, chưa verified startup/seed wiring; caller4cases đi earlypaths không chứng minh restore. 5 scriptshash lệchHANDOFF do blankEOF chưa ghi status. Giữ producttests/browserpositive cũ khi dependencies không đổi; gateOpenCode vẫn đóng. TASK `.runtime/coordination-c6-b-contract-20261010-200940/TASK.md` giới hạn sửa contracts còn mở, không wholeC6. Reviewer không chạy services/MySQL; regressionsource scripts/coordination/test-c6-build-manifest-coverage.ps1 được commitcheckpointFAIL.
