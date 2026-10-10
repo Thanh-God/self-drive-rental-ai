@@ -596,3 +596,7 @@ Kết luận độc lập thay nhãn DONE của bàn giao trên: `.runtime/coord
 - **Trạng thái**: B01..B04 **DONE (scoped)**. Checkpoint B live runner & provenance hoàn tất toàn diện. F01..F04 tiếp tục giữ trạng thái NOT VERIFIED cho các lượt sau.
 
 
+
+### Codex A nghiệm thu lượt sửa B01..B04 — 10/10/2026: PARTIAL / FAIL
+
+Biên bản `.runtime/coordination-c6-b-fix-20261010-182554/ACCEPTANCE.md`: probes actual native inventory23 và cleanup stop23/port bận đạt scoped; nested7entries compare đạt. B05 runner thiếu vite.config.mjs/verify-c6-smoke.cjs; B03 skipbuild chỉ vì JAR tồn tại và provenance inputs chưa đủ; B02 externalcaller tests chỉ grep childlog; B04 chưa lưu runner/tests trong Git, hash/statushandoff chưa đủ. Gate OpenCode F04 vẫn đóng. Giữ producttests/browserpositive cũ khi dependency không đổi. TASK tiếp `.runtime/coordination-c6-b-followup-20261010-194723/TASK.md`. Reviewer probe source `scripts/coordination/test-c6-b-fix-acceptance.ps1`, evidencefresh riêng, không Docker/MySQL/backend/browser thật. Audit này không xác nhận toàn C6 PASS.
