@@ -9,13 +9,15 @@ param(
     [switch]$SimulateDockerInventoryFailure,
     [switch]$SimulateCleanupFailure,
     [switch]$SimulateCleanupFailureEarly,
-    [switch]$SimulateMissingDependency
+    [switch]$SimulateMissingDependency,
+    [ValidateSet("Normal","Exception","Logger","Readback")][string]$EnvironmentProbeMode
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-$RepoRoot = "E:\AI\BERT_Project\codepython\KLTN"
+$RepoRoot = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
+if ($PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5) { throw '[UNSUPPORTED_SHELL] Windows PowerShell 5.1 required' }
 $BaseDir = $PSScriptRoot
 $BackendDir = Join-Path $RepoRoot "backend"
 $FrontendDir = Join-Path $RepoRoot "frontend"
@@ -54,7 +56,11 @@ $trackedEnvVars = @(
     "RUN_DIR",
     "BASE_URL",
     "API_BASE_URL",
-    "KDRIVE_TEST_FIXTURE",
+    "JAVA_HOME", "SEED_ENABLED", "MYSQL_PWD",
+"KDRIVE_TEST_DB_URL", "KDRIVE_TEST_DB_USER", "KDRIVE_TEST_DB_PASSWORD",
+"KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX", "KDRIVE_TEST_FIXTURE_MARKER_TOKEN",
+"KDRIVE_TEST_EXPECTED_HOST", "KDRIVE_TEST_EXPECTED_PORT", "KDRIVE_TEST_EXPECTED_SCHEMA",
+"KDRIVE_TEST_FIXTURE",
     "KDRIVE_TEST_MARKER_SCHEMA",
     "SEED_PASSWORD",
     "JWT_SECRET",
@@ -81,6 +87,14 @@ function Restore-ProcessEnvironment {
 }
 
 $initialEnvBackup = Backup-ProcessEnvironment
+function Get-RunInputs {
+    $inputs=[ordered]@{}
+    $files=@(Get-ChildItem (Join-Path $RepoRoot 'backend/src') -Recurse -File)+@(Get-ChildItem (Join-Path $RepoRoot 'frontend/src') -Recurse -File)+@(Get-ChildItem $BaseDir -File)
+    foreach($rel in @('backend/pom.xml','backend/mvnw.cmd','backend/mvnw','backend/.mvn/wrapper/maven-wrapper.properties','frontend/package.json','frontend/package-lock.json','frontend/vite.config.js','.runtime/coordination-c6-checkpoint-a-20261010-122848/c6-checkpoint-a-helpers.psm1')) { $files+=Get-Item (Join-Path $RepoRoot $rel) }
+    foreach($f in ($files | Sort-Object FullName -Unique)) {$inputs[$f.FullName.Substring($RepoRoot.Length+1)]=(Get-FileHash -LiteralPath $f.FullName).Hash}
+    return $inputs
+}
+$runInputsBefore=Get-RunInputs
 
 # =============================================================================
 # PREFLIGHT DEPENDENCY GUARD (B05)
@@ -116,6 +130,7 @@ Assert-PreflightDependencies -Dir $BaseDir
 # =============================================================================
 New-Item -ItemType Directory -Path $EvidenceDir -Force | Out-Null
 $runLog = Join-Path $EvidenceDir "runner.log"
+$inCleanup=$false
 
 function Write-RunLog {
     param([string]$Message)
@@ -124,12 +139,14 @@ function Write-RunLog {
     Write-Host $line
     try {
         Add-Content -LiteralPath $runLog -Value $line -Encoding UTF8
-    } catch {}
+    } catch {
+        if($inCleanup){$script:cleanupFailureOccurred=$true;$script:cleanupFailureMessage+=' Cleanup log write failed;'} else {throw}
+    }
 }
 
 # Khởi tạo các biến kiểm soát vòng đời tiến trình & fixture
 $containerCreated = $false
-$ContainerName = "kltn-c6-b-ag-$(Get-Date -Format 'yyyyMMdd-HHmmss')"
+$ContainerName = "kltn-c6-b-ag-$([Guid]::NewGuid().ToString('N').Substring(0,12))"
 $VolumeName = "vol-$ContainerName"
 $MysqlPort = 33610
 $BackendPort = 8125
@@ -144,6 +161,15 @@ $cleanupFailureMessage = ""
 # OUTER TRY / FINALLY: ĐẢM BẢO KHÔI PHỤC CALLER ENVIRONMENT VÔ ĐIỀU KIỆN
 # =============================================================================
 try {
+    if ($EnvironmentProbeMode) {
+        $env:DB_URL='probe-changed'
+        $env:PROBE_EXISTING_VAR='probe-changed'
+        $env:PROBE_ABSENT_VAR='probe-created'
+        if ($EnvironmentProbeMode -eq 'Logger') { $runLog=Join-Path $EvidenceDir 'missing-parent/log'; Write-RunLog 'probe' }
+        if ($EnvironmentProbeMode -eq 'Readback') { 'probe' | Set-Content (Join-Path $EvidenceDir 'missing-parent/readback') }
+        if ($EnvironmentProbeMode -eq 'Exception') { throw '[ENV_PROBE_EXCEPTION]' }
+        return
+    }
     # INNER TRY / FINALLY: THỰC THI NGHIỆP VỤ & CLEANUP TIẾN TRÌNH / DOCKER
     try {
         Write-RunLog "=== Starting Checkpoint B Live Runner (Session: $ContainerName) ==="
@@ -163,7 +189,15 @@ try {
         if ($invExit -ne 0) {
             throw "[PREFLIGHT_GUARD] Docker container inventory failed with native exit code ${invExit}: $($invOut -join ' ')"
         }
-        $existingContainers = $invOut -split "`r?`n" | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        $existingContainers = @($invOut | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+        if ($existingContainers -contains $ContainerName) { throw '[PREFLIGHT_GUARD] Container already exists' }
+        $vols=@(& docker volume ls --format '{{.Name}}' 2>&1)
+        if ($LASTEXITCODE -ne 0) { throw '[PREFLIGHT_GUARD] Docker volume inventory failed' }
+        if ($vols -contains $VolumeName) { throw '[PREFLIGHT_GUARD] Volume already exists' }
+        foreach ($port in @($MysqlPort,$BackendPort,$VitePort)) {
+            $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,$port)
+            try { $listener.Start() } catch { throw "[PREFLIGHT_GUARD] Port $port occupied" } finally { $listener.Stop() }
+        }
         Write-RunLog "Found $($existingContainers.Count) existing docker containers."
 
         # Guard: Không được trùng với container phase 5 local
@@ -173,12 +207,14 @@ try {
 
         # 2. KHỞI TẠO MYSQL FIXTURE CONTAINER
         Write-RunLog "--- 2. Starting Isolated MySQL Fixture Container: $ContainerName on port $MysqlPort ---"
-        $dbPassword = "kdrive_test_pw_c6_$(Get-Random -Minimum 100000 -Maximum 999999)"
+        $dbPassword = [Guid]::NewGuid().ToString("N")
         $DbUser = "root"
         $DbName = "kdrive_c6_b"
         $MarkerSchema = "kdrive_c6_b_meta"
 
-        $runArgs = @("run", "-d", "--name", $ContainerName, "-p", "${MysqlPort}:3306", "-e", "MYSQL_ROOT_PASSWORD=$dbPassword", "-e", "MYSQL_DATABASE=$DbName", "-v", "${VolumeName}:/var/lib/mysql", "mysql:8.4")
+                $privateEnv=Join-Path $EvidenceDir 'mysql.private.env'
+        [IO.File]::WriteAllLines($privateEnv,@("MYSQL_ROOT_PASSWORD=$dbPassword","MYSQL_DATABASE=$DbName"),[Text.UTF8Encoding]::new($false))
+        $runArgs = @('run','-d','--name',$ContainerName,'-p',"127.0.0.1:${MysqlPort}:3306",'--env-file',$privateEnv,'-v',"${VolumeName}:/var/lib/mysql",'mysql:8.4')
         $runOut = & docker $runArgs 2>&1
         $runExit = $LASTEXITCODE
         if ($null -eq $runExit) { $runExit = 0 }
@@ -192,13 +228,15 @@ try {
         Write-RunLog "Waiting for MySQL container to become ready on port $MysqlPort..."
         $mysqlReady = $false
         for ($i = 1; $i -le 30; $i++) {
-            $pingOut = & docker exec $ContainerName mysqladmin ping -u$DbUser -p$dbPassword 2>&1
+            try {
+            $pingOut = & docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot --batch --skip-column-names -e "SELECT 1;" 2>&1
             $pingExit = $LASTEXITCODE
             if ($null -eq $pingExit) { $pingExit = 0 }
-            if ($pingExit -eq 0 -and ($pingOut -join ' ').Contains("mysqld is alive")) {
+            if ($pingExit -eq 0 -and ($pingOut -join ' ').Trim() -eq "1") {
                 $mysqlReady = $true
                 break
             }
+            } catch {}
             Start-Sleep -Seconds 2
         }
         if (-not $mysqlReady) {
@@ -207,8 +245,9 @@ try {
         Write-RunLog "MySQL container is fully ready."
 
         # Tạo Marker Schema & Fixture Table
-        $metaSql = "CREATE DATABASE IF NOT EXISTS $MarkerSchema; CREATE TABLE $MarkerSchema.__kdrive_test_fixture_marker (id INT PRIMARY KEY, session_name VARCHAR(100), created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP); INSERT INTO $MarkerSchema.__kdrive_test_fixture_marker (id, session_name) VALUES (1, '$ContainerName');"
-        $sqlOut = & docker exec $ContainerName mysql -u$DbUser -p$dbPassword -e "$metaSql" 2>&1
+                $markerToken=[Guid]::NewGuid().ToString('N')
+        $metaSql = "CREATE DATABASE $MarkerSchema; CREATE TABLE $MarkerSchema.__kdrive_test_fixture_marker (id INT PRIMARY KEY, target_schema VARCHAR(255), marker_token VARCHAR(255)); INSERT INTO $MarkerSchema.__kdrive_test_fixture_marker VALUES (1,'$DbName','$markerToken');"
+        $sqlOut = & docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot -e "$metaSql" 2>&1
         $sqlExit = $LASTEXITCODE
         if ($null -eq $sqlExit) { $sqlExit = 0 }
         if ($sqlExit -ne 0) {
@@ -224,24 +263,33 @@ try {
         $env:DB_URL = $dbUrl
         $env:DB_USER = $DbUser
         $env:DB_PASSWORD = $dbPassword
+                $env:KDRIVE_TEST_DB_URL=$dbUrl
+        $env:KDRIVE_TEST_DB_USER=$DbUser
+        $env:KDRIVE_TEST_DB_PASSWORD=$dbPassword
+        $env:KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX=$DbName
+        $env:KDRIVE_TEST_FIXTURE_MARKER_TOKEN=$markerToken
+        $env:KDRIVE_TEST_EXPECTED_HOST='127.0.0.1'
+        $env:KDRIVE_TEST_EXPECTED_PORT="$MysqlPort"
+        $env:KDRIVE_TEST_EXPECTED_SCHEMA=$DbName
         $env:KDRIVE_TEST_FIXTURE = $ContainerName
         $env:KDRIVE_TEST_MARKER_SCHEMA = $MarkerSchema
 
+        $env:JAVA_HOME='E:/Tools/Java/jdk-21.0.12.1+1'
         # 3. BUILD FAT JAR VỚI ISOLATED OUTPUT (B03)
         Write-RunLog "--- 3. Building Fat JAR with Isolated Output & Full Manifest (B03) ---"
         $buildScript = Join-Path $BaseDir "build-fat-jar.ps1"
         $jarOutputDir = Join-Path $EvidenceDir "jar-isolated"
-        $buildResult = & $buildScript -EvidenceDir $EvidenceDir -OutputDir $jarOutputDir -SkipBuildIfJarMatches
+        $buildResult = & $buildScript -EvidenceDir (Join-Path $EvidenceDir "build") -OutputDir $jarOutputDir
         Write-RunLog "Fat JAR build provenance passed: $($buildResult.EffectiveJarPath) (SHA256: $($buildResult.JarSHA256))"
 
         # 4. CHẠY 11 BACKEND TESTS TRÊN MYSQL FIXTURE
         Write-RunLog "--- 4. Running 11 Backend Tests on MySQL Fixture ---"
         $prevDir = Get-Location
         try {
-            Set-Location -LiteralPath $BackendDir
+            Set-Location -LiteralPath (Split-Path $buildResult.CompiledOutput -Parent)
             $mvnTestLog = Join-Path $EvidenceDir "mvn-11-tests.log"
-            $mvnCmd = Join-Path $BackendDir "mvnw.cmd"
-            $pTest = Start-Process -FilePath $mvnCmd -ArgumentList "-Dtest=ReviewHttpIntegrationTest,ReviewIntegrationTest", "test" -NoNewWindow -Wait -PassThru -RedirectStandardOutput $mvnTestLog -RedirectStandardError (Join-Path $EvidenceDir "mvn-11-tests-err.log")
+            $mvnCmd = Join-Path (Split-Path $buildResult.CompiledOutput -Parent) "mvnw.cmd"
+            $pTest = Start-Process -FilePath $mvnCmd -ArgumentList "-o", "-B", "-ntp", "-Dmaven.repo.local=$RepoRoot/.runtime/m2", "-Dtest=ReviewHttpIntegrationTest,ReviewIntegrationTest", "test" -NoNewWindow -Wait -PassThru -RedirectStandardOutput $mvnTestLog -RedirectStandardError (Join-Path $EvidenceDir "mvn-11-tests-err.log")
             $mvnTestExit = $pTest.ExitCode
         } finally {
             Set-Location -LiteralPath $prevDir
@@ -251,21 +299,36 @@ try {
             throw "11 Backend integration tests failed with exit code $mvnTestExit"
         }
 
+        Import-Module (Join-Path $RepoRoot '.runtime/coordination-c6-checkpoint-a-20261010-122848/c6-checkpoint-a-helpers.psm1') -Force
+        foreach($suite in @(@{Name='ReviewHttpIntegrationTest';Count=5},@{Name='ReviewIntegrationTest';Count=6})) {
+            $xml=Join-Path $buildResult.CompiledOutput "surefire-reports/TEST-com.carrental.$($suite.Name).xml"
+            $saved=Join-Path $EvidenceDir "TEST-com.carrental.$($suite.Name).xml"
+            Copy-Item -LiteralPath $xml -Destination $saved
+            Assert-SurefireXmlStrict -XmlPath $saved -ExpectedTests $suite.Count -ExpectedFailures 0 -ExpectedErrors 0 -ExpectedSkipped 0 | Out-Null
+        }
+        # Confirm actual fixture identity and successful migrations independently.
+        $readSql="SELECT DATABASE(),@@port; SELECT version,success,checksum FROM $DbName.flyway_schema_history ORDER BY installed_rank; SELECT COUNT(*) FROM $DbName.reviews;"
+        $readOut=@(& docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot --database=$DbName --batch -e $readSql 2>&1)
+        if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Fixture readback failed'}
+        $readOut | Set-Content (Join-Path $EvidenceDir 'mysql-readback.txt')
         # 5. KHỞI CHẠY BACKEND FAT JAR
         Write-RunLog "--- 5. Spawning Backend Fat JAR on port $BackendPort ---"
         $env:PORT = "$BackendPort"
-        $env:SPRING_PROFILES_ACTIVE = "test"
+                [Environment]::SetEnvironmentVariable('SPRING_PROFILES_ACTIVE',$null,'Process')
+        $env:SEED_ENABLED='true'
+        $env:SEED_PASSWORD='kdrive_seed_pw_c6_review_20261010'
+        $env:JWT_SECRET='integration-test-only-secret-at-least-32-bytes'
         $backendLog = Join-Path $EvidenceDir "backend-live.log"
         $backendErr = Join-Path $EvidenceDir "backend-live-err.log"
 
-        $backendProcess = Start-Process -FilePath "java" -ArgumentList "-jar", "`"$($buildResult.EffectiveJarPath)`"", "--server.port=$BackendPort" -WindowStyle Hidden -PassThru -RedirectStandardOutput $backendLog -RedirectStandardError $backendErr
+        $backendProcess = Start-Process -FilePath (Join-Path $env:JAVA_HOME "bin/java.exe") -ArgumentList "-jar", "`"$($buildResult.EffectiveJarPath)`"", "--server.port=$BackendPort" -WindowStyle Hidden -PassThru -RedirectStandardOutput $backendLog -RedirectStandardError $backendErr
         Write-RunLog "Backend JAR Process started: PID=$($backendProcess.Id)"
 
         # Chờ Backend ready
         $backendReady = $false
         for ($i = 1; $i -le 45; $i++) {
             try {
-                $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$BackendPort/actuator/health" -UseBasicParsing -TimeoutSec 2
+                $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$BackendPort/api/v1/vehicles" -UseBasicParsing -TimeoutSec 2
                 if ($resp.StatusCode -eq 200) {
                     $backendReady = $true
                     break
@@ -278,6 +341,10 @@ try {
         }
         Write-RunLog "Backend JAR is HTTP-ready on port $BackendPort."
 
+        $bookingId='booking-e2e-completed-001'
+        $seedSql="INSERT INTO $DbName.bookings (id,user_id,vehicle_id,customer_name,vehicle_name,pickup_branch_id,return_branch_id,pickup_name,return_name,actual_return_branch_id,start_at,end_at,expires_at,status,daily_price,rental_days,rental_total,one_way_fee,total,policy_version,created_at,version) VALUES ('$bookingId','demo-user','v1','Demo','Toyota Vios','dn','dn','Demo','Demo','dn','2026-10-01 10:00:00','2026-10-04 10:00:00','2026-10-04 10:00:00','COMPLETED',650000,3,1950000,0,1950000,'v1_policy','2026-10-01 10:00:00',0);"
+        & docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot -e $seedSql | Out-Null
+        if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Completed booking seed failed'}
         # 6. KHỞI CHẠY VITE FRONTEND (B05)
         Write-RunLog "--- 6. Spawning Vite Frontend on port $VitePort ---"
         $env:VITE_PORT = "$VitePort"
@@ -328,13 +395,23 @@ try {
         if ($pSmoke.ExitCode -ne 0) {
             throw "Browser smoke test failed with exit code $($pSmoke.ExitCode)"
         }
+        $smokeResult=Get-Content (Join-Path $EvidenceDir 'browser-smoke-results.json') -Raw | ConvertFrom-Json
+        if(-not $smokeResult.AllAssertionsPassed){throw '[SMOKE_FAILURE] Assertions failed'}
         Write-RunLog "Browser smoke test: PASS"
 
+        $actualJarHash=(Get-FileHash -LiteralPath $buildResult.EffectiveJarPath).Hash
+        if($actualJarHash -ne $buildResult.JarSHA256){throw '[SOURCE_DRIFT] Live JAR changed'}
+        $runInputsAfter=Get-RunInputs
+        if(($runInputsBefore | ConvertTo-Json -Compress) -cne ($runInputsAfter | ConvertTo-Json -Compress)){throw '[SOURCE_DRIFT] Runner inputs changed'}
+        $runInputsBefore | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'source-before.json')
+        $runInputsAfter | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'source-after.json')
+        [pscustomobject]@{MySqlVerified=$true;HttpTests=5;ServiceTests=6;BrowserPositive=$true;JarSHA256=$actualJarHash;SourceDrift=$false} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'execution-summary.json')
         $overallSuccess = $true
     } finally {
         # =========================================================================
         # INNER FINALLY: DỌN TIẾN TRÌNH & DOCKER; NÉM NGOẠI LỆ NẾU CLEANUP LỖI (B02)
         # =========================================================================
+$inCleanup=$true
         Write-RunLog "--- INNER FINALLY: Performing Process and Container Cleanup ---"
 
         if ($SimulateCleanupFailureEarly) {
@@ -416,11 +493,16 @@ try {
             }
         }
 
+        # Only assert ports belonging to services actually created by this run.
+        $cleanupPorts=@()
+        if($containerCreated){$cleanupPorts+=$MysqlPort}
+        if($backendProcess){$cleanupPorts+=$BackendPort}
+        if($viteProcess){$cleanupPorts+=$VitePort}
         # 5. Kiểm tra ports giải phóng
         $portsFree = $false
         for ($attempt = 1; $attempt -le 3; $attempt++) {
             $anyBound = $false
-            foreach ($p in @($MysqlPort, $BackendPort, $VitePort)) {
+            foreach ($p in $cleanupPorts) {
                 $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $p)
                 try {
                     $listener.Start()
