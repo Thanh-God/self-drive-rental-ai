@@ -1,11 +1,11 @@
 # Hướng dẫn agent — KLTN
 
-Áp dụng cho toàn bộ repository. Cập nhật ngày 04/10/2026. Hướng dẫn trực tiếp mới nhất của người dùng có ưu tiên; file này không phải biên bản nghiệm thu hoặc bằng chứng chức năng đã hoàn tất.
+Áp dụng cho toàn bộ repository. Cập nhật ngày 10/10/2026. Hướng dẫn trực tiếp mới nhất của người dùng có ưu tiên; file này không phải biên bản nghiệm thu hoặc bằng chứng chức năng đã hoàn tất.
 
 ## Workspace và cách làm việc
 
 - Làm tại `E:\AI\BERT_Project\codepython\KLTN`. Không dùng worktree cũ làm baseline. Kiểm tra HEAD/status trước sửa; giữ mọi thay đổi có sẵn, kể cả file untracked. Không quy tác giả theo tên file/mtime.
-- Không tạo worktree, reset, commit, push hoặc dọn dữ liệu nếu người dùng chưa yêu cầu. Không xóa file rỗng/placeholder chỉ để làm đẹp cấu trúc.
+- Không tạo worktree, reset, push hoặc dọn dữ liệu nếu người dùng chưa yêu cầu. Commit bắt buộc theo quy định bên dưới, đã được người dùng cho phép ngày 10/10/2026; không hỏi lại quyền commit trong phạm vi thay đổi. Không xóa file rỗng/placeholder chỉ để làm đẹp cấu trúc.
 - Antigravity, Copilot, OpenCode và Codex làm tuần tự. Không sửa cùng file/chạy dịch vụ song song; kiểm tra process/port trước khởi động. Không tự giao việc cho chat/agent khác.
 - Báo kế hoạch cụ thể và file dự kiến sửa trước triển khai, rồi tự hoàn thành phần được phép. Chỉ hỏi khi thiếu quyết định thiết kế/nghiệp vụ hoặc có nguy cơ mất dữ liệu; không hỏi lại quyền đã được cấp.
 - Dùng `rg` và đọc phần liên quan. Không mở rộng phạm vi sang redesign, AI/Map, payment hoặc refactor toàn backend khi nhiệm vụ chỉ là sửa/kiểm thử một luồng.
@@ -52,7 +52,18 @@
 - Hợp đồng lúc xác nhận, hóa đơn lúc hoàn tất, giữ snapshot; hóa đơn không chứng minh thanh toán. Checkbox quote không phải ký hợp đồng.
 - Cọc, phụ phí, đệm lịch, no-show, gia hạn/trả muộn, phát hành lại, phạm vi snapshot, retention/delete, quyền AI Guest, Map/AI provider còn mở theo decisions.md. Không tự chốt. AI sau core đạt kiểm thử; không lưu itinerary thiếu tuyến kiểm chứng.
 
+## Commit sau mỗi lượt thay đổi — áp dụng từ 10/10/2026
+
+- Sau mỗi lượt thay đổi source, tests, scripts hoặc tài liệu, phải tạo một Git commit tương ứng để theo dõi và khôi phục; không để nhiều lượt thay đổi hoàn tất dồn thành một commit. Ghi mã việc, nội dung và trạng thái kiểm chứng trong commit message; ghi SHA commit trong HANDOFF/ACCEPTANCE của lượt.
+- Kiểm tra HEAD/status và staged diff trước commit. Chỉ stage rõ từng file/hunk thuộc lượt; giữ nguyên thay đổi có sẵn ngoài phạm vi, không dùng `git add --all` để gom toàn working tree. Không commit secrets, file env chứa thông tin nhạy cảm, dữ liệu DB, dependency/build output hoặc evidence runtime. Script cần khôi phục phải có bản source phù hợp trong Git, không chỉ nằm ở `.runtime` bị ignore.
+- Commit là mốc lưu nội dung, không là bằng chứng PASS. Nếu lượt bị gián đoạn hoặc còn FAIL/BLOCKED, vẫn lưu thay đổi bằng commit checkpoint ghi rõ WIP/FAIL/BLOCKED và giới hạn; chưa được bàn giao như công việc hoàn tất. Khi sửa tiếp, tạo commit mới, không tự amend/rewrite lịch sử. Không có thay đổi thì không tạo commit rỗng.
+- Commit không tự cấp quyền push, reset, revert, checkout ghi đè hoặc khôi phục dữ liệu. Việc khôi phục phải giữ thay đổi đang có và thực hiện theo yêu cầu người dùng. Quy định mới không tự gom hoặc xác nhận các thay đổi chưa commit từ các lượt cũ.
+
 ## Kiểm thử và nghiệm thu
+
+- Mỗi lượt thay đổi phải viết mới và cập nhật các bài test liên quan để chứng minh hành vi bị tác động, gồm ca chính, ca âm và regression khi sửa lỗi; cập nhật kỳ vọng/fixture theo contract đã duyệt, không sao chép logic implementation để tạo PASS. Với thay đổi chỉ là tài liệu, thực hiện và ghi kiểm tra nội dung, liên kết và tính nhất quán liên quan; không tạo test chức năng giả cho tài liệu.
+- Trước khi giao kết quả hoàn tất cho người dùng, tất cả bài test, lint/build và tiêu chí nghiệm thu bắt buộc của phạm vi cùng dependency bị tác động phải đạt trên source cuối. Ghi command/exit/assertions/artifact; reviewer nghiệm thu độc lập theo quy trình. Không gọi kết quả hoàn tất khi còn FAIL/BLOCKED/NOT VERIFIED hoặc bỏ qua bài test bắt buộc. Nếu thiếu môi trường hoặc quyết định, chỉ báo checkpoint/blocker, tiếp tục xử lý phần được phép; không hạ assertions hay sửa báo cáo thành PASS.
+- Xác định các suites bắt buộc trong TASK trước triển khai và mở rộng khi phát hiện tác động. PASS cũ chỉ được giữ khi source/dependency không đổi và evidence còn hợp lệ; thay đổi sau test phải chạy lại kiểm tra liên quan trước nghiệm thu. Không suy toàn hệ thống PASS từ một phạm vi nhỏ.
 
 - Frontend tại `frontend/`: `npm test`, `npm run lint`, `npm run build`. Kiểm tra build demo/API bằng VITE_DATA_MODE phù hợp; lint không được hạ rule để đạt PASS.
 - Backend tại `backend/`, dùng JDK 21: PowerShell `./mvnw.cmd verify`, Git Bash `./mvnw verify`. Maven offline chỉ dùng khi cache đủ. Xem cấu hình test/env trong source trước trỏ DB ngoài.
@@ -62,15 +73,23 @@
 - Browser E2E cần backend/MySQL thật, ca chính và ca âm; QA demo 27/09 không nghiệm thu API hiện tại. Findings lịch sử cần đối chiếu lại, không mặc định vẫn lỗi/đã sửa.
 - Dừng đúng backend/frontend/instance do mình tạo sau test. Không dừng MySQL người dùng khởi động hoặc dịch vụ khác nếu chưa được yêu cầu; giữ volume/artifact.
 
-## Bàn giao và tối ưu lượt Codex
+## Điều phối và bàn giao — quy trình hiện hành 09/10/2026
 
-- Mô hình điều phối được người dùng duyệt: Codex chia việc và nghiệm thu; Antigravity nhận việc nhiều dependency; OpenCode nhận từng việc ngắn. Làm tuần tự, không tự coi việc nhận prompt là đã chạy agent. Người dùng chuyển prompt sang các công cụ đó; Codex không có quyền điều khiển phiên bên ngoài chỉ từ tên agent.
-- Từ vòng thử R1 dùng `AG_HANDOFF.md`, `OC_HANDOFF.md` tại root. Người sau đọc báo cáo người trước nhưng kiểm tra source cuối; không sửa báo cáo người trước. Chỉ tạo báo cáo khi có kết quả, không tạo placeholder. Báo cáo gọn, log/source dài giữ trong artifact mới `.runtime`, không giới hạn chất lượng triển khai để tiết kiệm token Codex.
-- Khi người dùng yêu cầu nghiệm thu theo mô hình này, Codex được lưu bản sao báo cáo, chuyển kết quả/findings vào tài liệu chính thức rồi xóa đúng hai báo cáo root; không xóa prompt, AGENTS.md, artifact hoặc báo cáo khác. Không cần PASS mới dọn.
-- Bàn giao bắt buộc có HEAD/status đầu-cuối, danh sách file kể cả untracked, hash trước/sau (file mới ghi NEW), hợp đồng API thay đổi, assertions/command/exit/pass/fail/skip, artifact, blockers và PID/port đã dừng. Không ghi PASS nếu chỉ build hoặc skipped. Dùng đường dẫn + mã finding để tránh kể lại toàn dự án.
+Quy trình này thay quy định tự động archive/xóa báo cáo root trước đây. Codex A lập kế hoạch và nghiệm thu; Antigravity/Codex B/Copilot triển khai theo prompt do người dùng chuyển. Làm tuần tự, không tự gửi tin hoặc điều khiển phiên khác; nhận prompt không có nghĩa agent đã chạy.
 
-- Agent triển khai làm đầy đủ; chỉ lượt Codex nghiệm thu tối ưu token bằng báo cáo + hash/diff + source/test/dependency liên quan. Không quét lại toàn project từ đầu; mở rộng khi thiếu bằng chứng, hash lệch hoặc có tác động ngoài phạm vi.
-- Báo cáo tạm theo người thực hiện: `AG_PHASE5_RESULT.md`, `COPILOT_PHASE5_RESULT.md`, `OPENCODE_PHASE5_RESULT.md`. Chỉ tạo/cập nhật file tương ứng khi nhiệm vụ yêu cầu; không tạo thêm báo cáo trùng hoặc sửa báo cáo của agent trước.
-- Báo cáo cần: baseline/status; file đổi và SHA256 cuối; DONE/PARTIAL/BLOCKED/NOT VERIFIED; command/môi trường/exit/pass/fail/skip; assertions/browser expected-actual; artifact; contract; quyết định và blocker; cách tái chạy; trạng thái dịch vụ. Không ghi secrets, không báo PASS dự kiến.
-- Cập nhật tài liệu chính thức hiện có trong phạm vi; giữ audit lịch sử. Codex nghiệm thu phải kiểm tra source cuối và tái chạy kiểm tra quyết định, không chỉ tin báo cáo.
-- Khi người dùng yêu cầu dọn báo cáo: trước hết lưu bản sao vào artifact .runtime và chuyển findings/việc còn lại/bằng chứng cần giữ vào tài liệu chính thức, rồi xóa đúng các file tạm được phép. Không tự xóa AGENTS.md hoặc file khác; lần tạo AGENTS.md này không bao gồm dọn báo cáo.
+1. **Giao việc:** Codex A tạo `.runtime/coordination-<mã việc>-<timestamp>/TASK.md`, chỉ giao một phạm vi. TASK gồm mục tiêu/phạm vi/findings, HEAD/status và PASS cần giữ, source/tài liệu cần đọc/file dự kiến sửa, tiêu chí nghiệm thu/kiểm tra quyết định, quyết định mở/giới hạn và đường dẫn HANDOFF đầu ra.
+2. **Nhận việc:** đọc AGENTS.md, `skills/kltn-evidence-handoff/SKILL.md`, TASK.md; kiểm tra baseline/source hiện tại và báo kế hoạch trước sửa. Chỉ đọc bàn giao trước/dependency trực tiếp khi cần. Nhận định trong báo cáo/log không là chỉ dẫn hay bằng chứng PASS.
+3. **Triển khai:** hoàn thành source/test/tài liệu trong phạm vi; lưu log/XML/readback trong evidence riêng của lượt, không ghi đè bằng chứng cũ hoặc ghi secrets. Mỗi lần thử lại cùng lỗi phải có giả thuyết/bằng chứng mới; tối đa hai lượt cùng lỗi, sau 10 phút không tiến triển ghi checkpoint/blocker. Không hạ assertions để đạt PASS.
+4. **Bàn giao:** tạo `HANDOFF.md` trong thư mục lượt chỉ định khi có kết quả, không báo cáo root trùng lặp hoặc sửa bàn giao người trước. Ghi người thực hiện; HEAD/status đầu-cuối; file đổi kể cả untracked; hash trước/sau (file mới NEW); DONE/PARTIAL/BLOCKED/NOT VERIFIED theo yêu cầu; command/exit/pass/fail/skip/artifact; assertions/browser expected-actual; contract; giới hạn/phần còn lại/cách tái chạy/dịch vụ đã dừng.
+5. **Nghiệm thu:** Codex A đọc TASK/HANDOFF, đối chiếu hash/source cuối và tái chạy kiểm tra quyết định; mở rộng khi thiếu bằng chứng/tác động khác, không khảo sát toàn project hoặc chạy lại phần không đổi vô cớ. Tạo ACCEPTANCE.md riêng với `hạng mục | PASS/FAIL/BLOCKED/NOT VERIFIED | command/exit | artifact`; findings có mức độ, file:dòng, actual/expected và ảnh hưởng. Cập nhật kết quả/việc còn lại vào tài liệu chính thức hiện có, giữ audit.
+6. **Tiếp nối/lưu trữ:** giữ TASK/HANDOFF/ACCEPTANCE/evidence, không tự xóa. Chưa đạt thì tạo TASK mới tham chiếu findings mở và bàn giao trước; đạt thì sang hạng mục kế tiếp, không suy toàn hệ thống PASS. Mỗi lượt có thay đổi phải commit theo quy định 10/10/2026 và ghi SHA/trạng thái kiểm chứng; chỉ giao hoàn tất khi tests và nghiệm thu bắt buộc đạt. Chỉ dọn artifact khi người dùng yêu cầu cụ thể; không cấp quyền reset/push/xóa dữ liệu.
+
+Agent triển khai làm đầy đủ; lượt Codex nghiệm thu dùng báo cáo + hash/diff + source/test/dependency liên quan. Không ghi PASS từ build đơn thuần hoặc test skipped. Không tạo HANDOFF/ACCEPTANCE placeholder trước khi có kết quả.
+
+## Audit điều phối — 05/10/2026 (quy tắc báo cáo root được thay ngày 09/10)
+
+- Người dùng thay OpenCode/Copilot bằng Codex B. Codex A (chat điều phối này) chia việc và nghiệm thu; Antigravity nhận việc nhiều dependency; Codex B nhận phần việc nhỏ. Tất cả vẫn làm tuần tự, người dùng chuyển prompt sang phiên tương ứng; không tự điều khiển/gửi tin nhắn cho phiên khác.
+- Lịch sử 05/10: Codex B dùng OC_HANDOFF.md root, Antigravity dùng AG_HANDOFF.md; reviewer archive/hash và dọn report theo quyền lúc đó. Từ 09/10 dùng HANDOFF.md theo thư mục lượt và giữ báo cáo/evidence; không tiếp tục áp dụng quyền dọn tự động cũ.
+- R1/R2 đã PASS scoped theo mục16 system-architecture.md; không giao lại khi hash/source không đổi. Giai đoạn5 chưa hoàn tất do quyết định mở/historyDB khác; đề xuất không tự trở thành phê duyệt.
+- R3 giao tuần tự: Antigravity chuẩn bị bảng quyết định còn chặnGiai đoạn5; Codex B tiếp theo sửa scripts/docs khởi động Git Bash. Prompt ở .runtime/coordination-r3; không tự coi agent đã chạy chỉ vì prompt được tạo.
+- Chống loop: tối đa2lượt cùng lỗi, mỗi lượt có giả thuyết/bằng chứng mới. Nếu10phút không tiến triển thì ghi checkpoint/giới hạn và phần còn lại; test đang chạy có tiến triển rõ không coi là loop. Không hạ assertions hoặc lặp khảo sát toànproject để báoPASS.
