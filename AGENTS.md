@@ -71,7 +71,16 @@
 - Test phù hợp thay đổi, có assertions thực; không tính file rỗng hoặc test skipped là PASS. Không bỏ Flyway/Hibernate validate, permission, state machine hoặc dùng mock để vượt blocker.
 - Tách H2 và MySQL. Build không chứng minh startup; health không chứng minh toàn luồng. Fresh/upgrade phải giữ dữ liệu đại diện và xác nhận history/checksum/schema. Concurrency/rollback nghiệp vụ chỉ được tuyên bố đạt nếu ca thực thi trên MySQL chứng minh điều đó.
 - Browser E2E cần backend/MySQL thật, ca chính và ca âm; QA demo 27/09 không nghiệm thu API hiện tại. Findings lịch sử cần đối chiếu lại, không mặc định vẫn lỗi/đã sửa.
-- Dừng đúng backend/frontend/instance do mình tạo sau test. Không dừng MySQL người dùng khởi động hoặc dịch vụ khác nếu chưa được yêu cầu; giữ volume/artifact.
+- Dừng đúng backend/frontend/instance do mình tạo sau test. Không dừng MySQL người dùng khởi động hoặc dịch vụ khác nếu chưa được yêu cầu; giữ artifact, xử lý volume test theo chính sách fixture bên dưới.
+
+## Chính sách fixture Docker — người dùng chấp thuận 11/10/2026
+
+- Giữ fixture MySQL riêng từng lượt; không dùng/mount volume DB gốc hoặc trỏ test ghi vào cổng33385/3306. Không tạo fixture mới liên tục cho cùng một lỗi; tuân thủ checkpoint/retry hiện hành.
+- Sau nghiệm thu, Codex A lập danh sách có identity container/image/volume, evidence và lý do KEEP hoặc dọn. PASS phải đối chiếu source/assertions/readback; tên, mtime, exit0 của container hoặc báo cáo agent không tự chứng minh PASS/dư thừa.
+- Chính sách đã được người dùng cho phép: dọn đúng fixture test đã nghiệm thu không còn cần giữ sống, hoặc bản lặp/ngắt đã được reviewer xác định dư thừa. Giữ MySQL gốc, mốc migration/rollback và ca âm riêng, fixture còn finding cần điều tra, cùng mục chưa rõ nguồn gốc. Không tự xóa các mục ngoài danh sách hoặc dùng prune toàn Docker.
+- Khi cần giữ khả năng tái hiện/đối chiếu, archive dữ liệu nén có hash, image/config và mapping tới lượt; dừng fixture trước sao lưu vật lý, kiểm archive và khôi phục mẫu cô lập phù hợp trước dọn. Config/dump chứa dữ liệu riêng tư không được đưa vào chat/log công khai/Git. Archive không thay thế evidence assertions.
+- Trước xóa kiểm lại exact identity, stopped state, volume không dùng chung và archive/evidence theo tiêu chí TASK; sau xóa readback danh sách đã dọn/đã giữ và dữ liệu DB gốc. Giữ TASK/HANDOFF/ACCEPTANCE/log/XML/screenshots; việc dọn fixture không cấp quyền xóa evidence hoặc full backup. Orphan/unused không tự đồng nghĩa an toàn để xóa.
+- Công cụ ở scripts/operations/: fixture-cleanup-guard.psm1, archive-redundant-fixtures.ps1, restore-fixture-archive-probe.ps1; đọc README trước sử dụng. Chỉ giảm dữ liệu Docker logic không bảo đảm file VHDX host tự thu nhỏ; compact hoặc xóa backup cần yêu cầu riêng.
 
 ## Điều phối và bàn giao — quy trình hiện hành 09/10/2026
 
