@@ -1,10 +1,10 @@
-# runner.ps1
+﻿# runner.ps1
 # C6 Browser Negatives Runner (F01/F03) - Live MySQL Fixture, Fat JAR & Playwright
 
 [CmdletBinding()]
 param(
     [string]$EvidenceDir = $null,
-    [switch]$SkipRefusalCheck,
+    [string]$AcceptedBuildDir = ".runtime/coordination-c6-f04-codexa-complete-20261010-214205/evidence/live3/build",
     [switch]$RefusalTestOnly,
     [ValidateSet("Normal","Exception","Logger","Readback")][string]$EnvironmentProbeMode
 )
@@ -33,6 +33,8 @@ if ($RefusalTestOnly) {
     exit 0
 }
 
+$EvidenceDir=[IO.Path]::GetFullPath($EvidenceDir)
+
 # =============================================================================
 # ENVIRONMENT BACKUP & RESTORATION (2-LAYER ROBUST OUTER FINALLY)
 # =============================================================================
@@ -59,7 +61,7 @@ $trackedEnvVars = @(
     "KDRIVE_TEST_FIXTURE",
     "KDRIVE_TEST_MARKER_SCHEMA",
     "SEED_PASSWORD",
-    "JWT_SECRET",
+    "JWT_SECRET", "C6_FIXTURE_CONTAINER", "C6_FIXTURE_SCHEMA", "C6_FIXTURE_MARKER_SCHEMA", "C6_FIXTURE_MARKER_TOKEN",
     "PROBE_EXISTING_VAR",
     "PROBE_ABSENT_VAR"
 )
@@ -262,54 +264,22 @@ try {
         $env:KDRIVE_TEST_MARKER_SCHEMA = $MarkerSchema
 
         $env:JAVA_HOME='E:/Tools/Java/jdk-21.0.12.1+1'
-        # 3. BUILD FAT JAR VỚI ISOLATED OUTPUT
-        Write-RunLog "--- 3. Building Fat JAR with Isolated Output & Full Manifest ---"
-        $buildScript = Join-Path (Split-Path $PSScriptRoot -Parent) "c6-checkpoint-b\build-fat-jar.ps1"
-        $jarOutputDir = Join-Path $EvidenceDir "jar-isolated"
-        $buildResult = & $buildScript -EvidenceDir (Join-Path $EvidenceDir "build") -OutputDir $jarOutputDir
-        Write-RunLog "Fat JAR build provenance passed: $($buildResult.EffectiveJarPath) (SHA256: $($buildResult.JarSHA256))"
-
-        # 4. CHẠY BACKEND TESTS TRÊN MYSQL FIXTURE (ReviewHttpIntegrationTest + ReviewIntegrationTest = 11 tests)
-        Write-RunLog "--- 4. Running 11 Backend Tests on MySQL Fixture ---"
-        $prevDir = Get-Location
-        try {
-            Set-Location -LiteralPath (Split-Path $buildResult.CompiledOutput -Parent)
-            $mvnTestLog = Join-Path $EvidenceDir "mvn-11-tests.log"
-            $mvnCmd = Join-Path (Split-Path $buildResult.CompiledOutput -Parent) "mvnw.cmd"
-            $pTest = Start-Process -FilePath $mvnCmd -ArgumentList "-o", "-B", "-ntp", "-Dmaven.repo.local=$RepoRoot/.runtime/m2", "-Dtest=ReviewHttpIntegrationTest,ReviewIntegrationTest", "test" -NoNewWindow -Wait -PassThru -RedirectStandardOutput $mvnTestLog -RedirectStandardError (Join-Path $EvidenceDir "mvn-11-tests-err.log")
-            $mvnTestExit = $pTest.ExitCode
-        } finally {
-            Set-Location -LiteralPath $prevDir
+        # Reuse accepted JAR only after exact full build-input and artifact readback.
+        Write-RunLog "--- 3. Verifying accepted build inputs and JAR ---"
+        $accepted=Join-Path $RepoRoot $AcceptedBuildDir
+        $manifest=Get-Content (Join-Path $accepted 'build-inputs-before.json') -Raw | ConvertFrom-Json
+        $buildResult=Get-Content (Join-Path $accepted 'build-provenance-report.json') -Raw | ConvertFrom-Json
+        $actualFiles=@(Get-ChildItem $BackendDir/src -Recurse -File)+@(Get-ChildItem $BackendDir/.mvn -Recurse -File)
+        foreach($rel in @('pom.xml','mvnw','mvnw.cmd')){$actualFiles+=Get-Item (Join-Path $BackendDir $rel)}
+        if($actualFiles.Count -ne @($manifest.psobject.Properties).Count){throw '[SOURCE_DRIFT] Accepted build input keyset differs'}
+        foreach($prop in $manifest.psobject.Properties){
+            $inputFile=Join-Path $BackendDir $prop.Name
+            if(-not (Test-Path -LiteralPath $inputFile) -or (Get-FileHash $inputFile).Hash -ne $prop.Value){throw "[SOURCE_DRIFT] Accepted input differs: $($prop.Name)"}
         }
-        Write-RunLog "Backend integration tests finished with exit code: $mvnTestExit"
-        if ($mvnTestExit -ne 0) {
-            throw "11 Backend integration tests failed with exit code $mvnTestExit"
-        }
-
-        # Verify surefire XML
-        Import-Module (Join-Path $RepoRoot '.runtime/coordination-c6-checkpoint-a-20261010-122848/c6-checkpoint-a-helpers.psm1') -Force
-        foreach($suite in @(@{Name='ReviewHttpIntegrationTest';Count=5},@{Name='ReviewIntegrationTest';Count=6})) {
-            $xml=Join-Path $buildResult.CompiledOutput "surefire-reports/TEST-com.carrental.$($suite.Name).xml"
-            $saved=Join-Path $EvidenceDir "TEST-com.carrental.$($suite.Name).xml"
-            Copy-Item -LiteralPath $xml -Destination $saved
-            Assert-SurefireXmlStrict -XmlPath $saved -ExpectedTests $suite.Count -ExpectedFailures 0 -ExpectedErrors 0 -ExpectedSkipped 0 | Out-Null
-        }
-
-        # Confirm actual fixture identity and successful migrations independently
-        $readSql="SELECT DATABASE(),@@port; SELECT version,success,checksum FROM $DbName.flyway_schema_history ORDER BY installed_rank; SELECT COUNT(*) FROM $DbName.reviews;"
-        $readOut=@(& docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot --database=$DbName --batch -e $readSql 2>&1)
-        if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Fixture readback failed'}
-        $readOut | Set-Content (Join-Path $EvidenceDir 'mysql-readback.txt')
-
-        # Seed a completed booking for browser tests
-        $bookingId='booking-e2e-completed-001'
-        $seedSql="INSERT INTO $DbName.bookings (id,user_id,vehicle_id,customer_name,vehicle_name,pickup_branch_id,return_branch_id,pickup_name,return_name,actual_return_branch_id,start_at,end_at,expires_at,status,daily_price,rental_days,rental_total,one_way_fee,total,policy_version,created_at,version) VALUES ('$bookingId','demo-user','v1','Demo','Toyota Vios','dn','dn','Demo','Demo','dn','2026-10-01 10:00:00','2026-10-04 10:00:00','2026-10-04 10:00:00','COMPLETED',650000,3,1950000,0,1950000,'v1_policy','2026-10-01 10:00:00',0);"
-        & docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot -e $seedSql | Out-Null
-        if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Completed booking seed failed'}
-
-        # Also seed vehicle v1 if not exists
-        $vehicleSql="INSERT IGNORE INTO $DbName.vehicles (id,name,plate,brand_id,category_id,home_branch_id,current_branch_id,seats,transmission,daily_price,status,description,version) VALUES ('v1','Toyota Vios','51A-12345','brand1','cat1','dn','dn',5,'AUTO',650000,'ACTIVE','Test vehicle',0);"
-        & docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot -e $vehicleSql | Out-Null
+        if((Get-FileHash $buildResult.EffectiveJarPath).Hash -ne $buildResult.JarSHA256 -or -not $buildResult.AllClassesMatched){throw '[PROVENANCE_ERROR] Accepted JAR differs'}
+        $manifest | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'accepted-build-inputs.json')
+        $buildResult | ConvertTo-Json -Depth 5 | Set-Content (Join-Path $EvidenceDir 'accepted-build-provenance.json')
+        Write-RunLog "Accepted backend suites retained: unchanged inputs; no duplicate 11-test execution."
 
         # 5. KHỞI CHẠY BACKEND FAT JAR
         Write-RunLog "--- 5. Spawning Backend Fat JAR on port $BackendPort ---"
@@ -340,6 +310,21 @@ try {
             throw "Backend JAR did not become HTTP-ready on port $BackendPort"
         }
         Write-RunLog "Backend JAR is HTTP-ready on port $BackendPort."
+        $ids=@('c6-held','c6-get-null','c6-stale','c6-xss')
+        foreach($bookingId in $ids){
+            $seedSql="INSERT INTO $DbName.bookings (id,user_id,vehicle_id,customer_name,vehicle_name,pickup_branch_id,return_branch_id,pickup_name,return_name,actual_return_branch_id,start_at,end_at,expires_at,status,daily_price,rental_days,rental_total,one_way_fee,total,policy_version,created_at,version) VALUES ('$bookingId','demo-user','v1','Demo','Toyota Vios','dn','dn','Demo','Demo','dn','2026-10-01 10:00:00','2026-10-04 10:00:00','2026-10-04 10:00:00','COMPLETED',650000,3,1950000,0,1950000,'v1_policy','2026-10-01 10:00:00',0);"
+            $seedOut=@(& docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot -e $seedSql 2>&1)
+            if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Isolated booking seed failed'}
+        }
+        $env:C6_FIXTURE_CONTAINER=$ContainerName
+        $env:C6_FIXTURE_SCHEMA=$DbName
+        $env:C6_FIXTURE_MARKER_SCHEMA=$MarkerSchema
+        $env:C6_FIXTURE_MARKER_TOKEN=$markerToken
+        $readSql="SELECT version,success,checksum FROM $DbName.flyway_schema_history ORDER BY installed_rank; SELECT COUNT(*) FROM $DbName.bookings;"
+        $readOut=@(& docker exec -e "MYSQL_PWD=$dbPassword" $ContainerName mysql -uroot --batch -e $readSql 2>&1)
+        if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Migration readback failed'}
+        $readOut | Set-Content (Join-Path $EvidenceDir 'mysql-readback.txt')
+
 
         # 6. KHỞI CHẠY VITE FRONTEND
         Write-RunLog "--- 6. Spawning Vite Frontend on port $VitePort ---"
@@ -351,11 +336,11 @@ try {
         $viteConfigSource = Join-Path $BaseDir "vite.config.mjs"
         $viteConfigDest = Join-Path $FrontendDir "vite.config.c6-browser-neg.mjs"
         Copy-Item -LiteralPath $viteConfigSource -Destination $viteConfigDest -Force
-        $viteArgs = @(
-            "`"$viteBin`"",
-            "--config", "`"$viteConfigDest`"",
-            "--host", "0.0.0.0"
-        )
+        $apiDist=Join-Path $EvidenceDir 'api-dist'
+        $buildArgs=@("`"$viteBin`"",'build','--config',"`"$viteConfigDest`"",'--outDir',"`"$apiDist`"")
+        $apiBuild=Start-Process -FilePath 'node' -ArgumentList $buildArgs -WorkingDirectory $FrontendDir -WindowStyle Hidden -Wait -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'api-build.log') -RedirectStandardError (Join-Path $EvidenceDir 'api-build-error.log')
+        if($apiBuild.ExitCode -ne 0){throw '[BUILD_FAILURE] API browser build failed'}
+        $viteArgs=@("`"$viteBin`"",'preview','--config',"`"$viteConfigDest`"",'--outDir',"`"$apiDist`"",'--host','127.0.0.1','--port',"$VitePort",'--strictPort')
 
         $prevDir = Get-Location
         try {
@@ -404,7 +389,7 @@ try {
         if(($runInputsBefore | ConvertTo-Json -Compress) -cne ($runInputsAfter | ConvertTo-Json -Compress)){throw '[SOURCE_DRIFT] Runner inputs changed'}
         $runInputsBefore | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'source-before.json')
         $runInputsAfter | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'source-after.json')
-        [pscustomobject]@{MySqlVerified=$true;HttpTests=5;ServiceTests=6;BrowserNegatives=$true;JarSHA256=$actualJarHash;SourceDrift=$false} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'execution-summary.json')
+        [pscustomobject]@{MySqlVerified=$true;BackendSuitesRetained=$true;BrowserNegatives=$true;JarSHA256=$actualJarHash;SourceDrift=$false} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'execution-summary.json')
         $overallSuccess = $true
     } finally {
         # =========================================================================
