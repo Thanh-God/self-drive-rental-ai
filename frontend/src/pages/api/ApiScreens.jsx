@@ -461,28 +461,158 @@ function IncidentSection({ booking, records = [], area }) {
 }
 
 export function ApiHomePage() {
+  const { user: currentUser } = useAuth();
+  const vehiclesRequest = useApiData("/vehicles");
+  const catalogRequest = useApiData("/vehicles/catalog");
+  const [query, setQuery] = useState("");
+
+  const vehicles = useMemo(() => {
+    const rawList = Array.isArray(vehiclesRequest.data)
+      ? vehiclesRequest.data
+      : [];
+    const normalized = rawList.map((vehicle) =>
+      normalizeVehicle(vehicle, catalogRequest.data),
+    );
+    const filtered = query.trim()
+      ? normalized.filter((vehicle) =>
+          `${vehicle.name} ${vehicle.brand} ${vehicle.plate}`
+            .toLocaleLowerCase("vi")
+            .includes(query.trim().toLocaleLowerCase("vi")),
+        )
+      : normalized;
+
+    // Sắp xếp xác định: theo tên tăng dần, sau đó theo ID
+    const sorted = [...filtered].sort((a, b) => {
+      const nameComp = a.name.localeCompare(b.name, "vi");
+      if (nameComp !== 0) return nameComp;
+      return String(a.id).localeCompare(String(b.id));
+    });
+
+    return sorted.slice(0, 6);
+  }, [vehiclesRequest.data, catalogRequest.data, query]);
+
+  const loading = vehiclesRequest.loading || catalogRequest.loading;
+  const error = vehiclesRequest.error || catalogRequest.error;
+  const retry = () => {
+    vehiclesRequest.reload();
+    catalogRequest.reload();
+  };
+
+  const isUser = currentUser?.role === "USER";
+
   return (
     <Page
       title="Thuê xe tự lái cùng KDrive"
       description="Duyệt xe từ hệ thống và gửi yêu cầu thuê với báo giá, lịch xe và tuyến chi nhánh được máy chủ xác nhận."
       actions={
-        <Link className="btn" to="/vehicles">
-          Duyệt xe
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <Link className="btn" to="/vehicles">
+            Xem toàn bộ xe
+          </Link>
+          {isUser ? (
+            <Link className="btn-secondary" to="/user/bookings">
+              Đơn thuê của tôi
+            </Link>
+          ) : !currentUser ? (
+            <Link className="btn-secondary" to="/login">
+              Đăng nhập / Đăng ký
+            </Link>
+          ) : null}
+        </div>
       }
     >
-      <section className="panel grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
+      <section className="panel mb-8 grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
         <div>
           <p className="eyebrow">DỮ LIỆU TRỰC TIẾP</p>
           <h2 className="mt-2 text-xl font-semibold">Tìm chiếc xe phù hợp</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Giá, tình trạng và khả dụng được xác nhận bởi API khi bạn kiểm tra
-            báo giá. Gợi ý AI và lịch trình hiện chỉ có trong chế độ demo.
+            Giá niêm yết và tình trạng được xác nhận trực tiếp từ hệ thống.
+            Khả dụng thực tế, giá cuối và cước tuyến được máy chủ chốt chính xác
+            khi bạn kiểm tra báo giá theo lịch thuê.
           </p>
         </div>
-        <Link className="btn-secondary" to="/user/bookings">
-          Đơn thuê của tôi
-        </Link>
+        <div className="flex flex-wrap gap-3">
+          {isUser ? (
+            <Link className="btn-secondary" to="/user/profile">
+              Hồ sơ & GPLX
+            </Link>
+          ) : !currentUser ? (
+            <Link className="btn" to="/register">
+              Đăng ký tài khoản
+            </Link>
+          ) : null}
+        </div>
+      </section>
+
+      <section className="space-y-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-md flex-1">
+            <Field label="Tìm kiếm theo tên xe hoặc hãng">
+              <input
+                type="search"
+                placeholder="Nhập tên xe, hãng xe (ví dụ: Vios, Accent)..."
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </Field>
+          </div>
+          <div className="text-sm text-slate-500">
+            {query.trim() ? (
+              <span>Kết quả tìm kiếm ({vehicles.length})</span>
+            ) : (
+              <span>Hiển thị tối đa 6 xe</span>
+            )}
+          </div>
+        </div>
+
+        <RequestState loading={loading} error={error} onRetry={retry}>
+          {vehicles.length > 0 ? (
+            <div>
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {vehicles.map((vehicle) => (
+                  <VehicleCard key={vehicle.id} vehicle={vehicle} />
+                ))}
+              </div>
+              <div className="mt-8 flex justify-center border-t border-slate-200 pt-6">
+                <Link
+                  className="btn-secondary inline-flex items-center gap-2"
+                  to="/vehicles"
+                >
+                  Xem tất cả xe trong hệ thống <span>→</span>
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              title={query.trim() ? "Không tìm thấy xe phù hợp" : "Chưa có xe nào trong hệ thống"}
+              description={
+                query.trim()
+                  ? "Thử tìm kiếm với từ khóa khác hoặc duyệt danh mục xe đầy đủ."
+                  : "Hệ thống hiện chưa có danh sách xe khai thác."
+              }
+              action={
+                query.trim() ? (
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      className="btn-secondary"
+                      onClick={() => setQuery("")}
+                    >
+                      Xóa từ khóa tìm kiếm
+                    </button>
+                    <Link className="btn" to="/vehicles">
+                      Duyệt danh sách đầy đủ
+                    </Link>
+                  </div>
+                ) : (
+                  <button type="button" className="btn-secondary" onClick={retry}>
+                    Tải lại danh sách
+                  </button>
+                )
+              }
+            />
+          )}
+        </RequestState>
       </section>
     </Page>
   );
@@ -769,6 +899,7 @@ export function ApiNewBookingPage() {
   const [error, setError] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const [quoteRequestGeneration] = useState(createRequestGeneration);
   const branches = (branchesRequest.data || []).filter(
@@ -884,6 +1015,7 @@ export function ApiNewBookingPage() {
     }
     setError("");
     setBusy(true);
+    setSubmitting(true);
     try {
       const currentInput = getCurrentInput();
       const booking = await createBooking({
@@ -901,6 +1033,7 @@ export function ApiNewBookingPage() {
       setError(getErrorMessage(requestError, "Không thể tạo yêu cầu thuê."));
     } finally {
       setBusy(false);
+      setSubmitting(false);
     }
   }
 
@@ -938,7 +1071,7 @@ export function ApiNewBookingPage() {
                     <input
                       type="datetime-local"
                       required
-                      disabled={busy}
+                      disabled={submitting}
                       min={toVietnamInput(0)}
                       value={start}
                       onChange={(event) => {
@@ -950,7 +1083,7 @@ export function ApiNewBookingPage() {
                     <input
                       type="datetime-local"
                       required
-                      disabled={busy}
+                      disabled={submitting}
                       min={start}
                       value={end}
                       onChange={(event) => {
@@ -961,7 +1094,7 @@ export function ApiNewBookingPage() {
                   <Field label="Chi nhánh nhận xe">
                     <select
                       required
-                      disabled={busy}
+                      disabled={submitting}
                       value={pickup}
                       onChange={(event) => {
                         updateQuoteField(
@@ -981,7 +1114,7 @@ export function ApiNewBookingPage() {
                   <Field label="Chi nhánh trả xe">
                     <select
                       required
-                      disabled={busy}
+                      disabled={submitting}
                       value={dropoff}
                       onChange={(event) => {
                         updateQuoteField(
@@ -1204,9 +1337,98 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   );
 }
 
+export function BookingReviewSection({
+  booking,
+  area = "user",
+  bookingReviewRequest,
+  submitReview,
+  rating,
+  setRating,
+  review,
+  setReview,
+  reviewBusy,
+}) {
+  if (area !== "user" || booking?.status !== "COMPLETED") return null;
+
+  if (bookingReviewRequest.loading) {
+    return (
+      <section className="panel space-y-2">
+        <LoadingSkeleton rows={2} />
+      </section>
+    );
+  }
+
+  if (bookingReviewRequest.error) {
+    return (
+      <section className="panel space-y-2">
+        <Notice error>{bookingReviewRequest.error}</Notice>
+        <button
+          className="btn-secondary"
+          onClick={bookingReviewRequest.reload}
+          type="button"
+        >
+          Thử tải lại đánh giá
+        </button>
+      </section>
+    );
+  }
+
+  if (bookingReviewRequest.data) {
+    return (
+      <section className="panel space-y-2">
+        <h2 className="text-lg font-semibold">Đánh giá của bạn</h2>
+        <p className="font-semibold text-amber-600">
+          {bookingReviewRequest.data.rating}/5 sao
+        </p>
+        <p className="whitespace-pre-line text-sm leading-6 text-slate-700">
+          {bookingReviewRequest.data.content}
+        </p>
+        <p className="text-xs text-slate-500">
+          {dateTime(bookingReviewRequest.data.created_at)}
+          {bookingReviewRequest.data.hidden ? " • (Đang ẩn bởi kiểm duyệt)" : ""}
+        </p>
+      </section>
+    );
+  }
+
+  return (
+    <form className="panel space-y-4" onSubmit={submitReview}>
+      <h2 className="text-lg font-semibold">Đánh giá chuyến thuê</h2>
+      <Field label="Mức hài lòng">
+        <select
+          value={rating}
+          onChange={(event) => setRating(event.target.value)}
+        >
+          {[5, 4, 3, 2, 1].map((value) => (
+            <option key={value} value={value}>
+              {value} sao
+            </option>
+          ))}
+        </select>
+      </Field>
+      <Field label="Nội dung">
+        <textarea
+          required
+          maxLength={1000}
+          rows={4}
+          value={review}
+          onChange={(event) => setReview(event.target.value)}
+        />
+      </Field>
+      <button className="btn" disabled={reviewBusy}>
+        {reviewBusy ? "Đang gửi..." : "Gửi đánh giá"}
+      </button>
+    </form>
+  );
+}
+
 export function ApiBookingDetailPage({ area = "user" }) {
   const { bookingId } = useParams();
   const request = useApiData(`/bookings/${encodeURIComponent(bookingId)}`);
+  const bookingReviewRequest = useApiData(
+    `/bookings/${encodeURIComponent(bookingId)}/review`,
+    area === "user",
+  );
   const { user: currentUser } = useAuth();
   const isStaff = currentUser?.role === "STAFF";
   const branchAssignmentsRequest = useApiData("/me/branches", isStaff);
@@ -1281,6 +1503,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
 
   async function submitReview(event) {
     event.preventDefault();
+    if (reviewBusy) return;
     setError("");
     setNotice("");
     setReviewBusy(true);
@@ -1292,6 +1515,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
       });
       setNotice("Đã gửi đánh giá cho đơn hoàn tất.");
       setReview("");
+      bookingReviewRequest.reload();
     } catch (reviewError) {
       setError(
         getErrorMessage(
@@ -1449,37 +1673,17 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     </Link>
                   </div>
                 </section>
-                {area === "user" && booking.status === "COMPLETED" ? (
-                  <form className="panel space-y-4" onSubmit={submitReview}>
-                    <h2 className="text-lg font-semibold">
-                      Đánh giá chuyến thuê
-                    </h2>
-                    <Field label="Mức hài lòng">
-                      <select
-                        value={rating}
-                        onChange={(event) => setRating(event.target.value)}
-                      >
-                        {[5, 4, 3, 2, 1].map((value) => (
-                          <option key={value} value={value}>
-                            {value} sao
-                          </option>
-                        ))}
-                      </select>
-                    </Field>
-                    <Field label="Nội dung">
-                      <textarea
-                        required
-                        maxLength={1000}
-                        rows={4}
-                        value={review}
-                        onChange={(event) => setReview(event.target.value)}
-                      />
-                    </Field>
-                    <button className="btn" disabled={reviewBusy}>
-                      {reviewBusy ? "Đang gửi..." : "Gửi đánh giá"}
-                    </button>
-                  </form>
-                ) : null}
+                <BookingReviewSection
+                  booking={booking}
+                  area={area}
+                  bookingReviewRequest={bookingReviewRequest}
+                  submitReview={submitReview}
+                  rating={rating}
+                  setRating={setRating}
+                  review={review}
+                  setReview={setReview}
+                  reviewBusy={reviewBusy}
+                />
                 <IncidentSection
                   booking={booking}
                   records={detail.records || []}
@@ -1625,6 +1829,13 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     {busy ? "Đang lưu..." : "Cập nhật đơn"}
                   </button>
                   </form>
+                ) : null}
+                {currentUser?.role === "USER" &&
+                ["PENDING", "CONFIRMED"].includes(booking.status) &&
+                new Date(booking.startAt).getTime() - now < 86400000 ? (
+                  <Notice>
+                    Đã sát giờ nhận xe (dưới 24 giờ). Vui lòng liên hệ nhân viên để được hỗ trợ hủy.
+                  </Notice>
                 ) : null}
               </div>
               </div>

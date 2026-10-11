@@ -936,6 +936,7 @@ export function ApiReviewsAdminPage() {
   const [busyId, setBusyId] = useState("");
   const reviews = Array.isArray(reviewsRequest.data) ? reviewsRequest.data : [];
   async function moderate(review) {
+    if (busyId) return;
     setError("");
     setNotice("");
     setBusyId(review.id);
@@ -948,6 +949,9 @@ export function ApiReviewsAdminPage() {
       reviewsRequest.reload();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể kiểm duyệt đánh giá."));
+      if (requestError.response?.status === 409) {
+        reviewsRequest.reload();
+      }
     } finally {
       setBusyId("");
     }
