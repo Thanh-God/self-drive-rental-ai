@@ -652,3 +652,9 @@ HEAD8b836db, final5hashes khớpHANDOFF. Reviewer npm test35/35 0skip, lint/API/
 ### Codex A nghiệm thu F02 followup — 11/10/2026: chức năng PASS, manifest PARTIAL
 
 HEADad401f9; A1 actual bookingreviewGET error/retry/refetchnull/existing và A2 publicDOM XSS đãPASS độclập. npmtest37/37 0skip vàlint exit0, finalfrontendinputs khôngđổi trongtest. ProductionUI khôngđổi giữAPI/demo buildsreview080648. HANDOFF changed3hashes đúng, nhưng5actualdependencyhashes hook/context/client/package/viteconfig khôngkhớp, khôngdoLFnormalization; A3b chỉbàngiao cònmở. ACCEPTANCE/TASKauditonly .runtime/coordination-c6-f02-followup-review-20261011-081911/, khônggiao làm lại source/testsđãPASS. GateOpenCode vẫnđóng cho tới manifest/bàngiao nhấtquán. Commit mỗiiteration khônglàpush; chưauserauthorizepush trong lượt này, khôngautopush khiagentxong/acceptancePASS. KhôngtoànC6/Stage5PASS.
+
+### Hoàn tất Finding F02-A3b Bàn giao Manifest Tự động — Antigravity, 11/10/2026
+- **Phạm vi xử lý**: Khắc phục dứt điểm finding A3b theo TASK `.runtime/coordination-c6-f02-followup-review-20261011-081911/TASK.md`.
+  1. `Manifest Tự động trên Disk`: Sử dụng PowerShell `Get-FileHash` trực tiếp trên disk working tree đo mã băm SHA256 cho toàn bộ actual và transitive dependencies (khắc phục 5 mã băm bị sai do trước đây tính từ git blob thay vì disk file).
+  2. `Bảo toàn Nguồn & Test`: Toàn bộ source, test và configs frontend giữ nguyên vẹn 100%; kế thừa kết quả kiểm chứng độc lập đã PASS của reviewer (37/37 tests, lint 0 error/0 warning, build api/demo exit 0).
+- **Trạng thái**: F02-A3b **DONE (scoped)**, bàn giao hoàn tất và nhất quán.

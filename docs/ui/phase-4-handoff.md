@@ -901,3 +901,9 @@ Antigravity integrate ban đầu còn4/13hashlệch/statuscount/broadPIDinventor
   3. `A3 (Accurate Baseline Hashes & Provenance)`: Bảng Before / After hash đo trực tiếp trên disk baseline; file untracked `reviewState.test.js` có Before Hash đầy đủ, không gán nhãn NEW giả; status lines và manifest actual dependencies đầy đủ; không sửa đổi báo cáo/evidence cũ.
   4. `Suite Verification`: `node --test src/utils/reviewState.test.js` (7/7 pass, ~1.7s); `npm test` toàn frontend (37/37 pass, 0 fail/skip); `npm run lint` (0 error/warning); `npx vite build` cả hai mode `api` và `demo` đều exit 0.
 - **Trạng thái**: F02 Followup **DONE (scoped)**, chờ Codex A nghiệm thu chính thức. F01/F03 tiếp tục giữ trạng thái chờ gate OpenCode.
+
+### Hoàn tất Finding F02-A3b Bàn giao Manifest Tự động — Antigravity, 11/10/2026
+- **Phạm vi xử lý**: Khắc phục dứt điểm finding A3b theo TASK `.runtime/coordination-c6-f02-followup-review-20261011-081911/TASK.md`.
+  1. `Manifest Tự động trên Disk`: Sử dụng PowerShell `Get-FileHash` trực tiếp trên disk working tree đo mã băm SHA256 cho toàn bộ actual và transitive dependencies (khắc phục 5 mã băm bị sai do trước đây tính từ git blob thay vì disk file).
+  2. `Bảo toàn Nguồn & Test`: Toàn bộ source, test và configs frontend giữ nguyên vẹn 100%; kế thừa kết quả kiểm chứng độc lập đã PASS của reviewer (37/37 tests, lint 0 error/0 warning, build api/demo exit 0).
+- **Trạng thái**: F02-A3b **DONE (scoped)**, bàn giao hoàn tất và nhất quán.
