@@ -769,3 +769,30 @@ Reviewed Antigravity HEAD b98849830702a4116ff446688a42c242fb816c79: 161 before/a
 Independent matrix execution exit0; negative control on isolated unchanged matrix/helper copies with dummy runner throwing UNRELATED_BOOM also exit0 and falsely reports shell/root guards PASS and missing-dependency PASS despite no guard. R01 matrix false positives/helper-only caller checks, R02 raw caller-env reports and ignored cleanup/env failure flags, R03 incomplete real-HTTP coverage, R04 remaining rejection/success/representative-data assertions, R05 immutable fullverify provenance remain open. Do not consider the preceding agent DONE statement independent acceptance. Full details .runtime/coordination-c7a-followup-review-20261011-133003/ACCEPTANCE.md; follow-up .runtime/coordination-c7a-r2-antigravity-20261011-133003/TASK.md. C7B GATE CLOSED, C7 overall incomplete.
 
 Owned fixture kltn-c7-ag-5d80ad7112e1 stopped with volume retained, Maven PIDs30060/12328 absent, port33615 free by independent readback. Original MySQL identity/state/mount observed running only, not SQL equality verified. No reviewer Docker fixture created/deleted, product code edited, old reports replaced, unrelated C6 suites rerun or agent messaged. Audit retained; commit docs separately with scoped content/reference/diff checks.
+
+### C7A R2 — Khắc phục dứt điểm findings R01..R05 — Antigravity, 11/10/2026
+- **Phạm vi xử lý**: Khắc phục dứt điểm các finding C7A-R01..R05 theo TASK `.runtime/coordination-c7a-r2-antigravity-20261011-133003/TASK.md` và `ACCEPTANCE.md`:
+  1. `C7A-R01 (Sửa Matrix Fail-Closed, Literal Cause Matching & Aggregation Exit Non-Zero)`:
+     - Sửa lỗi pattern matching: Loại bỏ `-like '*[...] *'` (PowerShell hiểu nhầm regex class) sang `.Contains('[CAUSE]')` kiểm tra literal string chuẩn xác.
+     - Kiểm tra entrypoint thật của `run-c7.ps1`: Chạy actual sub-process runner với broken dependency và kiểm tra exact cause `[PREFLIGHT_GUARD] Missing dependency`.
+     - Kiểm tra caller env restoration trên actual runner trong process cả khi gặp exception và khi phục hồi bình thường.
+     - Bổ sung Negative Control check: Nếu runner ném lỗi bất ngờ `UNRELATED_BOOM`, matrix khẳng định không được phân loại vào bất kỳ guard nào và bắt buộc fail-closed.
+     - Tổng hợp kết quả: Bất kỳ sub-test nào thất bại đều aggregate thành non-zero exit code (`throw [MATRIX_FAILURE]` và exit 1).
+  2. `C7A-R02 (Runner Fail-Closed & Privacy Bảo Vệ Secrets)`:
+     - Trong `run-c7.ps1`: Tuyệt đối không dump raw password/token ra `environment-before.json` và `environment-restoration-report.json`. Dùng presence boolean (`Present`, `Length`) và equality matching.
+     - Fail-closed: Kiểm tra nghiêm ngặt `$cleanupProc.Success`, `$cleanupPassed`, và `$envRestoredActual`. Nếu bất kỳ cờ nào false, ném `[RUNNER_FAILURE]` và thoát non-zero.
+  3. `C7A-R03 (Real HTTP Socket Coverage Toàn Diện)`:
+     - Mở rộng `IncidentReportHttpServerTest` từ 5 ca lên 9 ca kiểm thử toàn diện trên network socket thật với `RANDOM_PORT` và `TestRestTemplate`:
+       - Payload validation rejections (invalid kind, blank description, description >1500 ký tự, evidenceReference >2000 ký tự).
+       - Late report trên `RETURNED` (chính xác mốc RETURN accepted, sau mốc 1µs bị 400) và `COMPLETED` (accepted).
+       - RBAC chi nhánh: Staff không gán chi nhánh cố đọc nhận 404; Staff chi nhánh hiện tại khóa xe thành công (200, `MAINTENANCE`); Staff chi nhánh trả cũ cố khóa xe khi xe ở chi nhánh khác nhận 403 Forbidden; Admin khóa xe thành công (200, `MAINTENANCE`).
+       - Khách lạ đọc lại GET list và GET events đều nhận 404 và DB bất biến 100%.
+  4. `C7A-R04 (Bổ Sung Fixture Dữ Liệu Đại Diện & Khẳng Định Bất Biến Chặt Chẽ)`:
+     - Trong `IncidentEvidence.java`: Thêm `ensurePopulatedRepresentativeRows(jdbc)` chèn dữ liệu mẫu độc lập cho các bảng `contracts`, `invoices`, `invoice_items`, `reviews` trước khi chạy test, bảo đảm so sánh snapshot chứng minh các dòng dữ liệu sẵn có không bị đột biến.
+     - Trong `IncidentReportIntegrationTest`: Đổi lệnh gọi raw mvc tại ca khách lạ GET events sang `assertNegativeGet`.
+     - Trong ca positive report: So sánh snapshot trước/sau xác nhận toàn bộ các bảng `bookings`, `booking_status_history`, `contracts`, `invoices`, `invoice_items`, `reviews`, `vehicle_handover_records` giữ nguyên 100% bất biến; kiểm tra exact instant timestamps qua `persistedCase1.occurredAt`, `persistedCase1.reportedAt` và các trường JDBC.
+     - Trong `IncidentReportHttpServerTest`: So sánh snapshot trước/sau xác nhận toàn bộ các bảng phụ trợ giữ nguyên 100% bất biến sau positive report; kiểm tra chi tiết các trường response ID, kind, status, timestamps, và quan hệ liên kết trong GET list và GET events.
+  5. `C7A-R05 (Bàn Giao Đầy Đủ Provenance & Full Backend Verify)`:
+     - Lưu đầy đủ XML surefire của 15 test suites vào `evidence/full-verify/`.
+     - Chạy `./mvnw.cmd verify` trên JDK 21 với source cuối: **101 tests run, 0 failures, 0 errors, 8 skipped** (các ca live MySQL có chủ đích skip do profile cô lập) đạt **BUILD SUCCESS (exit 0)**.
+- **Trạng thái**: C7A R01..R05 **DONE (scoped)**. Fixture container `kltn-c7-ag-7a1e6feaf259` đã dừng an toàn (`Running=false`), port 33615 giải phóng, volume `vol-kltn-c7-ag-7a1e6feaf259` bảo toàn làm bằng chứng audit. C7B gate chờ Codex A nghiệm thu.

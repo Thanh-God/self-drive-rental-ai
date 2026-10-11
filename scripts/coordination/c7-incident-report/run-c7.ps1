@@ -50,8 +50,18 @@ $expectedMethods | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'expecte
 
 $variables=@('JAVA_HOME','KDRIVE_TEST_DB_URL','KDRIVE_TEST_DB_USER','KDRIVE_TEST_DB_PASSWORD','KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX','KDRIVE_TEST_FIXTURE_MARKER_TOKEN','KDRIVE_TEST_EXPECTED_HOST','KDRIVE_TEST_EXPECTED_PORT','KDRIVE_TEST_EXPECTED_SCHEMA','KDRIVE_TEST_MARKER_SCHEMA','SPRING_PROFILES_ACTIVE')
 $environment=Snapshot-ProcessEnvironment -VariableNames $variables
-$environment | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'environment-before.json')
-$owned=$false;$testsPassed=$false;$cleanupPassed=$false
+# Privacy: Redact sensitive environment variables in persisted evidence (Presence & Equality only)
+$safeEnvironment=[ordered]@{}
+foreach($v in $variables){
+    $val=$environment[$v]
+    if($v -in @('KDRIVE_TEST_DB_PASSWORD','KDRIVE_TEST_FIXTURE_MARKER_TOKEN')){
+        $safeEnvironment[$v]=@{Present=(-not [string]::IsNullOrEmpty($val));Length=if($null -ne $val){$val.Length}else{0}}
+    } else {
+        $safeEnvironment[$v]=$val
+    }
+}
+$safeEnvironment | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'environment-before.json')
+$owned=$false;$testsPassed=$false;$cleanupPassed=$false;$processCleanupPassed=$true
 
 try {
     try {
@@ -62,15 +72,21 @@ try {
         & docker run -d --name $name -p "127.0.0.1:${port}:3306" --env-file $private -v "${volume}:/var/lib/mysql" mysql:8.4 | Out-Null
         if($LASTEXITCODE -ne 0){throw '[DOCKER_RUN_FAILED] Fixture not created'}
         $owned=$true
-        $ready=$false
+        $consecutiveSuccess=0
         for($i=0;$i -lt 45;$i++) {
             try {
                 $probe=@(& docker exec -e "MYSQL_PWD=$password" $name mysql -uroot --batch --skip-column-names -e 'SELECT 1;' 2>&1)
-                if($LASTEXITCODE -eq 0 -and ($probe -join '').Trim() -eq '1'){$ready=$true;break}
-            } catch {}
+                if($LASTEXITCODE -eq 0 -and ($probe -join '').Trim() -eq '1'){
+                    $consecutiveSuccess++
+                    if($consecutiveSuccess -ge 2){$ready=$true;break}
+                } else {
+                    $consecutiveSuccess=0
+                }
+            } catch {$consecutiveSuccess=0}
             Start-Sleep -Seconds 1
         }
         if(-not $ready){throw 'MySQL query ready timeout'}
+        Start-Sleep -Seconds 1
         $sql="CREATE DATABASE $meta; CREATE TABLE $meta.__kdrive_test_fixture_marker(id INT PRIMARY KEY,target_schema VARCHAR(255),marker_token VARCHAR(255)); INSERT INTO $meta.__kdrive_test_fixture_marker VALUES(1,'$db','$token');"
         & docker exec -e "MYSQL_PWD=$password" $name mysql -uroot -e $sql | Out-Null
         if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Marker setup'}
@@ -98,9 +114,13 @@ try {
                     $mavenExit=$maven.ExitCode
                 } finally {
                     $cleanupProc=Invoke-OwnedProcessCleanup -OwnedProcesses @($maven)
+                    if(-not $cleanupProc.Success){
+                        $processCleanupPassed=$false
+                    }
                     [pscustomobject]@{PID=$maven.Id;HasExited=$maven.HasExited;CleanupResult=$cleanupProc} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir "maven-process-$suite.json")
                 }
                 if($mavenExit -ne 0){throw "[TEST_FAILURE] Maven exit $mavenExit on $suite"}
+                if(-not $processCleanupPassed){throw "[CLEANUP_FAILURE] Process cleanup failed on $suite"}
 
                 $saved=Join-Path $EvidenceDir "TEST-com.carrental.$suite.xml"
                 Copy-Item (Join-Path $built.CompiledOutput "surefire-reports/TEST-com.carrental.$suite.xml") $saved
@@ -132,25 +152,41 @@ try {
     foreach($v in $variables){
         if($environment[$v] -cne $envReadback[$v]){
             $envRestoredActual=$false
-            $envDiffs[$v]=@{Expected=$environment[$v];Actual=$envReadback[$v]}
+            $envDiffs[$v]=@{
+                Match=false;
+                BeforePresent=(-not [string]::IsNullOrEmpty($environment[$v]));
+                AfterPresent=(-not [string]::IsNullOrEmpty($envReadback[$v]))
+            }
+        }
+    }
+    # Privacy: Safe environment after restoration report
+    $safeEnvAfter=[ordered]@{}
+    foreach($v in $variables){
+        $val=$envReadback[$v]
+        if($v -in @('KDRIVE_TEST_DB_PASSWORD','KDRIVE_TEST_FIXTURE_MARKER_TOKEN')){
+            $safeEnvAfter[$v]=@{Present=(-not [string]::IsNullOrEmpty($val));Length=if($null -ne $val){$val.Length}else{0}}
+        } else {
+            $safeEnvAfter[$v]=$val
         }
     }
     [pscustomobject]@{
-        EnvironmentBefore=$environment;
-        EnvironmentAfterRestoration=$envReadback;
+        EnvironmentBefore=$safeEnvironment;
+        EnvironmentAfterRestoration=$safeEnvAfter;
         EnvironmentRestoredActual=$envRestoredActual;
         Differences=$envDiffs
     } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'environment-restoration-report.json')
 
+    $overallSuccess = ($testsPassed -and $cleanupPassed -and $processCleanupPassed -and $envRestoredActual)
     [pscustomobject]@{
         TestsPassed=$testsPassed;
         CleanupPassed=$cleanupPassed;
-        OverallSuccess=($testsPassed -and $cleanupPassed);
+        ProcessCleanupPassed=$processCleanupPassed;
+        EnvironmentRestoredActual=$envRestoredActual;
+        OverallSuccess=$overallSuccess;
         Container=$name;
         VolumeRetained=$volume;
         Port=$port;
-        EnvironmentRestoredActual=$envRestoredActual;
         SuitesExecuted=$suites
     } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
 }
-if(-not($testsPassed -and $cleanupPassed)){throw 'C7 runner did not pass'}
+if(-not($testsPassed -and $cleanupPassed -and $processCleanupPassed -and $envRestoredActual)){throw '[RUNNER_FAILURE] C7 runner did not pass fail-closed validation'}

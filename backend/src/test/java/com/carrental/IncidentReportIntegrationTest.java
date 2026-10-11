@@ -33,6 +33,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.token-minutes=30",
     "app.seed-enabled=true",
     "app.seed-password=kdrive_seed_pw_c7_incident_20261011",
+    "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
     "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"
 })
 @AutoConfigureMockMvc
@@ -78,6 +79,7 @@ public class IncidentReportIntegrationTest {
     @Autowired com.carrental.modules.user.service.AccountService accountService;
     @Autowired MutableClock clock;
     @Autowired IncidentService incidentService;
+    @Autowired com.carrental.modules.operation.repository.IncidentCaseRepository incidentCaseRepository;
     @Autowired VehicleService vehicleService;
     @Autowired TransactionTemplate tx;
 
@@ -140,6 +142,8 @@ public class IncidentReportIntegrationTest {
         staffDnToken = "Bearer " + tokens.issue(accountService.require("demo-staff-dn"));
         staffSgnToken = "Bearer " + tokens.issue(accountService.require("demo-staff-sgn"));
         adminToken = "Bearer " + tokens.issue(accountService.require("demo-admin"));
+
+        IncidentEvidence.ensurePopulatedRepresentativeRows(jdbc);
     }
 
     private void ensureUserExists(String id, String fullName, String email, String role) {
@@ -628,6 +632,9 @@ public class IncidentReportIntegrationTest {
         int totalCasesBefore = jdbc.queryForObject("select count(*) from incident_cases", Integer.class);
         int totalEventsBefore = jdbc.queryForObject("select count(*) from incident_events", Integer.class);
 
+        // Chụp snapshot trạng thái trước khi tạo hồ sơ thành công
+        Map<String, Object> tablesBefore1 = IncidentEvidence.snapshot(jdbc);
+
         Instant occurred1 = fix.handoverTime.plus(Duration.ofHours(1));
         // Tạo sự cố thứ 1
         String res1 = mvc.perform(post("/api/v1/incidents")
@@ -656,20 +663,43 @@ public class IncidentReportIntegrationTest {
         int totalCasesAfter1 = jdbc.queryForObject("select count(*) from incident_cases", Integer.class);
         int totalEventsAfter1 = jdbc.queryForObject("select count(*) from incident_events", Integer.class);
         assertEquals(totalCasesBefore + 1, totalCasesAfter1, "Total incident_cases must increase by exactly 1");
-        assertEquals(totalEventsBefore + 1, totalEventsAfter1, "Total incident_events must increase by exactly 1");
+        assertEquals(totalEventsAfter1, totalEventsBefore + 1, "Total incident_events must increase by exactly 1");
+
+        // Khẳng định bất biến các bảng nghiệp vụ và tài chính: Không tự ý trừ cọc hay tác động hợp đồng, hóa đơn
+        Map<String, Object> tablesAfter1 = IncidentEvidence.snapshot(jdbc);
+        for (String invariantTable : List.of("bookings", "booking_status_history", "contracts", "invoices", "invoice_items", "reviews", "vehicle_handover_records")) {
+            assertEquals(tablesBefore1.get(invariantTable), tablesAfter1.get(invariantTable),
+                "Table " + invariantTable + " must remain 100% untouched and invariant after incident report creation");
+        }
 
         // Khẳng định HTTP response trả về chính xác timestamp ISO-8601
         assertEquals(occurred1.toString(), com.jayway.jsonpath.JsonPath.read(res1, "$.occurredAt"));
         assertEquals(clock.value.toString(), com.jayway.jsonpath.JsonPath.read(res1, "$.reportedAt"));
 
-        // Kiểm tra toàn diện mọi trường của IncidentCase row (C7A-F04)
+        // Kiểm tra toàn diện mọi trường của IncidentCase row (C7A-F04, C7A-R04)
+        var persistedCase1 = incidentCaseRepository.findById(case1Id).orElseThrow();
+        assertEquals(case1Id, persistedCase1.id);
+        assertEquals(fix.bookingId, persistedCase1.bookingId);
+        assertEquals("demo-user", persistedCase1.reportedBy);
+        assertEquals("DAMAGE", persistedCase1.kind);
+        assertEquals(occurred1, persistedCase1.occurredAt, "Persisted occurredAt Instant must match occurred1 exactly");
+        assertEquals(clock.value, persistedCase1.reportedAt, "Persisted reportedAt Instant must match clock.value exactly");
+        assertEquals("Vết xước cánh cửa", persistedCase1.description);
+        assertEquals("img-01.jpg", persistedCase1.evidenceReference);
+        assertEquals("OPEN", persistedCase1.status);
+        assertEquals(0L, persistedCase1.assessedDamage);
+        assertEquals(0L, persistedCase1.thirdPartyCoverage);
+        assertEquals(0L, persistedCase1.requestedAmount);
+        assertNull(persistedCase1.responsibilityBasis);
+        assertEquals(0L, persistedCase1.version);
+
         var caseRow1 = jdbc.queryForMap("select * from incident_cases where id=?", case1Id);
         assertEquals(case1Id, caseRow1.get("id"));
         assertEquals(fix.bookingId, caseRow1.get("booking_id"));
         assertEquals("demo-user", caseRow1.get("reported_by"));
         assertEquals("DAMAGE", caseRow1.get("kind"));
-        assertNotNull(caseRow1.get("occurred_at"));
-        assertNotNull(caseRow1.get("reported_at"));
+        assertNotNull(caseRow1.get("occurred_at"), "occurred_at column must be present and not null");
+        assertNotNull(caseRow1.get("reported_at"), "reported_at column must be present and not null");
         assertEquals("Vết xước cánh cửa", caseRow1.get("description"));
         assertEquals("img-01.jpg", caseRow1.get("evidence_reference"));
         assertEquals("OPEN", caseRow1.get("status"));
@@ -745,10 +775,8 @@ public class IncidentReportIntegrationTest {
                 .andExpect(jsonPath("$.length()").value(1))
                 .andExpect(jsonPath("$[0].action").value("OPEN"));
 
-        // Khách lạ xem events của case 1 -> 404
-        mvc.perform(get("/api/v1/incidents/" + case1Id + "/events")
-                .header("Authorization", otherUserToken))
-                .andExpect(status().isNotFound());
+        // Khách lạ xem events của case 1 -> 404 (bảo đảm không rò rỉ và so sánh snapshot bất biến toàn bộ 10 bảng)
+        assertNegativeGet(otherUserToken, "/api/v1/incidents/" + case1Id + "/events", null, null, status().isNotFound(), null);
     }
 
     // =========================================================================

@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
     "app.token-minutes=30",
     "app.seed-enabled=true",
     "app.seed-password=kdrive_seed_pw_c7_incident_http_20261011",
+    "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
     "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"
 })
 @Import(IncidentReportHttpServerTest.TimeConfig.class)
@@ -78,6 +79,7 @@ public class IncidentReportHttpServerTest {
     private String staffHnToken;
     private String staffDnToken;
     private String staffSgnToken;
+    private String unassignedStaffToken;
     private String adminToken;
 
     @BeforeEach
@@ -86,6 +88,7 @@ public class IncidentReportHttpServerTest {
 
         ensureUserExists("other-user-http", "Khách khác HTTP", "other.http@example.com", "USER");
         ensureUserExists("demo-staff-sgn-http", "Staff Sài Gòn HTTP", "staff.sgn.http@example.com", "STAFF");
+        ensureUserExists("unassigned-staff-http", "Staff Không Chi Nhánh HTTP", "unassigned.http@example.com", "STAFF");
         if (jdbc.queryForObject("select count(*) from branches where id='sgn'", Long.class) == 0) {
             jdbc.update("insert into branches(id, name, address, status, version) values('sgn', 'Sài Gòn · mẫu', 'Điểm mẫu SG', 'ACTIVE', 0)");
         }
@@ -98,7 +101,10 @@ public class IncidentReportHttpServerTest {
         staffHnToken = "Bearer " + tokens.issue(accountService.require("demo-staff-hn"));
         staffDnToken = "Bearer " + tokens.issue(accountService.require("demo-staff-dn"));
         staffSgnToken = "Bearer " + tokens.issue(accountService.require("demo-staff-sgn-http"));
+        unassignedStaffToken = "Bearer " + tokens.issue(accountService.require("unassigned-staff-http"));
         adminToken = "Bearer " + tokens.issue(accountService.require("demo-admin"));
+
+        IncidentEvidence.ensurePopulatedRepresentativeRows(jdbc);
     }
 
     private void ensureUserExists(String id, String fullName, String email, String role) {
@@ -152,10 +158,11 @@ public class IncidentReportHttpServerTest {
         FixtureContext fix = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
 
         String url = "http://localhost:" + port + "/api/v1/incidents";
+        Instant occurred = fix.handoverTime.plus(Duration.ofHours(2));
         Map<String, Object> req = Map.of(
             "bookingId", fix.bookingId,
             "kind", "ACCIDENT",
-            "occurredAt", fix.handoverTime.plus(Duration.ofHours(2)).toString(),
+            "occurredAt", occurred.toString(),
             "description", "Sự cố giao thông qua real HTTP client",
             "evidenceReference", "http://evidence.test/photo.jpg",
             "blockVehicle", false
@@ -167,21 +174,44 @@ public class IncidentReportHttpServerTest {
         assertNotNull(response.getBody());
         assertEquals("OPEN", response.getBody().get("status"));
         assertEquals("ACCIDENT", response.getBody().get("kind"));
+        assertEquals(occurred.toString(), response.getBody().get("occurredAt"));
+        assertEquals(clock.value.toString(), response.getBody().get("reportedAt"));
+        assertEquals(0, ((Number) response.getBody().get("assessedDamage")).intValue());
+        assertEquals(0, ((Number) response.getBody().get("thirdPartyCoverage")).intValue());
+        assertEquals(0, ((Number) response.getBody().get("requestedAmount")).intValue());
+        assertNull(response.getBody().get("responsibilityBasis"));
 
         String caseId = (String) response.getBody().get("id");
         assertNotNull(caseId);
 
-        // Readback GET list over HTTP
+        // Khẳng định bất biến các bảng không liên quan
+        var snapAfter = IncidentEvidence.snapshot(jdbc);
+        for (String invariantTable : List.of("bookings", "booking_status_history", "contracts", "invoices", "invoice_items", "reviews", "vehicle_handover_records")) {
+            assertEquals(snapBefore.get(invariantTable), snapAfter.get(invariantTable),
+                "Table " + invariantTable + " must remain 100% untouched and invariant after positive HTTP report");
+        }
+
+        // Readback GET list over HTTP (kiểm tra IDs, linking, fields)
         ResponseEntity<List> listResp = restTemplate.exchange(url + "?bookingId=" + fix.bookingId, HttpMethod.GET, new HttpEntity<>(authHeaders(userToken)), List.class);
         assertEquals(HttpStatus.OK, listResp.getStatusCode());
         assertNotNull(listResp.getBody());
         assertEquals(1, listResp.getBody().size());
+        Map firstItem = (Map) listResp.getBody().get(0);
+        assertEquals(caseId, firstItem.get("id"));
+        assertEquals(fix.bookingId, firstItem.get("bookingId"));
+        assertEquals("ACCIDENT", firstItem.get("kind"));
+        assertEquals("OPEN", firstItem.get("status"));
 
-        // Readback GET events over HTTP
+        // Readback GET events over HTTP (kiểm tra event details, actor, action)
         ResponseEntity<List> eventsResp = restTemplate.exchange(url + "/" + caseId + "/events", HttpMethod.GET, new HttpEntity<>(authHeaders(userToken)), List.class);
         assertEquals(HttpStatus.OK, eventsResp.getStatusCode());
         assertNotNull(eventsResp.getBody());
         assertEquals(1, eventsResp.getBody().size());
+        Map firstEvent = (Map) eventsResp.getBody().get(0);
+        assertNotNull(firstEvent.get("id"));
+        assertEquals("OPEN", firstEvent.get("action"));
+        assertEquals("demo-user", firstEvent.get("actor_id"));
+        assertEquals("Tiếp nhận hồ sơ; chưa kết luận trách nhiệm.", firstEvent.get("note"));
     }
 
     @Test
@@ -274,6 +304,147 @@ public class IncidentReportHttpServerTest {
 
         var snapAfter = IncidentEvidence.snapshot(jdbc);
         assertEquals(snapBefore, snapAfter, "Database state must be 100% invariant on 401 rejection");
+    }
+
+    @Test
+    void testRealHttp_PayloadValidationRejectionsOverSocket() {
+        FixtureContext fix = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+        String url = "http://localhost:" + port + "/api/v1/incidents";
+        Instant validTime = fix.handoverTime.plus(Duration.ofHours(1));
+
+        // 1. Invalid kind
+        assertPostHttpRejection(url, userToken, Map.of(
+            "bookingId", fix.bookingId, "kind", "INVALID_KIND", "occurredAt", validTime.toString(),
+            "description", "Mô tả", "evidenceReference", "ref", "blockVehicle", false
+        ), HttpStatus.BAD_REQUEST, "Thời điểm sự việc phải trong thời gian khách giữ xe thực tế.");
+
+        // 2. Blank description
+        assertPostHttpRejection(url, userToken, Map.of(
+            "bookingId", fix.bookingId, "kind", "ACCIDENT", "occurredAt", validTime.toString(),
+            "description", "   ", "evidenceReference", "ref", "blockVehicle", false
+        ), HttpStatus.BAD_REQUEST, "Cần nội dung có căn cứ, tối đa 1500 ký tự.");
+
+        // 3. Oversized description (>1500 chars)
+        assertPostHttpRejection(url, userToken, Map.of(
+            "bookingId", fix.bookingId, "kind", "ACCIDENT", "occurredAt", validTime.toString(),
+            "description", "A".repeat(1501), "evidenceReference", "ref", "blockVehicle", false
+        ), HttpStatus.BAD_REQUEST, "Cần nội dung có căn cứ, tối đa 1500 ký tự.");
+
+        // 4. Oversized evidence reference (>2000 chars)
+        assertPostHttpRejection(url, userToken, Map.of(
+            "bookingId", fix.bookingId, "kind", "ACCIDENT", "occurredAt", validTime.toString(),
+            "description", "Mô tả chuẩn", "evidenceReference", "http://ref.test/".concat("x".repeat(2000)), "blockVehicle", false
+        ), HttpStatus.BAD_REQUEST, "Tham chiếu tài liệu quá dài.");
+    }
+
+    @Test
+    void testRealHttp_LateReportOnReturnedAndCompletedOverSocket() {
+        // Late report trên RETURNED
+        FixtureContext fixReturned = createBookingFixture("RETURNED", "hn", "dn", "dn", true, true);
+        String url = "http://localhost:" + port + "/api/v1/incidents";
+
+        // a. Occurred exactly at RETURN record time -> ACCEPTED
+        Map<String, Object> reqExactReturn = Map.of(
+            "bookingId", fixReturned.bookingId, "kind", "DAMAGE", "occurredAt", fixReturned.returnTime.toString(),
+            "description", "Báo muộn đúng lúc trả xe trên chuyến RETURNED", "evidenceReference", "ref-ret", "blockVehicle", false
+        );
+        ResponseEntity<Map> respReturn = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(reqExactReturn, authHeaders(userToken)), Map.class);
+        assertEquals(HttpStatus.OK, respReturn.getStatusCode());
+        assertEquals("OPEN", respReturn.getBody().get("status"));
+
+        // b. Occurred 1 microsecond after RETURN record time -> REJECTED 400
+        Instant oneMicrosAfterReturn = fixReturned.returnTime.plusNanos(1000);
+        assertPostHttpRejection(url, userToken, Map.of(
+            "bookingId", fixReturned.bookingId, "kind", "DAMAGE", "occurredAt", oneMicrosAfterReturn.toString(),
+            "description", "Báo muộn sau khi đã trả xe 1µs", "evidenceReference", "ref-after-ret", "blockVehicle", false
+        ), HttpStatus.BAD_REQUEST, "Thời điểm sự việc phải trong thời gian khách giữ xe thực tế.");
+
+        // Late report trên COMPLETED
+        FixtureContext fixCompleted = createBookingFixture("COMPLETED", "hn", "dn", "dn", true, true);
+        Map<String, Object> reqCompleted = Map.of(
+            "bookingId", fixCompleted.bookingId, "kind", "VIOLATION", "occurredAt", fixCompleted.returnTime.minus(Duration.ofHours(2)).toString(),
+            "description", "Báo muộn phạt nguội trên chuyến COMPLETED", "evidenceReference", "ref-comp", "blockVehicle", false
+        );
+        ResponseEntity<Map> respCompleted = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(reqCompleted, authHeaders(userToken)), Map.class);
+        assertEquals(HttpStatus.OK, respCompleted.getStatusCode());
+        assertEquals("OPEN", respCompleted.getBody().get("status"));
+    }
+
+    @Test
+    void testRealHttp_BranchAuthorizationAndBlockVehicleOverSocket() {
+        String url = "http://localhost:" + port + "/api/v1/incidents";
+
+        // 1. Staff không gán chi nhánh cố đọc booking -> 404 (DomainException::missing)
+        FixtureContext fixHn = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+        var snapBefore1 = IncidentEvidence.snapshot(jdbc);
+        ResponseEntity<Map> respUnassigned = restTemplate.exchange(url + "?bookingId=" + fixHn.bookingId, HttpMethod.GET, new HttpEntity<>(authHeaders(unassignedStaffToken)), Map.class);
+        assertEquals(HttpStatus.NOT_FOUND, respUnassigned.getStatusCode());
+        assertEquals(snapBefore1, IncidentEvidence.snapshot(jdbc), "Invariant on 404 GET list");
+
+        // 2. Staff tại chi nhánh hiện tại của xe (HN) báo sự cố và khóa xe thành công -> 200, status=MAINTENANCE
+        Instant occurred1 = fixHn.handoverTime.plus(Duration.ofHours(1));
+        ResponseEntity<Map> respStaffHn = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(Map.of(
+            "bookingId", fixHn.bookingId, "kind", "DAMAGE", "occurredAt", occurred1.toString(),
+            "description", "Staff HN lập biên bản và khóa xe", "evidenceReference", "ref-staff-hn", "blockVehicle", true
+        ), authHeaders(staffHnToken)), Map.class);
+        assertEquals(HttpStatus.OK, respStaffHn.getStatusCode());
+        assertEquals("MAINTENANCE", vehicleService.get(fixHn.vehicleId).status);
+
+        // 3. Staff chi nhánh trả cũ (Đà Nẵng 'dn') cố khóa xe khi xe đang ở chi nhánh hiện tại 'hn' -> 403 Forbidden
+        FixtureContext fixHn2 = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+        var snapBefore3 = IncidentEvidence.snapshot(jdbc);
+        ResponseEntity<Map> respStaffDnWrongBranch = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(Map.of(
+            "bookingId", fixHn2.bookingId, "kind", "DAMAGE", "occurredAt", fixHn2.handoverTime.plus(Duration.ofHours(1)).toString(),
+            "description", "Staff DN cố khóa xe ở HN", "evidenceReference", "ref-staff-dn", "blockVehicle", true
+        ), authHeaders(staffDnToken)), Map.class);
+        assertEquals(HttpStatus.FORBIDDEN, respStaffDnWrongBranch.getStatusCode());
+        assertEquals(snapBefore3, IncidentEvidence.snapshot(jdbc), "Database invariant on 403 Staff wrong branch");
+        assertEquals("ACTIVE", vehicleService.get(fixHn2.vehicleId).status);
+
+        // 4. Admin khóa xe thành công không phụ thuộc chi nhánh -> 200, status=MAINTENANCE
+        ResponseEntity<Map> respAdmin = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(Map.of(
+            "bookingId", fixHn2.bookingId, "kind", "ACCIDENT", "occurredAt", fixHn2.handoverTime.plus(Duration.ofHours(1)).toString(),
+            "description", "Admin chỉ đạo khóa xe", "evidenceReference", "ref-admin", "blockVehicle", true
+        ), authHeaders(adminToken)), Map.class);
+        assertEquals(HttpStatus.OK, respAdmin.getStatusCode());
+        assertEquals("MAINTENANCE", vehicleService.get(fixHn2.vehicleId).status);
+    }
+
+    @Test
+    void testRealHttp_ForeignUserGetReadbackDenied404OverSocket() {
+        FixtureContext fix = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+        String url = "http://localhost:" + port + "/api/v1/incidents";
+
+        // Tạo 1 incident case hợp lệ trước
+        ResponseEntity<Map> createResp = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(Map.of(
+            "bookingId", fix.bookingId, "kind", "DAMAGE", "occurredAt", fix.handoverTime.plus(Duration.ofHours(1)).toString(),
+            "description", "Sự cố hợp lệ", "evidenceReference", "ref", "blockVehicle", false
+        ), authHeaders(userToken)), Map.class);
+        assertEquals(HttpStatus.OK, createResp.getStatusCode());
+        String caseId = (String) createResp.getBody().get("id");
+
+        // a. Khách lạ GET list -> 404 & database 100% invariant
+        var snapBeforeList = IncidentEvidence.snapshot(jdbc);
+        ResponseEntity<Map> getListResp = restTemplate.exchange(url + "?bookingId=" + fix.bookingId, HttpMethod.GET, new HttpEntity<>(authHeaders(otherUserToken)), Map.class);
+        assertEquals(HttpStatus.NOT_FOUND, getListResp.getStatusCode());
+        assertEquals(snapBeforeList, IncidentEvidence.snapshot(jdbc), "Invariant on 404 GET list foreign user");
+
+        // b. Khách lạ GET events -> 404 & database 100% invariant
+        var snapBeforeEvents = IncidentEvidence.snapshot(jdbc);
+        ResponseEntity<Map> getEventsResp = restTemplate.exchange(url + "/" + caseId + "/events", HttpMethod.GET, new HttpEntity<>(authHeaders(otherUserToken)), Map.class);
+        assertEquals(HttpStatus.NOT_FOUND, getEventsResp.getStatusCode());
+        assertEquals(snapBeforeEvents, IncidentEvidence.snapshot(jdbc), "Invariant on 404 GET events foreign user");
+    }
+
+    private void assertPostHttpRejection(String url, String token, Map<String, Object> req, HttpStatus expectedStatus, String expectedMessage) {
+        var snapBefore = IncidentEvidence.snapshot(jdbc);
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.POST, new HttpEntity<>(req, authHeaders(token)), Map.class);
+        assertEquals(expectedStatus, response.getStatusCode(), "Rejection HTTP status mismatch");
+        if (expectedMessage != null) {
+            assertEquals(expectedMessage, response.getBody().get("message"));
+        }
+        var snapAfter = IncidentEvidence.snapshot(jdbc);
+        assertEquals(snapBefore, snapAfter, "Database state must be 100% invariant across all 10 tables on HTTP rejection");
     }
 }
 
