@@ -820,3 +820,8 @@ Mounted API-mode UI coverage now guards duplicate incident POSTs while a respons
 ### C7B independent acceptance — PARTIAL / BLOCKED, Codex A, 11/10/2026
 
 Implementation 05ac032: independent frontend tests 39/39 no skips, lint and demo/API builds PASS (sandbox EPERM rerun outside sandbox); source/dependency hashes stable and C7A backend manifest has zero drift. Live Docker engine unavailable; required dedicated browser harness and SQL/persistence/auth/held-response evidence remain NOT VERIFIED. Acceptance and remaining-scope TASK: .runtime/coordination-c7b-review-20261011-145207/. C7A scoped PASS preserved; C7B/C7C and whole C7 remain incomplete. No services started, fixture cleanup or push.
+
+
+### C7B interrupted checkpoint review — FAIL / PARTIAL, Codex A, 11/10/2026
+
+Three untracked browser harness sources saved as WIP checkpoint, not accepted implementation. Syntax and 2 root-refusal guards PASS; prior39/39 UI/lint/demo/API evidence retained by unchanged hashes. Browser not executed in partial artifact, HANDOFF absent; static flow defects in cross-booking retry and two-history-case assumptions plus missing exact SQL/time/provenance/adverse proofs. Docker29.7.2 now available outside sandbox; interrupted fixture stopped and retained KEEP, original MySQL identity running. Acceptance: .runtime/coordination-c7b-checkpoint-review-20261011-151947/ACCEPTANCE.md. Remaining work transferred via user-forwarded TASK .runtime/coordination-c7b-antigravity-20261011-152123/TASK.md; no agent messaging/control, no fixture cleanup or push. C7A scopedPASS retained, C7B/C7C incomplete.
