@@ -723,7 +723,7 @@ public class IncidentReportIntegrationTest {
         assertEquals(0L, ((Number) ev1.get("third_party_coverage")).longValue());
         assertEquals(0L, ((Number) ev1.get("requested_amount")).longValue());
         assertNull(ev1.get("responsibility_basis"));
-        assertNotNull(ev1.get("occurred_at"));
+        assertEquals(clock.value, ((java.sql.Timestamp) ev1.get("occurred_at")).toInstant());
 
         // Lấy snapshot toàn bộ event 1 để kiểm tra tính bất biến (byte/field invariance)
         Map<String, Object> ev1Snapshot = new HashMap<>(ev1);

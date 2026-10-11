@@ -212,6 +212,15 @@ public class IncidentReportHttpServerTest {
         assertEquals("OPEN", firstEvent.get("action"));
         assertEquals("demo-user", firstEvent.get("actor_id"));
         assertEquals("Tiếp nhận hồ sơ; chưa kết luận trách nhiệm.", firstEvent.get("note"));
+        var storedEvent = jdbc.queryForMap("select * from incident_events where id=?", firstEvent.get("id"));
+        assertEquals(caseId, storedEvent.get("case_id"));
+        assertEquals(clock.value, ((java.sql.Timestamp) storedEvent.get("occurred_at")).toInstant());
+        assertNull(storedEvent.get("previous_status"));
+        assertEquals("OPEN", storedEvent.get("next_status"));
+        for (String column : List.of("assessed_damage", "third_party_coverage", "requested_amount")) {
+            assertEquals(0L, ((Number) storedEvent.get(column)).longValue());
+        }
+        assertNull(storedEvent.get("responsibility_basis"));
     }
 
     @Test
@@ -434,6 +443,56 @@ public class IncidentReportHttpServerTest {
         ResponseEntity<Map> getEventsResp = restTemplate.exchange(url + "/" + caseId + "/events", HttpMethod.GET, new HttpEntity<>(authHeaders(otherUserToken)), Map.class);
         assertEquals(HttpStatus.NOT_FOUND, getEventsResp.getStatusCode());
         assertEquals(snapBeforeEvents, IncidentEvidence.snapshot(jdbc), "Invariant on 404 GET events foreign user");
+    }
+
+    @Test
+    void testRealHttp_NullFieldsAndCustodyEndpoints() {
+        String url = "http://localhost:" + port + "/api/v1/incidents";
+        for (String field : List.of("kind", "occurredAt")) {
+            FixtureContext fix = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+            Map<String, Object> payload = reportPayload(fix, fix.handoverTime);
+            payload.put(field, null);
+            assertPostHttpRejection(url, userToken, payload, HttpStatus.BAD_REQUEST,
+                "Thời điểm sự việc phải trong thời gian khách giữ xe thực tế.");
+        }
+        for (boolean atStart : List.of(true, false)) {
+            FixtureContext fix = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+            Instant time = atStart ? fix.handoverTime : clock.value;
+            var response = restTemplate.exchange(url, HttpMethod.POST,
+                new HttpEntity<>(reportPayload(fix, time), authHeaders(userToken)), Map.class);
+            assertEquals(HttpStatus.OK, response.getStatusCode());
+            assertEquals(time.toString(), response.getBody().get("occurredAt"));
+        }
+        FixtureContext future = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+        assertPostHttpRejection(url, userToken, reportPayload(future, clock.value.plusNanos(1000)),
+            HttpStatus.BAD_REQUEST, "Thời điểm sự việc phải trong thời gian khách giữ xe thực tế.");
+    }
+
+    @Test
+    void testRealHttp_InvalidStatusMissingHandoverAndUnassignedStaffPost() {
+        String url = "http://localhost:" + port + "/api/v1/incidents";
+        for (String state : List.of("PENDING", "CONFIRMED")) {
+            FixtureContext fix = createBookingFixture(state, "hn", "dn", "hn", false, false);
+            assertPostHttpRejection(url, userToken, reportPayload(fix, clock.value), HttpStatus.BAD_REQUEST,
+                "Chỉ ghi nhận sự cố của chuyến đã giao xe.");
+        }
+        FixtureContext missing = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", false, false);
+        assertPostHttpRejection(url, userToken, reportPayload(missing, clock.value), HttpStatus.CONFLICT,
+            "Chưa có biên bản bàn giao xe.");
+        FixtureContext denied = createBookingFixture("IN_PROGRESS", "hn", "dn", "hn", true, false);
+        assertPostHttpRejection(url, unassignedStaffToken, reportPayload(denied, denied.handoverTime),
+            HttpStatus.NOT_FOUND, "Không tìm thấy dữ liệu.");
+    }
+
+    private Map<String, Object> reportPayload(FixtureContext fix, Instant time) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("bookingId", fix.bookingId);
+        payload.put("kind", "DAMAGE");
+        payload.put("occurredAt", time.toString());
+        payload.put("description", "Report boundary regression");
+        payload.put("evidenceReference", "fixture-evidence");
+        payload.put("blockVehicle", false);
+        return payload;
     }
 
     private void assertPostHttpRejection(String url, String token, Map<String, Object> req, HttpStatus expectedStatus, String expectedMessage) {

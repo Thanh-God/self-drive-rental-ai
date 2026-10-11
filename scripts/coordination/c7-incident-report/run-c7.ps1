@@ -1,4 +1,6 @@
-param([Parameter(Mandatory=$true)][string]$EvidenceDir)
+param([Parameter(Mandatory=$true)][string]$EvidenceDir,
+    [scriptblock]$ControlProbe,
+    [scriptblock]$AfterRestoreProbe)
 Set-StrictMode -Version Latest
 $ErrorActionPreference='Stop'
 $repo=(Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
@@ -72,6 +74,7 @@ try {
         & docker run -d --name $name -p "127.0.0.1:${port}:3306" --env-file $private -v "${volume}:/var/lib/mysql" mysql:8.4 | Out-Null
         if($LASTEXITCODE -ne 0){throw '[DOCKER_RUN_FAILED] Fixture not created'}
         $owned=$true
+        $ready=$false
         $consecutiveSuccess=0
         for($i=0;$i -lt 45;$i++) {
             try {
@@ -99,6 +102,10 @@ try {
         $env:KDRIVE_TEST_EXPECTED_HOST='127.0.0.1';$env:KDRIVE_TEST_EXPECTED_PORT="$port"
         $env:KDRIVE_TEST_EXPECTED_SCHEMA=$db;$env:KDRIVE_TEST_MARKER_SCHEMA=$meta
 
+        if($ControlProbe){
+            # Explicit control-flow seam; never counts as database verification.
+            & $ControlProbe
+        } else {
         # Re-use isolated source build; workspace target remains untouched.
         $built=& $build -EvidenceDir (Join-Path $EvidenceDir 'build') -OutputDir (Join-Path $EvidenceDir 'backend-copy')
         $cwd=Get-Location
@@ -131,6 +138,7 @@ try {
             }
         } finally {Set-Location $cwd}
 
+        }
         $readSql="SELECT DATABASE(),@@port; SELECT version,success,checksum FROM flyway_schema_history ORDER BY installed_rank; SELECT COUNT(*) FROM incident_cases; SELECT COUNT(*) FROM incident_events;"
         $read=@(& docker exec -e "MYSQL_PWD=$password" $name mysql -uroot --database=$db --batch -e $readSql)
         if($LASTEXITCODE -ne 0){throw '[SQL_FAILURE] Readback'}
@@ -146,6 +154,7 @@ try {
     }
 } finally {
     Restore-ProcessEnvironment -SavedEnvironment $environment
+    if($AfterRestoreProbe){& $AfterRestoreProbe}
     $envReadback=Snapshot-ProcessEnvironment -VariableNames $variables
     $envDiffs=[ordered]@{}
     $envRestoredActual=$true
@@ -153,7 +162,7 @@ try {
         if($environment[$v] -cne $envReadback[$v]){
             $envRestoredActual=$false
             $envDiffs[$v]=@{
-                Match=false;
+                Match=$false;
                 BeforePresent=(-not [string]::IsNullOrEmpty($environment[$v]));
                 AfterPresent=(-not [string]::IsNullOrEmpty($envReadback[$v]))
             }
@@ -178,7 +187,9 @@ try {
 
     $overallSuccess = ($testsPassed -and $cleanupPassed -and $processCleanupPassed -and $envRestoredActual)
     [pscustomobject]@{
-        TestsPassed=$testsPassed;
+        TestsPassed=($testsPassed -and -not $ControlProbe);
+        ControlFlowPassed=$testsPassed;
+        VerificationMode=if($ControlProbe){'SyntheticControlProbe'}else{'LiveMySQL'};
         CleanupPassed=$cleanupPassed;
         ProcessCleanupPassed=$processCleanupPassed;
         EnvironmentRestoredActual=$envRestoredActual;
@@ -186,7 +197,7 @@ try {
         Container=$name;
         VolumeRetained=$volume;
         Port=$port;
-        SuitesExecuted=$suites
+        SuitesExecuted=if($ControlProbe){@()}else{$suites}
     } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
 }
 if(-not($testsPassed -and $cleanupPassed -and $processCleanupPassed -and $envRestoredActual)){throw '[RUNNER_FAILURE] C7 runner did not pass fail-closed validation'}

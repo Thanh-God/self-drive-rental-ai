@@ -81,10 +81,11 @@ function Invoke-OwnedProcessCleanup {
                 if ($CustomStopProcess) {
                     & $CustomStopProcess $targetPid
                 } else {
-                    Stop-Process -Id $targetPid -Force -PassThru -ErrorAction Stop | Out-Null
+                    & taskkill.exe /PID $targetPid /T /F | Out-Null
+                    if($LASTEXITCODE -ne 0){throw 'Owned process-tree stop failed'}
                 }
 
-                Start-Sleep -Milliseconds 300
+                if($proc -is [System.Diagnostics.Process]){$null=$proc.WaitForExit(5000)}
                 $stillRunning = Get-Process -Id $targetPid -ErrorAction SilentlyContinue
                 if ($stillRunning) {
                     throw "Process PID $targetPid still running after Stop-Process"
