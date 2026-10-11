@@ -709,3 +709,35 @@ Codex A verified C6 final HEAD248cea422e6fa14495d44721c4273cb661d5a5a5 and273exe
 Plan `.runtime/coordination-c7-plan-20261011-122606/PLAN.md`, prompts PROMPTS.md and evidence baseline/status/C6preservation. C7A Antigravity TASK `.runtime/coordination-c7a-antigravity-20261011-122606/TASK.md`: one backend reporting slice custodybounds/latevalidreport/ownership/currentbranchblock and realMySQL per-request/rollback evidence, fixes only reproduceddefects. C7B Codex B TASK `.runtime/coordination-c7b-codexb-20261011-122606/TASK.md`: UI/API report/list/history pending/error/retry/DBreadback and relevantC6reviewregression, gated until Codex A accepts C7A PASS plus servicesstopped; executionbaseline measured after C7A, not planningHEAD.
 
 C7A READY to receive userforwardedprompt, C7B PREPARED/GATE CLOSED; neither agent launched or messaged. Subsequent C7C assessment/coverage/claim/dispute/reassess/close/version/historyimmutability/noautodeduct will get separate tasks after these reporting slices accepted. C7 overall not PASS from planning or two partialslices. Do not reopen priorR2/C3/C6PASS without dependency drift; do not decide deposits/fees/legalpolicy/AIMap. Isolated fixtures/retention policy, nativeguards/envcleanup/evidence and scopedcommits mandatory. Planning changes docs only; no services/productwrites, push/reset or cleanup.
+
+### C7A Hoàn thành kiểm chứng Báo sự cố & Quyền khóa xe — Antigravity, 11/10/2026
+
+Antigravity đã triển khai và kiểm chứng đầy đủ lát cắt C7A (Backend Incident Reporting & Vehicle Locking) trên môi trường MySQL 8.4 cô lập chuyên biệt (`kltn-c7-ag-71c3b901f7ce`, port 33615, volume `vol-kltn-c7-ag-71c3b901f7ce`, schema `kdrive_c7_ag` cùng schema marker `kdrive_c7_ag_meta`):
+
+1. **Ranh giới thời gian tạm giữ xe (Custody Time Boundaries)**:
+   - Đơn `IN_PROGRESS`: Thời điểm sự cố `occurredAt` trong thời gian giữ xe thực tế (từ biên `HANDOVER.occurred_at` đến `clock.instant()`) được chấp nhận (HTTP 200). Chệch biên trước hoặc sau đúng 1 microsecond (`1000ns`) hoặc sự việc ở tương lai đều bị từ chối chính xác với HTTP 400 (`Thời điểm sự việc phải trong thời gian khách giữ xe thực tế.`).
+   - Báo muộn trên đơn `RETURNED` và `COMPLETED`: Chấp nhận sự cố xảy ra trong thời gian khách giữ xe thực tế (`HANDOVER.occurred_at` <= `occurredAt` <= `RETURN.occurred_at`) dù thời điểm báo cáo (`reportedAt`) muộn hơn. Chệch sau mốc trả xe 1 microsecond bị từ chối HTTP 400.
+   - Trạng thái chưa bàn giao (`PENDING`, `CONFIRMED`) bị từ chối HTTP 400 (`Chỉ ghi nhận sự cố của chuyến đã giao xe.`); đơn `IN_PROGRESS` thiếu biên bản bàn giao bị từ chối HTTP 409 Conflict (`Chưa có biên bản bàn giao xe.`).
+
+2. **Validation dữ liệu HTTP**:
+   - `kind` không hợp lệ hoặc null, `occurredAt` null, mô tả trống/khoảng trắng hoặc vượt quá 1500 ký tự, `evidenceReference` vượt quá 2000 ký tự đều bị từ chối bằng HTTP 400 domain cụ thể, không ném 500 hay lỗi kết nối.
+
+3. **Phân quyền và bảo vệ rò rỉ dữ liệu (Ownership & Leakage)**:
+   - Khách lạ (`FOREIGN USER`) hoặc Staff không phụ trách chi nhánh nhận/trả khi cố tình POST tạo sự cố hoặc GET danh sách/chi tiết sự việc đều nhận HTTP 404 Not Found (`DomainException.missing()`), không làm rò rỉ sự tồn tại của đơn hàng. Request không có JWT nhận HTTP 401 Unauthorized.
+
+4. **Quyền khóa xe (`blockVehicle=true`)**:
+   - `USER` yêu cầu khóa xe bị từ chối nghiêm ngặt với HTTP 403 Forbidden; trạng thái xe giữ nguyên `ACTIVE`.
+   - `STAFF` chỉ được khóa xe nếu được phân công tại chi nhánh hiện tại của xe (`vehicle.currentBranchId`). Trường hợp Staff thuộc chi nhánh nhận/trả lịch sử của đơn hàng nhưng khác chi nhánh hiện tại của xe bị từ chối HTTP 403 Forbidden và xe giữ nguyên `ACTIVE`. Khi Staff đúng chi nhánh hiện tại yêu cầu, xe chuyển sang `MAINTENANCE`.
+   - `ADMIN` được phép khóa xe sang `MAINTENANCE` từ mọi chi nhánh.
+
+5. **Toàn vẹn dữ liệu, Event Invariance & Transaction Rollback**:
+   - Báo sự cố thành công tạo đúng 1 bản ghi `incident_cases` với status `OPEN`, các trường tài chính (`assessed_damage`, `third_party_coverage`, `requested_amount`) đều bằng 0, không tự động trừ tiền cọc; và đúng 1 bản ghi `incident_events` với action `OPEN`.
+   - Các bản ghi sự kiện trước đó hoàn toàn bất biến (byte/field identical) khi thêm sự cố mới cho cùng một đơn hàng.
+   - Kiểm chứng rollback giao dịch thực tế trên MySQL khi phát sinh ngoại lệ sau bước cập nhật xe: trạng thái xe tự động rollback về `ACTIVE`, không có bản ghi `incident_cases` hay `incident_events` rác nào bị ghi vào DB.
+
+6. **Kết quả kiểm thử & Nghiệm thu kỹ thuật**:
+   - Runner `scripts/coordination/c7-incident-report/run-c7.ps1` exit code 0; 8/8 test methods PASS trên container MySQL 8.4 cô lập, 0 fail, 0 error, 0 skipped.
+   - Báo cáo Surefire XML chuẩn xác (`TEST-com.carrental.IncidentReportIntegrationTest.xml`); readback MySQL xác nhận Flyway V1/V2 hợp lệ và số dòng dữ liệu.
+   - Toàn bộ test suite backend (`./mvnw.cmd verify` trên JDK 21) chạy thành công (92 tests run, 0 failures, 0 errors, 8 skipped do profile cô lập).
+   - Container fixture và volume được quản lý đúng chính sách; ports được giải phóng hoàn toàn; cơ sở dữ liệu người dùng (`kltn-phase5-rerun` cổng 33385) và các mốc kiểm chứng cũ được bảo toàn tuyệt đối.
+
