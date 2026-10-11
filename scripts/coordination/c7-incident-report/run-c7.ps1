@@ -6,24 +6,30 @@ if($PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major -
 if(Test-Path -LiteralPath $EvidenceDir){throw '[PREFLIGHT_REFUSAL] Evidence exists'}
 $EvidenceDir=[IO.Path]::GetFullPath($EvidenceDir)
 $build=Join-Path $repo 'scripts/coordination/c6-checkpoint-b/build-fat-jar.ps1'
-$xmlHelper=Join-Path $repo '.runtime/coordination-c6-checkpoint-a-20261010-122848/c6-checkpoint-a-helpers.psm1'
-foreach($dep in @($build,$xmlHelper,(Join-Path $PSScriptRoot 'fixture-cleanup.ps1'))){if(-not(Test-Path $dep)){throw '[PREFLIGHT_GUARD] Missing dependency'}}
-. (Join-Path $PSScriptRoot 'fixture-cleanup.ps1')
+$c7Helper=Join-Path $PSScriptRoot 'c7-helpers.psm1'
+$cleanupHelper=Join-Path $PSScriptRoot 'fixture-cleanup.ps1'
+foreach($dep in @($build,$c7Helper,$cleanupHelper)){if(-not(Test-Path $dep)){throw '[PREFLIGHT_GUARD] Missing dependency'}}
+. $cleanupHelper
+Import-Module $c7Helper -Force
 
 function Manifest {
     $files=@(Get-ChildItem (Join-Path $repo 'backend/src') -Recurse -File)+@(Get-ChildItem (Join-Path $repo 'backend/.mvn') -Recurse -File)+@(Get-ChildItem $PSScriptRoot -File)
     foreach($rel in @('backend/pom.xml','backend/mvnw','backend/mvnw.cmd')){$files+=Get-Item (Join-Path $repo $rel)}
-    $files+=Get-Item $build,$xmlHelper
+    $files+=Get-Item $build
     $result=[ordered]@{}
     foreach($file in ($files | Sort-Object FullName -Unique)){$result[$file.FullName.Substring($repo.Length+1)]=(Get-FileHash $file.FullName).Hash}
     return $result
 }
 
 $before=Manifest
-$suite='IncidentReportIntegrationTest'
-$text=Get-Content (Join-Path $repo "backend/src/test/java/com/carrental/$suite.java") -Raw
-$methods=@([regex]::Matches($text,'@Test\s+void\s+(\w+)\s*\(') | ForEach-Object {$_.Groups[1].Value})
-if(-not $methods.Count){throw 'No expected test methods'}
+$suites=@('IncidentReportIntegrationTest', 'IncidentReportHttpServerTest')
+$expectedMethods=[ordered]@{}
+foreach($suite in $suites){
+    $text=Get-Content (Join-Path $repo "backend/src/test/java/com/carrental/$suite.java") -Raw
+    $methods=@([regex]::Matches($text,'@Test\s+void\s+(\w+)\s*\(') | ForEach-Object {$_.Groups[1].Value})
+    if(-not $methods.Count){throw "No expected test methods in $suite"}
+    $expectedMethods[$suite]=$methods
+}
 
 $port=33615
 $name='kltn-c7-ag-'+[Guid]::NewGuid().ToString('N').Substring(0,12)
@@ -40,10 +46,11 @@ try {$listener.Start()} catch {throw '[PREFLIGHT_GUARD] Fixture port occupied'} 
 
 New-Item -ItemType Directory $EvidenceDir | Out-Null
 $before | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'source-before.json')
-@{$suite=$methods} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'expected-methods.json')
+$expectedMethods | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'expected-methods.json')
 
 $variables=@('JAVA_HOME','KDRIVE_TEST_DB_URL','KDRIVE_TEST_DB_USER','KDRIVE_TEST_DB_PASSWORD','KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX','KDRIVE_TEST_FIXTURE_MARKER_TOKEN','KDRIVE_TEST_EXPECTED_HOST','KDRIVE_TEST_EXPECTED_PORT','KDRIVE_TEST_EXPECTED_SCHEMA','KDRIVE_TEST_MARKER_SCHEMA','SPRING_PROFILES_ACTIVE')
-$environment=@{};foreach($v in $variables){$environment[$v]=[Environment]::GetEnvironmentVariable($v,'Process')}
+$environment=Snapshot-ProcessEnvironment -VariableNames $variables
+$environment | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'environment-before.json')
 $owned=$false;$testsPassed=$false;$cleanupPassed=$false
 
 try {
@@ -79,28 +86,30 @@ try {
         # Re-use isolated source build; workspace target remains untouched.
         $built=& $build -EvidenceDir (Join-Path $EvidenceDir 'build') -OutputDir (Join-Path $EvidenceDir 'backend-copy')
         $cwd=Get-Location
+        $suitesPassed=$true
         try {
             Set-Location (Split-Path $built.CompiledOutput -Parent)
-            $maven=Start-Process -FilePath (Join-Path (Get-Location) 'mvnw.cmd') -ArgumentList @('-o','-B','-ntp',"-Dmaven.repo.local=$repo/.runtime/m2","-Dtest=$suite",'test') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'maven.log') -RedirectStandardError (Join-Path $EvidenceDir 'maven-error.log')
-            $null=$maven.Handle
-            try {
-                if(-not $maven.WaitForExit(300000)){throw '[TEST_TIMEOUT] Maven exceeded five minutes'}
-                $mavenExit=$maven.ExitCode
-            } finally {
-                if(-not $maven.HasExited){& taskkill /PID $maven.Id /T /F | Out-Null;$maven.WaitForExit(5000) | Out-Null}
-                if(-not $maven.HasExited){throw '[CLEANUP_FAILURE] Owned Maven did not exit'}
-                [pscustomobject]@{PID=$maven.Id;HasExited=$maven.HasExited} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'maven-process.json')
+            foreach($suite in $suites) {
+                $suiteMethods=$expectedMethods[$suite]
+                $maven=Start-Process -FilePath (Join-Path (Get-Location) 'mvnw.cmd') -ArgumentList @('-o','-B','-ntp',"-Dmaven.repo.local=$repo/.runtime/m2","-Dtest=$suite",'test') -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir "maven-$suite.log") -RedirectStandardError (Join-Path $EvidenceDir "maven-$suite-error.log")
+                $null=$maven.Handle
+                try {
+                    if(-not $maven.WaitForExit(300000)){throw "[TEST_TIMEOUT] Maven exceeded five minutes on $suite"}
+                    $mavenExit=$maven.ExitCode
+                } finally {
+                    $cleanupProc=Invoke-OwnedProcessCleanup -OwnedProcesses @($maven)
+                    [pscustomobject]@{PID=$maven.Id;HasExited=$maven.HasExited;CleanupResult=$cleanupProc} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir "maven-process-$suite.json")
+                }
+                if($mavenExit -ne 0){throw "[TEST_FAILURE] Maven exit $mavenExit on $suite"}
+
+                $saved=Join-Path $EvidenceDir "TEST-com.carrental.$suite.xml"
+                Copy-Item (Join-Path $built.CompiledOutput "surefire-reports/TEST-com.carrental.$suite.xml") $saved
+                Assert-SurefireXmlStrict -XmlPath $saved -ExpectedTests $suiteMethods.Count -ExpectedFailures 0 -ExpectedErrors 0 -ExpectedSkipped 0 | Out-Null
+                [xml]$xml=Get-Content $saved -Raw
+                $actual=@($xml.testsuite.testcase | ForEach-Object {$_.name} | Sort-Object)
+                if(($actual -join '|') -cne (($suiteMethods | Sort-Object) -join '|')){throw "[XML_METHODS] Unexpected methods in $suite"}
             }
         } finally {Set-Location $cwd}
-        if($mavenExit -ne 0){throw "[TEST_FAILURE] Maven exit $mavenExit"}
-
-        Import-Module $xmlHelper -Force
-        $saved=Join-Path $EvidenceDir "TEST-com.carrental.$suite.xml"
-        Copy-Item (Join-Path $built.CompiledOutput "surefire-reports/TEST-com.carrental.$suite.xml") $saved
-        Assert-SurefireXmlStrict -XmlPath $saved -ExpectedTests $methods.Count -ExpectedFailures 0 -ExpectedErrors 0 -ExpectedSkipped 0 | Out-Null
-        [xml]$xml=Get-Content $saved -Raw
-        $actual=@($xml.testsuite.testcase | ForEach-Object {$_.name} | Sort-Object)
-        if(($actual -join '|') -cne (($methods | Sort-Object) -join '|')){throw '[XML_METHODS] Unexpected methods'}
 
         $readSql="SELECT DATABASE(),@@port; SELECT version,success,checksum FROM flyway_schema_history ORDER BY installed_rank; SELECT COUNT(*) FROM incident_cases; SELECT COUNT(*) FROM incident_events;"
         $read=@(& docker exec -e "MYSQL_PWD=$password" $name mysql -uroot --database=$db --batch -e $readSql)
@@ -116,8 +125,32 @@ try {
         $cleanupPassed=$cleanup.Passed
     }
 } finally {
-    foreach($v in $variables){[Environment]::SetEnvironmentVariable($v,$environment[$v],'Process')}
-    [pscustomobject]@{TestsPassed=$testsPassed;CleanupPassed=$cleanupPassed;OverallSuccess=($testsPassed -and $cleanupPassed);Container=$name;VolumeRetained=$volume;Port=$port;EnvironmentRestored=$true} | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
+    Restore-ProcessEnvironment -SavedEnvironment $environment
+    $envReadback=Snapshot-ProcessEnvironment -VariableNames $variables
+    $envDiffs=[ordered]@{}
+    $envRestoredActual=$true
+    foreach($v in $variables){
+        if($environment[$v] -cne $envReadback[$v]){
+            $envRestoredActual=$false
+            $envDiffs[$v]=@{Expected=$environment[$v];Actual=$envReadback[$v]}
+        }
+    }
+    [pscustomobject]@{
+        EnvironmentBefore=$environment;
+        EnvironmentAfterRestoration=$envReadback;
+        EnvironmentRestoredActual=$envRestoredActual;
+        Differences=$envDiffs
+    } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'environment-restoration-report.json')
+
+    [pscustomobject]@{
+        TestsPassed=$testsPassed;
+        CleanupPassed=$cleanupPassed;
+        OverallSuccess=($testsPassed -and $cleanupPassed);
+        Container=$name;
+        VolumeRetained=$volume;
+        Port=$port;
+        EnvironmentRestoredActual=$envRestoredActual;
+        SuitesExecuted=$suites
+    } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
 }
 if(-not($testsPassed -and $cleanupPassed)){throw 'C7 runner did not pass'}
-
