@@ -128,6 +128,7 @@ function IncidentSection({ booking, records = [], area }) {
   const [formError, setFormError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const reportPending = useRef(false);
   const loadEventsRequestId = useRef(0);
   const cases = Array.isArray(request.data) ? request.data : [];
   const selectedEvents = eventsForSelectedIncident(selectedId, eventHistory);
@@ -142,6 +143,8 @@ function IncidentSection({ booking, records = [], area }) {
 
   async function report(event) {
     event.preventDefault();
+    if (reportPending.current) return;
+    reportPending.current = true;
     setFormError("");
     setNotice("");
     setBusy(true);
@@ -164,6 +167,7 @@ function IncidentSection({ booking, records = [], area }) {
     } catch (error) {
       setFormError(getErrorMessage(error, "Không thể lập hồ sơ sự cố."));
     } finally {
+      reportPending.current = false;
       setBusy(false);
     }
   }
@@ -285,7 +289,15 @@ function IncidentSection({ booking, records = [], area }) {
                     {eventsLoading ? (
                       <li role="status">Đang tải lịch sử hồ sơ...</li>
                     ) : eventsError ? (
-                      <li role="alert">{eventsError}</li>
+                      <li role="alert">
+                        <p>{eventsError}</p>
+                        <button
+                          className="btn-secondary mt-2"
+                          onClick={() => loadEvents(incident.id)}
+                        >
+                          Thử tải lại lịch sử
+                        </button>
+                      </li>
                     ) : selectedEvents.length ? (
                       selectedEvents.map((item, index) => (
                         <li key={`${item.occurred_at}-${index}`}>
