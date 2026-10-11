@@ -1353,6 +1353,7 @@ export function BookingReviewSection({
   if (bookingReviewRequest.loading) {
     return (
       <section className="panel space-y-2">
+        <p role="status">Đang tải đánh giá...</p>
         <LoadingSkeleton rows={2} />
       </section>
     );

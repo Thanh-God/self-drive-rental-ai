@@ -91,9 +91,9 @@ async function main() {
    await page.route(url,async route=>{requests++;const response=await route.fetch();assert.equal(response.status(),200);
     const text=await response.text();if(existing)assert.equal(JSON.parse(text).content,'C6 held response persisted');else assert.ok(text===''||text==='null');
     ready.resolve();await release.promise;await route.fulfill({response});});
-   await booking(page,id);await ready.promise;await visible(page.locator('section.panel.space-y-2 [aria-busy=true]'));await absent(form(page));await absent(own(page));
+   await booking(page,id);await ready.promise;await visible(page.locator('section.panel.space-y-2 [aria-busy=true]'));await visible(page.getByRole('status').filter({hasText:'Đang tải đánh giá...'}));await absent(form(page));await absent(own(page));
    await screenshot(page,existing?'get-existing-loading':'get-null-loading');release.resolve();
-   await visible(existing?own(page):form(page));assert.equal(requests,1);await page.unroute(url);return page;
+   await visible(existing?own(page):form(page));await absent(page.getByText('Đang tải đánh giá...',{exact:true}));await screenshot(page,existing?'get-existing-released':'get-null-released');assert.equal(requests,1);await page.unroute(url);return page;
   }
   await delayed('c6-held',true);const getPage=await delayed('c6-get-null',false);
   let failOnce=true,retries=0;
@@ -103,8 +103,8 @@ async function main() {
   });
   await getPage.reload();await visible(getPage.getByText('C6 injected review transport error',{exact:true}));await absent(form(getPage));
   await screenshot(getPage,'get-500');await getPage.getByRole('button',{name:'Thử tải lại đánh giá',exact:true}).click();
-  await visible(form(getPage));await absent(getPage.getByText('C6 injected review transport error',{exact:true}));assert.equal(retries,1);assert.equal(rows('c6-get-null').length,0);
-  sections.GetReviewDelayed={NullFromBackend:true,ExistingFromBackend:true,LoadingNoForm:true,Error500:true,RealRetryClearsError:true,RequestCounts:true};
+  await visible(form(getPage));await absent(getPage.getByText('C6 injected review transport error',{exact:true}));await screenshot(getPage,'get-retry-success');assert.equal(retries,1);assert.equal(rows('c6-get-null').length,0);
+  sections.GetReviewDelayed={NullFromBackend:true,ExistingFromBackend:true,LoadingTextNoForm:true,Error500:true,RealRetryClearsError:true,RequestCounts:true};
 
   console.log('409: two actual admin UI contexts, SQL full row and audit');
   await submit(user,'c6-stale','C6 stale admin unique review');

@@ -288,6 +288,7 @@ test("DOM: BookingReviewSection handles loading, error with retry, success-empty
     }),
   );
   assert.ok(loadingContainer.querySelector(".animate-pulse"), "Skeleton must be rendered during loading");
+  assert.equal(loadingContainer.querySelector('[role="status"]').textContent, "Đang tải đánh giá...");
   assert.equal(loadingContainer.querySelector("form"), null, "Form must NOT be rendered during loading");
   assert.equal(loadingContainer.querySelector("button[type='submit']"), null);
   await unmountLoading();
@@ -345,6 +346,7 @@ test("DOM: BookingReviewSection handles loading, error with retry, success-empty
     }),
   );
   assert.ok(emptyContainer.querySelector("form"), "Form must be rendered when booking has no review");
+  assert.equal(emptyContainer.querySelector('[role="status"]'), null, "Loading text must disappear after response");
   assert.ok(emptyContainer.querySelector("select"), "Rating select must be rendered");
   assert.ok(emptyContainer.querySelector("textarea"), "Review content textarea must be rendered");
   const submitBtn = emptyContainer.querySelector("button.btn");
