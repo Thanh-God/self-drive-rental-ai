@@ -19,6 +19,7 @@ let setAuthInterceptors;
 let AuthProvider;
 let ApiBookingDetailPage;
 let BookingReviewSection;
+let ApiVehicleDetailPage;
 let ApiReviewsAdminPage;
 let MemoryRouter;
 let Routes;
@@ -151,7 +152,7 @@ before(async () => {
   });
 
   ({ AuthProvider } = await viteServer.ssrLoadModule("/src/context/AuthContext.jsx"));
-  ({ ApiBookingDetailPage, BookingReviewSection } = await viteServer.ssrLoadModule("/src/pages/api/ApiScreens.jsx"));
+  ({ ApiBookingDetailPage, BookingReviewSection, ApiVehicleDetailPage } = await viteServer.ssrLoadModule("/src/pages/api/ApiScreens.jsx"));
   ({ ApiReviewsAdminPage } = await viteServer.ssrLoadModule("/src/pages/api/ApiManagementScreens.jsx"));
   ({ default: apiClient, setAuthInterceptors } = await viteServer.ssrLoadModule("/src/api/client.js"));
   ({ MemoryRouter, Routes, Route } = await viteServer.ssrLoadModule("react-router-dom"));
@@ -401,6 +402,206 @@ test("DOM: BookingReviewSection handles loading, error with retry, success-empty
   );
   assert.equal(pendingContainer.innerHTML, "", "Must render null when booking is not COMPLETED");
   await unmountPending();
+});
+
+// =============================================================================
+// Tiêu chí 1 (A1 - F02-A1): Actual ApiBookingDetailPage + useApiData HTTP boundary:
+// Kiểm tra vòng đời review GET:
+// - Hold review GET -> loading skeleton, không hiển thị form
+// - Reject review GET -> error notice + nút retry, không hiển thị form
+// - Click retry -> đúng 1 new GET request, hiển thị loading trong lúc refetch
+// - Fulfill new GET với null -> chuyển sang hiển thị form nhập đánh giá
+// =============================================================================
+test("DOM: ApiBookingDetailPage review GET lifecycle: loading, error with retry refetch, and transition to review form", async () => {
+  const { container, unmount } = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(
+        MemoryRouter,
+        { initialEntries: ["/user/bookings/b-page-retry-null"] },
+        createElement(
+          Routes,
+          null,
+          createElement(Route, {
+            path: "/:area/bookings/:bookingId",
+            element: createElement(ApiBookingDetailPage, { area: "user" }),
+          }),
+        ),
+      ),
+    ),
+  );
+
+  const findReviewForm = () =>
+    Array.from(container.querySelectorAll("form")).find(
+      (f) => Boolean(f.querySelector("select")) && f.textContent.includes("Gửi đánh giá"),
+    );
+
+  // 1. Fulfill booking detail completed
+  const bReq = takeRequest("/bookings/b-page-retry-null");
+  await act(async () => {
+    fulfill(bReq, {
+      booking: {
+        id: "b-page-retry-null",
+        status: "COMPLETED",
+        vehicleName: "VinFast VF8 Eco",
+        version: 0,
+      },
+      license: null,
+      records: [],
+    });
+  });
+
+  // 2. Review GET request is initiated
+  const rReq1 = takeRequest("/bookings/b-page-retry-null/review");
+  assert.equal(rReq1.config.method?.toLowerCase() || "get", "get");
+
+  // Trong khi review GET request đang pending (held):
+  // DOM hiển thị skeleton loading, form review KHÔNG được render
+  assert.equal(Boolean(container.querySelector(".animate-pulse")), true, "Skeleton pulse must be rendered while review GET is pending");
+  assert.equal(Boolean(findReviewForm()), false, "Review form must NOT be rendered while review GET is pending");
+
+  // 3. Reject review GET request (mô phỏng lỗi mạng / máy chủ)
+  await act(async () => {
+    rejectWithStatus(rReq1, 500, { message: "Lỗi kết nối máy chủ review" });
+  });
+
+  // DOM hiển thị error notice và nút retry; form review vẫn KHÔNG được render
+  assert.equal(
+    container.textContent.includes("Lỗi kết nối máy chủ review"),
+    true,
+    "Error message must be visible on review GET failure",
+  );
+  const retryBtn = Array.from(container.querySelectorAll("button")).find(
+    (b) => b.textContent.trim() === "Thử tải lại đánh giá",
+  );
+  assert.equal(Boolean(retryBtn), true, "Retry button must be visible on review GET error");
+  assert.equal(Boolean(findReviewForm()), false, "Review form must NOT be rendered on review GET error");
+
+  // 4. Click retry -> kích hoạt refetch thực tế qua useApiData.reload()
+  const reviewRequestsBeforeRetry = requests.filter(
+    (r) => r.config.url === "/bookings/b-page-retry-null/review",
+  ).length;
+
+  await act(async () => {
+    retryBtn.click();
+  });
+
+  // Phải phát sinh đúng 1 new GET request đến /bookings/b-page-retry-null/review
+  const reviewRequestsAfterRetry = requests.filter(
+    (r) => r.config.url === "/bookings/b-page-retry-null/review",
+  ).length;
+  assert.equal(
+    reviewRequestsAfterRetry,
+    reviewRequestsBeforeRetry + 1,
+    "Clicking retry must trigger exactly one new GET request",
+  );
+
+  const rReq2 = takeRequest("/bookings/b-page-retry-null/review");
+  assert.equal(rReq2.config.method?.toLowerCase() || "get", "get");
+
+  // Trong khi retry request đang pending: hiển thị loading, không có form
+  assert.equal(Boolean(findReviewForm()), false, "Review form must NOT be rendered while retry is pending");
+
+  // 5. Fulfill retry request với null (chưa có review)
+  await act(async () => {
+    fulfill(rReq2, null);
+  });
+
+  // Sau khi fulfill null: form gửi đánh giá xuất hiện
+  const formAfterSuccess = findReviewForm();
+  assert.equal(Boolean(formAfterSuccess), true, "Review form must be rendered when review GET resolves with null");
+  assert.equal(Boolean(formAfterSuccess.querySelector("textarea")), true);
+  assert.equal(Boolean(formAfterSuccess.querySelector("select")), true);
+
+  await unmount();
+});
+
+// =============================================================================
+// Tiêu chí 1 (A1 - F02-A1): Actual ApiBookingDetailPage + useApiData HTTP boundary:
+// Kiểm tra retry thành công với existing review data -> chuyển sang hiển thị review của khách, không có form
+// =============================================================================
+test("DOM: ApiBookingDetailPage review GET lifecycle: retry refetch with existing review transitions to review display without form", async () => {
+  const { container, unmount } = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(
+        MemoryRouter,
+        { initialEntries: ["/user/bookings/b-page-retry-existing"] },
+        createElement(
+          Routes,
+          null,
+          createElement(Route, {
+            path: "/:area/bookings/:bookingId",
+            element: createElement(ApiBookingDetailPage, { area: "user" }),
+          }),
+        ),
+      ),
+    ),
+  );
+
+  const findReviewForm = () =>
+    Array.from(container.querySelectorAll("form")).find(
+      (f) => Boolean(f.querySelector("select")) && f.textContent.includes("Gửi đánh giá"),
+    );
+
+  // 1. Fulfill booking detail completed
+  const bReq = takeRequest("/bookings/b-page-retry-existing");
+  await act(async () => {
+    fulfill(bReq, {
+      booking: {
+        id: "b-page-retry-existing",
+        status: "COMPLETED",
+        vehicleName: "VinFast VF8 Eco",
+        version: 0,
+      },
+      license: null,
+      records: [],
+    });
+  });
+
+  // 2. Reject initial review GET
+  const rReq1 = takeRequest("/bookings/b-page-retry-existing/review");
+  await act(async () => {
+    rejectWithStatus(rReq1, 503, { message: "Dịch vụ tạm thời gián đoạn" });
+  });
+
+  const retryBtn = Array.from(container.querySelectorAll("button")).find(
+    (b) => b.textContent.trim() === "Thử tải lại đánh giá",
+  );
+  assert.equal(Boolean(retryBtn), true);
+  assert.equal(Boolean(findReviewForm()), false);
+
+  // 3. Click retry
+  await act(async () => {
+    retryBtn.click();
+  });
+
+  const rReq2 = takeRequest("/bookings/b-page-retry-existing/review");
+
+  // 4. Fulfill với existing review data
+  const existingReview = {
+    id: "rev-ext-999",
+    booking_id: "b-page-retry-existing",
+    rating: 5,
+    content: "Xe chạy êm, giao xe đúng giờ và sạch sẽ.",
+    created_at: "2026-10-10T14:00:00Z",
+    hidden: false,
+    version: 0,
+  };
+
+  await act(async () => {
+    fulfill(rReq2, existingReview);
+  });
+
+  // Sau khi fulfill review: form KHÔNG được render; hiển thị nội dung đánh giá
+  assert.equal(Boolean(findReviewForm()), false, "Review form must NOT be rendered when review already exists");
+  assert.equal(container.textContent.includes("Đánh giá của bạn"), true);
+  assert.equal(container.textContent.includes("5/5 sao"), true);
+  assert.equal(container.textContent.includes("Xe chạy êm, giao xe đúng giờ và sạch sẽ."), true);
+
+  await unmount();
 });
 
 // =============================================================================
@@ -740,4 +941,95 @@ test("DOM: XSS safety: malicious payload in review content is rendered as litera
   assert.equal(dom.window.__xssImageExecuted, false, "Image onerror sentinel must remain unexecuted");
 
   await unmountAdmin();
+
+  // 3. Test in ApiVehicleDetailPage (Public vehicle detail view - A2)
+  const { container: publicContainer, unmount: unmountPublic } = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(
+        MemoryRouter,
+        { initialEntries: ["/vehicles/v-xss-test"] },
+        createElement(
+          Routes,
+          null,
+          createElement(Route, {
+            path: "/vehicles/:vehicleId",
+            element: createElement(ApiVehicleDetailPage, null),
+          }),
+        ),
+      ),
+    ),
+  );
+
+  // Fulfill vehicle detail
+  const vReq = takeRequest("/vehicles/v-xss-test");
+  await act(async () => {
+    fulfill(vReq, {
+      id: "v-xss-test",
+      name: "VinFast VF8 Eco",
+      brand: "VinFast",
+      category: "SUV",
+      seats: 5,
+      transmission: "Tự động",
+      status: "ACTIVE",
+      price: 1200000,
+      currentBranchId: "HN",
+    });
+  });
+
+  // Fulfill catalog
+  const catReq = takeRequest("/vehicles/catalog");
+  await act(async () => {
+    fulfill(catReq, {
+      categories: ["SUV"],
+      branches: [{ id: "HN", name: "Hà Nội" }],
+    });
+  });
+
+  // Fulfill vehicle reviews containing malicious payload
+  const vReviewsReq = takeRequest("/vehicles/v-xss-test/reviews");
+  await act(async () => {
+    fulfill(vReviewsReq, [
+      {
+        id: "rev-pub-xss",
+        rating: 5,
+        content: maliciousPayload,
+        created_at: "2026-10-10T15:00:00Z",
+      },
+    ]);
+  });
+
+  // Assert in Public Vehicle DOM:
+  const publicReviewsSection = Array.from(publicContainer.querySelectorAll("section")).find(
+    (s) => s.textContent.includes("Đánh giá của khách hàng"),
+  );
+  assert.equal(Boolean(publicReviewsSection), true, "Public reviews section must exist");
+  assert.equal(
+    publicReviewsSection.textContent.includes(maliciousPayload),
+    true,
+    "Malicious payload must be rendered as literal text in public vehicle reviews",
+  );
+  assert.equal(
+    publicReviewsSection.querySelector("script"),
+    null,
+    "No <script> element must exist in public review container",
+  );
+  assert.equal(
+    publicReviewsSection.querySelector("img"),
+    null,
+    "No <img> element must be created from malicious payload in public review container",
+  );
+  assert.equal(
+    dom.window.__xssScriptExecuted,
+    false,
+    "Script sentinel must not have been executed (supplemental)",
+  );
+  assert.equal(
+    dom.window.__xssImageExecuted,
+    false,
+    "Image onerror sentinel must not have been executed (supplemental)",
+  );
+
+  await unmountPublic();
 });
