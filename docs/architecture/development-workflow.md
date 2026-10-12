@@ -1068,3 +1068,8 @@ TASK .runtime/coordination-c10a-ui-cursor-20261012-215705/TASK.md; backend basel
 ### C10A UI independent review — 12/10/2026 — PARTIAL, Codex A
 
 Acceptance .runtime/coordination-c10a-ui-review-20261012-222048/ACCEPTANCE.md; agentcommit23682c2 and4hashesmatched, backend173inputsretainedunchangedPASS. Independentfrontend65tests/lint/demoAPIbuild0exit, but3normalizer tests mirror implementation; stale test lacks freshPUT/no-falsesuccess assertion. Mandatory actualbrowser/MySQL/SQL/heldPUT/role/desktopmobile screenshots/source-buildbinding/cleanup evidence missing despiteHANDOFFDONE. Follow-up TASK UI-R01..R03 focuses proof gaps, not backend/reimplementwholeUI; C10AUI/C10 stillPARTIAL. No sourcefix/backendfixture/push/reset, workflowblankline preserved.
+
+
+### C10A UI design prompts and follow-up — 12/10/2026 — READY, Codex A
+
+Compared user-supplied Superdesign cinematic/dashboard/Observe prompts with actual teal/slate/SegoeUI/API source; adjusted canonical guidance docs/ui/c10a-design-guidance.md. TASK .runtime/coordination-c10a-ui-design-antigravity-20261012-223902/TASK.md combines remaining UI-R01..R03 proof and scoped API-homepage polish, retains backend173inputs when unchanged. Dark treatment limited to hero, no requiredvideo/CDN/newfont/provider/demoKPI; dashboard guidance reference-only pending separate metrics scope. Card/filter/amenity components keep API/role/data/placeholder contracts, visual/accessibility and actualbrowserSQL/buildbinding required. No implementation/agent launch/push/reset; docs content/source/path checks completed, prior workflowblankline preserved.
