@@ -129,6 +129,7 @@ function IncidentSection({ booking, records = [], area }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const reportPending = useRef(false);
+  const actionPending = useRef(false);
   const loadEventsRequestId = useRef(0);
   const cases = Array.isArray(request.data) ? request.data : [];
   const selectedEvents = eventsForSelectedIncident(selectedId, eventHistory);
@@ -174,6 +175,8 @@ function IncidentSection({ booking, records = [], area }) {
 
   async function updateIncident(event, incident, next) {
     event.preventDefault();
+    if (actionPending.current) return;
+    actionPending.current = true;
     setFormError("");
     setNotice("");
     setBusy(true);
@@ -197,6 +200,7 @@ function IncidentSection({ booking, records = [], area }) {
     } catch (error) {
       setFormError(getErrorMessage(error, "Không thể cập nhật hồ sơ sự cố."));
     } finally {
+      actionPending.current = false;
       setBusy(false);
     }
   }

@@ -5,6 +5,7 @@ param(
  [string]$AcceptedBuildDir='.runtime/coordination-c7a-codexa-complete-20261011-140830/evidence/full-verify',
  [string]$DependencyManifestPath,
  [string]$ResumeStatePath,
+ [ValidateSet('verify-c7b-browser.cjs','verify-c7c-chain.cjs')][string]$BrowserScript='verify-c7b-browser.cjs',
  [switch]$PreflightOnly,
  [ValidateSet('','Normal','Exception','CleanupFailure','RestoreFailure')][string]$ControlProbe=''
 )
@@ -20,7 +21,7 @@ if(-not $EvidenceRoot.StartsWith($runtime+'\',[StringComparison]::OrdinalIgnoreC
 if(Test-Path -LiteralPath $EvidenceDir){throw '[PREFLIGHT_REFUSAL] Evidence directory already exists'}
 $helper=Join-Path $repo 'scripts/coordination/c7-incident-report/c7-helpers.psm1'
 $fixtureHelper=Join-Path $repo 'scripts/coordination/c7-incident-report/fixture-cleanup.ps1'
-$browserScript=Join-Path $PSScriptRoot 'verify-c7b-browser.cjs'
+$browserEntry=Join-Path $PSScriptRoot $BrowserScript
 $controls=Join-Path $PSScriptRoot 'browser-controls.cjs'
 $frontend=Join-Path $repo 'frontend'
 $vite=Join-Path $frontend 'node_modules/vite/bin/vite.js'
@@ -29,12 +30,12 @@ $accepted=FullPath $AcceptedBuildDir
 $acceptedSource=Join-Path $accepted 'source-after.json'
 $acceptedHash=Join-Path $accepted 'jar-hash.txt'
 $jar=Join-Path $repo '.runtime/coordination-c7a-codexa-complete-20261011-140830/evidence/live1/backend-copy/target/kdrive-0.1.0-SNAPSHOT.jar'
-foreach($p in @($helper,$fixtureHelper,$browserScript,$controls,$vite,$acceptedSource,$acceptedHash,$jar,(Join-Path $playwright 'index.js'))){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "[DEPENDENCY_GUARD] Missing required file: $p"}}
+foreach($p in @($helper,$fixtureHelper,$browserEntry,$controls,$vite,$acceptedSource,$acceptedHash,$jar,(Join-Path $playwright 'index.js'))){if(-not(Test-Path -LiteralPath $p -PathType Leaf)){throw "[DEPENDENCY_GUARD] Missing required file: $p"}}
 $backendReference=Get-Content -LiteralPath $acceptedSource -Raw | ConvertFrom-Json
 foreach($p in $backendReference.PSObject.Properties){$file=Join-Path (Join-Path $repo 'backend') $p.Name;if(-not(Test-Path $file) -or (Get-FileHash $file).Hash -ne $p.Value){throw "[SOURCE_DRIFT] Accepted backend differs: $($p.Name)"}}
 if((Get-FileHash $jar).Hash -ne (Get-Content -LiteralPath $acceptedHash -Raw).Trim()){throw '[SOURCE_DRIFT] Accepted JAR hash differs'}
 function Manifest {
- $paths=@($helper,$fixtureHelper,$browserScript,$controls,$vite,$acceptedSource,$acceptedHash,$jar,(Join-Path $playwright 'package.json'),(Join-Path $frontend 'index.html'),(Join-Path $frontend 'vite.config.js'),(Join-Path $frontend 'package.json'),(Join-Path $frontend 'package-lock.json'))
+ $paths=@($helper,$fixtureHelper,$browserEntry,$controls,$vite,$acceptedSource,$acceptedHash,$jar,(Join-Path $playwright 'package.json'),(Join-Path $frontend 'index.html'),(Join-Path $frontend 'vite.config.js'),(Join-Path $frontend 'package.json'),(Join-Path $frontend 'package-lock.json'))
  $paths+=@(Get-ChildItem (Join-Path $frontend 'src') -File -Recurse | ForEach-Object FullName)
  $paths+=@(Get-ChildItem (Join-Path $frontend 'dist') -File -Recurse | ForEach-Object FullName)
  $paths+=@(Get-ChildItem $PSScriptRoot -File | ForEach-Object FullName)
@@ -95,7 +96,7 @@ try {
   $front=Start-Process (Get-Command node.exe).Source -ArgumentList @($vite,'preview','--host','127.0.0.1','--port','5173','--strictPort') -WorkingDirectory $frontend -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'frontend.log') -RedirectStandardError (Join-Path $EvidenceDir 'frontend-error.log');$null=$front.Handle;$processes+=,$front
   $ready=$false;for($i=0;$i -lt 45;$i++){if($front.HasExited){throw '[FRONTEND_FAILURE] Vite exited'};try{if((Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:5173/' -TimeoutSec 2).StatusCode -eq 200){$ready=$true;break}}catch{};Start-Sleep -Seconds 1};if(-not $ready){throw '[FRONTEND_TIMEOUT] Vite unavailable'}
   $env:C7B_BASE_URL='http://127.0.0.1:5173';$env:C7B_API_BASE_URL='http://127.0.0.1:8080/api/v1';$env:C7B_CONTAINER=$container;$env:C7B_SCHEMA=$schema;$env:C7B_MARKER_SCHEMA=$markerSchema;$env:C7B_MARKER_TOKEN=$token;$env:C7B_DB_PASSWORD=$password;$env:C7B_SEED_PASSWORD=$seedPassword;$env:C7B_PLAYWRIGHT_MODULE=$playwright;$env:C7B_EVIDENCE_DIR=$EvidenceDir
-  $browser=Start-Process (Get-Command node.exe).Source -ArgumentList @($browserScript) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'browser.log') -RedirectStandardError (Join-Path $EvidenceDir 'browser-error.log');$null=$browser.Handle;$processes+=,$browser
+  $browser=Start-Process (Get-Command node.exe).Source -ArgumentList @($browserEntry) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'browser.log') -RedirectStandardError (Join-Path $EvidenceDir 'browser-error.log');$null=$browser.Handle;$processes+=,$browser
   if(-not $browser.WaitForExit(180000)){throw '[BROWSER_TIMEOUT] No completion within three minutes'};if($browser.ExitCode -ne 0){throw "[BROWSER_FAILURE] Exit $($browser.ExitCode); inspect browser-failure.json"};$browserPassed=$true
  }
 }catch{$failure=$_.Exception.Message}

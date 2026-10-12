@@ -210,7 +210,9 @@ async function main() {
   assertNoUnexpected(http, consoleIssues, expected);
   write('assertions.json', { checks, http, consoleIssues, expected, fixtures, cases: [a, b, c] });
 }
-main().catch(async (error) => {
+module.exports = { sql, booking, snapshot, login, q };
+
+if (require.main === module) main().catch(async (error) => {
   if (page) { try { await page.screenshot({ path: path.join(evidence, 'failure.png'), fullPage: true }); fs.writeFileSync(path.join(evidence, 'failure.html'), await page.content()); } catch {} }
   write('browser-failure.json', { message: error.message, stack: error.stack, checks, http, consoleIssues });
   console.error(error.message);

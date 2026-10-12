@@ -57,7 +57,7 @@ function setValue(element, value) {
   element.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
 }
 
-async function mount() {
+async function mount(area = "user") {
   const container = document.createElement("div");
   document.body.append(container);
   const root = createRoot(container);
@@ -65,10 +65,10 @@ async function mount() {
   await act(async () => root.render(createElement(
     AuthProvider,
     null,
-    createElement(MemoryRouter, { initialEntries: ["/user/bookings/c7-report-ui"] },
+    createElement(MemoryRouter, { initialEntries: [`/${area}/bookings/c7-report-ui`] },
       createElement(Routes, null, createElement(Route, {
         path: "/:area/bookings/:bookingId",
-        element: createElement(ApiBookingDetailPage, { area: "user" }),
+        element: createElement(ApiBookingDetailPage, { area }),
       })),
     ),
   )));
@@ -267,4 +267,40 @@ test("mounted incident report displays API authorization errors without a succes
   assert.match(container.textContent, /Không có quyền truy cập hồ sơ này/);
   assert.doesNotMatch(container.textContent, /Đã lập hồ sơ sự cố/);
   assert.equal(requests.filter((item) => item.config.url === "/incidents?bookingId=c7-report-ui" && item.config.method === "get").length, 1);
+});
+
+test("mounted incident assessment permits one pending POST and releases its guard after a conflict", async () => {
+  const { container } = await mount("staff");
+  await act(async () => response(take("/bookings/c7-report-ui", "get"), {
+    booking: { id: "c7-report-ui", status: "COMPLETED", version: 0 },
+    records: [{ kind: "HANDOVER", occurred_at: "2026-10-10T02:00:00Z" }],
+  }));
+  await act(async () => response(take("/incidents?bookingId=c7-report-ui", "get"), [{
+    id: "assessment-case", kind: "DAMAGE", status: "OPEN", description: "Assessment fixture", version: 0,
+  }]));
+  const form = [...container.querySelectorAll("form")].find((item) => item.querySelector('[name="assessedDamage"]'));
+  assert.ok(form);
+  for (const [name, value] of Object.entries({ assessedDamage: "1000000", thirdPartyCoverage: "250000", requestedAmount: "750000", responsibilityBasis: "Verified evidence", note: "Assessment" })) {
+    setValue(form.querySelector(`[name="${name}"]`), value);
+  }
+  await act(async () => form.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  const pending = take("/incidents/assessment-case/actions", "post");
+  await act(async () => form.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  assert.equal(requests.filter((r) => r.config.url === "/incidents/assessment-case/actions").length, 1);
+  assert.equal(form.querySelector("button").disabled, true);
+  pending.reject(new AxiosError("Conflict", "ERR_BAD_REQUEST", pending.config, undefined, {
+    config: pending.config, data: { message: "Hồ sơ đã thay đổi." }, headers: {}, status: 409, statusText: "Conflict",
+  }));
+  await act(async () => {});
+  assert.match(container.textContent, /Hồ sơ đã thay đổi/);
+  assert.doesNotMatch(container.textContent, /Đã cập nhật hồ sơ/);
+  assert.equal(form.querySelector("button").disabled, false);
+  await act(async () => form.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  const retry = take("/incidents/assessment-case/actions", "post");
+  assert.equal(requests.filter((r) => r.config.url === "/incidents/assessment-case/actions").length, 2);
+  await act(async () => response(retry, { status: "ASSESSED", version: 1 }));
+  await act(async () => response(take("/incidents?bookingId=c7-report-ui", "get"), [{
+    id: "assessment-case", kind: "DAMAGE", status: "ASSESSED", description: "Assessment fixture", version: 1,
+  }]));
+  assert.match(container.textContent, /DAMAGE · ASSESSED/);
 });
