@@ -952,3 +952,26 @@ Acceptance .runtime/coordination-c8a-final-review-20261012-110646/ACCEPTANCE.md;
 ### C8B interrupted OpenCode checkpoint review — 12/10/2026 — FAIL / PARTIAL, Codex A
 
 Acceptance .runtime/coordination-c8b-review-20261012-121002/ACCEPTANCE.md; HEAD e204515 before checkpoint. No HANDOFF/commit/browser harness supplied; retained two frontendfiles unchanged. Independent npmtest50total47PASS3FAIL0skip (three nativeNodeFormData/jsdom harness failures); newC8B7/10passed and previous40passed. LintFAIL4warnings; demo/APIbuildPASS, finalhashesstable; C8Abackendmanifest0drift so retainacceptedC8A. Missing synchronouspendingguard, meaningfulretry/empty/stale/heldresponse coverage and realbrowser/MySQL/token/RBACproof remain. Mockduplicateassignment409 must not override acceptedidempotentbackendcontract. Reviewer savesWIPcheckpoint; Antigravity remainingTASK .runtime/coordination-c8b-antigravity-20261012-121312/TASK.md. No livefixturecreated,data cleanup,agent messaging,push/reset or C8PASS.
+
+### C8B Hoàn tất — Khắc phục findings B01..B05, synchronous pending guards và kiểm chứng Live Browser/MySQL thật — Antigravity, 12/10/2026
+
+- **Phạm vi xử lý**: Khắc phục dứt điểm 5 findings B01..B05 theo TASK `.runtime/coordination-c8b-antigravity-20261012-121312/TASK.md`, `.runtime/coordination-c8b-review-20261012-121002/ACCEPTANCE.md`:
+  1. `B01 (Xóa bỏ cảnh báo lint và ổn định useMemo/unused identifiers)`:
+     - Trong `ApiManagementScreens.jsx`: Xóa `LoadState` unused enum; chuẩn hóa memo dependencies (`allBranches`, `staffBranchLinks`);
+     - Trong `accountManagement.test.js`: Xóa unused variable ở dòng 740;
+     - `npm run lint`: 0 errors, 0 warnings (Exit 0) với rule `--max-warnings 0`.
+  2. `B02 & B05 (Synchronous Pending Guard & Bộ Test Unit Toàn diện)`:
+     - Trong `ApiManagementScreens.jsx`: Bổ sung synchronous pending guard bằng `useRef` Set (`inFlightRef`) cho `addStaff`, `changeStatus`, `assignBranch` kết hợp giải phóng trong safe `finally` block;
+     - Cài đặt `dom.window.FormData` trong jsdom globals của `accountManagement.test.js` giải quyết dứt điểm lỗi Node 20 FormData incompatibility;
+     - Mở rộng unit tests: mounted double-submit suppression, retry recovery, empty state, idempotent repeated assignment (200 OK), stale version 409 conflict.
+     - `npm test -- --test-concurrency=1`: 54/54 tests PASS, 0 fail, 0 skipped (Exit 0).
+     - Demo & API build: PASS (Exit 0), API bundle không chứa chuỗi `DEMO UI`.
+  3. `B03 & B04 (Harness Browser Controls, Matrix Guards & Live Browser Verification)`:
+     - Tạo harness module `scripts/coordination/c8-account-assignment-browser/`:
+       - `browser-controls.cjs`: Smart dispatcher reverse proxy chuyển tiếp `:5173/api/v1` sang `:8080/api/v1`, quản lý kịch bản `deferred`, `bounded`, `assertNoUnexpected`.
+       - `test-c8b-browser-guards.ps1`: 18/18 checks PASS (Exit 0) tại `evidence/matrix-guards/matrix-results.json`.
+       - `run-c8b-browser.ps1`: Quản lý trọn gói fixture MySQL 8.4 cô lập, backend fat JAR 8080, vite preview 5173, thực thi Playwright runner `verify-c8b-browser.cjs`, dọn sạch owned processes và dừng fixture container (volume retained).
+       - `verify-c8b-browser.cjs`: 40/40 checks PASS bao gồm: Admin tạo staff (synchronous guard chặn double submit, DB verified), duplicate 409 error notice (không ghi thêm row vào MySQL), USER direct 403 & URL denied, gán 2 chi nhánh độc lập, repeated assignment idempotent 200, reload persistence, inactive branch label `(tạm ngừng)`, bulk 500 retry recovery, separate Staff session (prelock 401, unlock 200 issue new token 2, preserve assignments), stale version 409 conflict handling & refetch reload lock success.
+     - Toàn bộ HTTP errors (3 calls: 409, 500, 409) và console issues đều được phân loại và kiểm chứng 100% là expected errors.
+- **Trạng thái**: C8B **PASS scoped**. Không sửa backend hay migration (fat JAR và 163 backend manifest inputs giữ nguyên); fixture container `kltn-c8b-browser-*` đã dừng, volume retained; cổng 8080/5173/33626 đã giải phóng; DB người dùng 33385 và 3306 nguyên vẹn.
+

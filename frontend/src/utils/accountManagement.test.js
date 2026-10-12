@@ -160,6 +160,7 @@ before(async () => {
     Node: dom.window.Node,
     Event: dom.window.Event,
     MouseEvent: dom.window.MouseEvent,
+    FormData: dom.window.FormData,
     IS_REACT_ACT_ENVIRONMENT: true,
   })) {
     installDomGlobal(name, value);
@@ -278,6 +279,24 @@ test("DOM: ApiAccountsPage handles loading, error with retry, and empty state", 
   const retryBtn = errorContainer.querySelector("button.btn-secondary");
   assert.ok(retryBtn, "Retry button must be rendered on error");
   assert.equal(retryBtn.textContent.trim(), "Thử tải lại");
+
+  // Actively click retry button and verify recovery
+  await act(async () => {
+    retryBtn.click();
+  });
+
+  const retryAccountsReq = takeRequest("/admin/accounts");
+  const retryBranchesReq = takeRequest("/branches");
+  const retryStaffBranchesReq = takeRequest("/admin/staff-branches");
+
+  await act(async () => {
+    fulfill(retryAccountsReq, []);
+    fulfill(retryBranchesReq, []);
+    fulfill(retryStaffBranchesReq, []);
+  });
+
+  assert.ok(!errorContainer.textContent.includes("Lỗi máy chủ"), "Error notice must be cleared after retry");
+  assert.ok(errorContainer.textContent.includes("Chưa có tài khoản"), "Empty state rendered after successful retry");
 
   await unmountError();
 });
@@ -632,9 +651,9 @@ test("DOM: ApiAccountsPage assign branch sends POST and reloads both requests", 
 });
 
 // =============================================================================
-// Tiêu chí 8: Duplicate assignment shows error, no false success
+// Tiêu chí 8: Assignment domain error shows notice, no false success and recovers
 // =============================================================================
-test("DOM: ApiAccountsPage duplicate assignment shows error, no false success", async () => {
+test("DOM: ApiAccountsPage assignment domain error shows notice, no false success and recovers", async () => {
   const { container, unmount } = await mount(
     createElement(
       AuthProvider,
@@ -695,6 +714,66 @@ test("DOM: ApiAccountsPage duplicate assignment shows error, no false success", 
 });
 
 // =============================================================================
+// Tiêu chí 8b: Repeated branch assignment succeeds idempotently per backend contract
+// =============================================================================
+test("DOM: ApiAccountsPage repeated branch assignment succeeds idempotently per backend contract", async () => {
+  const { container, unmount } = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(ApiAccountsPage, null),
+    ),
+  );
+
+  const accountsData = [
+    { id: "1", fullName: "Staff One", email: "staff1@test", role: "STAFF", status: "ACTIVE", version: 0 },
+  ];
+  const branchesData = [
+    { id: "hn", name: "Chi nhánh Hà Nội", status: "ACTIVE" },
+  ];
+
+  const accountsReq1 = takeRequest("/admin/accounts");
+  const branchesReq1 = takeRequest("/branches");
+  const staffBranchesReq1 = takeRequest("/admin/staff-branches");
+
+  await act(async () => {
+    fulfill(accountsReq1, accountsData);
+    fulfill(branchesReq1, branchesData);
+    fulfill(staffBranchesReq1, [{ userId: "1", branchId: "hn" }]);
+  });
+
+  const assignForm = findFormByButtonText(container, "Gán chi nhánh");
+  assert.ok(assignForm, "Assign branch form must be found");
+
+  const select = assignForm.querySelector("select");
+  await act(async () => {
+    changeValue(select, "hn");
+  });
+
+  await act(async () => {
+    clickSubmitButton(assignForm);
+  });
+
+  // Backend C8A contract: repeated assignment returns 200 idempotently
+  const assignReq = takeRequest("/admin/staff-branches");
+  await act(async () => {
+    fulfill(assignReq, {});
+  });
+
+  const accountsReq2 = takeRequest("/admin/accounts");
+  const staffBranchesReq2 = takeRequest("/admin/staff-branches");
+
+  await act(async () => {
+    fulfill(accountsReq2, accountsData);
+    fulfill(staffBranchesReq2, [{ userId: "1", branchId: "hn" }]);
+  });
+
+  assert.ok(container.textContent.includes("Đã gán chi nhánh cho Staff One."), "Success notice visible on idempotent repeat");
+
+  await unmount();
+});
+
+// =============================================================================
 // Tiêu chí 9: Branch name mapping uses full branch list (including inactive)
 // =============================================================================
 test("DOM: ApiAccountsPage branch name mapping uses full branch list", async () => {
@@ -737,7 +816,7 @@ test("DOM: ApiAccountsPage branch name mapping uses full branch list", async () 
 // Tiêu chí 10: No per-account GET fanout - only bulk staff-branches GET
 // =============================================================================
 test("DOM: ApiAccountsPage uses only bulk GET /admin/staff-branches, no per-account requests", async () => {
-  const { container, unmount } = await mount(
+  const { unmount } = await mount(
     createElement(
       AuthProvider,
       null,
@@ -777,6 +856,198 @@ test("DOM: ApiAccountsPage uses only bulk GET /admin/staff-branches, no per-acco
   // Check only one bulk staff-branches GET
   const bulkRequests = requests.filter(r => r.config.url === "/admin/staff-branches" && r.config.method?.toLowerCase() === "get");
   assert.equal(bulkRequests.length, 1, "Exactly one bulk staff-branches GET");
+
+  await unmount();
+});
+
+// =============================================================================
+// Tiêu chí 11: addStaff synchronous pending guard holds double dispatch & recovers
+// =============================================================================
+test("DOM: ApiAccountsPage addStaff synchronous pending guard holds double dispatch and recovers after error", async () => {
+  const { container, unmount } = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(ApiAccountsPage, null),
+    ),
+  );
+
+  const accountsReq1 = takeRequest("/admin/accounts");
+  const branchesReq1 = takeRequest("/branches");
+  const staffBranchesReq1 = takeRequest("/admin/staff-branches");
+
+  await act(async () => {
+    fulfill(accountsReq1, []);
+    fulfill(branchesReq1, []);
+    fulfill(staffBranchesReq1, []);
+  });
+
+  const createForm = findFormByHeading(container, "Tạo nhân viên");
+  const fullNameInput = createForm.querySelector("input[name='fullName']");
+  const emailInput = createForm.querySelector("input[name='email']");
+  const passwordInput = createForm.querySelector("input[name='password']");
+
+  await act(async () => {
+    changeValue(fullNameInput, "Guard Staff");
+    changeValue(emailInput, "guard@test");
+    changeValue(passwordInput, "password123");
+  });
+
+  // Synchronous double submit in same turn
+  await act(async () => {
+    clickSubmitButton(createForm);
+    clickSubmitButton(createForm);
+  });
+
+  // Assert exactly 1 POST request was issued (synchronous guard held the second)
+  const matchingRequests = requests.filter(r => r.config.url === "/admin/accounts" && r.config.method?.toLowerCase() === "post");
+  assert.equal(matchingRequests.length, 1, "Exactly one POST request issued despite double submit");
+
+  const createReq = takeRequest("/admin/accounts");
+  const submitBtn = createForm.querySelector("button.btn[type='submit']");
+  assert.ok(submitBtn.disabled, "Submit button disabled while request held");
+
+  // Injected error: reject with 400
+  await act(async () => {
+    rejectWithStatus(createReq, 400, { message: "Email không hợp lệ" });
+  });
+
+  assert.ok(container.textContent.includes("Email không hợp lệ"), "Error notice displayed");
+  assert.equal(submitBtn.disabled, false, "Submit button re-enabled after failure (safe finally release)");
+
+  // Retry after error: should allow a fresh submission
+  await act(async () => {
+    clickSubmitButton(createForm);
+  });
+
+  const createReq2 = takeRequest("/admin/accounts");
+  await act(async () => {
+    fulfill(createReq2, { id: "new-staff", email: "guard@test" });
+  });
+
+  const accountsReloadReq = takeRequest("/admin/accounts");
+  await act(async () => {
+    fulfill(accountsReloadReq, [{ id: "new-staff", fullName: "Guard Staff", email: "guard@test", role: "STAFF", status: "ACTIVE", version: 0 }]);
+  });
+
+  assert.ok(container.textContent.includes("Đã tạo tài khoản Staff."), "Success notice on retry submission");
+
+  await unmount();
+});
+
+// =============================================================================
+// Tiêu chí 12: changeStatus synchronous pending guard holds double dispatch & handles stale 409
+// =============================================================================
+test("DOM: ApiAccountsPage changeStatus synchronous pending guard holds double dispatch and handles stale 409 conflict", async () => {
+  const { container, unmount } = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(ApiAccountsPage, null),
+    ),
+  );
+
+  const accountsData = [
+    { id: "staff-1", fullName: "Staff One", email: "staff1@test", role: "STAFF", status: "ACTIVE", version: 0 },
+  ];
+
+  const accountsReq1 = takeRequest("/admin/accounts");
+  const branchesReq1 = takeRequest("/branches");
+  const staffBranchesReq1 = takeRequest("/admin/staff-branches");
+
+  await act(async () => {
+    fulfill(accountsReq1, accountsData);
+    fulfill(branchesReq1, []);
+    fulfill(staffBranchesReq1, []);
+  });
+
+  const lockBtn = container.querySelector("button.btn-secondary");
+  assert.equal(lockBtn.textContent.trim(), "Khóa tài khoản");
+
+  // Synchronous double click
+  await act(async () => {
+    lockBtn.click();
+    lockBtn.click();
+  });
+
+  const patchRequests = requests.filter(r => r.config.url.startsWith("/admin/accounts/") && r.config.method?.toLowerCase() === "patch");
+  assert.equal(patchRequests.length, 1, "Exactly one PATCH request issued despite double click");
+
+  const patchReq = takeRequest("/admin/accounts/staff-1");
+  assert.ok(lockBtn.disabled, "Lock button disabled while PATCH held");
+
+  // Reject with stale 409 conflict
+  await act(async () => {
+    rejectWithStatus(patchReq, 409, { message: "Dữ liệu đã bị thay đổi bởi phiên khác." });
+  });
+
+  assert.ok(
+    container.textContent.includes("Không thể cập nhật tài khoản") || container.textContent.includes("thay đổi"),
+    "Stale conflict error notice displayed"
+  );
+  assert.equal(lockBtn.disabled, false, "Lock button re-enabled after 409 conflict");
+
+  await unmount();
+});
+
+// =============================================================================
+// Tiêu chí 13: assignBranch synchronous pending guard holds double dispatch
+// =============================================================================
+test("DOM: ApiAccountsPage assignBranch synchronous pending guard holds double dispatch", async () => {
+  const { container, unmount } = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(ApiAccountsPage, null),
+    ),
+  );
+
+  const accountsData = [
+    { id: "staff-1", fullName: "Staff One", email: "staff1@test", role: "STAFF", status: "ACTIVE", version: 0 },
+  ];
+  const branchesData = [
+    { id: "hn", name: "Chi nhánh Hà Nội", status: "ACTIVE" },
+  ];
+
+  const accountsReq1 = takeRequest("/admin/accounts");
+  const branchesReq1 = takeRequest("/branches");
+  const staffBranchesReq1 = takeRequest("/admin/staff-branches");
+
+  await act(async () => {
+    fulfill(accountsReq1, accountsData);
+    fulfill(branchesReq1, branchesData);
+    fulfill(staffBranchesReq1, []);
+  });
+
+  const assignForm = findFormByButtonText(container, "Gán chi nhánh");
+  const select = assignForm.querySelector("select");
+  await act(async () => {
+    changeValue(select, "hn");
+  });
+
+  // Synchronous double submit
+  await act(async () => {
+    clickSubmitButton(assignForm);
+    clickSubmitButton(assignForm);
+  });
+
+  const postRequests = requests.filter(r => r.config.url === "/admin/staff-branches" && r.config.method?.toLowerCase() === "post");
+  assert.equal(postRequests.length, 1, "Exactly one assign POST request issued despite double submit");
+
+  const assignReq = takeRequest("/admin/staff-branches");
+  await act(async () => {
+    fulfill(assignReq, {});
+  });
+
+  const accountsReq2 = takeRequest("/admin/accounts");
+  const staffBranchesReq2 = takeRequest("/admin/staff-branches");
+
+  await act(async () => {
+    fulfill(accountsReq2, accountsData);
+    fulfill(staffBranchesReq2, [{ userId: "staff-1", branchId: "hn" }]);
+  });
+
+  assert.ok(container.textContent.includes("Đã gán chi nhánh cho Staff One."), "Success notice visible");
 
   await unmount();
 });

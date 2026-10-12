@@ -7,22 +7,6 @@ import EmptyState from "../../components/common/EmptyState";
 import LoadingSkeleton from "../../components/common/LoadingSkeleton";
 import Badge from "../../components/common/Badge";
 
-function LoadState({ requests, retry, children }) {
-  const loading = requests.some((request) => request.loading);
-  const error = requests.find((request) => request.error)?.error;
-  if (loading) return <LoadingSkeleton rows={3} />;
-  if (error)
-    return (
-      <div>
-        <Notice error>{error}</Notice>
-        <button className="btn-secondary" onClick={retry}>
-          Thử tải lại
-        </button>
-      </div>
-    );
-  return children;
-}
-
 export function ApiAccountsPage() {
   const accountsRequest = useApiData("/admin/accounts");
   const allBranchesRequest = useApiData("/branches");
@@ -30,37 +14,50 @@ export function ApiAccountsPage() {
   const accounts = Array.isArray(accountsRequest.data)
     ? accountsRequest.data
     : [];
-  const allBranches = allBranchesRequest.data || [];
-  const activeBranches = allBranches.filter(
-    (branch) => branch.status === "ACTIVE",
+  const allBranches = useMemo(
+    () => allBranchesRequest.data || [],
+    [allBranchesRequest.data],
+  );
+  const activeBranches = useMemo(
+    () => allBranches.filter((branch) => branch.status === "ACTIVE"),
+    [allBranches],
   );
   const branchNameMap = useMemo(
     () => new Map(allBranches.map((b) => [b.id, b.name])),
     [allBranches],
   );
-  const staffBranchLinks = Array.isArray(staffBranchesRequest.data)
-    ? staffBranchesRequest.data
-    : [];
-  const assignedBranchIdsByUser = useMemo(
-    () => {
-      const map = new Map();
-      for (const link of staffBranchLinks) {
-        if (!map.has(link.userId)) map.set(link.userId, []);
-        map.get(link.userId).push(link.branchId);
-      }
-      return map;
-    },
-    [staffBranchLinks],
+  const staffBranchLinks = useMemo(
+    () =>
+      Array.isArray(staffBranchesRequest.data) ? staffBranchesRequest.data : [],
+    [staffBranchesRequest.data],
   );
+  const assignedBranchIdsByUser = useMemo(() => {
+    const map = new Map();
+    for (const link of staffBranchLinks) {
+      if (!map.has(link.userId)) map.set(link.userId, []);
+      map.get(link.userId).push(link.branchId);
+    }
+    return map;
+  }, [staffBranchLinks]);
+
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [busyIds, setBusyIds] = useState(() => new Set());
+  const inFlightRef = useRef(new Set());
+
+  const isBusy = (id) => busyIds.has(id) || busyId === id;
 
   async function addStaff(event) {
     event.preventDefault();
+    if (inFlightRef.current.has("create")) {
+      return;
+    }
+    inFlightRef.current.add("create");
+    setBusyIds((prev) => new Set(prev).add("create"));
+    setBusyId("create");
     setError("");
     setNotice("");
-    setBusyId("create");
     const target = event.currentTarget;
     const form = new FormData(target);
     try {
@@ -75,14 +72,26 @@ export function ApiAccountsPage() {
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể tạo tài khoản Staff."));
     } finally {
-      setBusyId("");
+      inFlightRef.current.delete("create");
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete("create");
+        return next;
+      });
+      setBusyId((prev) => (prev === "create" ? "" : prev));
     }
   }
 
   async function changeStatus(account, status) {
+    const key = account.id;
+    if (inFlightRef.current.has(key)) {
+      return;
+    }
+    inFlightRef.current.add(key);
+    setBusyIds((prev) => new Set(prev).add(key));
+    setBusyId(key);
     setError("");
     setNotice("");
-    setBusyId(account.id);
     try {
       await apiClient.patch(
         `/admin/accounts/${encodeURIComponent(account.id)}`,
@@ -96,17 +105,31 @@ export function ApiAccountsPage() {
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể cập nhật tài khoản."));
     } finally {
-      setBusyId("");
+      inFlightRef.current.delete(key);
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+      setBusyId((prev) => (prev === key ? "" : prev));
     }
   }
 
   async function assignBranch(event, account) {
     event.preventDefault();
+    const key = `assign:${account.id}`;
+    const accountKey = account.id;
+    if (inFlightRef.current.has(key) || inFlightRef.current.has(accountKey)) {
+      return;
+    }
+    inFlightRef.current.add(key);
+    inFlightRef.current.add(accountKey);
+    setBusyIds((prev) => new Set(prev).add(key).add(accountKey));
+    setBusyId(accountKey);
     setError("");
     setNotice("");
     const target = event.currentTarget;
     const form = new FormData(target);
-    setBusyId(account.id);
     try {
       await apiClient.post("/admin/staff-branches", {
         userId: account.id,
@@ -119,7 +142,15 @@ export function ApiAccountsPage() {
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể gán chi nhánh."));
     } finally {
-      setBusyId("");
+      inFlightRef.current.delete(key);
+      inFlightRef.current.delete(accountKey);
+      setBusyIds((prev) => {
+        const next = new Set(prev);
+        next.delete(key);
+        next.delete(accountKey);
+        return next;
+      });
+      setBusyId((prev) => (prev === accountKey ? "" : prev));
     }
   }
 
@@ -181,7 +212,7 @@ export function ApiAccountsPage() {
                       {account.role !== "ADMIN" ? (
                         <button
                           className="btn-secondary"
-                          disabled={busyId === account.id}
+                          disabled={isBusy(account.id)}
                           onClick={() =>
                             changeStatus(
                               account,
@@ -240,7 +271,7 @@ export function ApiAccountsPage() {
                                 name="branchId"
                                 required
                                 defaultValue=""
-                                disabled={busyId === account.id}
+                                disabled={isBusy(account.id)}
                               >
                                 <option value="" disabled>
                                   Chọn chi nhánh để gán
@@ -264,7 +295,7 @@ export function ApiAccountsPage() {
                               <button
                                 type="submit"
                                 className="btn-secondary"
-                                disabled={busyId === account.id}
+                                disabled={isBusy(account.id)}
                               >
                                 Gán chi nhánh
                               </button>
@@ -301,8 +332,8 @@ export function ApiAccountsPage() {
                 Tài khoản tạo mới có role Staff; mật khẩu không được hiển thị hoặc
                 lưu ở giao diện.
               </p>
-              <button type="submit" className="btn" disabled={busyId === "create"}>
-                {busyId === "create" ? "Đang tạo..." : "Tạo Staff"}
+              <button type="submit" className="btn" disabled={isBusy("create")}>
+                {isBusy("create") ? "Đang tạo..." : "Tạo Staff"}
               </button>
             </form>
           </>
