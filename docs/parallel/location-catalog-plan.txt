@@ -1,0 +1,248 @@
+﻿KẾ HOẠCH LÀM ĐỘC LẬP TRÊN MÁY THỨ HAI
+C11B — CATALOG ĐIỂM THAM QUAN / LOCATION
+Ngày lập: 12/10/2026
+Repository: https://github.com/Thanh-God/self-drive-rental-ai
+Nhánh làm việc: location-catalog-20261012
+Baseline nguồn: 50529194d132feae9833ebb67082b65660e42cb6
+Tài liệu này là giao việc và tiêu chí kiểm chứng, KHÔNG phải biên bản PASS.
+
+1. KẾT LUẬN VÀ PHẠM VI ĐỘC LẬP
+
+Có thể triển khai phần quản trị điểm tham quan (nhánh công việc C11B) trên một máy khác. Không giao toàn C11: phần đóng chi nhánh vận hành (C11A) vẫn phụ thuộc luồng thuê xe và quyết định nghiệp vụ, KHÔNG nằm trong công việc này.
+
+Điểm tham quan là catalog địa điểm cho hành trình về sau: tên, phân loại, tọa độ, trạng thái. Chi nhánh là nơi giao/nhận xe. Hai đối tượng phải độc lập; tuyệt đối không dùng locations để thay branches hoặc thay điểm nhận/trả.
+
+Phần này không gọi AI, Gemini/OpenAI, Map, geocoding, API tính tuyến, không lưu lịch trình AI và không thêm khóa API. Chỉ quản trị dữ liệu điểm tham quan bằng API nội bộ và UI Admin. AI/Map tiếp tục hoãn theo quyết định hiện hành; việc catalog hoạt động không có nghĩa AI hoàn tất.
+
+Độc lập về module/file/domain, không có nghĩa không dùng nền tảng chung. Nó vẫn sử dụng Spring Boot, MySQL, xác thực JWT và route React sẵn có. Các nền tảng được kế thừa từ baseline cố định, không thiết kế lại. Máy thứ hai dùng checkout, dependency, port và fixture riêng; không truy cập MySQL gốc của máy chính.
+
+C8 trên máy chính đang sửa account/branch và sẽ sửa ApiManagementScreens.jsx. C9 sẽ sửa vehicle/catalog xe. Phần location phải tránh các vùng đó. Tính năng location không cần C8 hoàn tất để xây dựng và kiểm thử trên baseline này. Khi nhập nhánh sau cùng vẫn phải kiểm tra tích hợp với nguồn mới.
+
+2. QUYỀN LÀM VIỆC VÀ QUY TẮC ĐIỀU PHỐI
+
+Người dùng đã yêu cầu làm phần độc lập trên máy khác; đây là ngoại lệ có chủ đích đối với quy trình làm tuần tự trên cùng workspace trong AGENTS.md. Ngoại lệ chỉ áp dụng checkout và tài nguyên riêng của máy thứ hai, không cấp quyền sửa đồng thời file C8 trong máy chính, điều khiển phiên khác, merge/reset hoặc đụng dữ liệu thật.
+
+Đọc AGENTS.md và skills/kltn-evidence-handoff/SKILL.md trước thực hiện. Quy tắc an toàn, evidence, commit và retry vẫn áp dụng. Đường dẫn E:\AI\BERT_Project\codepython\KLTN trong hướng dẫn là máy chính: ở máy thứ hai dùng chính thư mục clone đã chọn và ghi đường dẫn thực; không giả định thư mục/runtime/Java/private env của máy chính tồn tại ở đó.
+
+Mỗi lượt thay đổi coherent phải commit riêng. Source/tests/scripts/docs cần khôi phục phải được version trong Git. Logs/XML/screenshots/DB/private env/dependency/build output để runtime riêng, không commit. Chưa PASS thì commit WIP/PARTIAL/BLOCKED ghi rõ, không sửa assertions để thành PASS.
+
+3. LẤY ĐÚNG NHÁNH TRÊN MÁY THỨ HAI
+
+Dùng repository mới, không clone nhầm nhánh master (master chưa có toàn bộ bản cập nhật core). Ví dụ mở terminal tại thư mục cha dành cho dự án:
+
+    git clone --branch location-catalog-20261012 https://github.com/Thanh-God/self-drive-rental-ai.git KLTN
+    cd KLTN
+    git branch --show-current
+    git rev-parse HEAD
+    git status --short
+    git remote -v
+
+Kết quả branch phải là location-catalog-20261012. Nhánh đã có commit kế hoạch trên baseline 5052919; không buộc HEAD bằng baseline gốc vì commit kế hoạch là commit mới hợp lệ. Tài liệu này cũng được lưu ở docs/parallel/location-catalog-plan.txt trên nhánh riêng.
+
+Không checkout master để triển khai. Không reset --hard, clean -fd, force-push hoặc cherry-pick toàn bộ thay đổi C8. Nếu repo đã clone trước đó và có thay đổi, lưu/kiểm tra thay đổi trước, không dùng checkout ghi đè. Người chưa có checkout nên dùng lệnh clone ở trên.
+
+Nếu dùng tài khoản GitHub khác: clone public có thể không cần quyền ghi, nhưng push vào repository gốc phải có quyền collaborator/write. Thiếu quyền thì giữ commit local và báo blocker hoặc xin cấp quyền; không đưa token vào file, chat hoặc remote URL. Không tự chuyển sang master. Nhánh không tự được gộp vào master khi clone/push.
+
+4. NGUỒN CẦN ĐỌC VÀ BASELINE
+
+Đọc có chọn lọc:
+- AGENTS.md; skills/kltn-evidence-handoff/SKILL.md.
+- docs/parallel/location-catalog-plan.txt (tài liệu này).
+- docs/architecture/core-audit-20261007.md: hàng C11 và tách location khỏi branch close.
+- docs/architecture/decisions.md: core trước AI, location khác branch, provider/policy còn mở.
+- docs/architecture/module-boundaries.md, system-architecture.md, project-structure.md: kiến trúc modular monolith và trách nhiệm lớp.
+- docs/database/database-design.md và database/README.md.
+- backend/src/main/resources/db/migration/V1__rental_schema.sql: location_categories, locations, itineraries/itinerary_items.
+- frontend/src/routes/AppRoutes.jsx; frontend/src/pages/admin/LocationsPage.jsx; đoạn definitions.locations trong ManagementScreens.jsx: chỉ tham khảo hành vi demo.
+- Backend SecurityConfig, Actor, DomainException và Controller/Service/Repository mẫu: read-only, không mở rộng cơ chế auth.
+
+Không khảo sát lại toàn project hay coi các báo cáo lịch sử là bằng chứng PASS cho môi trường mới. C7 đã được nghiệm thu trên máy chính; artifact .runtime không nằm trong clone. Máy thứ hai phải có bằng chứng mới cho location, không tự tuyên bố C7 hoặc toàn hệ thống PASS từ các file audit.
+
+Trước sửa tạo:
+    .runtime/coordination-location-<timestamp>/TASK.md
+và thư mục evidence/<fresh-run>/.
+TASK ghi HEAD/branch/status, mục tiêu/phạm vi, file dự kiến sửa, danh sách suites bắt buộc, source/hash đầu, output HANDOFF.md. Báo kế hoạch cụ thể trước khi sửa.
+
+5. CÁCH TÍNH NĂNG HOẠT ĐỘNG
+
+Admin đăng nhập qua JWT hiện có -> mở /admin/locations trong API mode -> UI gọi API Admin đọc phân loại và địa điểm -> backend kiểm tra ADMIN -> service kiểm tra nghiệp vụ -> repository đọc MySQL -> DTO trả về -> UI hiện loading/empty/error/data tương ứng.
+
+Tạo địa điểm:
+Admin chọn phân loại thật, nhập tên/vĩ độ/kinh độ/trạng thái -> frontend kiểm tra dữ liệu cơ bản -> gửi POST JSON -> backend validate lại toàn bộ, kiểm tra category tồn tại và quyền -> transaction ghi locations -> trả ID/DTO -> UI hiển thị kết quả, GET đọc lại và reload trang vẫn còn dữ liệu. Backend là nơi quyết định tính hợp lệ; UI không thay lỗi API bằng demo.
+
+Sửa địa điểm:
+Admin chọn bản ghi thật -> form được điền bằng API -> gửi PUT theo ID -> validate -> transaction cập nhật đúng bản ghi -> GET/reload chứng minh dữ liệu mới. Sửa location không tự thay snapshot itinerary_items, không sửa dữ liệu thuê xe hay branch.
+
+Trạng thái không hoạt động:
+Dùng trạng thái hợp lệ đã thống nhất cho catalog, dự kiến ACTIVE/INACTIVE theo thiết kế/demo hiện có. INACTIVE không phải xóa cứng, không tự xóa FK/snapshot/hành trình cũ, không tự đổi lịch xe. Nếu tài liệu/source có contract trạng thái khác, đối chiếu và ghi quyết định trước triển khai, không thêm ARCHIVED/DELETED tùy ý.
+
+Phân loại:
+location_categories đã có bảng với name UNIQUE. Cần API đọc danh sách và khả năng Admin tạo phân loại để catalog mới có dữ liệu thật, không chỉ các tên hardcode trong demo. Chỉ triển khai list/create trong phạm vi đầu tiên; đổi tên/xóa phân loại và retention chưa được giao.
+
+Không có tải bản đồ hoặc định vị GPS. Tọa độ là hai giá trị số được validate, không chứng minh địa điểm có thật, tính tuyến chính xác hoặc được Map provider xác nhận. Không bịa dữ liệu tham quan; fixture dùng dữ liệu mẫu ghi rõ. Dữ liệu thật nếu muốn đưa vào sản phẩm cần nguồn và attribution phù hợp, là việc khác.
+
+6. CONTRACT API ĐỀ XUẤT CỤ THỂ
+
+Tất cả endpoint dưới /api/v1/admin/ để tận dụng guard ADMIN hiện có, không sửa SecurityConfig để public API:
+
+    GET  /api/v1/admin/location-categories
+    POST /api/v1/admin/location-categories
+    GET  /api/v1/admin/locations
+    GET  /api/v1/admin/locations/{id}
+    POST /api/v1/admin/locations
+    PUT  /api/v1/admin/locations/{id}
+
+Không endpoint DELETE. Không endpoint Guest, AI hoặc itinerary trong scope.
+
+Category DTO tối thiểu: {id, name}.
+Create category input: {name}; trim đầu/cuối, required, độ dài theo schema (100), duplicate name -> 409 theo unique thật của DB. Không tự đổi collation hay bổ sung uniqueness khác ngoài schema. Quy tắc chữ hoa/thường kiểm theo DB/source thực và ghi rõ.
+
+Location DTO tối thiểu: {id, categoryId, name, latitude, longitude, status}.
+Input gồm categoryId/name/latitude/longitude/status; ID do backend cấp. Dùng BigDecimal hoặc cách biểu diễn phù hợp DECIMAL(10,7), không so tọa độ bằng chuỗi hoặc tự truncate ngoài contract.
+- name required, trim, tối đa200 ký tự.
+- categoryId required và phải tồn tại.
+- latitude bắt buộc, trong [-90,90], longitude bắt buộc trong [-180,180], gồm cả biên.
+- Không chấp nhận NaN, Infinity, null, chuỗi không phải số hay độ chính xác không phù hợp mà silently làm lệch tọa độ.
+- status chỉ thuộc contract đã chốt, không nhận chuỗi tùy ý.
+
+HTTP: read/update nonexistent ->404; input sai ->400; duplicate category ->409; chưa đăng nhập ->401; USER/STAFF ->403; thành công theo convention được chọn và ghi rõ (khuyến nghị create201, update200). Kiểm cả lỗi parse JSON, số vượt phạm vi, FK và profile quyền, tránh trả500 cho input sai.
+
+Không suy ra tên địa điểm UNIQUE: schema hiện không quy định như vậy. Không tự cấm hai địa điểm cùng tên. Nếu cần uniqueness mới, ghi câu hỏi chứ không tự tạo policy.
+
+Bảng locations hiện chưa có cột version; không thêm @Version trỏ vào cột không tồn tại hoặc giả định PUT đã chống lost-update. Trong lát cắt này không tuyên bố kiểm chứng concurrency/version khi chưa có contract và schema tương ứng. Nếu phát hiện cần mở rộng version/migration để đạt yêu cầu mới, ghi riêng checkpoint/đề xuất cho Codex A; không sửa migration V1/V2 đã phát hành hay tự tạo schema song song.
+
+7. DANH SÁCH FILE VÀ VÙNG KHÔNG ĐƯỢC CHẠM
+
+Được triển khai trong namespace mới:
+- backend/src/main/java/com/carrental/modules/location/entity/Location.java
+- backend/src/main/java/com/carrental/modules/location/entity/LocationCategory.java
+- .../location/repository/LocationRepository.java, LocationCategoryRepository.java
+- .../location/service/LocationService.java
+- .../location/controller/LocationController.java
+- DTO có kiểu có thể là record tại lớp phù hợp, không tạo abstraction/framework mới không cần thiết.
+- backend/src/test/java/com/carrental/LocationCatalog*Test.java
+- frontend/src/pages/api/ApiLocationsPage.jsx (file mới độc lập).
+- frontend/src/api/locations.js (nếu cần gom HTTP), test liên quan riêng.
+- frontend/src/utils/locationCatalog.test.js hoặc nơi test theo pattern hiện có; actual mounted component tests có ý nghĩa.
+- scripts/coordination/location-catalog/ (runner/test guard/browser source versioned, tên không kèm agent).
+- docs/parallel/location-catalog-handoff.md hoặc tài liệu module riêng cho kết quả/contract.
+
+AppRoutes.jsx là điểm tích hợp duy nhất được sửa tối thiểu: thêm import ApiLocationsPage và đổi route Admin locations từ screen(<LocationsPage />) sang screen(<LocationsPage />, <ApiLocationsPage />). Giữ nguyên mọi route/guard/layout còn lại. Không thay trang demo LocationsPage/ManagementScreens hoặc routing Guest/User/Staff.
+
+Tuyệt đối không sửa:
+- frontend/src/pages/api/ApiManagementScreens.jsx (C8 và catalog xe dùng chung).
+- ApiScreens.jsx, AuthContext, api/client.js, roles, requestGeneration, route guards.
+- Backend user/branch/vehicle/booking/operation/review/invoice/contract/security/config.
+- pom.xml, package.json/package-lock nếu không thật sự cần; dùng dependency có sẵn, không cài map SDK/UI framework mới.
+- migration V1/V2, schema.sql, DB gốc, seed hiện có, global CI, scripts C7/C8 chung.
+- README root và các tài liệu workflow/decisions/system-architecture dùng chung; ghi docs/parallel riêng để tránh tranh chấp audit trên hai máy.
+
+Đọc lớp dùng chung được phép, sửa chúng không nằm trong scope. Nếu phát hiện blocker bắt buộc sửa vùng cấm: ghi file:dòng, actual/expected, tác động; hỏi Codex A về phương án tích hợp. Không âm thầm refactor hoặc copy nền tảng chung thành một hệ thống khác.
+
+8. CÁC CHECKPOINT TRIỂN KHAI
+
+CP0 — Chuẩn bị:
+Đúng branch/baseline, đọc hướng dẫn, TASK, inventory môi trường (JDK21, Maven Wrapper, Node/npm, Docker). Ghi java/node/npm/git versions. Không dùng đường dẫn E:\Tools của máy chính nếu máy thứ hai khác. Dùng Maven Wrapper tại backend; npm ci theo lock, không npm update. .runtime cache/private env/browser của máy chính không được clone: cài/tạo riêng có kiểm chứng.
+
+CP1 — Backend tối thiểu:
+Schema hiện đã có bảng; xác nhận Flyway history/checksum và Hibernate validate trên fixture mới. List/create category, list/create/read/update location, DTO validation + Admin permissions. Controller nhận/trảHTTP; Service nghiệp vụ/transaction; Repository persistence trong module location. Không raw SQL vào user/branch module để kiểm quyền; Actor đã cung cấp role.
+Kiểm proof nhỏ list/negative trước khi viết runner lớn. Sau đó positive/critical negative và SQLbeforeafter. Commit một lượt coherent với trạng thái kiểm chứng.
+
+CP2 — UI Admin:
+Trang riêng sử dụng api/client/useApiData sẵn có. Danh sách, form tạo/sửa, phân loại thật, status, pending đồng bộ/chống duplicate submit, empty/loading/error/retry. Form tọa độ cần hỗ trợ số0, biên và dấu âm; không kiểm bằng if(!latitude) vì0 hợp lệ. Kết quả cần đọc lại; không hardcode thông báo PASS hoặc thay dataAPI bằng demo.
+Giữ demo/API tách biệt; route screen chỉ chọn đúng mode. Tạo category thao tác riêng đủ ngắn, không modal/framework mới nếu form chuẩn đã đủ.
+
+CP3 — Tích hợp browser:
+Backend/MySQL thật, JWT Admin thật, Vite API mode với VITE_API_BASE_URL=/api/v1 và proxy đúng backendport. Có thể dùng production API build/preview để giảm HMR/tài nguyên nhưng phải build đúng env và ghihash. Clone mới không có Playwright runtime: cài dependency/browser riêng dưới runtime hoặc công cụ được kiểm soát, không giả screenshot.
+Kiểm tất cả accepted scenarios mục9 và snapshotSQL, quay lại trang/reload. USER/STAFF/Guest denied phải dùng token thật, không mock role. Hold POST RESPONSE sau khi route.fetch đã đến backend để kiểm đúng một POST/một row. Mock500 chỉ dành cho lỗi transport loading/retry, không mock nghiệp vụ thành công.
+
+CP4 — Chốt:
+Freeze source, hash trước/sau/final, suite gates đầy đủ, cleanup/readback, HANDOFF, commit cuối. Push branch riêng, không merge vào nhánh chính. Reviewer sẽ nghiệm thu/tích hợp sau.
+
+9. TIÊU CHÍ NGHIỆM THU VÀ BÀI TEST BẮT BUỘC
+
+Backend unit/integration + actualHTTP/MySQL:
+A. Admin list categories/locations empty hợp lệ; create category + location; ID/FK/status/tọa độ/name đúng SQL; GETbyID/GETlist/update/re-read đúng và không sinh thêm row khi sửa.
+B. Category trùng, khoảng trắng, tên quá dài; location thiếu category/name/coords/status, category không tồn tại, số ngoài bounds, null và JSON hỏng; đúng400/409/404, không500 và không mutation.
+C. Vĩ độ/kinh độ0, âm, đúngbiên±90/±180 và precision được lưu/đọc chính xác; không silentround mất độ chính xác trái contract.
+D. Guest401, USER/STAFF403 cho read/write Admin endpoints; JWTwrong/expired thực401; noSQLwrite. Không dùng DB/auth mocks để claimintegration.
+E. UpdateINACTIVE giữ bản ghi và FK; không sửa bảng branches/users/bookings/financials. Nếu fixture có itinerary_items đã tham chiếu location, cập nhật metadata phải giữ nguyên snapshot/ID của itinerary_item; chỉ seed fixture đọc/kiểm bảo toàn, không thực hiện itineraryAPI hoặc AI.
+F. Không endpoint DELETE, không xóa location/category, không thêm policy/Map call; không đưa entity mutable trực tiếp làm DTO API.
+G. Full backend JDK21 ./mvnw.cmd verify hoặc ./mvnw verify; MySQL tests bắt buộc chạy thật, no skip. Phân biệt optional integration skips trong suite khác, không tính skip là PASS location. Capture Surefire XML/command/exit/sourcehash và JAR/resources/provenance, startup thật + Flyway/Hibernate validate.
+
+Frontend:
+H. Actual mounted ApiLocationsPage tests với ca chính/âm/regression: required fields,0/negativecoords, pendingguard, error khôngfalse success, list error/retry, formedit/cancel và khônggiữ staleformdata sau chọn bản ghi khác nếu có.
+I. npm test (serialize nếu Vitest/Vite ports cần), npm run lint (--max-warnings0), npm run build demo vàAPI với env tường minh. Không hạ rule hoặc skiptest để PASS.
+J. Browser actualAdmin create/update/status/reload SQLreadback; categoryduplicate/invalidcoorderror UI noextrawrite; loading/error/retry và đúnglabels; keyboard/mobile kiểm cơ bản của trang mới; screenshots trạng thái quan trọng.
+K. Browser/HTTP foreignrole denied, directURL routeguard, no auth secret leak; logs endpoint/method/status phân loại chính xác intentional negatives, pageerror khác phải fail.
+L. Lint/build không chứng minh browser/API/DBPASS; DOM với intercepted adapter chỉ chứng minhUI state.
+
+Runner/cleanup:
+M. Unsupported shell, outputroot đã tồn tại (file/empty/summary/session), dependency thiếu/drift phải bị từ chối trướcwrite/spawn. Negative control lỗi không liên quan không được tính PASS guard.
+N. Caller env existing/absent bình thường/exception phục hồi chính xác; giữ object/PID do mình tạo, sentinel không bị kill; cleanup/native error phải làm nonzero, không ghiPASS trướcfinally.
+O. Exact container/image/volume/schema/port identities, trước/sau readback. Không chạytest ghi vào3306/33385 hoặc volumeDBgốc. Không prune Docker toàn bộ hay tạo fixture lặp cho lỗi không đổi.
+
+10. MYSQL / EVIDENCE TRÊN MÁY THỨ HAI
+
+Docker là công cụ chạy MySQL riêng, không là DBsource trong Git. Dùng mysql8.4 tương thích baseline đã test; ghi imageID/digest thực, không tự nâng MySQL/Flyway giữa lượt. Nếu cần image chưa có thì pull một lần theo môi trường; lỗi download/môi trường phải báo blocker, không sửa assertion.
+
+Runner chọn port test còn trống (ví dụ33680), schema và volume UUID riêng của lượt. Ví dụ têncontainer kltn-location-<runid>, volumevol-kltn-location-<runid>; không chứa tênagent. Password/JWT secret sinh ngẫu nhiên, privateenv ở runtime và loader nạp biến thật. Spring không tự đọc backend/.env.local. Seed opt-in, khôngreset DB có dữ liệu.
+
+Trước create: inventory Docker/ports và protectedservices. Saucreate: marker đúng schema/identity rồi mới thao tác ghi. Test sai category là FKnegative phải không tạo location lạc dữ liệu. Build/JAR manifest lấy đúng toàn bộ input thực và compiler output, sohash final; không lấy filecùngtên ở nguồn khác.
+
+Cùng lỗi tối đa2lượt, mỗi lần có giả thuyết/bằngchứng mới. Sau10phút không tiến triển: checkpoint.md nêu đã xác nhận/thiếu gì/blocker/nextstep, commitWIP và dừng dependentwork. Test còn tiến triển rõ không gọi loop. Không chạy cảwrapper nặng lại vì sửa mộtlocator.
+
+Giữ thư mục evidence từngrun mới, không ghi đè. Sautest dừng đúngbackend/frontend/browser/container do mình tạo, giữ volume và evidence đểreview. Policy dọnfixture saureview cần exactlist/identity/archive/readback, không tự dọn artifact. Máy thứ hai không cần copy/khôi phục DBgốc của máy chính.
+
+HANDOFF.md runtime của lượt sau khi có kết quả: người thực hiện; HEAD/status đầu-cuối; mọifile đổi kểcảuntracked và hashbeforeafter/NEW; DONE/PARTIAL/BLOCKED/NOTVERIFIED từngtiêu chí; command/exit/passfail/skip/artifact; browser/SQLexpectedactual; contract/migration nếu có; giới hạn/cáchrerun/stoppedservices/commitSHA. Không tựhashHANDOFF.
+
+Để reviewer trên máy chính xem được phần mô tả khiclone/pull: ghi thêm docs/parallel/location-catalog-handoff.md đã redacted, tóm tắt kết quả/commands/suites/hash/limitations/commit trước đó (không tựhash hoặc tạocircularSHA). Runtime logs/XML/screenshots gốc giữmáythứhai, chuyển evidence bằng kênh riêng khi nghiệmthu; không commit runtime bí mật vì muốn dễreview.
+
+11. COMMIT VÀ UPDATE GIT
+
+Nhánh đã tạo: location-catalog-20261012, tên không kèmagent. Không thêm codex/antigravity/opencode vào tên nhánh hoặc tên feature. Commit message nêu mục tiêu/checkpoint/trạng thái, không cần tênagent.
+
+Sau mỗi lượt coherent:
+    git status --short
+    git diff --check
+    git add -- <từng file hoặc hunk thuộc location>
+    git diff --cached --stat
+    git diff --cached --check
+    git commit -m "feat(location): add validated admin catalog API [VERIFIED scoped]"
+
+Thông điệp ví dụ tiếp theo:
+    feat(location): add admin catalog UI [VERIFIED scoped]
+    test(location): verify MySQL and browser catalog flows [VERIFIED scoped]
+    docs(location): record final scoped handoff [VERIFIED scoped]
+Nếu chưa đạt:
+    chore(location): checkpoint validation blocker [WIP BLOCKED]
+
+Không dùng git add --all nếu có thay đổi ngoài phạm vi. Không commit secrets, test.env, privatefixturestate, Maven/npmcache,dist,target,node_modules,DBdata/logs/XML/screenshots runtime. Tạo .gitignore scope tươngứng chỉ nếu chưa được ignore; không xóa dữ liệu để làmstatus sạch.
+
+Khi hoàn thành tất cả tiêu chí:
+    git status --short
+    git log --oneline -5
+    git push -u origin location-catalog-20261012
+    git ls-remote origin refs/heads/location-catalog-20261012
+
+SoSHA remote với git rev-parse HEAD, báobranch/commit/tổngtest/assertions/limitations/handoff/evidencevàservices đãdừng. Push không tựmerge master hay update-20261012-0920. Nếu gitpush bị403 xinquyềnwrite; nếu nonfastforwardfetch+đốichiếu, khôngforcepush. Chỉ createPR/merge khi người dùng yêu cầu hoặc chuyểnkết quả để Codex A nghiệmthu trước; không tự công bố toàncorePASS.
+
+Có thể push các checkpoint đểsao lưu nếu người dùng yêu cầu, nhưng ghiWIP/FAIL rõ. Yêu cầu "updategit khihoànthành" nghĩa ít nhấtpushfinalbranch khi đãđạt và thôngbáoSHA; không dùng remotecommit làm bằngchứng testPASS.
+
+12. TÍCH HỢP SAU KHI C8 HOÀN TẤT
+
+C8 tiếp tục trên update-20261012-0920/máychính. Location tiếp tục trên branch riêng/máythứhai. Không mergeC8 vào location giữa mỗi lần test nếu chưa có lýdo; baseline riêng giúp bằngchứng ổn định.
+
+Khi location ready: người dùng gửibranchSHA vàhandoff/evidence để Codex A kiểmsource/hash, chạykiểmtraquyếtđịnhtrênsourcefinal. SoAppRoutes import/route hunk với nguồn mớinhất, khôngghiđè toànfile. Nếu C8 cóchỉnh auth/sharedfile, kiểmregressionphùhợp saumerge; khôngdùngPASSlocationtrênbaselinecũ đểsuy integrationPASS.
+
+Chưađạt thì fix ởbranchlocation, commitmới+pushmới, khôngamend lịch sửđãchiasẻ. Nếu cầnmigration/version, giảiquyếttênversion/checksum/DBhistory trướcmerge, khôngrepair/clean auto. Gitmergedoesnotmigrate DBgốc an toàn tựđộng.
+
+13. PROMPT ĐƯA CHO PHIÊN TRIỂN KHAI TRÊN MÁY THỨ HAI
+
+"Làm C11B location catalog trên branch location-catalog-20261012 theo docs/parallel/location-catalog-plan.txt. Đọc AGENTS.md và skills/kltn-evidence-handoff/SKILL.md. Đây là công việc độc lập trên checkout/máy khác được người dùng cho phép, không chỉnh file C8/C9 hoặc tài nguyên máy chính. Kiểm traHEAD/status, tạoTASK/evidence riêng, báokếhoạch trướcsửa. Thực hiện backend→UI→realHTTP/MySQL/browser, tuânthủ phạmvi endpoint/file và tiêu chí trong kếhoạch; khôngAI/Map/delete/revokepolicy. Commit từnglượt, chưađạtghiWIP/blocker; khiđạtpush branchriêng, xácminhSHAremote, tạoHANDOFF và bảnredacted docs/parallel/location-catalog-handoff.md. Khôngmerge/forcepush/reset/master hoặc commitsecrets/runtime."
+
+14. PHẦN KHÔNG ĐƯỢC TỰ TUYÊN BỐ HOÀN THÀNH
+
+Cataloglocations PASS khôngđồngnghĩa AI itinerary,Maprouting, catalogxe, branchclose,accountassignment, payment hoặc toànGiaiđoạn5PASS. Những nguồn tài liệu có providerAI/Map chỉlàđềxuất chưađượccấpquyền dùngAPI/key.
+
+Kếtquả cần là tínhnăngAdminlocation thật, dữliệuMySQL thật, kiểmchứng cụthể, sourcerecoverable quaGit và bằngchứng cóthểreview — không chỉ hìnhdemo hoặc filetestbỏqua.
