@@ -140,3 +140,12 @@ Guard tách role; Admin không vào Staff/User. Route guard và mô phỏng quy�
 - Modal giữ focus, Escape đóng và trả focus về nút mở. Phạm vi bàn giao hiện tại ưu tiên web desktop 1366px và 1440px; không phát triển ứng dụng hoặc bộ thiết kế mobile riêng.
 - Loading/empty/error qua toolbar, trạng thái rỗng do bộ lọc, lỗi AI, tài nguyên không tồn tại; kiểm tra console không có lỗi.
 - Kết quả demo không chứng minh transaction chống đặt trùng, phân quyền server hoặc AI/Map đã hoạt động. Các phần này cần kiểm thử tích hợp riêng khi backend sẵn sàng.
+
+
+## C10A UI / homepage — 12/10/2026
+
+API mode now displays linked amenity DTOs on home/list/detail; Admin vehicle edit has a separate amenity checkbox editor and PUT/revision contract. Staff fleet stays read-only for amenities. Stale409 keeps a visible error and requires explicit reload; subsequent PUT uses fresh revision. Editor instance is keyed by vehicle ID so a late save of another vehicle cannot report success in the current editor.
+
+Homepage keeps KDrive teal/slate/system font, uses one dark hero/H1/CTA group and actual API cards. ACTIVE cards in API mode say operational state, not guaranteed schedule availability; quote remains authoritative. Demo card label remains separate. Reduced motion/static hero, no video/font CDN/provider/dashboard metrics or fake API fallback. Vehicle image placeholders remain until C10B.
+
+Accepted scoped proof and before/after desktop/mobile/tablet screenshots: .runtime/coordination-c10a-ui-codexa-complete-20261012-230616/. Source runner scripts/coordination/c10a-ui-browser/README.md; mandatory build uses VITE_DATA_MODE=api and VITE_API_BASE_URL=/api/v1 at compile time. Evidence includes isolated MySQL browser integration; user DB/services are preserved.

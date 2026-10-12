@@ -355,13 +355,16 @@ function VehicleAmenityForm({
   revision,
   catalogAmenities,
   onReload,
+  error,
+  notice,
+  onError,
+  onNotice,
 }) {
   const [selectedIds, setSelectedIds] = useState(
     () => new Set((initialAmenities || []).map((a) => a.id)),
   );
-  const [saveError, setSaveError] = useState("");
-  const [saveNotice, setSaveNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const [hasConflict, setHasConflict] = useState(false);
   const pendingRef = useRef(false);
 
   const toggleId = useCallback((id) => {
@@ -378,8 +381,9 @@ function VehicleAmenityForm({
     if (pendingRef.current) return;
     pendingRef.current = true;
     setBusy(true);
-    setSaveError("");
-    setSaveNotice("");
+    onError("");
+    onNotice("");
+    setHasConflict(false);
     try {
       await apiClient.put(
         `/admin/vehicles/${encodeURIComponent(vehicleId)}/amenities`,
@@ -388,29 +392,19 @@ function VehicleAmenityForm({
           expectedRevision: revision,
         },
       );
-      setSaveNotice("Đã lưu tiện nghi. Đang tải lại...");
+      onNotice("Đã lưu tiện nghi thành công.");
       onReload();
     } catch (err) {
       const status = err?.response?.status;
       if (status === 409) {
-        setSaveError(
-          "Tiện nghi đã được cập nhật bởi người khác (409). Đang tải lại phiên bản mới...",
-        );
-        onReload();
+        setHasConflict(true);
+        onError("Tiện nghi đã thay đổi bởi thao tác khác (409). Vui lòng tải lại bản mới.");
       } else {
-        // 400: giữ lựa chọn, thông báo lỗi, giải phóng guard
-        setSaveError(
-          getErrorMessage(err, "Không thể lưu tiện nghi. Kiểm tra lại lựa chọn."),
-        );
-        pendingRef.current = false;
-        setBusy(false);
-        return;
+        onError(getErrorMessage(err, "Không thể lưu tiện nghi. Kiểm tra lại lựa chọn."));
       }
     } finally {
-      if (pendingRef.current) {
-        pendingRef.current = false;
-        setBusy(false);
-      }
+      pendingRef.current = false;
+      setBusy(false);
     }
   }
 
@@ -422,13 +416,18 @@ function VehicleAmenityForm({
       onSubmit={saveAmenities}
       aria-label="Tiện nghi xe"
     >
-      <h3 className="text-sm font-semibold text-slate-700">Tiện nghi</h3>
-      {saveNotice ? (
-        <p className="text-sm text-teal-700">{saveNotice}</p>
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-700">Tiện nghi</h3>
+
+      </div>
+
+      {notice ? (
+        <p className="text-sm font-medium text-teal-700">{notice}</p>
       ) : null}
-      {saveError ? (
-        <p className="text-sm text-red-600">{saveError}</p>
+      {error ? (
+        <p className="text-sm font-medium text-red-600">{error}</p>
       ) : null}
+
       {allAmenities.length === 0 ? (
         <p className="text-xs text-slate-500">
           Chưa có tiện nghi nào trong catalog. Thêm tiện nghi tại trang Danh
@@ -455,13 +454,29 @@ function VehicleAmenityForm({
         </fieldset>
       )}
       {allAmenities.length > 0 ? (
-        <button
-          type="submit"
-          className="btn-secondary text-xs"
-          disabled={busy}
-        >
-          {busy ? "Đang lưu..." : "Lưu tiện nghi"}
-        </button>
+        <div className="flex items-center gap-2 pt-1">
+          <button
+            type="submit"
+            className="btn-secondary text-xs"
+            disabled={busy}
+          >
+            {busy ? "Đang lưu..." : "Lưu tiện nghi"}
+          </button>
+          {hasConflict ? (
+            <button
+              type="button"
+              className="btn-secondary text-xs"
+              disabled={busy}
+              onClick={() => {
+                setHasConflict(false);
+                onError("");
+                onReload();
+              }}
+            >
+              Tải lại bản mới
+            </button>
+          ) : null}
+        </div>
       ) : null}
     </form>
   );
@@ -477,6 +492,8 @@ function VehicleAmenityEditor({ vehicleId, catalogAmenities }) {
   const amenityRequest = useApiData(
     `/admin/vehicles/${encodeURIComponent(vehicleId)}/amenities`,
   );
+  const [editorError, setEditorError] = useState("");
+  const [editorNotice, setEditorNotice] = useState("");
 
   if (amenityRequest.loading) {
     return (
@@ -509,6 +526,10 @@ function VehicleAmenityEditor({ vehicleId, catalogAmenities }) {
       revision={amenityRequest.data.revision}
       catalogAmenities={catalogAmenities}
       onReload={amenityRequest.reload}
+      error={editorError}
+      notice={editorNotice}
+      onError={setEditorError}
+      onNotice={setEditorNotice}
     />
   );
 }
@@ -894,6 +915,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
             {form.id ? (
               <div className="panel h-fit">
                 <VehicleAmenityEditor
+                  key={form.id}
                   vehicleId={form.id}
                   catalogAmenities={catalog.amenities || []}
                 />

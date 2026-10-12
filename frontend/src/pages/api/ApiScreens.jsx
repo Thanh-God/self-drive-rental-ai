@@ -61,7 +61,7 @@ function RequestState({ loading, error, onRetry, children }) {
   return children;
 }
 
-function normalizeVehicle(vehicle, catalog) {
+export function normalizeVehicle(vehicle, catalog) {
   const brandNames = new Map(
     (catalog?.brands || []).map((item) => [item.id, item.name]),
   );
@@ -517,49 +517,56 @@ export function ApiHomePage() {
   const isUser = currentUser?.role === "USER";
 
   return (
-    <Page
-      title="Thuê xe tự lái cùng KDrive"
-      description="Duyệt xe từ hệ thống và gửi yêu cầu thuê với báo giá, lịch xe và tuyến chi nhánh được máy chủ xác nhận."
-      actions={
-        <div className="flex flex-wrap items-center gap-3">
-          <Link className="btn" to="/vehicles">
-            Xem toàn bộ xe
-          </Link>
-          {isUser ? (
-            <Link className="btn-secondary" to="/user/bookings">
-              Đơn thuê của tôi
-            </Link>
-          ) : !currentUser ? (
-            <Link className="btn-secondary" to="/login">
-              Đăng nhập / Đăng ký
-            </Link>
-          ) : null}
-        </div>
-      }
-    >
-      <section className="panel mb-8 grid gap-5 md:grid-cols-[1fr_auto] md:items-center">
-        <div>
-          <p className="eyebrow">DỮ LIỆU TRỰC TIẾP</p>
-          <h2 className="mt-2 text-xl font-semibold">Tìm chiếc xe phù hợp</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">
-            Giá niêm yết và tình trạng được xác nhận trực tiếp từ hệ thống.
-            Khả dụng thực tế, giá cuối và cước tuyến được máy chủ chốt chính xác
-            khi bạn kiểm tra báo giá theo lịch thuê.
+    <div className="page-shell">
+      {/* Hero section: Phong cách Deep Teal / Dark Slate kết hợp viền mỏng và gradient CSS */}
+      <section className="relative mb-10 overflow-hidden rounded-3xl border border-teal-800/40 bg-gradient-to-br from-slate-950 via-teal-950 to-slate-900 p-6 text-white shadow-xl sm:p-10">
+        <div className="relative z-10 max-w-3xl">
+          <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3.5 py-1 text-xs font-semibold tracking-wider text-teal-300 backdrop-blur-md">
+            <span className="h-2 w-2 rounded-full bg-teal-400" />
+            DỮ LIỆU THẬT · BÁO GIÁ HỆ THỐNG
+          </div>
+          <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl md:text-5xl leading-tight">
+            Khám phá hành trình cùng xe tự lái <span className="text-teal-400">KDrive</span>
+          </h1>
+          <p className="mt-3 text-base leading-relaxed text-slate-300 sm:text-lg sm:leading-8">
+            Giá niêm yết minh bạch, tính chuẩn block 24 giờ và tuyến chi nhánh nhận/trả được xác nhận trực tiếp từ máy chủ. Máy chủ kiểm tra lịch, tuyến và giá khi bạn yêu cầu báo giá.
           </p>
+
+          <div className="mt-6 flex flex-wrap items-center gap-3">
+            <Link className="btn bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md px-5 py-2.5" to="/vehicles">
+              Xem toàn bộ xe ↗
+            </Link>
+            {isUser ? <Link className="btn-secondary bg-white/10 hover:bg-white/20 border-white/20 text-white" to="/user/bookings">Đơn thuê của tôi</Link> : null}
+            {isUser ? (
+              <Link className="btn-secondary bg-white/10 hover:bg-white/20 border-white/20 text-white" to="/user/profile">
+                Hồ sơ &amp; GPLX
+              </Link>
+            ) : !currentUser ? (
+              <Link className="btn-secondary bg-white/10 hover:bg-white/20 border-white/20 text-white" to="/register">
+                Đăng ký tài khoản
+              </Link>
+            ) : null}
+          </div>
         </div>
-        <div className="flex flex-wrap gap-3">
-          {isUser ? (
-            <Link className="btn-secondary" to="/user/profile">
-              Hồ sơ & GPLX
-            </Link>
-          ) : !currentUser ? (
-            <Link className="btn" to="/register">
-              Đăng ký tài khoản
-            </Link>
-          ) : null}
+
+        {/* 3 Thẻ giá trị cốt lõi trung thực từ hệ thống */}
+        <div className="relative z-10 mt-8 grid gap-4 border-t border-teal-800/50 pt-6 sm:grid-cols-3">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">Giá theo block 24h</p>
+            <p className="mt-1 text-xs text-slate-300">Thời gian thuê được làm tròn theo block 24 giờ; các khoản trong báo giá được trình bày trước khi gửi yêu cầu.</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">Tuyến chi nhánh mở</p>
+            <p className="mt-1 text-xs text-slate-300">Nhận và trả tại các điểm giao dịch được hệ thống vận hành hỗ trợ.</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-sm">
+            <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">Tiện nghi trực tiếp</p>
+            <p className="mt-1 text-xs text-slate-300">Danh mục tiện nghi gắn liền với từng xe thực tế trong cơ sở dữ liệu.</p>
+          </div>
         </div>
       </section>
 
+      {/* Danh sách xe nổi bật và Search bar */}
       <section className="space-y-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-md flex-1">
@@ -572,7 +579,7 @@ export function ApiHomePage() {
               />
             </Field>
           </div>
-          <div className="text-sm text-slate-500">
+          <div className="text-sm font-medium text-slate-500">
             {query.trim() ? (
               <span>Kết quả tìm kiếm ({vehicles.length})</span>
             ) : (
@@ -584,14 +591,14 @@ export function ApiHomePage() {
         <RequestState loading={loading} error={error} onRetry={retry}>
           {vehicles.length > 0 ? (
             <div>
-              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 {vehicles.map((vehicle) => (
                   <VehicleCard key={vehicle.id} vehicle={vehicle} />
                 ))}
               </div>
               <div className="mt-8 flex justify-center border-t border-slate-200 pt-6">
                 <Link
-                  className="btn-secondary inline-flex items-center gap-2"
+                  className="btn-secondary inline-flex items-center gap-2 px-6 py-2.5 font-medium"
                   to="/vehicles"
                 >
                   Xem tất cả xe trong hệ thống <span>→</span>
@@ -630,7 +637,7 @@ export function ApiHomePage() {
           )}
         </RequestState>
       </section>
-    </Page>
+    </div>
   );
 }
 

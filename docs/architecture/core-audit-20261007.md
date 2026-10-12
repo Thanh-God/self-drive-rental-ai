@@ -167,3 +167,8 @@ C9 A08 đọc/tạo/cập nhật hãng, loại xe, tiện nghi qua Admin API/UI/
 ## C10A backend checkpoint — 12/10/2026
 
 Amenity links API/backend PASS scoped tại .runtime/coordination-c10a-codexa-complete-20261012-212639/ACCEPTANCE.md. MySQL9zero-skip,verify115/10optional skips,guards18,actual newJARHTTP/source173no-drift. UI C10A chờ Cursor; ảnh C10B chưa triển khai, nên C10 vẫn PARTIAL. Giữ lịch sử audit, không tự cập nhật phần trăm/wholecorePASS.
+
+
+## C10A end-to-end scoped closure — 12/10/2026
+
+C10A amenity links backend+UI DONE scoped: backend acceptance57be1ee retained173unchangedinputs and UI/homepage proof70tests/38guards/50realbrowserchecks at .runtime/coordination-c10a-ui-codexa-complete-20261012-230616/ACCEPTANCE.md. ActualAdminassign/clear/stale/recover→SQL/publichome/list/detail/RBAC/screenshots closed UI-R01..R03; latecallbackneweditorfalse-success regression fixed. C10B image URL/order/attribution/gallery remains pending, hence wholeC10 stillPARTIAL. Dashboard/C12/AIMap not implemented, historical percentages preserved.

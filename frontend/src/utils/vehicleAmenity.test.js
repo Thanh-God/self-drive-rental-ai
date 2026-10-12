@@ -1,14 +1,15 @@
 /**
  * C10A UI — vehicleAmenity.test.js
- * 1. Unit tests: normalizeVehicle contract (giữ amenities DTO backend, empty, catalog map)
- * 2. Mounted DOM tests: ApiVehiclesAdminPage với VehicleAmenityEditor:
- *    - Loading, error, retry, empty
- *    - Checkbox hiển thị links thật chứ không phải all catalog
- *    - Assign / clear tiện nghi
- *    - Synchronous pending ref chống double-PUT (chỉ 1 PUT bay ra)
- *    - 400 guard release và input preserved
- *    - 409 stale conflict không false-success, reload fresh revision
- *    - Staff fleet mode không có amenity editor
+ *
+ * Khắc phục triệt để findings UI-R02 và UI-R03:
+ * 1. UI-R02: Gọi trực tiếp actual normalizeVehicle từ production (ApiScreens.jsx),
+ *    không dùng bất kỳ hàm mirror/sao chép nào.
+ * 2. UI-R03:
+ *    - Assert 409 stale conflict hiển thị thông báo lỗi 409 rõ ràng, không false-success.
+ *    - Click "Tải lại bản mới", reload fresh revision và thực hiện subsequent PUT
+ *      với expectedRevision mới, assert payload và status 200.
+ *    - Test đầy đủ các trạng thái loading, error (kèm retry), empty catalog.
+ *    - Test mounted public chips và detail rendering của amenities trên giao diện xe.
  */
 import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, test } from "node:test";
@@ -29,6 +30,8 @@ let apiClient;
 let setAuthInterceptors;
 let AuthProvider;
 let ApiVehiclesAdminPage;
+let ApiVehicleDetailPage;
+let normalizeVehicle;
 let createRoot;
 let viteServer;
 let originalAdapter;
@@ -143,6 +146,10 @@ before(async () => {
 
   ({ AuthProvider } = await viteServer.ssrLoadModule("/src/context/AuthContext.jsx"));
   ({ ApiVehiclesAdminPage } = await viteServer.ssrLoadModule("/src/pages/api/ApiManagementScreens.jsx"));
+  const apiScreens = await viteServer.ssrLoadModule("/src/pages/api/ApiScreens.jsx");
+  normalizeVehicle = apiScreens.normalizeVehicle;
+  ApiVehicleDetailPage = apiScreens.ApiVehicleDetailPage;
+
   ({ default: apiClient, setAuthInterceptors } = await viteServer.ssrLoadModule("/src/api/client.js"));
 
   originalAdapter = apiClient.defaults.adapter;
@@ -187,33 +194,11 @@ after(async () => {
 });
 
 // =============================================================================
-// PHẦN 1: Unit tests normalizeVehicle contract
+// PHẦN 1 (UI-R02): Test trực tiếp actual normalizeVehicle từ ApiScreens.jsx
 // =============================================================================
 
-function normalize(vehicle, catalog) {
-  const brandNames = new Map(
-    (catalog?.brands || []).map((item) => [item.id, item.name]),
-  );
-  const categoryNames = new Map(
-    (catalog?.categories || []).map((item) => [item.id, item.name]),
-  );
-  return {
-    ...vehicle,
-    noLocalAsset: true,
-    price: vehicle.dailyPrice,
-    brand:
-      brandNames.get(vehicle.brandId) || vehicle.brandId || "Chưa phân loại",
-    category:
-      categoryNames.get(vehicle.categoryId) ||
-      vehicle.categoryId ||
-      "Chưa phân loại",
-    transmission: vehicle.transmission === "AUTO" ? "Tự động" : "Số sàn",
-    fuel: "Chưa cập nhật",
-    amenities: Array.isArray(vehicle.amenities) ? vehicle.amenities : [],
-  };
-}
-
-test("normalizeVehicle giữ amenities [{id,name}] từ DTO backend", () => {
+test("UI-R02: actual production normalizeVehicle giữ amenities [{id,name}] từ DTO backend", () => {
+  assert.equal(typeof normalizeVehicle, "function", "normalizeVehicle phải được export từ ApiScreens");
   const vehicle = {
     id: "v1",
     name: "Toyota Vios",
@@ -233,7 +218,7 @@ test("normalizeVehicle giữ amenities [{id,name}] từ DTO backend", () => {
       { id: "a2", name: "GPS" },
     ],
   };
-  const result = normalize(vehicle, {
+  const result = normalizeVehicle(vehicle, {
     brands: [{ id: "brand1", name: "Toyota" }],
     categories: [{ id: "cat1", name: "Sedan" }],
   });
@@ -244,7 +229,7 @@ test("normalizeVehicle giữ amenities [{id,name}] từ DTO backend", () => {
   assert.equal(result.amenities[1].name, "GPS");
 });
 
-test("normalizeVehicle giữ amenities:[] (xe không liên kết) trung thực", () => {
+test("UI-R02: actual production normalizeVehicle giữ amenities:[] trung thực", () => {
   const vehicle = {
     id: "v2",
     name: "Honda City",
@@ -261,12 +246,12 @@ test("normalizeVehicle giữ amenities:[] (xe không liên kết) trung thực",
     version: 1,
     amenities: [],
   };
-  const result = normalize(vehicle, null);
+  const result = normalizeVehicle(vehicle, null);
   assert.ok(Array.isArray(result.amenities));
   assert.equal(result.amenities.length, 0);
 });
 
-test("normalizeVehicle fallback [] khi vehicle thiếu field amenities", () => {
+test("UI-R02: actual production normalizeVehicle fallback [] khi thiếu field", () => {
   const vehicle = {
     id: "v3",
     name: "Ford Ranger",
@@ -282,13 +267,13 @@ test("normalizeVehicle fallback [] khi vehicle thiếu field amenities", () => {
     description: "",
     version: 1,
   };
-  const result = normalize(vehicle, null);
+  const result = normalizeVehicle(vehicle, null);
   assert.ok(Array.isArray(result.amenities));
   assert.equal(result.amenities.length, 0);
 });
 
 // =============================================================================
-// PHẦN 2: Mounted DOM tests cho ApiVehiclesAdminPage & VehicleAmenityEditor
+// PHẦN 2 (UI-R03): Mounted DOM tests hoàn chỉnh cho Admin & Detail & Public
 // =============================================================================
 
 const mockCatalog = {
@@ -324,12 +309,12 @@ const mockVehicles = [
   },
 ];
 
-async function renderAdminVehicles() {
+async function renderAdminVehicles(vehicles = mockVehicles) {
   const mounted = await mount(
     createElement(AuthProvider, null, createElement(ApiVehiclesAdminPage, { fleet: false })),
   );
   await act(async () => {
-    fulfill(takeRequest("/vehicles"), mockVehicles);
+    fulfill(takeRequest("/vehicles"), vehicles);
     fulfill(takeRequest("/vehicles/catalog"), mockCatalog);
     fulfill(takeRequest("/branches"), mockBranches);
   });
@@ -339,14 +324,12 @@ async function renderAdminVehicles() {
 test("DOM: ApiVehiclesAdminPage click Chỉnh sửa hiển thị VehicleAmenityEditor với links hiện hành", async () => {
   const { container, unmount } = await renderAdminVehicles();
 
-  // Click nút "Chỉnh sửa" của xe
   const editBtn = container.querySelector("article button");
   assert.ok(editBtn, "Phải có nút Chỉnh sửa");
   await act(async () => {
     editBtn.click();
   });
 
-  // Editor trigger GET /admin/vehicles/veh-101/amenities
   const amenityReq = takeRequest("/admin/vehicles/veh-101/amenities");
   assert.equal(amenityReq.config.method, "get");
 
@@ -357,16 +340,51 @@ test("DOM: ApiVehiclesAdminPage click Chỉnh sửa hiển thị VehicleAmenityE
     });
   });
 
-  // Kiểm tra UI: Form tiện nghi hiển thị
   const amenityForm = container.querySelector('form[aria-label="Tiện nghi xe"]');
   assert.ok(amenityForm, "Phải hiển thị form Tiện nghi xe");
 
-  // Checkbox am1 phải checked, am2 và am3 unchecked
   const checkboxes = amenityForm.querySelectorAll('input[type="checkbox"]');
   assert.equal(checkboxes.length, 3, "Phải có 3 checkbox từ catalog");
   assert.equal(checkboxes[0].checked, true, "am1 phải được chọn");
   assert.equal(checkboxes[1].checked, false, "am2 không được chọn");
   assert.equal(checkboxes[2].checked, false, "am3 không được chọn");
+
+  await unmount();
+});
+
+test("DOM: VehicleAmenityEditor loading, error với retry, và empty catalog state", async () => {
+  const { container, unmount } = await renderAdminVehicles();
+
+  await act(async () => {
+    container.querySelector("article button").click();
+  });
+
+  // 1. Kiểm tra loading state
+  const amenityReq = takeRequest("/admin/vehicles/veh-101/amenities");
+  assert.match(container.textContent, /Đang tải tiện nghi/);
+
+  // 2. Kiểm tra error state
+  await act(async () => {
+    rejectWithStatus(amenityReq, 500, { message: "Mạng lỗi khi tải tiện nghi" });
+  });
+  assert.match(container.textContent, /Mạng lỗi khi tải tiện nghi/);
+
+  // 3. Click Thử tải lại tiện nghi
+  const retryBtn = Array.from(container.querySelectorAll("button")).find(
+    (b) => b.textContent === "Thử tải lại tiện nghi",
+  );
+  assert.ok(retryBtn, "Phải có nút Thử tải lại tiện nghi");
+  await act(async () => {
+    retryBtn.click();
+  });
+
+  const retryReq = takeRequest("/admin/vehicles/veh-101/amenities");
+  await act(async () => {
+    fulfill(retryReq, { amenities: [], revision: "rev-empty" });
+  });
+
+  const amenityForm = container.querySelector('form[aria-label="Tiện nghi xe"]');
+  assert.ok(amenityForm, "Form phải mount sau khi retry thành công");
 
   await unmount();
 });
@@ -394,24 +412,22 @@ test("DOM: VehicleAmenityEditor assign/clear và chống double-PUT", async () =
   });
   assert.equal(checkboxes[1].checked, true);
 
-  // Dispatch submit 2 lần liên tiếp (double dispatch)
+  // Double dispatch submit
   await act(async () => {
     amenityForm.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
     amenityForm.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
   });
 
-  // Chỉ có đúng 1 PUT request bay ra
   const putReqs = requests.filter(
     (r) => r.config.method === "put" && r.config.url.includes("/amenities"),
   );
-  assert.equal(putReqs.length, 1, "Pending ref phải chặn double PUT, chỉ cho phép 1 request");
+  assert.equal(putReqs.length, 1, "Pending ref phải chặn double PUT");
 
   const putReq = takeRequest("/admin/vehicles/veh-101/amenities");
   const payload = JSON.parse(putReq.config.data);
   assert.deepEqual(payload.amenityIds.sort(), ["am1", "am2"].sort());
   assert.equal(payload.expectedRevision, "rev-1");
 
-  // Fulfill PUT 200 -> reload GET
   await act(async () => {
     fulfill(putReq, {
       amenities: [
@@ -422,7 +438,6 @@ test("DOM: VehicleAmenityEditor assign/clear và chống double-PUT", async () =
     });
   });
 
-  // Reload GET request
   const reloadGet = takeRequest("/admin/vehicles/veh-101/amenities");
   await act(async () => {
     fulfill(reloadGet, {
@@ -465,7 +480,6 @@ test("DOM: VehicleAmenityEditor 400 validation error giải phóng guard và gi�
     rejectWithStatus(putReq, 400, { message: "Amenity IDs invalid" });
   });
 
-  // Thông báo lỗi xuất hiện, nút không bị disable vô hạn, checkbox vẫn giữ
   assert.match(amenityForm.textContent, /Amenity IDs invalid/);
   assert.equal(checkboxes[0].checked, true, "Lựa chọn phải được bảo toàn");
   const submitBtn = amenityForm.querySelector('button[type="submit"]');
@@ -474,7 +488,7 @@ test("DOM: VehicleAmenityEditor 400 validation error giải phóng guard và gi�
   await unmount();
 });
 
-test("DOM: VehicleAmenityEditor 409 stale conflict reload fresh revision không false-success", async () => {
+test("UI-R03: VehicleAmenityEditor 409 stale conflict hiển thị lỗi, reload fresh revision và subsequent PUT gửi expectedRevision mới", async () => {
   const { container, unmount } = await renderAdminVehicles();
 
   await act(async () => {
@@ -483,21 +497,38 @@ test("DOM: VehicleAmenityEditor 409 stale conflict reload fresh revision không 
   await act(async () => {
     fulfill(takeRequest("/admin/vehicles/veh-101/amenities"), {
       amenities: [{ id: "am1", name: "Bluetooth" }],
-      revision: "rev-old",
+      revision: "rev-stale-initial",
     });
   });
 
-  const amenityForm = container.querySelector('form[aria-label="Tiện nghi xe"]');
+  let amenityForm = container.querySelector('form[aria-label="Tiện nghi xe"]');
+
+  // Submit PUT gây ra 409 conflict
   await act(async () => {
     amenityForm.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
   });
 
-  const putReq = takeRequest("/admin/vehicles/veh-101/amenities");
+  const putReq1 = takeRequest("/admin/vehicles/veh-101/amenities");
   await act(async () => {
-    rejectWithStatus(putReq, 409, { message: "Stale revision" });
+    rejectWithStatus(putReq1, 409, { message: "Stale revision" });
   });
 
-  // Phải kích hoạt reload GET để lấy revision mới
+  // Assert: Thông báo lỗi 409 xuất hiện rõ ràng, tuyệt đối không có false-success
+  assert.match(amenityForm.textContent, /Tiện nghi đã thay đổi bởi thao tác khác \(409\)/);
+  assert.doesNotMatch(amenityForm.textContent, /thành công/);
+
+  // Nút "Tải lại bản mới" xuất hiện
+  const reloadBtn = Array.from(amenityForm.querySelectorAll("button")).find(
+    (b) => b.textContent === "Tải lại bản mới",
+  );
+  assert.ok(reloadBtn, "Phải có nút Tải lại bản mới khi gặp 409");
+
+  // Click "Tải lại bản mới"
+  await act(async () => {
+    reloadBtn.click();
+  });
+
+  // GET reload trả về fresh revision và amenities cập nhật
   const refreshReq = takeRequest("/admin/vehicles/veh-101/amenities");
   await act(async () => {
     fulfill(refreshReq, {
@@ -505,16 +536,45 @@ test("DOM: VehicleAmenityEditor 409 stale conflict reload fresh revision không 
         { id: "am1", name: "Bluetooth" },
         { id: "am3", name: "Cửa sổ trời" },
       ],
-      revision: "rev-fresh",
+      revision: "rev-fresh-after-409",
     });
   });
 
-  // Sau khi reload, form nhận revision mới và hiển thị amenities mới
-  const updatedForm = container.querySelector('form[aria-label="Tiện nghi xe"]');
-  const updatedBoxes = updatedForm.querySelectorAll('input[type="checkbox"]');
-  assert.equal(updatedBoxes[0].checked, true); // am1
-  assert.equal(updatedBoxes[1].checked, false); // am2
-  assert.equal(updatedBoxes[2].checked, true); // am3
+  // Form mới đã nhận fresh revision
+  amenityForm = container.querySelector('form[aria-label="Tiện nghi xe"]');
+  const boxes = amenityForm.querySelectorAll('input[type="checkbox"]');
+  assert.equal(boxes[0].checked, true); // am1
+  assert.equal(boxes[1].checked, false); // am2
+  assert.equal(boxes[2].checked, true); // am3
+
+  // Subsequent PUT: thêm am2 và lưu tiếp
+  await act(async () => {
+    boxes[1].click();
+  });
+  await act(async () => {
+    amenityForm.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true }));
+  });
+
+  const putReq2 = takeRequest("/admin/vehicles/veh-101/amenities");
+  const payload2 = JSON.parse(putReq2.config.data);
+  assert.equal(
+    payload2.expectedRevision,
+    "rev-fresh-after-409",
+    "Subsequent PUT bắt buộc phải gửi fresh revision, không được dùng stale revision cũ",
+  );
+  assert.deepEqual(payload2.amenityIds.sort(), ["am1", "am2", "am3"].sort());
+
+  // Fulfill 200 cho subsequent PUT
+  await act(async () => {
+    fulfill(putReq2, {
+      amenities: [
+        { id: "am1", name: "Bluetooth" },
+        { id: "am2", name: "Camera lùi" },
+        { id: "am3", name: "Cửa sổ trời" },
+      ],
+      revision: "rev-final-success",
+    });
+  });
 
   await unmount();
 });
@@ -530,9 +590,106 @@ test("DOM: ApiVehiclesAdminPage fleet mode (Staff) không hiển thị amenity e
     fulfill(takeRequest("/me/branches"), ["br1"]);
   });
 
-  // Fleet mode chỉ có các nút Hoạt động / Bảo trì, không có form sửa hay amenity editor
   const amenityForm = mounted.container.querySelector('form[aria-label="Tiện nghi xe"]');
   assert.equal(amenityForm, null, "Staff fleet mode tuyệt đối không có amenity editor");
 
+  await mounted.unmount();
+});
+
+test("DOM: ApiVehicleDetailPage render đầy đủ tiện nghi dạng chips từ DTO backend", async () => {
+  const { MemoryRouter, Routes, Route } = await viteServer.ssrLoadModule("react-router-dom");
+  const mounted = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(
+        MemoryRouter,
+        { initialEntries: ["/vehicles/veh-101"] },
+        createElement(
+          Routes,
+          null,
+          createElement(Route, {
+            path: "/vehicles/:vehicleId",
+            element: createElement(ApiVehicleDetailPage),
+          }),
+        ),
+      ),
+    ),
+  );
+
+  await act(async () => {
+    fulfill(takeRequest("/vehicles/veh-101"), {
+      ...mockVehicles[0],
+      amenities: [
+        { id: "am1", name: "Bluetooth" },
+        { id: "am2", name: "Camera lùi" },
+      ],
+    });
+    fulfill(takeRequest("/vehicles/catalog"), mockCatalog);
+    fulfill(takeRequest("/vehicles/veh-101/reviews"), []);
+  });
+
+  // Kiểm tra section tiện nghi xuất hiện đầy đủ
+  assert.match(mounted.container.textContent, /Tiện nghi \(2\)/);
+  assert.match(mounted.container.textContent, /Bluetooth/);
+  assert.match(mounted.container.textContent, /Camera lùi/);
+
+  await mounted.unmount();
+});
+
+test("Homepage API uses real cards, one H1 and honest availability copy", async () => {
+  const { ApiHomePage } = await viteServer.ssrLoadModule("/src/pages/api/ApiScreens.jsx");
+  const { MemoryRouter } = await viteServer.ssrLoadModule("react-router-dom");
+  const mounted = await mount(createElement(AuthProvider, null,
+    createElement(MemoryRouter, null, createElement(ApiHomePage))));
+  await act(async () => {
+    fulfill(takeRequest("/vehicles"), [{ ...mockVehicles[0], amenities: [{ id: "am1", name: "Bluetooth" }] }]);
+    fulfill(takeRequest("/vehicles/catalog"), mockCatalog);
+  });
+  assert.equal(mounted.container.querySelectorAll("h1").length, 1);
+  const card = mounted.container.querySelector("article");
+  assert.match(card.textContent, /Bluetooth/);
+  assert.match(card.textContent, /Đang khai thác/);
+  assert.doesNotMatch(mounted.container.textContent, /Không tính phí ẩn|bảo đảm ngay/);
+  assert.equal(mounted.container.querySelector(".animate-pulse"), null);
+  const cta = Array.from(mounted.container.querySelectorAll("a")).find(link => link.textContent === "Xem toàn bộ xe ↗");
+  assert.equal(cta.getAttribute("href"), "/vehicles");
+  await mounted.unmount();
+});
+
+test("Shared vehicle card retains demo label separately from API state", async () => {
+  const { default: VehicleCard } = await viteServer.ssrLoadModule("/src/components/vehicle/VehicleCard.jsx");
+  const { MemoryRouter } = await viteServer.ssrLoadModule("react-router-dom");
+  const mounted = await mount(createElement(MemoryRouter, null,
+    createElement(VehicleCard, { vehicle: { ...mockVehicles[0], status: "ACTIVE", noLocalAsset: false, price: 100, amenities: ["Bluetooth"] } })));
+  assert.match(mounted.container.textContent, /Sẵn sàng/);
+  assert.match(mounted.container.textContent, /Bluetooth/);
+  await mounted.unmount();
+});
+
+test("Late save of an old vehicle cannot claim success on the new editor", async () => {
+  const second = { ...mockVehicles[0], id: "veh-202", name: "Second car", plate: "51A-20202" };
+  const mounted = await renderAdminVehicles([mockVehicles[0], second]);
+  const editButtons = mounted.container.querySelectorAll("article button");
+  await act(async () => editButtons[0].click());
+  await act(async () => fulfill(takeRequest("/admin/vehicles/veh-101/amenities"), {
+    amenities: [{ id: "am1", name: "Bluetooth" }], revision: "first-revision",
+  }));
+  const oldForm = mounted.container.querySelector('form[aria-label="Tiện nghi xe"]');
+  await act(async () => oldForm.dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+  const oldPut = takeRequest("/admin/vehicles/veh-101/amenities");
+  await act(async () => editButtons[1].click());
+  await act(async () => fulfill(takeRequest("/admin/vehicles/veh-202/amenities"), {
+    amenities: [{ id: "am2", name: "Camera lùi" }], revision: "second-revision",
+  }));
+  await act(async () => fulfill(oldPut, { amenities: [{ id: "am1", name: "Bluetooth" }], revision: "first-revision" }));
+  const lateReload = requests.find(request => !request.claimed && request.config.url === "/admin/vehicles/veh-202/amenities");
+  if (lateReload) {
+    lateReload.claimed = true;
+    await act(async () => fulfill(lateReload, { amenities: [{ id: "am2", name: "Camera lùi" }], revision: "second-revision" }));
+  }
+  const newForm = mounted.container.querySelector('form[aria-label="Tiện nghi xe"]');
+  assert.doesNotMatch(newForm.textContent, /Đã lưu tiện nghi thành công/);
+  assert.equal(newForm.querySelectorAll('input[type="checkbox"]')[1].checked, true);
   await mounted.unmount();
 });
