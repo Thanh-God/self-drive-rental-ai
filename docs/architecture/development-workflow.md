@@ -932,3 +932,7 @@ C8A is not accepted: caller env matrix checks untouched variables/any exception 
      - Sửa toàn bộ ví dụ hợp đồng API trong HANDOFF mới: `POST /api/v1/admin/staff-branches` với body `{"userId": "...", "branchId": "..."}`; `PATCH /api/v1/admin/accounts/{id}` với body `{"status": "...", "version": 0}`.
 - **Trạng thái**: C8A Follow-up **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu. DB người dùng tại 33385 và 3306 nguyên vẹn; frontend C8B giữ nguyên chờ gate mở.
 
+
+### C8A follow-up independent review — 12/10/2026 — PARTIAL / FAIL, Codex A
+
+Baseline7cc263e; preexisting12 blank-line deletions preserved. Acceptance .runtime/coordination-c8a-followup-review-20261012-104526/ACCEPTANCE.md. Independent unsandboxed matrix16/16 exit0 (sandbox attempt cleanup permission failure); reference160/live163 input hashes match. Saved verify106/0fail/0error/8skip and actual fat-JAR startup/MySQL XML3+4 evidence retained; not independently replayed live. Fixture eb25cfaa...412b82 exited. Required cleanup failure proof still simulates a boolean rather than actual cleanup; control mode emits misleading business PASS_SCOPED and unknown modes bypass preflight; JAR8188 ownership/occupied-port proof needs strengthening. Follow-up .runtime/coordination-c8a-final-guards-20261012/TASK.md addresses only remaining F01..F04. C8B gate CLOSED; no new live fixture, business change, data cleanup or push. This supersedes prior completion claim while preserving audit history.
