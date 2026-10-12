@@ -1020,3 +1020,7 @@ Userauthorizeddirectcompletion. Acceptance/HANDOFF/IMPLEMENTATION_NOTES .runtime
 ### C9 planning — 12/10/2026 — PLANNED, Codex A
 
 Plan .runtime/coordination-c9-plan-20261012-145304/PLAN.md at HEAD39ecc01 after C8 scoped PASS. Verified current catalog read-only and /admin/catalog routes to branches; brand/category/amenity tables already exist without version. Plan two sequential slices: C9A brand/category API+UI+MySQL/browser acceptance; then C9B amenities. Preserve existing schema/public catalog/FK; design revision conflict guard before implementation; no DELETE policy approval, C10 media/links, Location/AI/Map or agent launch implied. Mandatory source-bound new backend JAR and UI build, meaningful negative/pending/concurrency/RBAC/readback and final guards. Only planning docs changed; C9 not implemented or accepted. Preexisting workflow blank-line change preserved.
+
+### C9A handoff prepared — 12/10/2026 — READY, Codex A
+
+TASK .runtime/coordination-c9a-antigravity-20261012-151600/TASK.md from plan .runtime/coordination-c9-plan-20261012-145304/PLAN.md; baseline79be344, existing workflow blank-line change preserved. Antigravity scope is brand/category Admin API+UI and actual MySQL/browser proof only; amenities C9B gate CLOSED until C9A acceptance. Schema/public catalog/FK retained, no DELETE/policy/media/Location/AIMap or agent launch implied. Concurrency revision contract checkpoint and full source/JAR/frontend-build provenance required. User forwards prompt; no messaging/control, implementation or push performed by preparing TASK.
