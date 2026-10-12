@@ -944,7 +944,6 @@ Baseline7cc263e; preexisting12 blank-line deletions preserved. Acceptance .runti
      - Ghi nhận câu lệnh cụ thể không rút gọn; bảo toàn thay đổi blank-line hiện có.
 - **Trạng thái**: C8A Final Guards **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu. DB người dùng tại 33385 và 3306 nguyên vẹn; frontend C8B giữ nguyên chờ gate mở.
 
-
 ### C8A final independent acceptance — 12/10/2026 — PASS scoped, Codex A
 
 Acceptance .runtime/coordination-c8a-final-review-20261012-110646/ACCEPTANCE.md; implementation160d636 clean at review. Independent matrix18/18 exit0; fresh isolatedMySQL Account3+Route4 (no failure/error/skip), newfatJAR startup/login/protectedGET/ownedcleanup PASS;163 sourceinputs no drift and74JAR entries match. Mandatory verify evidence retained unchanged backend106total98executed8optionalskips. Fixture kltn-c8a-ag-2eeea3d267ed exited,volumeKEEP,ports8188/33626 free; originalMySQL knownidentity running. Report-only discrepancies in supplied HANDOFF (test/matrix names,mode names,login and migration names) corrected from actual source/XML/readback in ACCEPTANCE; do not use narrative as evidence. C8A scope accepted; C8B gate OPEN via appended TASK gateupdate, awaiting user-forwarded prompt. No C8B launch,policy approval,push/reset/prune or whole-systemPASS implied.
@@ -975,7 +974,37 @@ Acceptance .runtime/coordination-c8b-review-20261012-121002/ACCEPTANCE.md; HEAD 
      - Toàn bộ HTTP errors (3 calls: 409, 500, 409) và console issues đều được phân loại và kiểm chứng 100% là expected errors.
 - **Trạng thái**: C8B **PASS scoped**. Không sửa backend hay migration (fat JAR và 163 backend manifest inputs giữ nguyên); fixture container `kltn-c8b-browser-*` đã dừng, volume retained; cổng 8080/5173/33626 đã giải phóng; DB người dùng 33385 và 3306 nguyên vẹn.
 
-
 ### C8B Antigravity independent review — 12/10/2026 — FAIL / PARTIAL, Codex A
 
 Acceptance .runtime/coordination-c8b-antigravity-review-20261012-125354/ACCEPTANCE.md; HEAD2b78e3b, preexisting2blank-line deletions preserved. Independent54/54frontendtests,lint/demoAPIbuild and18/18guard PASS; C8A163manifest0drift retained. Savedbrowser40assertions partial; missingactualStaffUI401session/loginproof and requiredinvalid/RBAC/statuspendingcases. Runner prematurelywritesPASS beforecommoncleanup, ignoresfailureobject/nativeexit and does notinvalidateonrestorefailure; previewdist/sourceprovenance absent. Follow-up .runtime/coordination-c8b-final-proof-20261012-125620/TASK.md handles C8B-F01..F04only, preserves provenUI/tests. No reviewer livefixture/data cleanup/push, C8B/C8 not complete.
+
+### C8B final proof implementation — 12/10/2026 — PASS scoped, Antigravity
+
+- **Mục tiêu**: Xử lý triệt để 4 findings C8B-F01..F04 theo `.runtime/coordination-c8b-final-proof-20261012-125620/TASK.md` và `.runtime/coordination-c8b-antigravity-review-20261012-125354/ACCEPTANCE.md`.
+- **Nội dung thực hiện**:
+  1. `C8B-F01 (Runner exit code, common cleanup & restore failure invalidation)`:
+     - Tái cấu trúc `run-c8b-browser.ps1`: Chuyển việc quyết định trạng thái `Status = 'PASS_SCOPED'` và exit code xuống sau khối common `finally`. Kiểm tra kết quả trả về của `Invoke-OwnedProcessCleanup`, native exit code và inspect trạng thái container khi stop, snapshot đối chiếu phục hồi caller environment.
+     - Bảo toàn nguyên vẹn `$originalError` từ try block qua khối finally.
+     - Hỗ trợ các control probes: `Normal` (CONTROL_ONLY), `Exception`, `CleanupFailure`, `ContainerFailure`, `RestoreFailure`.
+     - Thêm giới hạn bộ nhớ JVM `-Xms128m -Xmx512m` cho Java process Windows ngăn chặn cạn kiệt virtual space.
+  2. `C8B-F02 & C8B-F03 (Browser Session Proof & Adverse Cases)`:
+     - Mở rộng `verify-c8b-browser.cjs`: 42/42 checks PASS bao gồm:
+       - Invalid create 400 (mật khẩu ngắn) và SQL không tạo dòng.
+       - Staff direct Admin URL/API negative (403, chuyển hướng).
+       - Non-Staff và invalid branch assignment negative (400, không ghi vào SQL).
+       - Status change pending button busy and exact 1 synchronous PATCH guard proof.
+       - Status failure recovery (mock 500 -> guard release).
+       - Staff browser lifecycle: staff truy cập `/staff/queue`, bị 401 khi tài khoản bị khóa, xóa token khỏi `localStorage`, chuyển hướng về `/login`, locked staff login fail trên form UI, sau khi unlock UI login mới cấp token 2 và bảo toàn danh sách chi nhánh phân công.
+       - Inactive branch label hiển thị `(tạm ngừng)`.
+       - Bulk GET 500 retry button recovery.
+       - Stale 409 conflict handling và refetch reload lock success.
+       - Phân loại và kiểm chứng 100% HTTP/console errors là expected.
+  3. `C8B-F04 (Reference Manifest & Matrix Guards)`:
+     - Tạo `c8b-reference-manifest.json` đóng băng SHA256 của 12 transitive inputs (frontend sources, scripts browser, build dist, helpers).
+     - `test-c8b-browser-guards.ps1`: 35/35 checks PASS (Exit 0) tại `evidence/matrix-guards/matrix-results.json`.
+  4. `Unit tests, Lint & Build`:
+     - `npm test -- --test-concurrency=1`: 54/54 tests PASS (Exit 0).
+     - `npm run lint`: 0 errors/warnings (Exit 0).
+     - `npm run build`: Demo và API mode build thành công (Exit 0).
+- **Trạng thái**: C8B Final Proof **PASS scoped**. Không sửa backend fat JAR hoặc Flyway migrations (163 backend manifest inputs giữ nguyên); fixture container `kltn-c8b-browser-d725b4e2542f` đã dừng an toàn, volume lưu giữ; các cổng 8080/5173/33626 đã giải phóng; DB người dùng 33385 và 3306 nguyên vẹn.
+

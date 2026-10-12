@@ -56,19 +56,60 @@ try {
     Refused { & $runner -EvidenceDir $targetUnsupported -ControlProbe 'UnsupportedMode' } '[PREFLIGHT_GUARD]'
     Check 'Unsupported ControlProbe refused before directory creation' (-not (Test-Path $targetUnsupported))
 
-    # 2. Existing evidence directory refused
-    $targetExisting = Join-Path $EvidenceDir 'existing-dir'
-    New-Item -ItemType Directory -Path $targetExisting | Out-Null
-    Set-Content (Join-Path $targetExisting 'sentinel.txt') 'keep'
-    Refused { & $runner -EvidenceDir $targetExisting } '[PREFLIGHT_REFUSAL]'
-    Check 'Existing evidence directory refused and content unmodified' ((Get-Content (Join-Path $targetExisting 'sentinel.txt')) -eq 'keep')
+    # 2. Unsupported shell version refused before any mutation
+    $targetUnsupportedShell = Join-Path $EvidenceDir 'unsupported-shell'
+    $shellOutput = & powershell.exe -NoProfile -Command "
+        `$env:TEST_OVERRIDE_PS_EDITION = 'Core'
+        try {
+            & '$runner' -EvidenceDir '$targetUnsupportedShell'
+        } catch {
+            Write-Output `$_.Exception.Message
+        }
+    "
+    Check 'Unsupported shell version refused with UNSUPPORTED_SHELL' ($shellOutput.Contains('[UNSUPPORTED_SHELL]'))
+    Check 'Unsupported shell left no evidence directory' (-not (Test-Path $targetUnsupportedShell))
 
-    # 3. Non-runtime evidence directory refused
-    $outsideTarget = Join-Path $env:TEMP ("c8b-guard-" + [Guid]::NewGuid().ToString('N'))
+    # 3. Canonical containment: outside repository runtime refused
+    $outsideTarget = Join-Path $env:TEMP ("c8b-outside-" + [Guid]::NewGuid().ToString('N'))
     Refused { & $runner -EvidenceDir $outsideTarget } '[PREFLIGHT_REFUSAL]'
     Check 'Outside runtime evidence directory refused' (-not (Test-Path $outsideTarget))
 
-    # 4. Port occupied refused before spawn (test port 8080)
+    # 4. Canonical containment: sibling prefix directory refused (.runtime-sibling)
+    $siblingTarget = Join-Path $repo ('.runtime-sibling-' + [Guid]::NewGuid().ToString('N'))
+    Refused { & $runner -EvidenceDir $siblingTarget } '[PREFLIGHT_REFUSAL]'
+    Check 'Sibling prefix evidence directory refused' (-not (Test-Path $siblingTarget))
+
+    # 5. Canonical containment: nonexistent parent directory refused
+    $nonexistentTarget = "C:\nonexistent-parent-" + [Guid]::NewGuid().ToString('N') + "\evidence"
+    Refused { & $runner -EvidenceDir $nonexistentTarget } '[PREFLIGHT_REFUSAL]'
+    Check 'Nonexistent parent evidence directory refused' (-not (Test-Path $nonexistentTarget))
+
+    # 6. Existing evidence directory refused: empty directory
+    $emptyTarget = Join-Path $EvidenceDir 'existing-empty-dir'
+    New-Item -ItemType Directory -Path $emptyTarget | Out-Null
+    Refused { & $runner -EvidenceDir $emptyTarget } '[PREFLIGHT_REFUSAL]'
+    $emptyItems = @(Get-ChildItem -LiteralPath $emptyTarget)
+    Check 'Existing empty directory refused and remains empty' ($emptyItems.Count -eq 0)
+
+    # 7. Existing evidence directory refused: directory with summary
+    $summaryTarget = Join-Path $EvidenceDir 'existing-summary-dir'
+    New-Item -ItemType Directory -Path $summaryTarget | Out-Null
+    Set-Content (Join-Path $summaryTarget 'summary.json') '{"Status":"EXISTING"}'
+    $initialSummaryHash = (Get-FileHash (Join-Path $summaryTarget 'summary.json')).Hash
+    Refused { & $runner -EvidenceDir $summaryTarget } '[PREFLIGHT_REFUSAL]'
+    $afterSummaryHash = (Get-FileHash (Join-Path $summaryTarget 'summary.json')).Hash
+    Check 'Existing summary directory refused and content unmodified' ($initialSummaryHash -eq $afterSummaryHash)
+
+    # 8. Existing evidence directory refused: directory with session artifacts
+    $sessionTarget = Join-Path $EvidenceDir 'existing-session-dir'
+    New-Item -ItemType Directory -Path $sessionTarget | Out-Null
+    Set-Content (Join-Path $sessionTarget 'session.txt') 'old-session-data'
+    $initialSessionHash = (Get-FileHash (Join-Path $sessionTarget 'session.txt')).Hash
+    Refused { & $runner -EvidenceDir $sessionTarget } '[PREFLIGHT_REFUSAL]'
+    $afterSessionHash = (Get-FileHash (Join-Path $sessionTarget 'session.txt')).Hash
+    Check 'Existing session directory refused and content unmodified' ($initialSessionHash -eq $afterSessionHash)
+
+    # 9. Port occupied refused before spawn (port 8080)
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 8080)
     $portTarget = Join-Path $EvidenceDir 'occupied-port'
     try {
@@ -79,7 +120,12 @@ try {
         $listener.Stop()
     }
 
-    # 5. Caller Sentinel Survival & Adverse Cleanup Failure Injection
+    # 10. Missing dependency refused fail-closed
+    $missingTarget = Join-Path $EvidenceDir 'missing-dep'
+    Refused { & $runner -EvidenceDir $missingTarget -AcceptedBuildDir '.runtime/nonexistent-build-evidence' } '[DEPENDENCY_GUARD]'
+    Check 'Missing dependency refused fail-closed' (-not (Test-Path $missingTarget))
+
+    # 11. Caller Sentinel Survival & Adverse Cleanup Failure Injection through common finally
     $sentinel = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 300') -WindowStyle Hidden -PassThru
     $null = $sentinel.Handle
 
@@ -93,10 +139,49 @@ try {
     Check 'Runner failed closed on injected cleanup failure' ($adverseCaught.Contains('[RUNNER_FAILURE]'))
     Check 'Caller sentinel remained alive despite runner cleanup failure' (-not $sentinel.HasExited)
 
-    $adverseReadback = Get-Content (Join-Path $adverseTarget 'adverse-cleanup.json') -Raw | ConvertFrom-Json
-    Check 'Adverse cleanup recorded owned process survival' (-not $adverseReadback.HasExited)
+    $adverseSummary = Get-Content (Join-Path $adverseTarget 'summary.json') -Raw | ConvertFrom-Json
+    Check 'Adverse cleanup summary recorded FAILED status' ($adverseSummary.Status -eq 'FAILED')
+    Check 'Adverse cleanup summary recorded CleanupPassed=false' ($adverseSummary.CleanupPassed -eq $false)
 
-    # 6. ControlMode Explicit Semantics
+    # 12. Adverse Container Failure through common finally
+    $adverseContainerTarget = Join-Path $EvidenceDir 'adverse-container'
+    $containerCaught = ''
+    try {
+        & $runner -EvidenceDir $adverseContainerTarget -ControlProbe 'ContainerFailure'
+    } catch {
+        $containerCaught = $_.Exception.Message
+    }
+    Check 'Adverse container stop failure caught fail-closed' ($containerCaught.Contains('[CONTAINER_FAILURE]'))
+    $containerSummary = Get-Content (Join-Path $adverseContainerTarget 'summary.json') -Raw | ConvertFrom-Json
+    Check 'Adverse container summary recorded FAILED status' ($containerSummary.Status -eq 'FAILED')
+    Check 'Adverse container summary recorded CleanupPassed=false' ($containerSummary.CleanupPassed -eq $false)
+
+    # 13. Adverse Environment Restore Failure through common finally
+    $adverseRestoreTarget = Join-Path $EvidenceDir 'adverse-restore'
+    $restoreCaught = ''
+    try {
+        & $runner -EvidenceDir $adverseRestoreTarget -ControlProbe 'RestoreFailure'
+    } catch {
+        $restoreCaught = $_.Exception.Message
+    }
+    Check 'Adverse environment restore caught fail-closed' ($restoreCaught.Contains('[RESTORE_FAILURE]'))
+    $restoreSummary = Get-Content (Join-Path $adverseRestoreTarget 'summary.json') -Raw | ConvertFrom-Json
+    Check 'Adverse restore summary recorded FAILED status' ($restoreSummary.Status -eq 'FAILED')
+    Check 'Adverse restore summary recorded CleanupPassed=false' ($restoreSummary.CleanupPassed -eq $false)
+
+    # 14. Original exception preserved through common finally
+    $exceptionTarget = Join-Path $EvidenceDir 'control-exception'
+    $exceptionCaught = ''
+    try {
+        & $runner -EvidenceDir $exceptionTarget -ControlProbe 'Exception'
+    } catch {
+        $exceptionCaught = $_.Exception.Message
+    }
+    Check 'Original exception preserved through common finally' ($exceptionCaught.Contains('[CONTROL_EXCEPTION]'))
+    $exceptionSummary = Get-Content (Join-Path $exceptionTarget 'summary.json') -Raw | ConvertFrom-Json
+    Check 'Exception summary recorded FAILED status' ($exceptionSummary.Status -eq 'FAILED')
+
+    # 15. ControlMode Normal explicit semantics
     $controlTarget = Join-Path $EvidenceDir 'control-semantics'
     & $runner -EvidenceDir $controlTarget -ControlProbe 'Normal'
     $controlSummary = Get-Content (Join-Path $controlTarget 'summary.json') -Raw | ConvertFrom-Json
@@ -105,8 +190,9 @@ try {
     Check 'ControlMode records BrowserVerified=false' ($controlSummary.BrowserVerified -eq $false)
     Check 'ControlMode does not invent container' ($null -eq $controlSummary.Container)
     Check 'ControlMode does not invent volume' ($null -eq $controlSummary.Volume)
+    Check 'ControlMode records CleanupPassed=true' ($controlSummary.CleanupPassed -eq $true)
 
-    # 7. Caller Environment Snapshot & Restore (Existing vs Absent x Normal vs Exception)
+    # 16. Caller Environment Snapshot & Restore (Existing vs Absent x Normal vs Exception)
     foreach ($presence in @('existing', 'absent')) {
         foreach ($v in $variables) {
             [Environment]::SetEnvironmentVariable($v, $(if ($presence -eq 'existing') { 'CALLER_' + $v } else { $null }), 'Process')

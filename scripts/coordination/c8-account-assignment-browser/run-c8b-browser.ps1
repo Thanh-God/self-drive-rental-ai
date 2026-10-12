@@ -17,15 +17,18 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
-$validProbes = @('', 'Normal', 'Exception', 'CleanupFailure', 'RestoreFailure')
+$validProbes = @('', 'Normal', 'Exception', 'CleanupFailure', 'RestoreFailure', 'ContainerFailure')
 if (-not [string]::IsNullOrEmpty($ControlProbe) -and $validProbes -notcontains $ControlProbe) {
     throw "[PREFLIGHT_GUARD] Unsupported ControlProbe/ControlMode: $ControlProbe"
 }
 
-$repo = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
-if ($PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major -ne 5) {
+$edition = if ($env:TEST_OVERRIDE_PS_EDITION) { $env:TEST_OVERRIDE_PS_EDITION } else { $PSVersionTable.PSEdition }
+$major = if ($env:TEST_OVERRIDE_PS_MAJOR) { [int]$env:TEST_OVERRIDE_PS_MAJOR } else { $PSVersionTable.PSVersion.Major }
+if ($edition -ne 'Desktop' -or $major -ne 5) {
     throw '[UNSUPPORTED_SHELL] Windows PowerShell 5.1 required'
 }
+
+$repo = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
 
 function FullPath([string]$path) {
     if ([IO.Path]::IsPathRooted($path)) {
@@ -65,6 +68,21 @@ $expectedJarHash = '7FF54151D4301CE870C52116B55643A3FF1283BACAEF1182621DFC8F052A
 foreach ($p in @($helper, $fixtureHelper, $browserEntry, $controls, $vite, $acceptedSource, $acceptedJar, (Join-Path $playwright 'index.js'))) {
     if (-not (Test-Path -LiteralPath $p -PathType Leaf)) {
         throw "[DEPENDENCY_GUARD] Missing required file: $p"
+    }
+}
+
+$c8bManifestFile = Join-Path $PSScriptRoot 'c8b-reference-manifest.json'
+if (Test-Path -LiteralPath $c8bManifestFile) {
+    $c8bManifest = Get-Content -LiteralPath $c8bManifestFile -Raw | ConvertFrom-Json
+    foreach ($prop in $c8bManifest.PSObject.Properties) {
+        $file = Join-Path $repo $prop.Name
+        if (-not (Test-Path $file)) {
+            throw "[PREFLIGHT_GUARD] Missing dependency: $($prop.Name)"
+        }
+        $h = (Get-FileHash $file).Hash
+        if ($h -ne $prop.Value) {
+            throw "[PREFLIGHT_GUARD] Source drift: $($prop.Name) expected $($prop.Value), actual $h"
+        }
     }
 }
 
@@ -164,6 +182,10 @@ if (-not $ControlProbe) {
 New-Item -ItemType Directory -Path $EvidenceDir | Out-Null
 $privateFile = Join-Path $EvidenceDir 'mysql.private.env'
 
+$originalError = $null
+$cleanupError = $null
+$envRestoreError = $null
+
 try {
     if ($PreflightOnly) {
         [pscustomobject]@{
@@ -181,196 +203,237 @@ try {
         $null = $controlProc.Handle
         $processes += ,$controlProc
 
-        if ($ControlProbe -eq 'CleanupFailure') {
-            $cleanupRes = Invoke-OwnedProcessCleanup -OwnedProcesses @($controlProc) -CustomStopProcess { param($p) throw 'Injected cleanup failure' }
-            [pscustomobject]@{
-                HasExited = $controlProc.HasExited
-                ProcessId = $controlProc.Id
-                CleanupResult = $cleanupRes
-            } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'adverse-cleanup.json')
-            if (-not $cleanupRes.Success -or $cleanupRes.CleanupFailed) {
-                throw "[RUNNER_FAILURE] Injected cleanup failure on owned processes"
-            }
-        }
-
         if ($ControlProbe -eq 'Exception') {
             throw '[CONTROL_EXCEPTION] Injected exception after control spawn'
         }
+    } else {
+        $password = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
+        $seedPassword = [Guid]::NewGuid().ToString('N') + 'Aa9!'
+        $token = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
 
-        [pscustomobject]@{
-            Status = 'CONTROL_ONLY'
-            BusinessVerified = $false
-            BrowserVerified = $false
-            ControlProbe = $ControlProbe
-            Container = $null
-            Volume = $null
-        } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
-        return
-    }
-
-    $password = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
-    $seedPassword = [Guid]::NewGuid().ToString('N') + 'Aa9!'
-    $token = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
-
-    [IO.File]::WriteAllLines($privateFile, @("MYSQL_ROOT_PASSWORD=$password", "MYSQL_DATABASE=$schema"), [Text.UTF8Encoding]::new($false))
-    & docker run -d --name $container --publish "127.0.0.1:${mysqlPort}:3306" --env-file $privateFile --mount "source=${volume},target=/var/lib/mysql" mysql:8.4.11 | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw '[DOCKER_RUN_FAILURE] Fixture start failed'
-    }
-    $owned = $true
-
-    $ready = $false
-    for ($i = 0; $i -lt 60; $i++) {
-        try {
-            $probe = @(& docker exec -e "MYSQL_PWD=$password" $container mysql -uroot --batch --skip-column-names -e "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$schema';" 2>&1)
-            if ($LASTEXITCODE -eq 0 -and ($probe -join '').Trim() -eq '1') {
-                $ready = $true
-                break
-            }
-        } catch {}
-        Start-Sleep -Seconds 1
-    }
-    if (-not $ready) {
-        throw '[MYSQL_READY_TIMEOUT] Final schema not ready'
-    }
-
-    & docker exec -e "MYSQL_PWD=$password" $container mysql -uroot -e "CREATE DATABASE $markerSchema; CREATE TABLE $markerSchema.__kdrive_test_fixture_marker(id INT PRIMARY KEY, target_schema VARCHAR(255), marker_token VARCHAR(255)); INSERT INTO $markerSchema.__kdrive_test_fixture_marker VALUES(1, '$schema', '$token');" | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw '[SQL_FAILURE] Marker creation failed'
-    }
-
-    $env:JAVA_HOME = 'E:/Tools/Java/jdk-21.0.12.1+1'
-    $env:PORT = '8080'
-    $env:DB_URL = "jdbc:mysql://127.0.0.1:${mysqlPort}/${schema}?connectionTimeZone=UTC"
-    $env:DB_USER = 'root'
-    $env:DB_PASSWORD = $password
-    $env:JWT_SECRET = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
-    $env:FRONTEND_ORIGIN = 'http://127.0.0.1:5173'
-    $env:SEED_ENABLED = 'true'
-    $env:SEED_PASSWORD = $seedPassword
-    [Environment]::SetEnvironmentVariable('SPRING_PROFILES_ACTIVE', $null, 'Process')
-
-    $java = Join-Path $env:JAVA_HOME 'bin/java.exe'
-    $backend = Start-Process $java -ArgumentList @('-jar', $acceptedJar) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'backend.log') -RedirectStandardError (Join-Path $EvidenceDir 'backend-error.log')
-    $null = $backend.Handle
-    $processes += ,$backend
-
-    $ready = $false
-    for ($i = 0; $i -lt 90; $i++) {
-        if ($backend.HasExited) {
-            throw '[BACKEND_FAILURE] Owned backend exited prematurely'
+        [IO.File]::WriteAllLines($privateFile, @("MYSQL_ROOT_PASSWORD=$password", "MYSQL_DATABASE=$schema"), [Text.UTF8Encoding]::new($false))
+        & docker run -d --name $container --publish "127.0.0.1:${mysqlPort}:3306" --env-file $privateFile --mount "source=${volume},target=/var/lib/mysql" mysql:8.4.11 | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw '[DOCKER_RUN_FAILURE] Fixture start failed'
         }
-        try {
-            if ((Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8080/api/v1/vehicles' -TimeoutSec 2).StatusCode -eq 200) {
-                $ready = $true
-                break
-            }
-        } catch {}
-        Start-Sleep -Seconds 1
-    }
-    if (-not $ready) {
-        throw '[BACKEND_TIMEOUT] Backend API unavailable'
-    }
+        $owned = $true
 
-    for ($i = 0; $i -lt 10; $i++) {
-        $pProbe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 5173)
-        $free = $false
-        try {
-            $pProbe.Start()
-            $free = $true
-        } catch {} finally {
-            $pProbe.Stop()
+        $ready = $false
+        for ($i = 0; $i -lt 120; $i++) {
+            try {
+                $probe = @(& docker exec -e "MYSQL_PWD=$password" $container mysql -uroot --batch --skip-column-names -e "SELECT COUNT(*) FROM information_schema.schemata WHERE schema_name='$schema';" 2>&1)
+                if ($LASTEXITCODE -eq 0 -and ($probe -join '').Trim() -eq '1') {
+                    $ready = $true
+                    break
+                }
+            } catch {}
+            Start-Sleep -Seconds 1
         }
-        if ($free) { break }
+        if (-not $ready) {
+            throw '[MYSQL_READY_TIMEOUT] Final schema not ready'
+        }
+
+        & docker exec -e "MYSQL_PWD=$password" $container mysql -uroot -e "CREATE DATABASE $markerSchema; CREATE TABLE $markerSchema.__kdrive_test_fixture_marker(id INT PRIMARY KEY, target_schema VARCHAR(255), marker_token VARCHAR(255)); INSERT INTO $markerSchema.__kdrive_test_fixture_marker VALUES(1, '$schema', '$token');" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            throw '[SQL_FAILURE] Marker creation failed'
+        }
+
+        $env:JAVA_HOME = 'E:/Tools/Java/jdk-21.0.12.1+1'
+        $env:PORT = '8080'
+        $env:DB_URL = "jdbc:mysql://127.0.0.1:${mysqlPort}/${schema}?connectionTimeZone=UTC"
+        $env:DB_USER = 'root'
+        $env:DB_PASSWORD = $password
+        $env:JWT_SECRET = [Guid]::NewGuid().ToString('N') + [Guid]::NewGuid().ToString('N')
+        $env:FRONTEND_ORIGIN = 'http://127.0.0.1:5173'
+        $env:SEED_ENABLED = 'true'
+        $env:SEED_PASSWORD = $seedPassword
+        [Environment]::SetEnvironmentVariable('SPRING_PROFILES_ACTIVE', $null, 'Process')
+
+        for ($i = 0; $i -lt 30; $i++) {
+            $p8080 = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 8080)
+            $free = $false
+            try {
+                $p8080.Start()
+                $free = $true
+            } catch {} finally {
+                $p8080.Stop()
+            }
+            if ($free) { break }
+            Start-Sleep -Milliseconds 500
+        }
+
+        for ($i = 0; $i -lt 30; $i++) {
+            $tcp = [Net.Sockets.TcpClient]::new()
+            $connected = $false
+            try {
+                $tcp.Connect('127.0.0.1', $mysqlPort)
+                $connected = $tcp.Connected
+            } catch {} finally {
+                $tcp.Dispose()
+            }
+            if ($connected) { break }
+            Start-Sleep -Milliseconds 500
+        }
+
+        $java = Join-Path $env:JAVA_HOME 'bin/java.exe'
+        $backend = Start-Process $java -ArgumentList @('-Xms128m', '-Xmx512m', '-jar', $acceptedJar) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'backend.log') -RedirectStandardError (Join-Path $EvidenceDir 'backend-error.log')
+        $null = $backend.Handle
+        $processes += ,$backend
+
+        $ready = $false
+        for ($i = 0; $i -lt 90; $i++) {
+            if ($backend.HasExited) {
+                throw '[BACKEND_FAILURE] Owned backend exited prematurely'
+            }
+            try {
+                if ((Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:8080/api/v1/vehicles' -TimeoutSec 2).StatusCode -eq 200) {
+                    $ready = $true
+                    break
+                }
+            } catch {}
+            Start-Sleep -Seconds 1
+        }
+        if (-not $ready) {
+            throw '[BACKEND_TIMEOUT] Backend API unavailable'
+        }
+
+        for ($i = 0; $i -lt 10; $i++) {
+            $pProbe = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 5173)
+            $free = $false
+            try {
+                $pProbe.Start()
+                $free = $true
+            } catch {} finally {
+                $pProbe.Stop()
+            }
+            if ($free) { break }
+            Start-Sleep -Milliseconds 500
+        }
+
+        $env:VITE_DATA_MODE = 'api'
+        $env:VITE_API_BASE_URL = '/api/v1'
+        $front = Start-Process (Get-Command node.exe).Source -ArgumentList @($vite, 'preview', '--host', '127.0.0.1', '--port', '5173', '--strictPort') -WorkingDirectory $frontend -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'frontend.log') -RedirectStandardError (Join-Path $EvidenceDir 'frontend-error.log')
+        $null = $front.Handle
+        $processes += ,$front
         Start-Sleep -Milliseconds 500
-    }
 
-    $env:VITE_DATA_MODE = 'api'
-    $env:VITE_API_BASE_URL = '/api/v1'
-    $front = Start-Process (Get-Command node.exe).Source -ArgumentList @($vite, 'preview', '--host', '127.0.0.1', '--port', '5173', '--strictPort') -WorkingDirectory $frontend -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'frontend.log') -RedirectStandardError (Join-Path $EvidenceDir 'frontend-error.log')
-    $null = $front.Handle
-    $processes += ,$front
-    Start-Sleep -Milliseconds 500
-
-    $ready = $false
-    for ($i = 0; $i -lt 45; $i++) {
-        if ($front.HasExited) {
-            throw '[FRONTEND_FAILURE] Vite exited prematurely'
-        }
-        try {
-            if ((Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:5173/' -TimeoutSec 2).StatusCode -eq 200) {
-                $ready = $true
-                break
+        $ready = $false
+        for ($i = 0; $i -lt 45; $i++) {
+            if ($front.HasExited) {
+                throw '[FRONTEND_FAILURE] Vite exited prematurely'
             }
-        } catch {}
-        Start-Sleep -Seconds 1
+            try {
+                if ((Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:5173/' -TimeoutSec 2).StatusCode -eq 200) {
+                    $ready = $true
+                    break
+                }
+            } catch {}
+            Start-Sleep -Seconds 1
+        }
+        if (-not $ready) {
+            throw '[FRONTEND_TIMEOUT] Frontend preview unavailable'
+        }
+
+        $env:C8B_BASE_URL = 'http://127.0.0.1:5173'
+        $env:C8B_API_BASE_URL = 'http://127.0.0.1:8080/api/v1'
+        $env:C8B_CONTAINER = $container
+        $env:C8B_SCHEMA = $schema
+        $env:C8B_MARKER_SCHEMA = $markerSchema
+        $env:C8B_MARKER_TOKEN = $token
+        $env:C8B_DB_PASSWORD = $password
+        $env:C8B_SEED_PASSWORD = $seedPassword
+        $env:C8B_PLAYWRIGHT_MODULE = $playwright
+        $env:C8B_EVIDENCE_DIR = $EvidenceDir
+
+        $browser = Start-Process (Get-Command node.exe).Source -ArgumentList @($browserEntry) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'browser.log') -RedirectStandardError (Join-Path $EvidenceDir 'browser-error.log')
+        $null = $browser.Handle
+        $processes += ,$browser
+
+        if (-not $browser.WaitForExit(180000)) {
+            throw '[BROWSER_TIMEOUT] Browser test did not complete within 3 minutes'
+        }
+        if ($browser.ExitCode -ne 0) {
+            throw "[BROWSER_FAILURE] Browser test exited with code $($browser.ExitCode)"
+        }
+        $browserPassed = $true
     }
-    if (-not $ready) {
-        throw '[FRONTEND_TIMEOUT] Frontend preview unavailable'
-    }
 
-    $env:C8B_BASE_URL = 'http://127.0.0.1:5173'
-    $env:C8B_API_BASE_URL = 'http://127.0.0.1:8080/api/v1'
-    $env:C8B_CONTAINER = $container
-    $env:C8B_SCHEMA = $schema
-    $env:C8B_MARKER_SCHEMA = $markerSchema
-    $env:C8B_MARKER_TOKEN = $token
-    $env:C8B_DB_PASSWORD = $password
-    $env:C8B_SEED_PASSWORD = $seedPassword
-    $env:C8B_PLAYWRIGHT_MODULE = $playwright
-    $env:C8B_EVIDENCE_DIR = $EvidenceDir
-
-    $browser = Start-Process (Get-Command node.exe).Source -ArgumentList @($browserEntry) -WorkingDirectory $repo -WindowStyle Hidden -PassThru -RedirectStandardOutput (Join-Path $EvidenceDir 'browser.log') -RedirectStandardError (Join-Path $EvidenceDir 'browser-error.log')
-    $null = $browser.Handle
-    $processes += ,$browser
-
-    if (-not $browser.WaitForExit(180000)) {
-        throw '[BROWSER_TIMEOUT] Browser test did not complete within 3 minutes'
-    }
-    if ($browser.ExitCode -ne 0) {
-        throw "[BROWSER_FAILURE] Browser test exited with code $($browser.ExitCode)"
-    }
-    $browserPassed = $true
-
-    [pscustomobject]@{
-        Status = 'PASS_SCOPED'
-        BusinessVerified = $true
-        BrowserVerified = $true
-        Container = $container
-        Volume = $volume
-        Schema = $schema
-        MysqlPort = $mysqlPort
-        CleanupPassed = $true
-    } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
-
+} catch {
+    $originalError = $_
 } finally {
     $cleanupLog = [Collections.Generic.List[string]]::new()
     $logScript = { param($msg) $cleanupLog.Add($msg) }
 
     try {
         if ($processes.Count -gt 0) {
-            Invoke-OwnedProcessCleanup -OwnedProcesses $processes -LogAction $logScript
+            $customStop = $null
+            if ($ControlProbe -eq 'CleanupFailure') {
+                $customStop = { param($p) throw '[INJECTED_CLEANUP_FAILURE] Injected owned process cleanup failure' }
+            }
+            $cleanupRes = if ($customStop) {
+                Invoke-OwnedProcessCleanup -OwnedProcesses $processes -LogAction $logScript -CustomStopProcess $customStop
+            } else {
+                Invoke-OwnedProcessCleanup -OwnedProcesses $processes -LogAction $logScript
+            }
+            if (-not $cleanupRes.Success -or $cleanupRes.CleanupFailed) {
+                $cleanupPassed = $false
+                if (-not $cleanupError) {
+                    $cleanupError = '[RUNNER_FAILURE] Injected cleanup failure on owned processes'
+                }
+            }
         }
     } catch {
         $cleanupPassed = $false
         $cleanupLog.Add("Process cleanup failed: $($_.Exception.Message)")
+        if (-not $cleanupError) {
+            $cleanupError = $_
+        }
     }
 
-    if ($owned -and -not [string]::IsNullOrEmpty($container)) {
-        try {
-            & docker stop $container | Out-Null
-            $cleanupLog.Add("Stopped fixture container $container (volume $volume retained)")
-        } catch {
-            $cleanupLog.Add("Failed to stop container: $($_.Exception.Message)")
+    if ($ControlProbe -eq 'ContainerFailure' -or ($owned -and -not [string]::IsNullOrEmpty($container))) {
+        if ($ControlProbe -eq 'ContainerFailure') {
+            $cleanupPassed = $false
+            $cleanupLog.Add('Injected container stop failure')
+            if (-not $cleanupError) {
+                $cleanupError = '[CONTAINER_FAILURE] Injected container stop failure'
+            }
+        } else {
+            try {
+                & docker stop $container | Out-Null
+                if ($LASTEXITCODE -ne 0) {
+                    $cleanupPassed = $false
+                    $cleanupLog.Add("Docker stop failed with exit code $LASTEXITCODE")
+                    if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Docker stop exited with code $LASTEXITCODE" }
+                } else {
+                    $runningCheck = @(& docker inspect --format '{{.State.Running}}' $container 2>&1)
+                    if (($runningCheck -join '').Trim() -eq 'true') {
+                        $cleanupPassed = $false
+                        $cleanupLog.Add("Container $container is still running after stop")
+                        if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Container $container failed to stop" }
+                    } else {
+                        $cleanupLog.Add("Stopped fixture container $container (volume $volume retained)")
+                    }
+                }
+            } catch {
+                $cleanupPassed = $false
+                $cleanupLog.Add("Failed to stop container: $($_.Exception.Message)")
+                if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Failed to stop container: $($_.Exception.Message)" }
+            }
         }
     }
 
     try {
+        if ($ControlProbe -eq 'RestoreFailure') {
+            throw '[RESTORE_FAILURE] Injected environment restore failure'
+        }
         Restore-ProcessEnvironment -SavedEnvironment $savedEnv
         $cleanupLog.Add("Process environment restored")
     } catch {
         $cleanupPassed = $false
         $cleanupLog.Add("Environment restore failed: $($_.Exception.Message)")
+        if (-not $envRestoreError) {
+            $envRestoreError = $_
+        }
     }
 
     if (Test-Path -LiteralPath $EvidenceDir) {
@@ -378,5 +441,43 @@ try {
             CleanupPassed = $cleanupPassed
             Log = $cleanupLog
         } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'cleanup.json')
+
+        $finalStatus = if ($originalError) {
+            'FAILED'
+        } elseif ($ControlProbe -eq 'Normal') {
+            'CONTROL_ONLY'
+        } elseif ($ControlProbe -in @('CleanupFailure', 'RestoreFailure', 'ContainerFailure', 'Exception')) {
+            'FAILED'
+        } elseif ($browserPassed -and $cleanupPassed) {
+            'PASS_SCOPED'
+        } else {
+            'FAILED'
+        }
+
+        $isBusinessVerified = ($finalStatus -eq 'PASS_SCOPED')
+        $isBrowserVerified = ($finalStatus -eq 'PASS_SCOPED')
+
+        [pscustomobject]@{
+            Status = $finalStatus
+            BusinessVerified = $isBusinessVerified
+            BrowserVerified = $isBrowserVerified
+            Container = if ($container) { $container } else { $null }
+            Volume = if ($volume) { $volume } else { $null }
+            Schema = if ($schema) { $schema } else { $null }
+            MysqlPort = if ($container) { $mysqlPort } else { $null }
+            CleanupPassed = $cleanupPassed
+            ControlProbe = if ($ControlProbe) { $ControlProbe } else { $null }
+        } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
+    }
+
+    if ($originalError) {
+        throw $originalError
+    }
+    if ($cleanupError) {
+        throw $cleanupError
+    }
+    if ($envRestoreError) {
+        throw $envRestoreError
     }
 }
+
