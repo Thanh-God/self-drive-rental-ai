@@ -1063,3 +1063,8 @@ User requested direct completion after another absent OpenCode HANDOFF/tests/com
 ### C10A UI handoff prepared — 12/10/2026 — READY, Codex A
 
 TASK .runtime/coordination-c10a-ui-cursor-20261012-215705/TASK.md; backend baseline57be1ee PASS retained when hashes unchanged. Cursor scope amenity Admin editor/public display and modest visual improvements; if broad redesign required, aesthetic changes limited to API homepage while required amenity integration remains in existing Admin/card/detail layout. Backend/imageC10B/provider unchanged; meaningful mounted/UI/MySQLbrowser/desktopmobile/buildsource/cleanup proofs required. No agent launch or implementation from preparing TASK; existing workflowblankline preserved outside commit.
+
+
+### C10A UI independent review — 12/10/2026 — PARTIAL, Codex A
+
+Acceptance .runtime/coordination-c10a-ui-review-20261012-222048/ACCEPTANCE.md; agentcommit23682c2 and4hashesmatched, backend173inputsretainedunchangedPASS. Independentfrontend65tests/lint/demoAPIbuild0exit, but3normalizer tests mirror implementation; stale test lacks freshPUT/no-falsesuccess assertion. Mandatory actualbrowser/MySQL/SQL/heldPUT/role/desktopmobile screenshots/source-buildbinding/cleanup evidence missing despiteHANDOFFDONE. Follow-up TASK UI-R01..R03 focuses proof gaps, not backend/reimplementwholeUI; C10AUI/C10 stillPARTIAL. No sourcefix/backendfixture/push/reset, workflowblankline preserved.
