@@ -901,3 +901,9 @@ Baseline5052919 branchupdate-20261012-0920 clean; C7 accepted scoped(d3ebcb6,C7C
 - **Trạng thái**: C8A **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu độc lập. Giữ nguyên DB người dùng (33385, 3306), không chỉnh sửa frontend (chờ mở gate C8B), không git push.
 
 
+
+### C8A independent review — 12/10/2026 — FAIL / PARTIAL, Codex A
+
+Implementation e5b81aa retained; review baseline fcf6847 clean. Acceptance: .runtime/coordination-c8a-review-20261012-101206/ACCEPTANCE.md. Independent checks: 160 recorded input hashes match; 74 fat-JAR class/resource entries match; three existing-evidence guards pass; reported rerun command rejected unsupported EvidenceRoot. Agent XML records AccountAssignment 3 and RouteVersionGuard 4 without failure/skip, not independently replayed here. Current fixture exited and original MySQL identity running; no claim of whole data integrity.
+
+C8A is not accepted: caller env matrix checks untouched variables/any exception with no normal case; missing transitive dependency hash guards; containment bypass for absent parent/prefix sibling; mandatory verify and actual new-fat-JAR startup not evidenced; handoff commands/API contracts inaccurate. This review supersedes completion claims above without deleting historical audit. Follow-up .runtime/coordination-c8a-antigravity-followup-20261012-101206/TASK.md addresses C8A-R01..R05 only. C8B gate CLOSED. No live fixture created, data cleanup, product edit or push during review.
