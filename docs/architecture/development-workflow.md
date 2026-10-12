@@ -1008,3 +1008,7 @@ Acceptance .runtime/coordination-c8b-antigravity-review-20261012-125354/ACCEPTAN
      - `npm run build`: Demo và API mode build thành công (Exit 0).
 - **Trạng thái**: C8B Final Proof **PASS scoped**. Không sửa backend fat JAR hoặc Flyway migrations (163 backend manifest inputs giữ nguyên); fixture container `kltn-c8b-browser-d725b4e2542f` đã dừng an toàn, volume lưu giữ; các cổng 8080/5173/33626 đã giải phóng; DB người dùng 33385 và 3306 nguyên vẹn.
 
+
+### C8B final-proof independent review — 12/10/2026 — FAIL / PARTIAL, Codex A
+
+Acceptance .runtime/coordination-c8b-final-review-20261012-140054/ACCEPTANCE.md; HEADfdf7a012. Prior54UItests/lint/buildsourceproof retainedunchanged. Independentguardmatrixexit1: occupiedportcase receivesdistindexSOURCE_DRIFT; referencebundlemissing/currentindexmismatch. Staffpage stillnever navigated; missingStaffUI401session/login and requirednegative/statuspendingcases despiteHANDOFFDONE. Commonfinallyplacement improved but mandatorymanifest/finalsourcefreeze/Dockerinspect/callerreadback remainincomplete. Fixture7f076f31...8d93d exited; no newlivefixture/productchange/cleanup/push. NextTASK .runtime/coordination-c8b-evidence-repair-20261012-140248/TASK.md addressesR01..R04only; C8AretainedPASS,C8B/C8incomplete.
