@@ -551,3 +551,159 @@ Giới hạn: script còn chờ cố định ngoài ca điều phối; chờ200m
 Giữ quyết định snapshot/no-show/cọc/phụ phí/retention vàhistoryDB khác BLOCKED theo decisions/audits trước. Điều kiện chuyểnGiai đoạn6: người dùng chốt hoặc phê duyệt hoãn các quyết định mở và phạm viGiai đoạn6; kiểm kê DB khác trước deployment. PhầnR2 kỹ thuật hiện không cần giao agent làm lại nếu source/hash không đổi. Không tự mở rộng AI/Map/payment.
 
 Codex không sửa source/test/migration,không reset/commit/push; chỉartifact và2docs kiến trúc/workflow. Đã dừng đúng PIDJava8080/Vite5173/MySQL33397 doQA tạo,shutdown0,cổng đã kiểm tra đóng;không chạmuserDB,giữdatadir. Trước dọn,ghi biên bản này,lưu bản saoAG_HANDOFF.md/hashverified vàoartifact rồi chỉxóaAG root;OC rootkhôngtồn tại. Xem source-preservation.json,backup-verification.json,cleanup-services.json,cleanup.json,status-final.txt.
+
+### 17. Nghiệm thu R3 Antigravity + Codex B — 05/10/2026
+
+**Kết luận: R3 chưa hoàn tất. Antigravity PARTIAL bảng đề xuất; Codex B PARTIAL scripts/hướng dẫn. Giai đoạn5 vẫn chưa chốt, không cấp quyền tự triển khai Giai đoạn6.** HEAD51d12313679b212f92c87eb92a42594ee8a5c34b không đổi. Artifact mới `.runtime/r3-qa-20261005`; chỉ đọc phạm vi bàn giao/dependency trực tiếp và kiểm tra commands quyết định, không khảo sát lại project.
+
+Hash decisions/proposals/frontendREADME/2scripts khớp báo cáo. AG khai migrationSHA256 khác source: actualV1AD47ABF767E24D2D37074F16786B89B65EE38908DD4F9847ABC5498AFA50E3B6, V27FEF7125D7FB266435BA8D8FAEB75A4C014C3DDCC4D54068BEB74ADECD7EE94D; migrations không có diff so vớiHEAD và khớp audits trước. Không kết luận migration bị agent sửa, không repair/clean. Không dùng hash sai trong báo cáo để triển khaiDB.
+
+| Hạng mục | Kết quả | Command/exit | Artifact |
+|---|---|---|---|
+| Đề xuất/nghiệp vụ | PARTIAL;chưa được phê duyệt | diff/source review /N/A | AG_HANDOFF.md backup; .runtime/r3-ag-20261005-2218/decision-proposals.md;không DDL/source mới |
+| Bash syntax2scripts | PASS | Git Bash -n script /0 mỗi file, ngoài sandbox | bash-syntax-unrestricted.json; lượt trong sandbox bash DLL exit-1073741502 không tínhPASS; đường dẫnGit thực E:/data github/Git/bin/bash.exe |
+| MSYS API URL/exclusion | PASS kiểm tra env GitBash→Node | node check /0 | API path /api/v1 và PREEXISTING preserved; không phải backend/runtimePASS |
+| Cài dependency theo hướng dẫn | FAIL tái chạy | npm ci --dry-run /1 | npm-ci-unrestricted.log:ERESOLVE eslint10.11.0 vseslint-plugin-react7.37.5 peer<=9; lượt offline sandboxENOTCACHED lưu riêng, không cài/xóa node_modules |
+| Frontend build/start | Agent có kết quả;QA không lặp fullbuild | source/hash review /N/A | .runtime/r3-cb-20261005-gitbash/verification.md báo root200,healthECONNREFUSED; không tínhproxyAPI PASS |
+| Backend script/build/auth quaGitBash | NOT VERIFIED runtime | Java21versioncheck /0;không chạybackendscript trỏuserDB | Java21 ởE:/Tools/Java/jdk-21.0.12.1+1 cósẵn; agentJava23 blocker chỉ doPATH, không phải máy thiếuJDK21. Chưa cóhealth/register/login/emailtrùng trênfixtureMySQLriêng |
+| R1/R2 nghiệp vụ | Giữ kết quả scoped trước;không chạy lại | hash/diff review /N/A | không córuntime source/migration changes trongdiff; không suy toàn hệ thốngPASS |
+
+Findings:
+
+- **R3-CB01 P2:** frontend/README.md:27 (cũng9) hướng dẫn npmci fresh thất bạiERESOLVE thực. Expected quy trình dependency lặp được, giải thích đúngpeerpolicy hoặc sửaversions hợp lệ trong nhiệm vụ triển khai được giao; không hạlintrules/force mùquáng đểPASS. Conflict cótrướcR3 nhưng hướng dẫnR3 mới tiếp tục phụ thuộc, cần xửlý/ghi rõgiới hạn.
+- **R3-CB02 P2:** scripts/run-backend-gitbash.sh:36-46/frontendREADME:21: preflight dùngjava từPATH, wrapper dùngJAVA_HOME; thiếu hướng dẫn căn chỉnh2nguồn vớiJDK21 đang có. Agent báo môi trườngJava21 khôngkhả dụng không chínhxác: QA gọiJDK21 thànhcông. Expected JAVA_HOME/PATHnhấtquán, envfixturecôlập có cáchoverride antoàn và kiểm chứng build/start/health/register/login/duplicateemail. Hiện script luôn nạpbackend/.env.local sau processenv nên không thể trỏDBQA quaexportđơnthuần; QA không ghi vào33385 đểlàmPASS.
+- **R3-AG01 P2:** proposal:19 DEC07 nói tài khoảnINACTIVE đãcó, actualAccountService.java:57 chỉACTIVE/LOCKED. DEC05:17 khẳngđịnhdeep snapshot đảm bảo giátrịpháplý chưa cócăn cứ, CCCD chưa thuộcbaseline; đềxuất chưa đượcchốt. Expected hiệntrạngchínhxác, không đồngnhất snapshotbấtbiến vớigiátrịpháplý hoặc tựmởrộngthu thậpPII. Snapshotkeys mô tảcustomerName/vehicleName nhưngsourceJSON dùngcustomer/vehicle; InvoiceJSON khônggiốnghợpđồng, cầnghiđúng trướcquyếtđịnh.
+- **R3-AG02 P2:** proposal:38,54,57-60: “khôngrepairnếu chưa sa lưu” chưa đủràngbuộc phêduyệt; backup không tựcấpquyềnrepair. TiêuchíchỉchốtDEC01-05 nhưngGiai đoạn6 AI/Mapphụ thuộcDEC08/09, vàreissue/retention cònmở. KhôngđượccoiphạmviGemini/Leaflet/OSM làđãcấpquyền. Model/provider/pricing/quota chưa đượcverify nguồnhiệnhành; khôngdùngproposalđể triểnkhai. Expected cácphươngán/hoãn/dependency rõ, người dùngphêduyệt trước phụthuộc, khôngruleengine thayAIđểbáoPASS.
+- **R3-AG03 P2 evidence:** bảnAG_HANDOFF lưuSHA256V1/V2khôngkhớp sourcefinal;OP10 decisions.md:36 “đãchốt/kiểmchứng” phảihiểu theoauditslocalthực, không coi mọiportagentghi làQAđộclập. Source/hashfield cầnđối chiếu/thôngtin commandlogs/hashtrước-sau cònthiếu; agentreport khôngbằngchứngPASS.
+
+Không sửa source/scripts/tests/migration đểlàmPASS trongQA. Chỉghi findings/tài liệu chính thức; cácđềxuấtkhôngthànhquyếtđịnh. Khôngcommit/push/reset. LượtQA khôngtạodịchvụ, khôngtouchuserDB; không cầnstopdịchvụcủangườidùng. Lưu2handoffs/hash vàoartifact saubiênbản rồi xóađúng2rootAG_HANDOFF/OC_HANDOFF;giữAGENTS/prompt/artifacts/source. Xem backup-verification.json,source-preservation.json,cleanup.json,status-final.txt.
+
+### Theo dõi R3-CB01/02 — Codex B, 06/10/2026
+
+**Kết quả scoped: DONE cho cài dependency và scripts/hướng dẫn; runtime API đã kiểm chứng trên MySQL cô lập.** CB01: ghim ESLint và `@eslint/js` nhánh 9, peer-compatible với `eslint-plugin-react@7.37.5`; không đổi flat config, lint rules hoặc test. Ghim Tailwind/Vite ở 4.1.7 để tránh lock mismatch ở bundle WASI optional của 4.3.3. `npm ci` trong thư mục tạm sạch: exit 0, 422 packages; lint exit 0, test 27/27, build demo/API exit 0. Chi tiết command output ở `.runtime/r3-cb-20261006-codexb/`.
+
+CB02: backend script dùng cùng JDK từ `JAVA_HOME` cho preflight, Maven Wrapper và JAR; env file chọn được bằng `--env-file`, chỉ điền biến chưa export và parse BOM/CRLF mà không `eval`. Build lỗi dừng trước JAR. Frontend giữ proxy `/api/v1` và nối `VITE_API_BASE_URL` vào `MSYS2_ENV_CONV_EXCL` mà không bỏ giá trị có sẵn. Qua Git Bash với JDK 21.0.12.1 và MySQL 8.4.11 riêng cổng 33399: package/build/start thành công; health qua Vite 200; register 201; login 200; email trùng 409 với JSON `message`. Maven package: 31 test, 0 fail, 3 skipped (không tính skipped là PASS). Hai tiến trình Java/Vite và hai container do lượt này tạo đã dừng; hai volume kiểm thử được giữ; DB/cổng 33385 không được dùng. Xem `OC_HANDOFF.md` và artifact để biết hash, logs, exit codes và giới hạn.
+
+### 18. Nghiệm thu R3 sửa tiếp — Codex A, 06/10/2026
+
+**Codex B PASS trong phạm vi CB01/CB02. Antigravity đã sửa các sai lệch chính của bảng đề xuất; đề xuất vẫn chưa được duyệt. Giai đoạn 5 chưa chốt hoàn tất.** HEAD `51d12313679b212f92c87eb92a42594ee8a5c34b` không đổi. Artifact `.runtime/r3-final-qa-20261006/`; giữ audit 17 FAIL/PARTIAL để truy nguyên.
+
+Kiểm tra HEAD/status, hash bàn giao (tất cả file CB cuối khớp), tracked diff và scripts untracked. Backend/source frontend/tests/migrations không có diff so HEAD; không lặp nghiệm thu R1/R2 khi source không đổi. Không suy tác giả theo tên/mtime. `docs/requirements/use-cases.md` đã đổi trước lượt Codex B, không thuộc bàn giao R3 và không được tự coi là phê duyệt baseline 28 UC.
+
+| Hạng mục | Kết quả | Command/exit | Artifact |
+|---|---|---|---|
+| Dependency sạch, lint, tests | PASS | npm ci --no-audit --no-fund /0; npm run lint /0; npm test /0, 27 pass/0 skip | npm-ci.log; qa-run-lint.log; qa-test.log; source copy + fresh dependencies trong frontend/ của artifact |
+| Demo/API build | PASS | npm run build /0 demo; script frontend thực build API thành công rồi chạy Vite | qa-run-build.log; frontend.log; script sao chép byte-identical, root replica cô lập |
+| Backend Git Bash/JDK/env/JAR | PASS scoped | script root thật --env-file fixture BOM/CRLF; JDK21 cùng preflight/Maven/JAR; ./mvnw package BUILD SUCCESS; PORT export8080 thắng file9999 | backend.log; backend-error.log; backend-runner.sh; fixture backend.env chỉ dùng credentials kiểm thử |
+| Maven tests | PASS 28, SKIPPED 3 | package:31 run/0 fail/0 error/3 skip; H2, không thay MySQL concurrency PASS | backend.log |
+| API qua proxy với MySQL thật | PASS | node api-assertions.mjs /0; 12 assertions: health200/UP, register201/USER, login200, email trùng409 | api-assertions.json; api-assertions.mjs; MySQL8.4.11 riêng33401 |
+| Flyway/schema runtime | PASS scoped | docker exec mysql SELECT /0; V1=190705803/V2=-1792922806 success1,26tables, reviews.vehicle_id=0; Hibernate validate startup | mysql-schema.txt; migration-hashes.json; backend.log |
+| R1/R2 nghiệp vụ | Giữ PASS scoped audits trước | source/diff/hash review; không lặp upgrade/concurrency/browser toàn luồng | audits14–16; không tuyên bố lượt này thực thi lại các ca đó |
+| AG corrections | PASS đối chiếu phần sửa; quyết định BLOCKED | ACTIVE/LOCKED và keys Contract/Invoice khớp source; migration rawhash sửa đúng; backup không tự cấp repair/clean; N/A | AG_HANDOFF.md backup; .runtime/r3-ag-20261006-0901/decision-proposals.md |
+| DB môi trường khác / phạm vi mới | BLOCKED / NOT VERIFIED | lịch sử DB khác chưa biết; 28UC ngoài bàn giao không được nghiệm thu; N/A | decisions.md; status-before.txt; use-cases.md diff |
+
+Findings/giới hạn còn lại:
+- **R3-QA18-DOC01 P2 scope:** `docs/requirements/use-cases.md:6`: actual tách/bổ sung22→28UC và thêm phạm vi; expected đối chiếu quyết định và source trước coi baseline đã duyệt/đạt. Tác động: không dùng số UC mới để tính % hoàn tất hay giao phần mới tự động. Giữ thay đổi, không sửa trong QA.
+- **R3-QA18-AG01 P3 proposal:** `.runtime/r3-ag-20261006-0901/decision-proposals.md:21,28`: phụ phí không tự đồng nhất sự cố; mock/rule engine không chứng minh AI đã triển khai; ví dụ provider/model chưa được xác minh hiện hành. Expected làm rõ khi duyệt từng phương án; không dùng đề xuất để gọi API hoặc áp dụng chính sách. Không phải lỗi runtime CB, không cần giao OpenCode sửa CB01/02.
+- ESLint lifecycle/deprecation warning và SpyBean deprecation được lưu trong log; lint rules/assertions không hạ. Cài/test cô lập không cập nhật frontend/node_modules của người dùng; khi chạy project thật phải npm ci theo lock mới.
+- Lượt này không browser E2E mới; API auth kiểm tra qua HTTP thật, không thay bằng mock hoặc build. Fresh runtime không thay chứng cứ V1 upgrade/partial-V2/concurrency/rollback từ R1.
+
+Điều kiện đóng5/mở6: người dùng chốt hoặc duyệt hoãn cọc/phụ phí/no-show/trả muộn-đệm lịch/snapshot/phát hành lại/retention; nếu chọn bổ sung thì triển khai và kiểm thử phần đó trước khi tính hoàn tất. Xác nhận baseline UC và phạm vi6 (UI nội bộ hay AI/Map). Trước phần AI phụ thuộc: chốt Guest/User, nhà cung cấp/model/quota/chi phí, routing/output validation và cách giữ secret backend. Trước deployment DB khác: inventory history/checksum/schema và dry-run bản sao; unknown history không ngăn chuẩn bị UI trên DB mới cô lập khi được duyệt rõ. Các đề xuất không tự trở thành quyết định.
+
+Không sửa source/test/migration; chỉ tài liệu nghiệm thu và artifact. Không reset/commit/push. QA tạo container kltn-r3-final-qa-20261006 port33401 và Java23436/Vite31696; dừng chính xác các dịch vụ của QA, giữ volume và bằng chứng, không đụng user DB. Xem cleanup-services.json. Sao lưu/hash cả hai handoff vào artifact trước chỉ xóa AG_HANDOFF.md/OC_HANDOFF.md root; xem cleanup.json và source-preservation.json.
+
+### 19. Rà soát bàn giao sau audit18 — Codex B, 06/10/2026
+
+**Kết luận: không có task kỹ thuật Antigravity mới đủ điều kiện triển khai độc lập để đóng Giai đoạn 5.** HEAD vẫn `51d12313679b212f92c87eb92a42594ee8a5c34b`. `AG_HANDOFF.md` root tại lượt rà soát là placeholder rỗng (0 byte); bản lưu trong `.runtime/r3-final-qa-20261006/AG_HANDOFF.md` là báo cáo đề xuất R3-AG, không phải phê duyệt hay giao việc source mới. Các hash CB01/CB02 hiện tại khớp bằng chứng audit18 (`.runtime/r3-final-qa-20261006/cb-hash-check.json`); không chạy lại CB01/CB02 hoặc R1/R2.
+
+| Mục còn lại | Trạng thái | Ranh giới |
+|---|---|---|
+| R3-QA18-DOC01 — baseline use case đang ghi 28 thay vì baseline 22 | **BLOCKED — cần người dùng xác nhận phạm vi/baseline** | Không tính 28 UC là baseline đã duyệt; không tự sửa/tách lại use-cases.md. |
+| R3-QA18-AG01 — phụ phí/sự cố và ví dụ mock/provider/model | **BLOCKED — cần quyết định chính sách và phạm vi AI/Map** | Không đồng nhất phụ phí với incident; ví dụ nhà cung cấp/model chưa được xác minh và không cấp quyền tích hợp. Không đổi nghiệp vụ hoặc gọi dịch vụ ngoài. |
+| OP-10 — history/checksum/schema của DB môi trường khác | **BLOCKED — chưa xác định/ủy quyền target DB** | Không kết nối, clean, repair, reset hoặc sửa migration; cần inventory có target và kế hoạch được duyệt. |
+
+Không tìm thấy lỗi source trong phần được duyệt khi rà soát có mục tiêu; không có file source/test/migration thay đổi và không chạy test/runtime. Artifact mới `.runtime/r3-cb-closure-20261006/`; bàn giao chi tiết tại `OC_HANDOFF.md`. CB01/CB02 và R1/R2 vẫn PASS scoped theo các audit trước; điều đó không đóng các blocker trên và **Giai đoạn 5 chưa hoàn tất**.
+
+### 20. Nghiệm thu bàn giao đóng Giai đoạn 5 — Codex A, 06/10/2026
+
+**Kết luận: FAIL bàn giao Antigravity; Codex B BLOCKED đầu vào, không có triển khai kỹ thuật mới. Giai đoạn 5 chưa hoàn tất.** HEAD51d12313679b212f92c87eb92a42594ee8a5c34b không đổi. Artifact `.runtime/r4-closure-qa-20261006/`. Không khảo sát lại toàn project, không chạy lại test runtime khi source phạm vi đã PASS không đổi.
+
+| Hạng mục | Kết quả | Command/exit | Artifact |
+|---|---|---|---|
+| Handoff/hash/status | PASS kiểm chứng dữ liệu | git rev-parse/status, Get-FileHash /0; 10/10 CB final hashes khớp | cb-hash-check.json; status-before.txt |
+| Antigravity mapping/checklist/decision pack | FAIL bàn giao; thực hiện NOT VERIFIED | Get-Item AG_HANDOFF.md /0:0 byte, SHA256E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855 | AG_HANDOFF.md backup; không lấy báo cáo lượt cũ thay kết quả mới |
+| Codex B follow-up | BLOCKED thiếu AG handoff, 0 tests/0 source changes | artifact/hash review /N/A | OC_HANDOFF.md backup; .runtime/r3-cb-closure-20261006/result.json |
+| CB01/CB02 và R1/R2 | Giữ PASS scoped trước; không chạy mới | scripts/package/README/proposal hash khớp audit18; backend/src/frontend/src không diff HEAD | audit18-hash-check.json; audits14–18 |
+| UC baseline | NOT VERIFIED/phê duyệt chưa có | count table /0:HEAD22/current28; currentSHA256F11D7CC213306B63B4B76214FBF6E5D6A16F3490450A6679AD2A849B153C1920 | use-cases-head.diff; hashes-before.json |
+| DB khác / chính sách chưa duyệt | BLOCKED tại bước phụ thuộc | không targetDB/không duyệt chính sách; N/A | decisions.md; không truy cập DB hoặc sửa migration |
+
+Findings:
+- **R4-AG01 P2, AG_HANDOFF.md:1 (file rỗng, không có dòng thực):** actual0byte/không mapping22→28UC, checklist bằng chứng/decision pack hoặc giao việc mới. Expected các đầu ra trong prompt Antigravity sau audit18. Ảnh hưởng: thiếu đầu vào Codex B và chưa có hồ sơ để người dùng duyệt đóng5. Không kết luận agent chưa từng chạy chỉ từ file rỗng; kết quả thực hiện chưa chứng minh được.
+- **R4-CB01 P3, OC_HANDOFF.md:9:** actual nói scripts không còn untracked; status-before.txt của chính CB và git status QA đều ghi scripts/ untracked. Expected ghi đúng trạng thái, gồm cả untracked. Không ảnh hưởng runtimePASS; không suy tác giả từ trạng thái.
+- **R4-DOC01 P2, docs/requirements/use-cases.md:7:** hash đã đổi so audit18 (117059141D6AAFF8378FAB7CCF0BF5107753AD3130F92EC32B8F3A9B68232138→F11D7CC...). Hash khớp entry/final CB hiện tại; không quy CB sửa. Expected mapping có căn cứ và xác nhận phạm vi; không coi28UC là phê duyệt/đạt. Không có bản source đầy đủ audit18 để gán chính xác nội dung delta giữa hai hash, giữ diffHEAD và current hash.
+- **R4-SCOPE01 P3, OC_HANDOFF.md:19–20:** chốt chính sách/provider cần người dùng, nhưng mapping UC, checklist hiện trạng và sửa diễn đạt đề xuất không cần tự chốt nghiệp vụ. Expected phân biệt việc tài liệu có thể làm ngay với quyết định phải chờ. Không dùng BLOCKED chính sách để bỏ toàn bộ công việc chuẩn bị được giao. DEC08/09 cần trước bướcAI phụ thuộc, không tự đưa thành yêu cầu triển khaiAI của Giai đoạn5.
+
+Việc tiếp theo: Antigravity hoàn thiện mapping/checklist/decision pack trong phạm vi tài liệu trước; chưa giao lại code/test đãPASS. Codex B chỉ tiếp nối khi có handoff không rỗng, thực hiện các task nhỏ được duyệt và kiểm chứng đúng phạm vi. Người dùng sau đó chốt hoặc duyệt hoãn chính sách còn mở và xác nhận phạm vi UC; lựa chọn bổ sung phải triển khai/test. DB khác inventory trước deployment có target, không chặn việc tài liệu/local cô lập. Chưa mởGiai đoạn6.
+
+QA không sửa source/test/migration, không reset/commit/push, không tạo/dừng dịch vụ hoặc đụng DB người dùng. Giữ audit19. Trước dọn, sao lưu/hash hai báo cáo và ghi findings tại biên bản này; sau đó chỉ xóa AG_HANDOFF.md và OC_HANDOFF.md root theo quyền đã cấp. Giữ artifacts/AGENTS/prompt. Xem backup-verification.json, cleanup.json, status-final.txt. Không dùng file rỗng làm bằng chứngPASS.
+
+### 21. Crosswalk 22 UC baseline → 28 UC hiện tại — Codex B, 06/10/2026
+
+**Kết luận tài liệu:** bảng đầy đủ 22→28 được lưu tại `.runtime/uc-mapping-20261006/uc-mapping-22-to-28.md`. Các ID bổ sung chủ yếu tách/đổi nhãn những nội dung đã có trong baseline 22; việc tách ID không tự phê duyệt chức năng. Một số mô tả có khả năng mở rộng (đặc biệt thống kê/báo cáo, quản lý GPLX, phân công hoặc kiểm tra vượt baseline) cần người dùng xác nhận trước khi triển khai. Giữ nguyên audit18–20 và không sửa `docs/requirements/use-cases.md` trong lượt này.
+
+Mapping xử lý phần đối chiếu tài liệu của R3-QA18-DOC01/R4-DOC01 nhưng **không chứng minh UC đã chạy/đạt, không xác nhận baseline 28 và không tự đóng Giai đoạn 5**. Cần người dùng xác nhận cách dùng baseline 22 và chấp nhận phân rã 28 hay chỉ rõ phần mở rộng; các quyết định OP còn mở vẫn được giữ nguyên. UC-G04 và UC-U07 có trong bộ 22 nhưng phụ thuộc quyết định AI/Map của giai đoạn sau (OP-01/07, AD-13); không tính là yêu cầu runtime đã nghiệm thu ở Giai đoạn 5. Source/test/runtime không được kiểm tra lại trong lượt tài liệu này (**NOT VERIFIED**).
+### 22. Nghiệm thu UC crosswalk và chuẩn bị chạy UI — Codex A, 06/10/2026
+
+**Codex B PASS đối chiếu tài liệu 22→28 trong phạm vi giao; không phải PASS chức năng hoặc phê duyệt baseline28. Giai đoạn5 chưa đóng.** HEAD51d12313679b212f92c87eb92a42594ee8a5c34b không đổi. Artifact `.runtime/uc-mapping-qa-20261006/`.
+
+| Hạng mục | Kết quả | Command/exit | Artifact |
+|---|---|---|---|
+| Manifest bàn giao | PASS | Get-FileHash /0,9/9 khớp final CB | hash-check.json |
+| Mapping cấu trúc | PASS | kiểm tra PowerShell độc lập /0:22 nguồn,22 dòng mapping,28 đích; source IDs/destination IDs so sánh không thiếu/thừa | mapping-validation.json |
+| Mapping ý nghĩa | PASS scoped docs | đối chiếu HEAD/current UC/decisions và bảng; N/A | uc-mapping-22-to-28.md copy; bản gốc .runtime/uc-mapping-20261006 |
+| Source/test/runtime trong lượt | NOT VERIFIED mới; giữ PASS scoped trước | không source/test/migration diffHEAD; runtime files khớp audit18; không chạy lại test/build/browser/API | runtime-file-hashes.json; audits14–18 |
+| Antigravity checklist/decision pack | NOT VERIFIED bàn giao | AG_HANDOFF root0byte; N/A | bản sao AG_HANDOFF.md; audit20 việc còn lại |
+| Cấu hình chạy UI | PASS đọc cấu hình/trạng thái, không thay runtime acceptance | docker ps /0:kltn-phase5-rerun chạy33385; backend/.env.local DB destination127.0.0.1:33385/kdrive; Viteproxy8080,strict5173; JDK21 tồn tại | nguồn scripts/README/vite config; không sao chép secrets |
+
+R3-QA18-DOC01/R4-DOC01: phần thiếu mapping đã được xử lý; phần xác nhận baseline/phạm vi vẫn chờ người dùng. Các ID mới chủ yếu phân rã mục đã có; UC-A05 báo cáo vận hành có thể mở rộng so thống kê/tình trạng tích hợp, cần xác nhận nội dung cụ thể. Không dùng số28 để chứng minh chức năng hoàn tất. Không thêm test cho lượt chỉtài liệu hoặc chạy lại scopedPASS để tạo tiến triển giả.
+
+Giữ findings audit20 còn phù hợp: handoff AG rỗng chưa chứng minh checklist/decision pack đã làm; chính sách cọc/phụ phí/no-show/gia hạn-trả muộn/buffer/snapshot/reissue/retention và ngoại lệ còn mở cần chốt hoặc duyệt hoãn trước bước phụ thuộc. AI/Map provider/Guest permissions thuộc bước tương ứng giai đoạn sau, không ép triển khaiAI để đóng5. DB khác inventory trước deployment cótarget; local UI dùngDB đã kiểm chứng không phải audit mọiDB.
+
+Hướng dẫn chạy UI Git Bash: root /e/AI/BERT_Project/codepython/KLTN; MySQL container hiện có kltn-phase5-rerun33385; backend JAVA_HOME=/e/Tools/Java/jdk-21.0.12.1+1, PORT8080, script scripts/run-backend-gitbash.sh --env-file backend/.env.local; frontend npmci theo lock mới rồi scripts/run-frontend-gitbash.sh API mode; proxyhealth qua5173. Seed mặc định không ép bật, không reset dữ liệu hoặc tạo lại tài khoản đãcó. Browser test thật cóghi dữ liệu local; auth không chứng minh mọiUC. Khôngin secrets. LượtQA khôngkhởi động/dừng dịch vụ, chỉ quan sát MySQL người dùng đang chạy;8080/5173 trống thời điểm kiểmtra.
+
+Đã giữ audit21 và ghi kết quả/giới hạn chính thức trước dọn. Hai handoff root lưu bản sao/hash vàoartifact rồi chỉxóa AG_HANDOFF.md/OC_HANDOFF.md theo quyền đã cấp; AG rỗng được giữ bằng chứng, không coiPASS. Giữ artifacts/AGENTS/source; không reset/commit/push. Xem backup-verification.json,cleanup.json,status-final.txt.
+
+### 23. Nghiệm thu Guest/User GU-01/02 — Codex A, 06/10/2026
+
+**GU-01 PASS scoped home/catalogue; GU-02 PASS các ca xác thực/điều hướng đã thực thi; GU-03 PARTIAL còn checkout; GU-04 BACKLOG. Giai đoạn5 chưa hoàn tất.** HEAD51d12313679b212f92c87eb92a42594ee8a5c34b không đổi. Artifact `.runtime/gu-qa-20261006/`. Hash4sourcefiles/auth vàAGhandoff khớp CB cuối; không sửa source/test/migration trongQA. Chỉ mở diff/dependency trực tiếp và bằng chứng đúng bàn giao.
+
+| Hạng mục | Kết quả | Command/exit | Artifact |
+|---|---|---|---|
+| Source/unit/lint | PASS | npm.cmd test /0:29pass0fail0skip; npm.cmd run lint /0; final sourcehash preserved | test.log; run-lint.log; hashes-before.json; source-preservation.json |
+| Build demo/API | PASS | demo build /0; frontend script buildAPI thành công rồi Vite ready | build-demo.log; frontend.log |
+| Home + auth browser/MySQL | PASS các ca thực | node verify.cjs lượt đầu /0; mở rộng16checksPASS rồi harnesslogout sai đích exit1; node logout.cjs /0 sửa riêng kỳvọng /login | browser-results-expanded-first.json; browser-expanded-first.log; logout-result.json; verify.cjs; logout.cjs; screenshots |
+| Home states | PASS | danh sách3xeAPI33402, searchAccent đúng1, rỗngsearch/reset,detail đúngID; injectnetworkerror/retry vàAPIempty riêngghi nhãn | browser results; không dùng injection làm bằng chứng happy API |
+| Register/login/roles/session | PASS scoped | register về /;reloadgiữUSER;duplicate409;badpassword401;USERdefault/;resume/user/profile;Staff/staff/queue;Admin/admin;logoutreloadclear | browser16checks+logout riêng; unsafeURL/prefix quaunit29tests |
+| Visual | PASS desktop1280/mobile375 đã xemảnh, khôngtràn ngang | Playwright/ảnh thực; no pageerrors trong các contexts được ghi | home-desktop.png;home-user.png;home-mobile.png |
+| Checkout GU-03 | NOT VERIFIED trong lượt mới; tổngGU-03PARTIAL | CB chưa chạy GPLX→quote→create→detail/negative; QA không thay phạmvi bằng auditcore cũ | OC_HANDOFF.md backup; CBresult; GU-03 yêu cầu còn lại |
+| Flyway/JAR | PASS startupMySQL scoped | JAR existingbackendkhôngđổi,MySQL8.4.11 mới33402;Flyway/Hibernatevalidate startup | backend.log;jar-hash.json; không rerun freshupgrade/concurrencyR1 |
+
+BrowserAct CLI không có (version commandnotfound); dùng Playwright đãcài theo fallback browser được giao; khôngcài mới. QA tạo MySQLkltn-gu-qa-20261006/schema gu_qa/cổng33402/volume kltn_gu_qa_20261006, opt-inseed riêng cho fixture; không ghi/dừngDB33385 người dùng. JARQA26848/Vite37252 và launcher23900 được dừng chínhxác sau kiểmchứng;volume/artifacts giữ. Không suy toànactorPASS hoặc hoàntất5 từ home/auth.
+
+Findings:
+- **GU-QA01 P2 completion, OC_HANDOFF.md mục Browser acceptance:** actualGU-03 khôngthựcthi do têncontainer cũ tồn tại;expected tạo container/schema/port tênmới như prompt đãcho phép, thay vì coi tênfixture cũ là bắtbuộc. QA đãchứngminh fixturemới33402 chạyđược. Ảnh hưởng: checkout/caâm chưa chứngminh, taskcầnCodexBtiếpnối; không giao làm lạiGU-01/02đãđạt.
+- **GU-QA02 P3 handoff, AG_HANDOFF.md:100–104:** đườngdẫnRegister/Login thiếu guest/ và homeStaff/Admin mô tả /staff/bookings,/admin/vehicles sai so /staff/queue,/admin. SourcefinalCB giữ đúng nên khôngphải runtimebug. AG nói debounce nhưng sourceonChange cậpnhật ngay; không tự tính debouncePASS.
+- **GU-QA03 P2 evidence hygiene, .runtime/gu-ag-20261006-1950/verify-browser.cjs:143:** có literalcredential tài khoản môi trườngngườidùng trong harnessartifact. Expected nhận từenvfixture riêng, khôngghi secret vào script/log/bàn giao. Khôngnhắc giátrị;khôngxóa/sửaartifact lịch sửQA. Cần xửlý vệsinh evidence trong task riêng với bằngchứngmetadata giữ; khônglặp script đó trênDB33385.
+
+Giớihạn: max6/sort đã đọcsource nhưng fixture3xe chưa thử >6; loadingdelay, malformedregisterfallback, redirectattack browser chưathựcthi riêng (helperunit có); consolepageerrors ghi0, khôngtuyênbố exhaustiveconsole/networkhealth. Logoutharness banđầu giảđịnh vềhome nhưngNavbar chuyển/login; giữ logFAIL và kiểmtra lại đúngđích/phiên,không sửaproductđểPASS. GU-04 chưa ràsoátmới. Policies/phạmvi mở vẫn theo decisions.md; khôngAI/Map/payment/sourcefix/commit/push/reset.
+
+CodexB tiếp theo GU-03 trênfixturemới: USERprofile/GPLX→quote→bookingdetail và thiếuGPLX/invalidinput/conflictquote từchối đúng API;network/DBassertions cầnthiết,không tựđổi policy. Prompt artifact 03-codexb-checkout.md. Lưu2handoff/hash trướcghi audit rồi chỉ dọn2root AG_HANDOFF/OC_HANDOFF;giữAGENTS/source/volume/bằngchứng. Xemcleanup-services.json,backup-verification.json,cleanup.json,status-final.txt.
+
+### User1A acceptance 07/10/2026
+PARTIAL;13/13browser scoped rerunMySQL33404,29/29frontend tests,lintPASS. UA-01..04 và giới hạn tại docs/ui/phase-4-handoff.md; CodexB đóng checkoutnegative/race/revoke evidence trướcU04. Artifact .runtime/user1a-acceptance-20261007; báo cáoAG sao lưu trước dọn; khôngsource/migrationchange, không toànUser/Giai đoạn5PASS.
+
+### CodexB gaps1A acceptance07/10/2026
+PARTIAL. APIharness rerunPASS/DB1đơn1history/token401→200 trênfixture33406;UA-01/03PARTIAL,UA-02/U04NOTVERIFIED,UA-04PASSdocs. UB-01/02 vàartifact .runtime/user1b-acceptance-20261007 tại biên bản docs/ui/phase-4-handoff.md. Khôngsourcechange,khôngwholeactorPASS.
+
+### UA-02 acceptance07/10/2026
+PASS scoped:browserquote stale suppression/doublesubmit1POST/MySQL1booking1history;29tests/lint/APIbuildPASS. Artifact .runtime/ua02-acceptance-20261007. UA-01/03 vẫnPARTIAL,U04NOTVERIFIED;chi tiết docs/ui/phase-4-handoff.md. KhôngwholeUserPASS.

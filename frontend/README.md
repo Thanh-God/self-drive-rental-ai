@@ -16,12 +16,39 @@ $env:VITE_DATA_MODE = "demo"
 npm run dev -- --host 127.0.0.1
 ```
 
-Git Bash:
+Git Bash (API mode): open two terminals at the repository root. The scripts locate the repository from their own path, so they can also be called from another working directory. For a clean checkout, install dependencies once from the `frontend` directory with `npm ci`; the lockfile pins ESLint 9, which satisfies `eslint-plugin-react@7.37.5`'s declared ESLint peer range while retaining the existing flat config and lint rules. Do not use `--force` or `--legacy-peer-deps`.
+
+Use JDK 21 consistently for the preflight, Maven Wrapper, and running JAR. In Git Bash, set it in the same terminal before starting the backend:
 
 ```bash
-cd /e/AI/BERT_Project/codepython/KLTN/frontend
-VITE_DATA_MODE=demo npm run dev -- --host 127.0.0.1
+export JAVA_HOME='/e/Tools/Java/jdk-21.0.12.1+1'
+export PATH="$JAVA_HOME/bin:$PATH"
+java -version
 ```
+
+The last command must report Java 21. Maven Wrapper uses `JAVA_HOME`; the backend script resolves and invokes that same JDK for both version check and JAR startup.
+
+Terminal 1 — backend (requires Java 21, Maven Wrapper, and a reachable MySQL):
+
+```bash
+bash scripts/run-backend-gitbash.sh
+```
+
+By default, unset backend variables are read from `backend/.env.local`; variables already exported in the terminal take precedence. To select a fixture or other environment file explicitly, pass its path (relative paths are from repository root):
+
+```bash
+bash scripts/run-backend-gitbash.sh --env-file .runtime/my-isolated-db/backend.env
+```
+
+The selected file uses simple `KEY=value` lines (optional `export`, single/double quotes, UTF-8 BOM, and CRLF are supported); it is parsed as data and never evaluated. Only recognized backend keys are loaded. Do not paste secrets into terminal commands or logs. For database verification, configure the fixture file for a separate MySQL instance/schema, never the shared port 33385.
+
+Terminal 2 — frontend (requires `frontend/node_modules`; install with `cd frontend && npm ci` once if dependencies are missing):
+
+```bash
+bash scripts/run-frontend-gitbash.sh
+```
+
+The backend script loads the ignored `backend/.env.local`, runs `./mvnw package`, and starts the packaged JAR only if the build succeeds. The frontend script builds with `VITE_DATA_MODE=api` and starts Vite at `http://127.0.0.1:5173`; `/api/v1` stays a relative URL and Vite proxies `/api` to the backend at port 8080. It sets `MSYS2_ENV_CONV_EXCL` for `VITE_API_BASE_URL` so Git Bash does not rewrite `/api/v1` into a Windows drive path. Check the proxied backend health at `http://127.0.0.1:5173/api/v1/health` (or `curl -fsS http://127.0.0.1:5173/api/v1/health`). Keep both terminals open and press Ctrl+C in each to stop only the process started there. The scripts do not start, stop, or reset Docker/MySQL. If using the existing local MySQL container, confirm Docker Desktop and that container are already running; do not point the application at another project's database. Use the configured backend port and Vite's configured proxy when testing locally; do not change production CORS settings to work around Git Bash path conversion.
 
 Giữ terminal mở; Ctrl+C để dừng. Nếu cổng 5173 bận, dùng URL Vite thực tế thông báo. Khi đổi biến môi trường, dừng và chạy lại server. Build thành công không bảo đảm không có lỗi lúc render: cần mở các route và thử luồng demo bên dưới.
 
@@ -39,7 +66,7 @@ Giữ terminal mở; Ctrl+C để dừng. Nếu cổng 5173 bận, dùng URL Vit
 4. Theo dõi đơn, gửi yêu cầu hủy theo chính sách, xem snapshot hợp đồng/hóa đơn; Staff xử lý trạng thái và biên bản trong phạm vi chi nhánh được gán.
 5. User khai báo hồ sơ/GPLX, đánh giá booking hoàn tất và ghi nhận sự cố; Admin quản lý tài khoản, xe, chi nhánh, tuyến và kiểm duyệt đánh giá.
 
-API mode phụ thuộc backend đang chạy tại `VITE_API_BASE_URL` (mặc định `http://localhost:8080/api/v1`) và cấu hình database/seed phù hợp. Để phát triển local qua proxy cùng origin trong `vite.config.js`, đặt `$env:VITE_API_BASE_URL = "/api/v1"` trước khi khởi động Vite; nếu gọi URL backend trực tiếp, backend phải cho phép CORS từ origin frontend. Khi API lỗi, giao diện hiển thị lỗi và thao tác thử lại; không dùng dữ liệu mẫu thay thế. Build/test frontend không chứng minh API, phân quyền backend, MySQL hoặc concurrency đã nghiệm thu.
+API mode phụ thuộc backend đang chạy và cấu hình database/seed phù hợp. Trên PowerShell, có thể đặt `$env:VITE_API_BASE_URL = "/api/v1"` trước khi khởi động Vite để dùng proxy cùng origin trong `vite.config.js`; trên Git Bash dùng script ở trên để tránh MSYS chuyển đổi giá trị này. Nếu gọi URL backend trực tiếp, backend phải cho phép CORS từ origin frontend. Khi API lỗi, giao diện hiển thị lỗi và thao tác thử lại; không dùng dữ liệu mẫu thay thế. Build/test frontend không chứng minh API, phân quyền backend, MySQL hoặc concurrency đã nghiệm thu.
 - `.env.example` chỉ là mẫu cấu hình. Vite dùng `.env.local` khi bạn tạo file đó; tuyệt đối không đặt Gemini/Map secret trong biến `VITE_*`.
 
 ### Kiểm tra frontend

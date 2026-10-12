@@ -96,3 +96,74 @@ test("Admin never receives Staff handover or return actions", () => {
     [],
   );
 });
+
+test("User can cancel PENDING and CONFIRMED bookings only when 24h or more remain until pickup", () => {
+  // 6 deterministic combinations: PENDING/CONFIRMED x (24h-1s, exactly 24h, 24h+1s)
+  const boundaryCases = [
+    { deltaMs: 86400000, status: "PENDING", expected: ["CANCELLED"], desc: "Exactly 24h PENDING" },
+    { deltaMs: 86400000 + 1000, status: "PENDING", expected: ["CANCELLED"], desc: "24h+1s PENDING" },
+    { deltaMs: 86400000 - 1000, status: "PENDING", expected: [], desc: "24h-1s PENDING" },
+    { deltaMs: 86400000, status: "CONFIRMED", expected: ["CANCELLED"], desc: "Exactly 24h CONFIRMED" },
+    { deltaMs: 86400000 + 1000, status: "CONFIRMED", expected: ["CANCELLED"], desc: "24h+1s CONFIRMED" },
+    { deltaMs: 86400000 - 1000, status: "CONFIRMED", expected: [], desc: "24h-1s CONFIRMED" },
+  ];
+
+  for (const tc of boundaryCases) {
+    const startAt = new Date(now + tc.deltaMs).toISOString();
+    assert.deepEqual(
+      getBookingActions(
+        { ...booking, status: tc.status, startAt },
+        { role: "USER", now },
+      ),
+      tc.expected,
+      `${tc.desc} must yield ${JSON.stringify(tc.expected)}`,
+    );
+  }
+
+  // > 24h (e.g. 48h)
+  const startAt48h = new Date(now + 2 * 86400000).toISOString();
+  assert.deepEqual(
+    getBookingActions(
+      { ...booking, status: "PENDING", startAt: startAt48h },
+      { role: "USER", now },
+    ),
+    ["CANCELLED"],
+  );
+
+  // Other statuses never permit USER cancellation
+  assert.deepEqual(
+    getBookingActions(
+      { ...booking, status: "IN_PROGRESS", startAt: startAt48h },
+      { role: "USER", now },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    getBookingActions(
+      { ...booking, status: "CANCELLED", startAt: startAt48h },
+      { role: "USER", now },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    getBookingActions(
+      { ...booking, status: "RETURNED", startAt: startAt48h },
+      { role: "USER", now },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    getBookingActions(
+      { ...booking, status: "COMPLETED", startAt: startAt48h },
+      { role: "USER", now },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    getBookingActions(
+      { ...booking, status: "REJECTED", startAt: startAt48h },
+      { role: "USER", now },
+    ),
+    [],
+  );
+});

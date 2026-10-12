@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8"/>
+<script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+<style>
+  body { margin:0; padding:20px 24px; background:var(--background,#f8fafc); font-family:'Segoe UI',sans-serif; color:var(--foreground,#1e293b); }
+  h1   { font-size:18px; font-weight:800; margin-bottom:4px; }
+  h2   { font-size:14px; font-weight:700; margin:20px 0 8px; color:#1d4ed8; border-left:3px solid #1d4ed8; padding-left:8px; }
+  h3   { font-size:12.5px; font-weight:700; margin:14px 0 6px; color:#374151; }
+  p,li { font-size:12.5px; line-height:1.6; }
+  table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:16px; }
+  th   { background:#1e3a5f; color:#fff; padding:7px 10px; text-align:left; font-weight:600; }
+  td   { padding:6px 10px; border-bottom:1px solid #e2e8f0; vertical-align:top; }
+  tr:nth-child(even) td { background:#f8fafc; }
+  .bad  { color:#dc2626; text-decoration:line-through; font-size:11px; }
+  .good { color:#16a34a; font-weight:600; font-size:12px; }
+  .ok   { color:#0284c7; font-weight:600; font-size:12px; }
+  .tag  { display:inline-block; padding:2px 7px; border-radius:9px; font-size:10px; font-weight:700; }
+  .t-err  { background:#fee2e2; color:#dc2626; }
+  .t-ok   { background:#dcfce7; color:#16a34a; }
+  .t-keep { background:#dbeafe; color:#1d4ed8; }
+  .t-info { background:#fef3c7; color:#92400e; }
+  .rule-box { background:#eff6ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; margin:12px 0; }
+  .rule-box li { margin-bottom:4px; }
+  .cmp-box { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:10px 0; }
+  .cmp-l { background:#fff7ed; border:1px solid #fed7aa; border-radius:6px; padding:10px 12px; }
+  .cmp-r { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:10px 12px; }
+  .cmp-l h4 { color:#c2410c; font-size:11px; font-weight:700; margin-bottom:6px; }
+  .cmp-r h4 { color:#15803d; font-size:11px; font-weight:700; margin-bottom:6px; }
+  .actor-badge { display:inline-block; padding:1px 6px; border-radius:4px; font-size:10px; font-weight:600; }
+  .ab-admin { background:#ede9fe; color:#6d28d9; }
+  .ab-staff { background:#cffafe; color:#0e7490; }
+  .ab-guest { background:#fef9c3; color:#854d0e; }
+  .ab-user  { background:#dcfce7; color:#166534; }
+</style>
+</head>
+<body>
+
+<h1>📋 Đề xuất chuẩn hóa tên Use Case</h1>
+<p style="color:#64748b;font-size:12px;margin-bottom:16px;">So sánh với sơ đồ mẫu (TMĐT) và đề xuất điều chỉnh — chưa áp dụng, chờ phê duyệt</p>
+
+<!-- ════════════════════════════════════
+     PHẦN 1: PHÂN TÍCH VẤN ĐỀ
+════════════════════════════════════ -->
+<h2>1. Quy tắc đặt tên trong sơ đồ mẫu</h2>
+
+<div class="rule-box">
+  <p style="font-weight:700;margin-bottom:8px;">Quan sát từ sơ đồ mẫu (TMĐT):</p>
+  <ul>
+    <li>✅ <strong>Mỗi UC chỉ mô tả một đối tượng duy nhất</strong> — "Quản lý nhân viên", "Quản lý vai trò", "Quản lý quyền" (ba UC riêng, không gộp)</li>
+    <li>✅ <strong>Không dùng "và", dấu phẩy, dấu gạch chéo</strong> để nối nhiều chức năng trong một tên</li>
+    <li>✅ <strong>Không dùng ngoặc đơn</strong> để giải thích thêm trong tên UC</li>
+    <li>✅ <strong>Động từ ngắn gọn</strong>: "Quản lý", "Xem", "Tìm kiếm", "Chat" — không dùng "Cập nhật/báo", "Khai báo và quản lý"</li>
+    <li>✅ <strong>Tên phản ánh đúng đối tượng nghiệp vụ</strong>, không mô tả luồng ("Quản lý đơn hàng" thay vì "Xem hàng đợi và xử lý đơn hàng")</li>
+  </ul>
+</div>
+
+<h2>2. Bốn vấn đề chính trong cách đặt tên hiện tại</h2>
+
+<div class="cmp-box">
+  <div class="cmp-l">
+    <h4>❌ VẤN ĐỀ 1 — Dùng "và", dấu phẩy nối nhiều thứ</h4>
+    <p class="bad">Quản lý tài khoản User và Staff</p>
+    <p class="bad">Quản lý chi nhánh, tuyến và phí</p>
+    <p class="bad">Xem lịch sử đơn, hợp đồng, hóa đơn</p>
+    <p class="bad">Báo giá và kiểm tra khả dụng xe</p>
+    <p class="bad">Nhận xe trả và hoàn tất đơn</p>
+    <p class="bad">Khai báo và quản lý GPLX</p>
+    <p class="bad">Báo sự cố và phản hồi yêu cầu bồi thường</p>
+    <p class="bad">Xem hàng đợi và xử lý đơn thuê</p>
+    <p class="bad">Đánh giá sự cố và căn cứ trách nhiệm</p>
+    <p class="bad">Tạo và quản lý hành trình cá nhân (AI)</p>
+  </div>
+  <div class="cmp-r">
+    <h4>✅ Mẫu mong muốn (từ sơ đồ tham khảo)</h4>
+    <p class="good">Quản lý tài khoản</p>
+    <p class="good">Quản lý chi nhánh</p>
+    <p class="good">Xem lịch sử thuê xe</p>
+    <p class="good">Kiểm tra xe khả dụng</p>
+    <p class="good">Hoàn tất đơn thuê</p>
+    <p class="good">Khai báo GPLX</p>
+    <p class="good">Báo cáo sự cố</p>
+    <p class="good">Xử lý đơn thuê</p>
+    <p class="good">Thẩm định sự cố</p>
+    <p class="good">Lập hành trình</p>
+  </div>
+</div>
+
+<div class="cmp-box">
+  <div class="cmp-l">
+    <h4>❌ VẤN ĐỀ 2 — Dùng ngoặc đơn giải thích</h4>
+    <p class="bad">Quản lý danh mục xe (hãng, loại, tiện nghi)</p>
+    <p class="bad">Tạo và quản lý hành trình cá nhân (AI)</p>
+    <p class="bad">Nhận gợi ý xe (AI)</p>
+  </div>
+  <div class="cmp-r">
+    <h4>✅ Tên ngắn gọn, không giải thích trong ngoặc</h4>
+    <p class="good">Quản lý danh mục xe</p>
+    <p class="good">Lập hành trình</p>
+    <p class="good">Gợi ý xe</p>
+  </div>
+</div>
+
+<div class="cmp-box">
+  <div class="cmp-l">
+    <h4>❌ VẤN ĐỀ 3 — Mô tả luồng thay vì đối tượng</h4>
+    <p class="bad">Xem hàng đợi và xử lý đơn thuê</p>
+    <p class="bad">Xem thống kê và báo cáo vận hành</p>
+    <p class="bad">Xác minh GPLX trước bàn giao</p>
+    <p class="bad">Gửi đánh giá sau khi thuê</p>
+    <p class="bad">Cập nhật/báo tình trạng vận hành xe</p>
+  </div>
+  <div class="cmp-r">
+    <h4>✅ Tên phản ánh đối tượng/chức năng chính</h4>
+    <p class="good">Xử lý đơn thuê</p>
+    <p class="good">Xem báo cáo vận hành</p>
+    <p class="good">Xác minh GPLX</p>
+    <p class="good">Đánh giá xe</p>
+    <p class="good">Cập nhật tình trạng xe</p>
+  </div>
+</div>
+
+<div class="cmp-box">
+  <div class="cmp-l">
+    <h4>❌ VẤN ĐỀ 4 — Dùng tiếng Anh không cần thiết</h4>
+    <p class="bad">Phân công Staff theo chi nhánh</p>
+    <p class="bad">Quản lý tài khoản User và Staff</p>
+  </div>
+  <div class="cmp-r">
+    <h4>✅ Dùng thuần Việt</h4>
+    <p class="good">Phân công nhân viên</p>
+    <p class="good">Quản lý tài khoản</p>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════
+     PHẦN 2: BẢNG ĐỀ XUẤT
+════════════════════════════════════ -->
+<h2>3. Bảng đề xuất tên mới — Chờ phê duyệt</h2>
+
+<h3><span class="actor-badge ab-admin">Quản trị viên</span> — Admin (10 UC)</h3>
+<table>
+  <tr><th style="width:8%">ID</th><th style="width:35%">Tên hiện tại</th><th style="width:35%">Tên đề xuất</th><th style="width:22%">Lý do</th></tr>
+  <tr>
+    <td>A01</td>
+    <td><span class="bad">Quản lý tài khoản User và Staff</span></td>
+    <td><span class="good">Quản lý tài khoản</span></td>
+    <td><span class="tag t-err">Lỗi 1+4</span> Bỏ "và", dùng tiếng Việt</td>
+  </tr>
+  <tr>
+    <td>A02</td>
+    <td><span class="ok">Quản lý xe</span></td>
+    <td><span class="tag t-keep">Giữ nguyên</span></td>
+    <td>Đúng pattern, ngắn gọn</td>
+  </tr>
+  <tr>
+    <td>A03</td>
+    <td><span class="ok">Quản lý địa điểm</span></td>
+    <td><span class="tag t-keep">Giữ nguyên</span></td>
+    <td>Đúng pattern</td>
+  </tr>
+  <tr>
+    <td>A04</td>
+    <td><span class="ok">Kiểm duyệt đánh giá</span></td>
+    <td><span class="tag t-keep">Giữ nguyên</span></td>
+    <td>Rõ ràng, đúng nghĩa</td>
+  </tr>
+  <tr>
+    <td>A05</td>
+    <td><span class="bad">Xem thống kê và báo cáo vận hành</span></td>
+    <td><span class="good">Xem báo cáo vận hành</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> Bỏ "và thống kê", "báo cáo" bao gồm luôn</td>
+  </tr>
+  <tr>
+    <td>A06</td>
+    <td><span class="bad">Quản lý chi nhánh, tuyến và phí</span></td>
+    <td><span class="good">Quản lý chi nhánh</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> Gộp 3 đối tượng — nên chỉ lấy đối tượng chính</td>
+  </tr>
+  <tr>
+    <td>A07</td>
+    <td><span class="bad">Phân công Staff theo chi nhánh</span></td>
+    <td><span class="good">Phân công nhân viên</span></td>
+    <td><span class="tag t-err">Lỗi 4</span> "Staff" → "nhân viên"; bỏ "theo chi nhánh"</td>
+  </tr>
+  <tr>
+    <td>A08</td>
+    <td><span class="bad">Quản lý danh mục xe (hãng, loại, tiện nghi)</span></td>
+    <td><span class="good">Quản lý danh mục xe</span></td>
+    <td><span class="tag t-err">Lỗi 2</span> Bỏ ngoặc giải thích</td>
+  </tr>
+  <tr>
+    <td>A09</td>
+    <td><span class="bad">Duyệt yêu cầu bồi thường sự cố</span></td>
+    <td><span class="good">Duyệt bồi thường</span></td>
+    <td><span class="tag t-err">Lỗi 3</span> Rút gọn, bỏ từ thừa</td>
+  </tr>
+<tr><td>A10</td><td>Tách từ A06</td><td><span class="good">Quản lý tuyến xe</span></td><td>Phí tuyến là thuộc tính tuyến; không thêm module</td></tr></table>
+
+<h3><span class="actor-badge ab-staff">Nhân viên</span> — Staff (6 UC)</h3>
+<table>
+  <tr><th style="width:8%">ID</th><th style="width:35%">Tên hiện tại</th><th style="width:35%">Tên đề xuất</th><th style="width:22%">Lý do</th></tr>
+  <tr>
+    <td>S01</td>
+    <td><span class="bad">Xem hàng đợi và xử lý đơn thuê</span></td>
+    <td><span class="good">Xử lý đơn thuê</span></td>
+    <td><span class="tag t-err">Lỗi 1+3</span> Mô tả chức năng chính, bỏ "xem hàng đợi"</td>
+  </tr>
+  <tr>
+    <td>S02</td>
+    <td><span class="bad">Bàn giao xe cho khách</span></td>
+    <td><span class="good">Bàn giao xe</span></td>
+    <td><span class="tag t-err">Lỗi 3</span> Bỏ "cho khách" — ngầm hiểu</td>
+  </tr>
+  <tr>
+    <td>S03</td>
+    <td><span class="bad">Nhận xe trả và hoàn tất đơn</span></td>
+    <td><span class="good">Tiếp nhận xe trả</span></td>
+    <td><span class="tag t-err">Lỗi 1+3</span> "Hoàn tất" là hệ quả, không phải hành động riêng</td>
+  </tr>
+  <tr>
+    <td>S04</td>
+    <td><span class="bad">Cập nhật/báo tình trạng vận hành xe</span></td>
+    <td><span class="good">Cập nhật tình trạng xe</span></td>
+    <td><span class="tag t-err">Lỗi 3</span> Bỏ "/báo" và "vận hành" — rút gọn</td>
+  </tr>
+  <tr>
+    <td>S05</td>
+    <td><span class="bad">Đánh giá sự cố và căn cứ trách nhiệm</span></td>
+    <td><span class="good">Thẩm định sự cố</span></td>
+    <td><span class="tag t-err">Lỗi 1+3</span> "Thẩm định" bao hàm luôn đánh giá căn cứ</td>
+  </tr>
+  <tr>
+    <td>S06</td>
+    <td><span class="bad">Xác minh GPLX trước bàn giao</span></td>
+    <td><span class="good">Xác minh GPLX</span></td>
+    <td><span class="tag t-err">Lỗi 3</span> Bỏ "trước bàn giao" — ngữ cảnh từ luồng</td>
+  </tr>
+</table>
+
+<h3><span class="actor-badge ab-guest">Khách vãng lai</span> — Guest (4 UC)</h3>
+<table>
+  <tr><th style="width:8%">ID</th><th style="width:35%">Tên hiện tại</th><th style="width:35%">Tên đề xuất</th><th style="width:22%">Lý do</th></tr>
+  <tr>
+    <td>G01</td>
+    <td><span class="bad">Duyệt, tìm kiếm và lọc xe</span></td>
+    <td><span class="good">Tìm kiếm xe</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> "Duyệt" và "lọc" là sub-action, "Tìm kiếm" là chính</td>
+  </tr>
+  <tr>
+    <td>G02</td>
+    <td><span class="bad">Xem chi tiết xe và đánh giá</span></td>
+    <td><span class="good">Xem thông tin xe</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> Phù hợp mẫu: "Xem thông tin sản phẩm"</td>
+  </tr>
+  <tr>
+    <td>G03</td>
+    <td><span class="bad">Đăng ký / Đăng nhập</span></td>
+    <td><span class="good">Đăng ký tài khoản</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> Đăng nhập là UC trung tâm riêng; G03 = đăng ký</td>
+  </tr>
+  <tr>
+    <td>G04</td>
+    <td><span class="bad">Nhận gợi ý xe (AI)</span></td>
+    <td><span class="good">Gợi ý xe</span></td>
+    <td><span class="tag t-err">Lỗi 2</span> Bỏ ngoặc (AI); rút gọn động từ "Nhận"</td>
+  </tr>
+</table>
+
+<h3><span class="actor-badge ab-user">Người dùng</span> — User (9 UC)</h3>
+<table>
+  <tr><th style="width:8%">ID</th><th style="width:35%">Tên hiện tại</th><th style="width:35%">Tên đề xuất</th><th style="width:22%">Lý do</th></tr>
+  <tr>
+    <td>U01</td>
+    <td><span class="bad">Quản lý hồ sơ cá nhân</span></td>
+    <td><span class="good">Quản lý thông tin cá nhân</span></td>
+    <td><span class="tag t-info">Cải thiện</span> Phù hợp mẫu: "Quản lý thông tin cá nhân"</td>
+  </tr>
+  <tr>
+    <td>U02</td>
+    <td><span class="bad">Báo giá và kiểm tra khả dụng xe</span></td>
+    <td><span class="good">Kiểm tra xe khả dụng</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> Báo giá là kết quả, không phải hành động riêng</td>
+  </tr>
+  <tr>
+    <td>U03</td>
+    <td><span class="ok">Tạo đơn thuê</span></td>
+    <td><span class="good">Đặt xe</span></td>
+    <td><span class="tag t-info">Cải thiện</span> "Đặt xe" gần gũi hơn với người dùng cuối</td>
+  </tr>
+  <tr>
+    <td>U04</td>
+    <td><span class="bad">Xem lịch sử đơn, hợp đồng, hóa đơn</span></td>
+    <td><span class="good">Xem lịch sử thuê xe</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> Gộp 3 đối tượng — dùng tên bao quát</td>
+  </tr>
+  <tr>
+    <td>U05</td>
+    <td><span class="ok">Hủy đơn thuê</span></td>
+    <td><span class="tag t-keep">Giữ nguyên</span></td>
+    <td>Rõ ràng, ngắn gọn</td>
+  </tr>
+  <tr>
+    <td>U06</td>
+    <td><span class="bad">Gửi đánh giá sau khi thuê</span></td>
+    <td><span class="good">Đánh giá xe</span></td>
+    <td><span class="tag t-err">Lỗi 3</span> Bỏ "Gửi" và "sau khi thuê" — ngầm hiểu</td>
+  </tr>
+  <tr>
+    <td>U07</td>
+    <td><span class="bad">Tạo và quản lý hành trình cá nhân (AI)</span></td>
+    <td><span class="good">Lập hành trình</span></td>
+    <td><span class="tag t-err">Lỗi 1+2</span> Bỏ "và quản lý", ngoặc AI; "Lập" bao hàm cả tạo mới</td>
+  </tr>
+  <tr>
+    <td>U08</td>
+    <td><span class="bad">Khai báo và quản lý GPLX</span></td>
+    <td><span class="good">Khai báo GPLX</span></td>
+    <td><span class="tag t-err">Lỗi 1</span> "Quản lý" ở đây trùng nghĩa "khai báo/cập nhật"</td>
+  </tr>
+  <tr>
+    <td>U09</td>
+    <td><span class="bad">Báo sự cố và phản hồi yêu cầu bồi thường</span></td>
+    <td><span class="good">Báo cáo sự cố</span></td>
+    <td><span class="tag t-err">Lỗi 1+3</span> "Phản hồi bồi thường" là sub-flow của báo cáo</td>
+  </tr>
+</table>
+
+<!-- ════════════════════════════════════
+     PHẦN 3: TỔNG KẾT
+════════════════════════════════════ -->
+<h2>4. Tổng kết thay đổi đề xuất</h2>
+
+<table>
+  <tr><th>Loại thay đổi</th><th>Số lượng</th><th>UC</th></tr>
+  <tr>
+    <td><span class="tag t-keep">Giữ nguyên</span></td>
+    <td>4</td>
+    <td>A02, A03, A04, U05</td>
+  </tr>
+  <tr>
+    <td><span class="tag t-err">Sửa lỗi đặt tên (bắt buộc)</span></td>
+    <td>22</td>
+    <td>A01, A05, A06, A07, A08, A09, S01, S02, S03, S04, S05, S06, G01, G02, G03, G04, U02, U04, U06, U07, U08, U09</td>
+  </tr>
+  <tr>
+    <td><span class="tag t-info">Cải thiện thêm</span></td>
+    <td>2</td>
+    <td>U01 (hồ sơ → thông tin), U03 (tạo đơn thuê → đặt xe)</td></tr><tr><td>Tách tuyến xe</td><td>1</td><td>A10</td>
+  </tr>
+</table>
+
+<div class="rule-box" style="background:#f0fdf4;border-color:#bbf7d0;">
+  <p style="font-weight:700;color:#15803d;margin-bottom:6px;">📌 Đã tách trong tài liệu: UC-A06 và UC-A10</p>
+  <p style="font-size:12px;">UC-A06 và UC-A10 đã được thể hiện riêng trong use-cases.md và sơ đồ:</p>
+  <ul style="font-size:12px;">
+    <li><strong>UC-A06:</strong> Quản lý chi nhánh</li>
+    <li><strong>UC-A10:</strong> Quản lý tuyến xe</li>
+  </ul>
+  <p style="font-size:12px;">Phí tuyến là thuộc tính của tuyến → thuộc UC-A10. Danh sách hiện tại có 29 UC nghiệp vụ; Đăng nhập là UC dùng chung riêng. Tách ID không chứng minh đã triển khai.</p>
+</div>
+
+<p style="color:#64748b;font-size:11.5px;margin-top:16px;font-style:italic;">
+  Đồng bộ tài liệu 06/10/2026 theo yêu cầu người dùng. Các chính sách còn mở và kết quả chức năng giữ theo decisions.md/audit; tên gọn không loại bỏ bước nghiệp vụ.
+</p>
+</body>
+</html>
+

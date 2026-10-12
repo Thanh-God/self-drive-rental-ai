@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Use Case Tổng Quát – 29 UC</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    body { margin:0; padding:14px 18px; background:var(--background,#f8fafc); font-family:'Segoe UI',sans-serif; }
+    .pg-title { font-size:17px; font-weight:800; text-align:center; color:var(--foreground,#1e293b); margin-bottom:2px; }
+    .pg-sub   { font-size:12px; text-align:center; color:#64748b; margin-bottom:14px; }
+    svg text  { font-family:'Segoe UI',sans-serif; }
+
+    ellipse.uc        { fill:#dbeafe; stroke:#1d4ed8; stroke-width:1.5; }
+    ellipse.uc-ai     { fill:#ede9fe; stroke:#7c3aed; stroke-width:1.5; }
+    ellipse.uc-new    { fill:#dcfce7; stroke:#16a34a; stroke-width:1.8; }
+    ellipse.uc-center { fill:#fef3c7; stroke:#d97706; stroke-width:2.2; }
+
+    .t-uc    { font-size:11px;  font-weight:500; fill:#0f172a; }
+    .t-id    { font-size:8.5px; font-weight:700; fill:#1e3a5f; }
+    .t-id-g  { font-size:8.5px; font-weight:700; fill:#166534; }
+    .t-id-ai { font-size:8.5px; font-weight:700; fill:#6d28d9; }
+    .t-ctr   { font-size:13px;  font-weight:800; fill:#0f172a; }
+    .t-actor { font-size:12px;  font-weight:700; fill:#1e3a5f; }
+    .t-grp   { font-size:9px;   font-weight:600; fill:#94a3b8; letter-spacing:.4px; }
+    .t-incl  { font-size:8px;   font-style:italic; fill:#6b7280; }
+
+    .lk   { stroke:#374151; stroke-width:1.3; fill:none; }
+    .lk-s { stroke:#374151; stroke-width:1.3; fill:none; stroke-dasharray:3,3; }
+    .dash { stroke:#475569; stroke-width:1.1; stroke-dasharray:5,3; fill:none; }
+    .sep  { stroke:#e2e8f0; stroke-width:1.2; stroke-dasharray:6,4; }
+    .bnd  { fill:none; stroke:#374151; stroke-width:2; }
+    .ah   { stroke:#1e3a5f; stroke-width:1.8; fill:#bfdbfe; }
+    .ab   { stroke:#1e3a5f; stroke-width:1.8; fill:none; }
+  </style>
+</head>
+<body>
+<div class="pg-title">2.4.1. Use Case Tổng Quát</div>
+<div class="pg-sub">Hệ thống Cho Thuê Xe Tự Lái Tích Hợp AI — 29 UC nghiệp vụ + 1 UC xác thực dùng chung | 4 Actor</div>
+<div style="overflow-x:auto;">
+<svg viewBox="0 0 1250 1310" width="1250" style="max-width:100%;display:block;margin:auto;">
+
+  <!-- SYSTEM BOUNDARY -->
+  <rect x="148" y="28" width="910" height="1218" rx="14" class="bnd"/>
+  <text x="603" y="52" text-anchor="middle" style="font-size:12px;font-weight:800;fill:#374151;">HỆ THỐNG CHO THUÊ XE TỰ LÁI TÍCH HỢP AI</text>
+
+  <!-- CENTER: Đăng nhập -->
+  <ellipse cx="603" cy="608" rx="66" ry="30" class="uc-center"/>
+  <text x="603" y="612" text-anchor="middle" class="t-ctr">Đăng nhập</text>
+
+  <!-- ══════════════ LEFT: ADMIN (10 UCs) ══════════════ -->
+  <text x="308" y="74" text-anchor="middle" class="t-grp">[ QUẢN TRỊ VIÊN ]</text>
+
+  <!-- A01 -->
+  <ellipse cx="308" cy="96" rx="90" ry="22" class="uc"/>
+  <text x="308" y="100" text-anchor="middle" class="t-uc">Quản lý tài khoản</text>
+  <text x="222" y="93" class="t-id">UC-A01</text>
+
+  <!-- A02 -->
+  <ellipse cx="308" cy="144" rx="90" ry="22" class="uc"/>
+  <text x="308" y="148" text-anchor="middle" class="t-uc">Quản lý xe</text>
+  <text x="222" y="141" class="t-id">UC-A02</text>
+
+  <!-- A03 -->
+  <ellipse cx="308" cy="192" rx="90" ry="22" class="uc"/>
+  <text x="308" y="196" text-anchor="middle" class="t-uc">Quản lý địa điểm</text>
+  <text x="222" y="189" class="t-id">UC-A03</text>
+
+  <!-- A04 -->
+  <ellipse cx="308" cy="240" rx="90" ry="22" class="uc"/>
+  <text x="308" y="244" text-anchor="middle" class="t-uc">Kiểm duyệt đánh giá</text>
+  <text x="222" y="237" class="t-id">UC-A04</text>
+
+  <!-- A05 -->
+  <ellipse cx="308" cy="288" rx="90" ry="22" class="uc"/>
+  <text x="308" y="292" text-anchor="middle" class="t-uc">Xem báo cáo vận hành</text>
+  <text x="222" y="285" class="t-id">UC-A05</text>
+
+  <!-- A06 -->
+  <ellipse cx="308" cy="336" rx="90" ry="22" class="uc"/>
+  <text x="308" y="340" text-anchor="middle" class="t-uc">Quản lý chi nhánh</text>
+  <text x="222" y="333" class="t-id">UC-A06</text>
+
+  <!-- A07 (new) -->
+  <ellipse cx="308" cy="384" rx="90" ry="22" class="uc-new"/>
+  <text x="308" y="388" text-anchor="middle" class="t-uc">Phân công nhân viên</text>
+  <text x="222" y="381" class="t-id-g">UC-A07 ✦</text>
+
+  <!-- A08 (new) -->
+  <ellipse cx="308" cy="432" rx="90" ry="22" class="uc-new"/>
+  <text x="308" y="436" text-anchor="middle" class="t-uc">Quản lý danh mục xe</text>
+  <text x="222" y="429" class="t-id-g">UC-A08 ✦</text>
+
+  <!-- A09 (new) -->
+  <ellipse cx="308" cy="480" rx="90" ry="22" class="uc-new"/>
+  <text x="308" y="484" text-anchor="middle" class="t-uc">Duyệt bồi thường</text>
+  <text x="222" y="477" class="t-id-g">UC-A09 ✦</text>
+
+  <!-- A10 (new - split from A06) -->
+  <ellipse cx="308" cy="528" rx="90" ry="22" class="uc-new"/>
+  <text x="308" y="532" text-anchor="middle" class="t-uc">Quản lý tuyến xe</text>
+  <text x="222" y="525" class="t-id-g">UC-A10 ✦</text>
+
+  <!-- separator admin/staff -->
+  <line x1="170" y1="573" x2="448" y2="573" class="sep"/>
+  <text x="308" y="588" text-anchor="middle" class="t-grp">[ NHÂN VIÊN ]</text>
+
+  <!-- ══════════════ LEFT: STAFF (6 UCs) ══════════════ -->
+
+  <!-- S01 -->
+  <ellipse cx="308" cy="614" rx="90" ry="22" class="uc"/>
+  <text x="308" y="618" text-anchor="middle" class="t-uc">Xử lý đơn thuê</text>
+  <text x="222" y="611" class="t-id">UC-S01</text>
+
+  <!-- S02 -->
+  <ellipse cx="308" cy="662" rx="90" ry="22" class="uc"/>
+  <text x="308" y="666" text-anchor="middle" class="t-uc">Bàn giao xe</text>
+  <text x="222" y="659" class="t-id">UC-S02</text>
+
+  <!-- S03 -->
+  <ellipse cx="308" cy="710" rx="90" ry="22" class="uc"/>
+  <text x="308" y="714" text-anchor="middle" class="t-uc">Tiếp nhận xe trả</text>
+  <text x="222" y="707" class="t-id">UC-S03</text>
+
+  <!-- S04 -->
+  <ellipse cx="308" cy="758" rx="90" ry="22" class="uc"/>
+  <text x="308" y="762" text-anchor="middle" class="t-uc">Cập nhật tình trạng xe</text>
+  <text x="222" y="755" class="t-id">UC-S04</text>
+
+  <!-- S05 -->
+  <ellipse cx="308" cy="806" rx="90" ry="22" class="uc"/>
+  <text x="308" y="810" text-anchor="middle" class="t-uc">Thẩm định sự cố</text>
+  <text x="222" y="803" class="t-id">UC-S05</text>
+
+  <!-- S06 (new) -->
+  <ellipse cx="308" cy="854" rx="90" ry="22" class="uc-new"/>
+  <text x="308" y="858" text-anchor="middle" class="t-uc">Xác minh GPLX</text>
+  <text x="222" y="851" class="t-id-g">UC-S06 ✦</text>
+
+  <!-- ══════════════ RIGHT: GUEST (4 UCs) ══════════════ -->
+  <text x="882" y="74" text-anchor="middle" class="t-grp">[ KHÁCH VÃNG LAI — không cần đăng nhập ]</text>
+
+  <!-- G03 -->
+  <ellipse cx="882" cy="96" rx="92" ry="22" class="uc"/>
+  <text x="882" y="100" text-anchor="middle" class="t-uc">Đăng ký tài khoản</text>
+  <text x="882" y="83" text-anchor="middle" class="t-id">UC-G03</text>
+
+  <!-- G01 -->
+  <ellipse cx="882" cy="152" rx="92" ry="22" class="uc"/>
+  <text x="882" y="156" text-anchor="middle" class="t-uc">Tìm kiếm xe</text>
+  <text x="882" y="139" text-anchor="middle" class="t-id">UC-G01</text>
+
+  <!-- G02 -->
+  <ellipse cx="882" cy="208" rx="92" ry="22" class="uc"/>
+  <text x="882" y="212" text-anchor="middle" class="t-uc">Xem thông tin xe</text>
+  <text x="882" y="195" text-anchor="middle" class="t-id">UC-G02</text>
+
+  <!-- G04 (AI) -->
+  <ellipse cx="882" cy="264" rx="92" ry="22" class="uc-ai"/>
+  <text x="882" y="268" text-anchor="middle" class="t-uc">Gợi ý xe</text>
+  <text x="882" y="251" text-anchor="middle" class="t-id-ai">UC-G04</text>
+
+  <!-- separator guest/user -->
+  <line x1="755" y1="308" x2="1038" y2="308" class="sep"/>
+  <text x="882" y="326" text-anchor="middle" class="t-grp">[ NGƯỜI DÙNG — yêu cầu đăng nhập ]</text>
+
+  <!-- ══════════════ RIGHT: USER (9 UCs) ══════════════ -->
+
+  <!-- U01 -->
+  <ellipse cx="882" cy="358" rx="92" ry="22" class="uc"/>
+  <text x="882" y="362" text-anchor="middle" class="t-uc">Quản lý thông tin cá nhân</text>
+  <text x="882" y="345" text-anchor="middle" class="t-id">UC-U01</text>
+
+  <!-- U02 (new split) -->
+  <ellipse cx="882" cy="408" rx="92" ry="22" class="uc-new"/>
+  <text x="882" y="412" text-anchor="middle" class="t-uc">Kiểm tra xe khả dụng</text>
+  <text x="882" y="395" text-anchor="middle" class="t-id-g">UC-U02 ✦</text>
+
+  <!-- U03 (new split) -->
+  <ellipse cx="882" cy="458" rx="92" ry="22" class="uc-new"/>
+  <text x="882" y="462" text-anchor="middle" class="t-uc">Đặt xe</text>
+  <text x="882" y="445" text-anchor="middle" class="t-id-g">UC-U03 ✦</text>
+
+  <!-- U04 -->
+  <ellipse cx="882" cy="508" rx="92" ry="22" class="uc"/>
+  <text x="882" y="512" text-anchor="middle" class="t-uc">Xem lịch sử thuê xe</text>
+  <text x="882" y="495" text-anchor="middle" class="t-id">UC-U04</text>
+
+  <!-- U05 -->
+  <ellipse cx="882" cy="558" rx="92" ry="22" class="uc"/>
+  <text x="882" y="562" text-anchor="middle" class="t-uc">Hủy đơn thuê</text>
+  <text x="882" y="545" text-anchor="middle" class="t-id">UC-U05</text>
+
+  <!-- U06 -->
+  <ellipse cx="882" cy="608" rx="92" ry="22" class="uc"/>
+  <text x="882" y="612" text-anchor="middle" class="t-uc">Đánh giá xe</text>
+  <text x="882" y="595" text-anchor="middle" class="t-id">UC-U06</text>
+
+  <!-- U07 (AI) -->
+  <ellipse cx="882" cy="658" rx="92" ry="22" class="uc-ai"/>
+  <text x="882" y="662" text-anchor="middle" class="t-uc">Lập hành trình</text>
+  <text x="882" y="645" text-anchor="middle" class="t-id-ai">UC-U07</text>
+
+  <!-- U08 -->
+  <ellipse cx="882" cy="714" rx="92" ry="28" class="uc"/>
+  <text x="882" y="710" text-anchor="middle" class="t-uc">Khai báo GPLX</text>
+  <text x="882" y="699" text-anchor="middle" class="t-id">UC-U08</text>
+
+  <!-- U09 -->
+  <ellipse cx="882" cy="768" rx="92" ry="22" class="uc"/>
+  <text x="882" y="772" text-anchor="middle" class="t-uc">Báo cáo sự cố</text>
+  <text x="882" y="755" text-anchor="middle" class="t-id">UC-U09</text>
+
+  <!-- ══════════════ ACTORS ══════════════ -->
+
+  <!-- Admin (left, upper) -->
+  <circle cx="66" cy="310" r="16" class="ah"/>
+  <line x1="66" y1="326" x2="66" y2="368" class="ab"/>
+  <line x1="66" y1="340" x2="44"  y2="358" class="ab"/>
+  <line x1="66" y1="340" x2="88"  y2="358" class="ab"/>
+  <line x1="66" y1="368" x2="44"  y2="396" class="ab"/>
+  <line x1="66" y1="368" x2="88"  y2="396" class="ab"/>
+  <text x="66" y="415" text-anchor="middle" class="t-actor">Quản trị viên</text>
+
+  <!-- Staff (left, lower) -->
+  <circle cx="66" cy="735" r="16" class="ah"/>
+  <line x1="66" y1="751" x2="66" y2="793" class="ab"/>
+  <line x1="66" y1="765" x2="44"  y2="783" class="ab"/>
+  <line x1="66" y1="765" x2="88"  y2="783" class="ab"/>
+  <line x1="66" y1="793" x2="44"  y2="821" class="ab"/>
+  <line x1="66" y1="793" x2="88"  y2="821" class="ab"/>
+  <text x="66" y="839" text-anchor="middle" class="t-actor">Nhân viên</text>
+
+  <!-- Guest (right, upper) -->
+  <circle cx="1194" cy="175" r="16" class="ah"/>
+  <line x1="1194" y1="191" x2="1194" y2="233" class="ab"/>
+  <line x1="1194" y1="205" x2="1172" y2="223" class="ab"/>
+  <line x1="1194" y1="205" x2="1216" y2="223" class="ab"/>
+  <line x1="1194" y1="233" x2="1172" y2="261" class="ab"/>
+  <line x1="1194" y1="233" x2="1216" y2="261" class="ab"/>
+  <text x="1194" y="279" text-anchor="middle" class="t-actor">Khách vãng lai</text>
+
+  <!-- User (right, lower) -->
+  <circle cx="1194" cy="573" r="16" class="ah"/>
+  <line x1="1194" y1="589" x2="1194" y2="631" class="ab"/>
+  <line x1="1194" y1="603" x2="1172" y2="621" class="ab"/>
+  <line x1="1194" y1="603" x2="1216" y2="621" class="ab"/>
+  <line x1="1194" y1="631" x2="1172" y2="659" class="ab"/>
+  <line x1="1194" y1="631" x2="1216" y2="659" class="ab"/>
+  <text x="1194" y="677" text-anchor="middle" class="t-actor">Người dùng</text>
+
+  <!-- ══════════════ ACTOR → UC LINKS ══════════════ -->
+
+  <!-- Admin → A01~A10 -->
+  <line x1="91" y1="340" x2="218" y2="96"  class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="144" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="192" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="240" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="288" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="336" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="384" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="432" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="480" class="lk"/>
+  <line x1="91" y1="340" x2="218" y2="528" class="lk"/>
+
+  <!-- Staff → S01~S06 -->
+  <line x1="91" y1="763" x2="218" y2="614" class="lk"/>
+  <line x1="91" y1="763" x2="218" y2="662" class="lk"/>
+  <line x1="91" y1="763" x2="218" y2="710" class="lk"/>
+  <line x1="91" y1="763" x2="218" y2="758" class="lk"/>
+  <line x1="91" y1="763" x2="218" y2="806" class="lk"/>
+  <line x1="91" y1="763" x2="218" y2="854" class="lk"/>
+
+  <!-- Guest → G03,G01,G02,G04 -->
+  <line x1="1169" y1="198" x2="974" y2="96"  class="lk"/>
+  <line x1="1169" y1="198" x2="974" y2="152" class="lk"/>
+  <line x1="1169" y1="198" x2="974" y2="208" class="lk"/>
+  <line x1="1169" y1="198" x2="974" y2="264" class="lk"/>
+
+  <!-- User → U01~U09 -->
+  <line x1="1169" y1="606" x2="974" y2="358" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="408" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="458" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="508" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="558" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="608" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="658" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="714" class="lk"/>
+  <line x1="1169" y1="606" x2="974" y2="768" class="lk"/>
+  <!-- User dùng chung G01/G02; G04 Guest còn chờ chính sách -->
+  <line x1="1169" y1="606" x2="974" y2="152" class="lk-s"/>
+  <line x1="1169" y1="606" x2="974" y2="208" class="lk-s"/>
+  <!-- User dùng chung G04 -->
+  <line x1="1169" y1="606" x2="974" y2="264" class="lk-s"/>
+
+  <!-- Xác thực là tiền điều kiện cho thao tác được bảo vệ; không đăng nhập lại mỗi lần -->
+  <line x1="1169" y1="198" x2="669" y2="608" class="lk"/>
+  <text x="603" y="650" text-anchor="middle" font-size="10">Phiên hợp lệ là tiền điều kiện</text>
+  <!-- ══════════════ LEGEND ══════════════ -->
+  <rect x="155" y="1164" width="895" height="72" rx="8" fill="#f8fafc" stroke="#e2e8f0" stroke-width="1"/>
+
+  <ellipse cx="196" cy="1181" rx="22" ry="12" fill="#dbeafe" stroke="#1d4ed8" stroke-width="1.3"/>
+  <text x="222" y="1185" font-size="11" fill="#374151">UC thông thường</text>
+
+  <ellipse cx="345" cy="1181" rx="22" ry="12" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="371" y="1185" font-size="11" fill="#374151">UC mới / tách ✦</text>
+
+  <ellipse cx="490" cy="1181" rx="22" ry="12" fill="#ede9fe" stroke="#7c3aed" stroke-width="1.3"/>
+  <text x="516" y="1185" font-size="11" fill="#374151">UC tích hợp AI</text>
+
+  <ellipse cx="638" cy="1181" rx="22" ry="12" fill="#fef3c7" stroke="#d97706" stroke-width="1.5"/>
+  <text x="664" y="1185" font-size="11" fill="#374151">UC trung tâm</text>
+
+  <line x1="170" y1="1209" x2="200" y2="1209" stroke="#374151" stroke-width="1.4"/>
+  <text x="205" y="1213" font-size="11" fill="#374151">Liên kết Actor → UC</text>
+
+  <line x1="330" y1="1209" x2="360" y2="1209" stroke="#374151" stroke-width="1.2" stroke-dasharray="5,3"/>
+  <text x="365" y="1213" font-size="11" fill="#374151">Xác thực: tiền điều kiện, không phải include</text>
+
+  <line x1="508" y1="1209" x2="538" y2="1209" stroke="#374151" stroke-width="1.3" stroke-dasharray="3,3"/>
+  <text x="543" y="1213" font-size="11" fill="#374151">Dùng chung (Khách + Người dùng)</text>
+
+  <text x="1040" y="1181" text-anchor="end" font-size="10.5" fill="#64748b">Admin: 10 | Staff: 6</text>
+  <text x="1040" y="1197" text-anchor="end" font-size="10.5" fill="#64748b">Guest: 4 | User: 9</text>
+
+  <!-- footer -->
+  <text x="603" y="1256" text-anchor="middle" font-size="11.5" font-style="italic" fill="#6b7280">
+    Hình 2.4 — Use Case Tổng Quát | Hệ thống Cho Thuê Xe Tự Lái Tích Hợp AI | 29 UC nghiệp vụ + Đăng nhập dùng chung
+  </text>
+
+</svg>
+</div>
+</body>
+</html>
+
+

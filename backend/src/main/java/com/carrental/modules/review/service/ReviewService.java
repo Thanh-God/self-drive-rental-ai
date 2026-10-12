@@ -14,6 +14,11 @@ import java.util.*;
   if(!"COMPLETED".equals(b.status)||rating<1||rating>5||content==null||content.isBlank()||content.length()>1000)throw DomainException.bad("Chỉ đánh giá một lần cho đơn hoàn tất, 1–5 sao và nội dung hợp lệ.");
   jdbc.update("insert into reviews(id,booking_id,rating,content,hidden,created_at,version) values(?,?,?,?,false,?,0)",UUID.randomUUID().toString(),booking,rating,content.strip(),java.sql.Timestamp.from(clock.instant()));
  }
+ public Object getForBooking(Actor a,String bookingId){
+  var b=bookings.require(a,bookingId);
+  var rows=jdbc.queryForList("select id,booking_id,rating,content,hidden,created_at,version from reviews where booking_id=?",b.id);
+  return rows.isEmpty()?null:rows.get(0);
+ }
  public Object publicList(String vehicle){
   var bookingIds=bookings.bookingIdsForVehicle(vehicle);
   if(bookingIds.isEmpty())return List.of();

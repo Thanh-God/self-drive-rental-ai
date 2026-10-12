@@ -31,6 +31,7 @@ frontend/yarn-error.log*
 frontend/npm-debug.log*
 
 # Environment & Secrets
+/test.env
 .env
 .env.local
 .env.development.local

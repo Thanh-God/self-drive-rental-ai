@@ -33,7 +33,7 @@ Cập nhật audit: 29/09/2026. Đây là nguồn quyết định chung, đã h�
 | OP-07 | Map provider | Chọn theo tài khoản, coverage, quota và điều kiện sử dụng; không mặc định OpenStreetMap là một dịch vụ API đầy đủ | Adapter Map |
 | OP-08 | JWT/khóa tài khoản — chốt một phần | Đã duyệt access token ngắn hạn, không refresh, kiểm tra trạng thái và token_version, đăng xuất mọi phiên. Source dùng TTL mặc định 30 phút (cấu hình 1–120), localStorage; đây là cấu hình hiện tại, cần đánh giá bảo mật client trước phát hành | Nghiệm thu auth |
 | OP-09 | Fallback itinerary — đã chốt MVP | Không đủ dữ liệu kiểm chứng thì dừng/thử lại; không lưu bản thiếu tuyến, chưa triển khai trình chỉnh sửa thủ công đầy đủ | UI/API itinerary |
-| OP-10 | Môi trường/phiên bản | Source dùng Java 21, Spring Boot 3.5.16, MySQL 8.x, seed opt-in; chưa có Maven Wrapper. Test mặc định H2, cần kiểm thử MySQL và quy trình khởi động đầy đủ | Nghiệm thu runtime |
+| OP-10 | Môi trường/phiên bản — đã chốt/kiểm chứng | Đã có Maven Wrapper (`mvnw`, `mvnw.cmd`). Đã kiểm chứng độc lập trên Java 21, Spring Boot 3.5.16, MySQL 8.4.11 thật (port 33385/33393/33394/33396/33397) và H2; seed opt-in an toàn. Còn mở: kế hoạch kiểm kê DB môi trường dùng chung khác trước nâng cấp | Nghiệm thu runtime (Đã đạt local) |
 
 ## Baseline nghiệp vụ đã duyệt ngày 28/09/2026
 
@@ -85,3 +85,27 @@ Thông tin phạm vi đã được gửi các chat Giai đoạn 2, 3 và 4; khô
 | AD-19 | Locking Read bảo đảm Current-read dưới MySQL REPEATABLE READ (L03 / F02) | Sử dụng truy vấn khóa PESSIMISTIC_WRITE (lockScheduleByVehicleId) khi kiểm tra lịch và tình trạng xe, buộc InnoDB đọc dữ liệu mới nhất đã commit thay vì đọc snapshot cũ. Khóa tài nguyên xe trước qua scalar ID (findVehicleIdById), tránh nạp entity cũ vào persistence context trước khi có lock. |
 | AD-20 | Chuẩn hóa ranh giới module và Entry Point Workflow (F03) | Đặt controller xử lý vòng đời đơn và chứng từ (RentalWorkflowController) tại module operation, giữ nguyên URL REST và quyền; giao tiếp giữa review sang booking và branch sang user hoàn toàn qua typed API/service thay vì raw SQL cross-module. |
 
+
+
+## Giới hạn nghiệm thu và Chuẩn bị Đóng Giai đoạn 5 — 06/10/2026
+
+- **Trạng thái Kỹ thuật Lõi:** Các kiểm chứng kỹ thuật R1 (Modular Monolith, Concurrency, Rollback), R2/R2B (Browser Incident History, Re-assessment Immutability, Out-of-Order Race), và R3 (Git Bash scripts, fresh dependency, API proxy auth trên MySQL cô lập) đã đạt PASS trong các đợt kiểm thử scoped độc lập (xem Mục 14–18, 20 tại `system-architecture.md`).
+- **Phân định Yêu cầu / Đề xuất / Quyết định:**
+  - Bảng đề xuất (`user-decisions-table.md`) và ma trận ánh xạ Use Case (`uc-mapping-analysis.md`) tại `.runtime/r4-closure-ag-20261006/` là tài liệu chuẩn bị đóng Giai đoạn 5, **không tự động trở thành quyết định phê duyệt**.
+  - **Phụ phí (Surcharges):** Phụ phí phát sinh thông thường (nhiên liệu, vệ sinh, trễ hạn) không được tự tiện đồng nhất hoặc ép vào hồ sơ sự cố (`incident_cases`).
+  - **Snapshot:** Snapshot JSON hợp đồng và hóa đơn là bản ghi toàn vẹn dữ liệu nội bộ tại thời điểm phát hành, **không tự khẳng định có giá trị pháp lý** thay thế văn bản điện tử có thẩm định/chứng thực ngoài hệ thống.
+  - **Tài khoản:** Trạng thái tài khoản trong source hiện tại chỉ gồm `ACTIVE` và `LOCKED`, không có `INACTIVE`. Không tự mở rộng thu thập CCCD/PII.
+  - **AI & Bản đồ:** Mock data hoặc rule engine nội bộ **không chứng minh module AI đã hoàn tất**. Nhà cung cấp AI (Gemini Flash/OpenAI...) và Bản đồ (Leaflet/OSM/Google Maps) hiện chỉ là các phương án đề xuất chưa được phê duyệt chính thức; không gọi API ngoài hoặc tích hợp secret key khi chưa chốt quota, tài khoản và chi phí.
+  - **Cơ sở dữ liệu môi trường dùng chung:** Sao lưu dữ liệu (Backup) không tự cấp quyền chạy Flyway `repair` hay `clean`. Mọi thao tác nâng cấp DB khác phải tuân thủ quy trình kiểm kê 5 bước độc lập sau khi xác định được target DB cụ thể.
+- **Điều kiện Đóng Giai đoạn 5:** Người dùng xem xét và phê duyệt (hoặc phê duyệt hoãn) 8 quyết định nghiệp vụ còn mở (QD-01 $\rightarrow$ QD-08). Sau khi có phê duyệt của Người dùng, Giai đoạn 5 chính thức hoàn tất.
+
+
+## Chỉ đạo ưu tiên trải nghiệm Guest/User — 06/10/2026
+
+Người dùng yêu cầu lập kế hoạch/hoàn thiện tài liệu và giao Guest/User trước. Mục tiêu UX: home cóxeAPI thật; đăng ký USER thànhcông về /; login USER mặc định về /, giữ đích /user hợp lệ; Staff/Admin giữ home theo role. Triển khai/QA chưa thực hiện trong lượt lập kế hoạch. Xem kế hoạch GU trong docs/ui/phase-4-handoff.md. Không phê duyệt toàn bộ28UC, cọc/phụphí/no-show/snapshot/retention, AI/Map hoặc provider. Điều kiện đóng5 là phạmvi/phêduyệt và bằngchứng của phần triểnkhai tươngứng; không mặc định chỉ duyệt bảng đềxuất là chức năng hoàn tất.
+
+### Đồng bộ Use Case — 06/10/2026
+29 UC nghiệp vụ + Đăng nhập dùng chung; User dùng chung tìm/xem xe. Tách tên A10 và rút gọn tên không đổi API/schema/quyền. U04 giữ tài liệu thuê; U09 giữ phản hồi bồi thường. Thu hồi phân công, giờ hoạt động chi nhánh và Guest AI không được tự coi là quyết định đã duyệt. Kế hoạch User tại docs/ui/phase-4-handoff.md; U07 cần giải quyết quyết định AI/Map phụ thuộc trước triển khai. Các quyết định và audit lịch sử giữ nguyên.
+
+## Chỉ đạo core trước AI — 07/10/2026
+Người dùng yêu cầu audit toànproject và hoàn thiện nghiệp vụ cácactor trước mọiAI. G04/U07 hoãn sangphaseAI,khôngbịxóa/nóikhôngcầnvĩnhviễn. Onlinepaymentvẫnngoàiscope; policycònmởkhôngtựchốt. Audit/kếhoạch core-audit-20261007.md phânbiệt triểnkhai/nghiệmthu và phase0–8mới với auditgiaiđoạncũ. Chưatriểnkhai source trong lượt audit.

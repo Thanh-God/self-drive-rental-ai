@@ -25,7 +25,7 @@ export default function RegisterPage() {
     setSubmitting(true);
     try {
       const result = await register(form);
-      if (result.user?.role) {
+      if (result.token && result.user?.role === "USER") {
         navigate(homePathForRole(result.user.role), { replace: true });
       } else {
         navigate("/login", { replace: true, state: { registered: true } });
