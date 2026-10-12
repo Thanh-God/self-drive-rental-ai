@@ -975,3 +975,7 @@ Acceptance .runtime/coordination-c8b-review-20261012-121002/ACCEPTANCE.md; HEAD 
      - Toàn bộ HTTP errors (3 calls: 409, 500, 409) và console issues đều được phân loại và kiểm chứng 100% là expected errors.
 - **Trạng thái**: C8B **PASS scoped**. Không sửa backend hay migration (fat JAR và 163 backend manifest inputs giữ nguyên); fixture container `kltn-c8b-browser-*` đã dừng, volume retained; cổng 8080/5173/33626 đã giải phóng; DB người dùng 33385 và 3306 nguyên vẹn.
 
+
+### C8B Antigravity independent review — 12/10/2026 — FAIL / PARTIAL, Codex A
+
+Acceptance .runtime/coordination-c8b-antigravity-review-20261012-125354/ACCEPTANCE.md; HEAD2b78e3b, preexisting2blank-line deletions preserved. Independent54/54frontendtests,lint/demoAPIbuild and18/18guard PASS; C8A163manifest0drift retained. Savedbrowser40assertions partial; missingactualStaffUI401session/loginproof and requiredinvalid/RBAC/statuspendingcases. Runner prematurelywritesPASS beforecommoncleanup, ignoresfailureobject/nativeexit and does notinvalidateonrestorefailure; previewdist/sourceprovenance absent. Follow-up .runtime/coordination-c8b-final-proof-20261012-125620/TASK.md handles C8B-F01..F04only, preserves provenUI/tests. No reviewer livefixture/data cleanup/push, C8B/C8 not complete.
