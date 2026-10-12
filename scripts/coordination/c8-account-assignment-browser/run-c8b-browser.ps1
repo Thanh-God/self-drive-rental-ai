@@ -11,6 +11,7 @@ param(
 
     [switch]$PreflightOnly,
 
+    [string]$ReferenceManifestPath = '',
     [string]$ControlProbe = ''
 )
 
@@ -71,9 +72,13 @@ foreach ($p in @($helper, $fixtureHelper, $browserEntry, $controls, $vite, $acce
     }
 }
 
-$c8bManifestFile = Join-Path $PSScriptRoot 'c8b-reference-manifest.json'
+$c8bManifestFile = if ($ReferenceManifestPath) { FullPath $ReferenceManifestPath } else { Join-Path $PSScriptRoot 'c8b-reference-manifest.json' }
+if (-not (Test-Path -LiteralPath $c8bManifestFile)) { throw '[DEPENDENCY_GUARD] Missing C8B reference manifest' }
+. (Join-Path $PSScriptRoot 'c8b-inputs.ps1')
+$inputBefore = Get-C8BInputs $repo
 if (Test-Path -LiteralPath $c8bManifestFile) {
     $c8bManifest = Get-Content -LiteralPath $c8bManifestFile -Raw | ConvertFrom-Json
+    if (@($c8bManifest.PSObject.Properties).Count -ne $inputBefore.Count -or $inputBefore.Count -eq 0) { throw '[SOURCE_DRIFT] C8B input keyset differs' }
     foreach ($prop in $c8bManifest.PSObject.Properties) {
         $file = Join-Path $repo $prop.Name
         if (-not (Test-Path $file)) {
@@ -181,6 +186,7 @@ if (-not $ControlProbe) {
 
 New-Item -ItemType Directory -Path $EvidenceDir | Out-Null
 $privateFile = Join-Path $EvidenceDir 'mysql.private.env'
+$inputBefore | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'source-before.json')
 
 $originalError = $null
 $cleanupError = $null
@@ -390,6 +396,11 @@ try {
         }
     }
 
+    if ($ControlProbe -eq 'CleanupFailure') {
+        $fallback = Invoke-OwnedProcessCleanup -OwnedProcesses $processes
+        $cleanupLog.Add("Adverse-test owned process fallback stopped: $($fallback.Success)")
+    }
+
     if ($ControlProbe -eq 'ContainerFailure' -or ($owned -and -not [string]::IsNullOrEmpty($container))) {
         if ($ControlProbe -eq 'ContainerFailure') {
             $cleanupPassed = $false
@@ -406,7 +417,7 @@ try {
                     if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Docker stop exited with code $LASTEXITCODE" }
                 } else {
                     $runningCheck = @(& docker inspect --format '{{.State.Running}}' $container 2>&1)
-                    if (($runningCheck -join '').Trim() -eq 'true') {
+                    if ($LASTEXITCODE -ne 0 -or $runningCheck.Count -ne 1 -or ($runningCheck -join '').Trim() -cne 'false') {
                         $cleanupPassed = $false
                         $cleanupLog.Add("Container $container is still running after stop")
                         if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Container $container failed to stop" }
@@ -427,7 +438,9 @@ try {
             throw '[RESTORE_FAILURE] Injected environment restore failure'
         }
         Restore-ProcessEnvironment -SavedEnvironment $savedEnv
-        $cleanupLog.Add("Process environment restored")
+        $envAfter = Snapshot-ProcessEnvironment -VariableNames $variables
+        foreach ($v in $variables) { if ($savedEnv[$v] -cne $envAfter[$v]) { throw "[RESTORE_FAILURE] Caller environment differs: $v" } }
+        $cleanupLog.Add("Process environment restored and independently compared")
     } catch {
         $cleanupPassed = $false
         $cleanupLog.Add("Environment restore failed: $($_.Exception.Message)")
@@ -436,6 +449,10 @@ try {
         }
     }
 
+    if ($ControlProbe -eq 'RestoreFailure') { Restore-ProcessEnvironment -SavedEnvironment $savedEnv }
+    $inputAfter = Get-C8BInputs $repo
+    $inputAfter | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'source-after.json')
+    if (($inputBefore | ConvertTo-Json -Compress) -cne ($inputAfter | ConvertTo-Json -Compress)) { $cleanupPassed = $false; $cleanupError = '[SOURCE_DRIFT] Inputs changed during execution' }
     if (Test-Path -LiteralPath $EvidenceDir) {
         [pscustomobject]@{
             CleanupPassed = $cleanupPassed
@@ -444,7 +461,7 @@ try {
 
         $finalStatus = if ($originalError) {
             'FAILED'
-        } elseif ($ControlProbe -eq 'Normal') {
+        } elseif ($ControlProbe -eq 'Normal' -and $cleanupPassed) {
             'CONTROL_ONLY'
         } elseif ($ControlProbe -in @('CleanupFailure', 'RestoreFailure', 'ContainerFailure', 'Exception')) {
             'FAILED'

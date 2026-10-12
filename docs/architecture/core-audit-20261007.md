@@ -153,3 +153,7 @@ Inspect→Understand→minimal Implement→target Tests→Regression→Review→
 
 
 
+
+## C8 scoped closure — 12/10/2026
+
+C8 accounts/add-only Staff assignment scope is DONE: C8A acceptance retained with163unchangedinputs and C8B completed directly by Codex A at userrequest. Acceptance .runtime/coordination-c8-codexa-complete-20261012-140824/ACCEPTANCE.md;54/54frontendtests,lint/demoAPIbuild,37/37guards,59/59realbrowserHTTPMySQLchecks,147finalsource/buildhashesnodrift,ownedservicesstopped. Staff UI lock401 clearsession/loginredirect/unlockfreshlogin, invalid/RBAC/pending/stale/assignmentreadback proved. Add-onlycontractretained; revocationpolicy stillunapproved. Historical07/10snapshotrows/percentagesabove preserved, not retrospectivelyrecalculated. C8completiondoesnotcloseC9/location/AIMap/otherStage5work; no wholesystemPASS.

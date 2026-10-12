@@ -297,6 +297,19 @@ async function main() {
     403,
   );
 
+  const negativeLinks=sql("SELECT COUNT(*) FROM staff_branches;");
+  for(const [name,payload,status] of [
+    ["nonStaff",{userId:userData.user.id,branchId:"hn"},400],
+    ["missingBranch",{userId:staffId,branchId:"does-not-exist"},404],
+    ["inactiveBranch",{userId:staffId,branchId:"br-inactive"},409]]) {
+    const response=await fetch(`${api}/admin/staff-branches`,{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${adminToken}`},body:JSON.stringify(payload)});
+    record(`Invalid assignment ${name}`,response.status,status);
+  }
+  record("Invalid assignments preserve all links",sql("SELECT COUNT(*) FROM staff_branches;"),negativeLinks);
+  const beforeInvalid=sql("SELECT COUNT(*) FROM users;");
+  const invalid=await fetch(`${api}/admin/accounts`,{method:"POST",headers:{"content-type":"application/json",authorization:`Bearer ${adminToken}`},body:JSON.stringify({email:"invalid@test",fullName:"Invalid",password:"tiny"})});
+  record("Backend invalid staff password rejected",invalid.status,400);
+  record("Invalid create writes no row",sql("SELECT COUNT(*) FROM users;"),beforeInvalid);
   // User browser context direct URL navigation
   const userContext = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -495,12 +508,40 @@ async function main() {
   );
   const staffPage = await staffContext.newPage();
   monitor(staffPage);
+  await staffContext.route("**/api/v1/**", dispatcher(new Map()));
+  await staffPage.goto(`${base}/staff/queue`);
+  await staffPage.waitForURL("**/staff/queue");
+  await staffPage.waitForFunction(() => localStorage.getItem("kdrive.user") !== null);
+  record("Staff authenticated application before lock", new URL(staffPage.url()).pathname, "/staff/queue");
+  const staffAdmin = await fetch(`${api}/admin/accounts`, {headers:{authorization:`Bearer ${staffToken1}`}});
+  record("Staff admin API forbidden", staffAdmin.status, 403);
+  await staffPage.waitForLoadState("networkidle");
+  await staffPage.goto(`${base}/admin/accounts`);
+  await staffPage.waitForURL(url => url.pathname !== "/admin/accounts");
+  record("Staff admin page denied", new URL(staffPage.url()).pathname !== "/admin/accounts", true);
+  await staffPage.waitForLoadState("networkidle");
 
+  const patchKey = `PATCH ${browserApi}/admin/accounts/${staffId}`;
+  expected.push({method:"PATCH",url:`${browserApi}/admin/accounts/${staffId}`,status:500});
+  scenarios.set(patchKey,{error:500,message:"Status failure control",count:0});
+  await staffArticle.getByRole("button",{name:"Khóa tài khoản",exact:true}).click();
+  await page.getByText("Status failure control",{exact:true}).waitFor();
+  record("Failed status leaves SQL unchanged",sql(`SELECT status,version FROM users WHERE id=${q(staffId)};`),"ACTIVE\t1");
+  scenarios.delete(patchKey);
+  const patchReached=deferred(), patchRelease=deferred(), patchFinished=deferred();
+  scenarios.set(patchKey,{reached:patchReached,release:patchRelease,finished:patchFinished,count:0});
   // Admin locks Staff account via UI
   const lockBtn = staffArticle
     .locator("button.btn-secondary")
     .filter({ hasText: "Khóa tài khoản" });
   await lockBtn.click();
+  await bounded(patchReached.promise,"status reached backend");
+  record("Status disabled while held",await lockBtn.isDisabled(),true);
+  await lockBtn.evaluate(button => {button.click(); button.click();});
+  record("One status PATCH while held",scenarios.get(patchKey).count,1);
+  patchRelease.resolve();
+  await bounded(patchFinished.promise,"status fulfilled");
+  scenarios.delete(patchKey);
   await page
     .getByText(`Đã cập nhật trạng thái tài khoản ${staffEmail}.`)
     .waitFor();
@@ -516,6 +557,17 @@ async function main() {
     "LOCKED\t2",
   );
 
+  expected.push({method:"GET",url:`${browserApi}/auth/me`,status:401});
+  await staffPage.reload();
+  await staffPage.waitForURL("**/login");
+  record("Locked Staff application redirects login", new URL(staffPage.url()).pathname, "/login");
+  record("Locked Staff token cleared", await staffPage.evaluate(() => localStorage.getItem("kdrive.jwt")), null);
+  await staffPage.locator('input[name="email"]').fill(staffEmail);
+  await staffPage.locator('input[name="password"]').fill(staffPass);
+  expected.push({method:"POST",url:`${browserApi}/auth/login`,status:401});
+  await staffPage.getByRole("button",{name:"Đăng nhập",exact:true}).click();
+  await staffPage.locator("form p").waitFor();
+  record("Locked Staff UI login remains unauthenticated", await staffPage.evaluate(() => localStorage.getItem("kdrive.jwt")), null);
   // Next protected request with old staff token receives 401
   expected.push({ method: "GET", url: `${api}/me/branches`, status: 401 });
   const staffLockedRequest = await fetch(`${api}/me/branches`, {
@@ -567,6 +619,10 @@ async function main() {
     401,
   );
 
+  await staffPage.getByRole("button",{name:"Đăng nhập",exact:true}).click();
+  await staffPage.waitForURL("**/staff/queue");
+  record("Unlocked Staff UI login succeeds", new URL(staffPage.url()).pathname, "/staff/queue");
+  record("Fresh UI token differs from revoked token", await staffPage.evaluate(old => localStorage.getItem("kdrive.jwt") !== old, staffToken1), true);
   // New login succeeds and issues token 2
   const newStaffLoginRes = await loginApi(staffEmail, staffPass);
   record(
@@ -592,6 +648,7 @@ async function main() {
     2,
   );
 
+  await staffPage.waitForLoadState("networkidle");
   await staffContext.close();
 
   // =========================================================================

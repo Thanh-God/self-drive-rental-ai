@@ -125,6 +125,18 @@ try {
     Refused { & $runner -EvidenceDir $missingTarget -AcceptedBuildDir '.runtime/nonexistent-build-evidence' } '[DEPENDENCY_GUARD]'
     Check 'Missing dependency refused fail-closed' (-not (Test-Path $missingTarget))
 
+    $manifest = Join-Path $PSScriptRoot 'c8b-reference-manifest.json'
+    $driftMap = Get-Content $manifest -Raw | ConvertFrom-Json
+    $driftMap.'frontend/package.json' = ('0' * 64)
+    $driftPath = Join-Path $EvidenceDir 'drift-reference.json'
+    $driftMap | ConvertTo-Json | Set-Content $driftPath
+    $driftTarget = Join-Path $EvidenceDir 'drift-target'
+    Refused { & $runner -EvidenceDir $driftTarget -ReferenceManifestPath $driftPath -ControlProbe Normal } '[PREFLIGHT_GUARD] Source drift'
+    Check 'Actual runner refuses content drift without mutation' (-not (Test-Path $driftTarget))
+    $missingManifestTarget = Join-Path $EvidenceDir 'missing-manifest-target'
+    Refused { & $runner -EvidenceDir $missingManifestTarget -ReferenceManifestPath (Join-Path $EvidenceDir 'absent.json') -ControlProbe Normal } '[DEPENDENCY_GUARD]'
+    Check 'Required manifest cannot be omitted' (-not (Test-Path $missingManifestTarget))
+
     # 11. Caller Sentinel Survival & Adverse Cleanup Failure Injection through common finally
     $sentinel = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 300') -WindowStyle Hidden -PassThru
     $null = $sentinel.Handle
