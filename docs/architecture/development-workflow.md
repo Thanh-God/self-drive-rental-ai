@@ -852,30 +852,21 @@ Acceptance/HANDOFF .runtime/coordination-c7a-codexa-complete-20261011-140830/. F
 
 Mounted API-mode UI coverage now guards duplicate incident POSTs while a response is pending, verifies Vietnam-local to UTC payload conversion, and exercises incident list/history loading, error, retry, and refreshed readback states. A 403 response remains an error and does not claim success or reload the list. The UI also exposes retry for incident-event history failures. `npm test -- --test-concurrency=1` passed 39/39 with no skips, `npm run lint` passed, and demo/API builds passed. This evidence exercises the mounted UI with an intercepted HTTP adapter; it is not live backend or MySQL evidence. Docker was unavailable in this run, so browser/API/MySQL acceptance remains BLOCKED pending a live isolated fixture. See `.runtime/coordination-c7b-codexb-20261011-122606/HANDOFF.md`; C7B is not accepted by this audit entry.
 
-
 ### C7B independent acceptance — PARTIAL / BLOCKED, Codex A, 11/10/2026
 
 Implementation 05ac032: independent frontend tests 39/39 no skips, lint and demo/API builds PASS (sandbox EPERM rerun outside sandbox); source/dependency hashes stable and C7A backend manifest has zero drift. Live Docker engine unavailable; required dedicated browser harness and SQL/persistence/auth/held-response evidence remain NOT VERIFIED. Acceptance and remaining-scope TASK: .runtime/coordination-c7b-review-20261011-145207/. C7A scoped PASS preserved; C7B/C7C and whole C7 remain incomplete. No services started, fixture cleanup or push.
-
-
 
 ### C7B interrupted checkpoint review — FAIL / PARTIAL, Codex A, 11/10/2026
 
 Three untracked browser harness sources saved as WIP checkpoint, not accepted implementation. Syntax and 2 root-refusal guards PASS; prior39/39 UI/lint/demo/API evidence retained by unchanged hashes. Browser not executed in partial artifact, HANDOFF absent; static flow defects in cross-booking retry and two-history-case assumptions plus missing exact SQL/time/provenance/adverse proofs. Docker29.7.2 now available outside sandbox; interrupted fixture stopped and retained KEEP, original MySQL identity running. Acceptance: .runtime/coordination-c7b-checkpoint-review-20261011-151947/ACCEPTANCE.md. Remaining work transferred via user-forwarded TASK .runtime/coordination-c7b-antigravity-20261011-152123/TASK.md; no agent messaging/control, no fixture cleanup or push. C7A scopedPASS retained, C7B/C7C incomplete.
 
-
-
 ### C7B Codex A direct completion — PASS scoped, 11/10/2026
 
 Interrupted Antigravity checkpoint remains FAIL/PARTIAL (three repeated alert timeouts, route double-handle, interrupted fixture, no handoff/commit). Codex A repaired single awaited route dispatcher, precise TIMESTAMP6 comparison, real custody/late report and ownership/400 negatives, pending POST, SQL/event/readback,8-table meaningful invariants, loading/retry/out-of-order. Final live54 assertions PASS; guard/lifecycle41, resume3, focused regression5 PASS. JAR C7A reused with0backend source drift; current final runtime manifest151entries stable. API build/preview uses explicit /api/v1 proxy after resource/CORS findings; same exact isolated fixture reused with new booking IDs, not new-container loop. Acceptance/HANDOFF/implementation notes: .runtime/coordination-c7b-codexa-complete-20261011-164952/. Own services/fixture stopped, volume/evidence retained; original MySQL identity/mount running unchanged, no SQL equality claimed. C7B report slice accepted; C7C/wholeC7/Stage5 remain unverified, no policy/backend/frontendproduct change, no push/reset/prune.
 
-
-
 ### C7 closure — PASS scoped, Codex A, 12/10/2026
 
 C7 incidentworkflow rowC7 now closed: C7A backend input/JAR unchanged(hashretained); C7B reverified54realbrowserassertions onfinalsharedUI; C7C138assertions(120HTTP/MySQL+18browser) prove approvedassessment/coverage/request,ADMINclaim,USERdispute,reassess/close,role/state/range negatives,stale+concurrent200/409,historyimmutability and8table noautomaticdeduction. Reproduced duplicateincidentactionPOST despite disabledbutton, fixedsynchronousguard+finallyreset and regression. Frontend40/40noskip,lint,demo/APIbuild PASS; actualguard/lifecycle41,resume3,focused5 PASS. Bothlive152inputmanifests currentmatch0drift. Acceptance/HANDOFF/notes: .runtime/coordination-c7c-codexa-20261012-083404/. Oneisolatedfixture bade0d92ec28 stopped/volumeKEEP,ownPIDabsent/portsfree,originalMySQLidentity/mount running unchanged(noSQL-equalityclaim). RetainhistoricalFAIL/evidence/dirty/untracked; noagentmessages,backend/migration/policychange,push/reset/prune. C7complete indefinedscope, notwholeStage5/systemPASS; otherbacklog/decisions remain.
-
-
 
 ### C8 planning and sequential handoff — 12/10/2026
 
@@ -899,8 +890,6 @@ Baseline5052919 branchupdate-20261012-0920 clean; C7 accepted scoped(d3ebcb6,C7C
      - `run-c8a.ps1`: Xây dựng fat JAR mới của C8A, khởi chạy fixture MySQL cô lập (`kltn-c8a-ag-*`), thực thi `AccountAssignmentHttpServerTest` và `RouteVersionGuardTest`, capture XML và SQL readback -> PASS (Exit 0, `PASS_SCOPED`).
      - Regression: `./mvnw.cmd test` chạy 106 tests, 0 failures, 0 errors, 8 skipped -> BUILD SUCCESS.
 - **Trạng thái**: C8A **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu độc lập. Giữ nguyên DB người dùng (33385, 3306), không chỉnh sửa frontend (chờ mở gate C8B), không git push.
-
-
 
 ### C8A independent review — 12/10/2026 — FAIL / PARTIAL, Codex A
 
@@ -932,7 +921,26 @@ C8A is not accepted: caller env matrix checks untouched variables/any exception 
      - Sửa toàn bộ ví dụ hợp đồng API trong HANDOFF mới: `POST /api/v1/admin/staff-branches` với body `{"userId": "...", "branchId": "..."}`; `PATCH /api/v1/admin/accounts/{id}` với body `{"status": "...", "version": 0}`.
 - **Trạng thái**: C8A Follow-up **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu. DB người dùng tại 33385 và 3306 nguyên vẹn; frontend C8B giữ nguyên chờ gate mở.
 
-
 ### C8A follow-up independent review — 12/10/2026 — PARTIAL / FAIL, Codex A
 
 Baseline7cc263e; preexisting12 blank-line deletions preserved. Acceptance .runtime/coordination-c8a-followup-review-20261012-104526/ACCEPTANCE.md. Independent unsandboxed matrix16/16 exit0 (sandbox attempt cleanup permission failure); reference160/live163 input hashes match. Saved verify106/0fail/0error/8skip and actual fat-JAR startup/MySQL XML3+4 evidence retained; not independently replayed live. Fixture eb25cfaa...412b82 exited. Required cleanup failure proof still simulates a boolean rather than actual cleanup; control mode emits misleading business PASS_SCOPED and unknown modes bypass preflight; JAR8188 ownership/occupied-port proof needs strengthening. Follow-up .runtime/coordination-c8a-final-guards-20261012/TASK.md addresses only remaining F01..F04. C8B gate CLOSED; no new live fixture, business change, data cleanup or push. This supersedes prior completion claim while preserving audit history.
+
+### C8A Final Guards — Khắc phục dứt điểm findings F01..F04 — Antigravity, 12/10/2026
+
+- **Phạm vi xử lý**: Khắc phục triệt để 4 findings F01..F04 theo TASK `.runtime/coordination-c8a-final-guards-20261012/TASK.md` và `ACCEPTANCE.md`:
+  1. `F01 (Actual Common Cleanup Failure Injection & Caller Sentinel Survival)`:
+     - Trong `run-c8a.ps1`: `-ControlMode AdverseCleanup` khởi chạy owned process thật và gọi trực tiếp `Invoke-OwnedProcessCleanup -OwnedProcesses @($controlOwnedProc) -CustomStopProcess { param($p) throw 'Injected cleanup failure' }`. Sinh readback `maven-process-adverse.json` chứng minh owned process chưa thoát (`HasExited=false`) và runner fail-closed (`Summary.Status='FAILED'`, `Summary.ProcessCleanupPassed=false`, mã lỗi `[RUNNER_FAILURE]`).
+     - Trong `test-c8a-guards.ps1`: Chạy caller sentinel độc lập, kích hoạt runner adverse, khẳng định runner thất bại và caller sentinel vẫn sống sót 100%.
+  2. `F02 (Explicit CONTROL_ONLY & BusinessVerified=false Semantics, Preflight Mode Rejection)`:
+     - `run-c8a.ps1`: Kiểm tra tham số `ControlMode`, từ chối fail-closed `[PREFLIGHT_GUARD] Unsupported ControlMode` trước bất kỳ thao tác tạo thư mục hay mutation nào nếu mode không hợp lệ.
+     - Khi chạy ở `ControlMode`, không sinh container/volume ảo (`$null`), ghi nhận minh bạch `Status = 'CONTROL_ONLY'` và `BusinessVerified = $false`. Trạng thái `PASS_SCOPED` và `BusinessVerified = $true` chỉ được ghi khi chạy live nghiệp vụ thực tế.
+  3. `F03 (Fat JAR Port 8188 Preflight Occupancy Refusal, Owned Startup Identity, Authenticated Protected GET & Exact Log Validation)`:
+     - `run-c8a.ps1`: Thêm preflight check cổng 8188 trống bằng `TcpListener` trước khi spawn fat JAR (từ chối fail-closed nếu bị chiếm dụng). Xác minh startup identity tiến trình sở hữu (`PID`, `HasExited=false`).
+     - Sau khi login lấy được JWT token, thực hiện tiếp authenticated request `GET /api/v1/me/branches` với header `Authorization: Bearer <token>`, chứng minh token hoạt động trên endpoint được bảo vệ.
+     - Kiểm tra chuỗi log đặc trưng cho Flyway (`org.flywaydb.core.FlywayExecutor`, `flyway_schema_history`) và Hibernate (`HHH000412: Hibernate ORM core version`, `HHH10001005: Database info`).
+     - Dọn dẹp fat JAR bằng `Invoke-OwnedProcessCleanup` và ghi nhận readback `fatjar-verification.json` kèm PID và `HasExited=true`.
+  4. `F04 (Chuẩn hóa XML Counts & Concrete Commands)`:
+     - Chuẩn hóa số lượng test case trong HANDOFF: `RouteVersionGuardTest` là 4 (4 executed, 0 skipped trên live MySQL fixture; 3 executed, 1 skipped trên verify không có MySQL env); `AccountAssignmentHttpServerTest` là 3 (3 executed, 0 skipped); tổng cộng 7 tests live MySQL (7 executed, 0 skipped, 0 failures, 0 errors).
+     - Ghi nhận câu lệnh cụ thể không rút gọn; bảo toàn thay đổi blank-line hiện có.
+- **Trạng thái**: C8A Final Guards **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu. DB người dùng tại 33385 và 3306 nguyên vẹn; frontend C8B giữ nguyên chờ gate mở.
+

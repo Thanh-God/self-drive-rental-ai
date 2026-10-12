@@ -87,7 +87,6 @@ try {
     $fixtureScripts = Join-Path $fixtureRoot 'scripts/coordination/c8-account-assignment'
     New-Item -ItemType Directory $fixtureScripts -Force | Out-Null
     Copy-Item $runner (Join-Path $fixtureScripts 'run-c8a.ps1')
-    # Create reference manifest pointing to nonexistent file
     $badManifest = [ordered]@{ 'nonexistent/file.txt' = '0123456789abcdef' }
     $badManifest | ConvertTo-Json | Set-Content (Join-Path $fixtureScripts 'c8a-reference-manifest.json')
     $missingTarget = Join-Path $fixtureRoot '.runtime/missing-target'
@@ -100,10 +99,8 @@ try {
     $driftScripts = Join-Path $driftRoot 'scripts/coordination/c8-account-assignment'
     New-Item -ItemType Directory $driftScripts -Force | Out-Null
     Copy-Item $runner (Join-Path $driftScripts 'run-c8a.ps1')
-    # Create dummy existing file in drift fixture
     New-Item -ItemType Directory (Join-Path $driftRoot 'backend') -Force | Out-Null
     'dummy content' | Set-Content (Join-Path $driftRoot 'backend/pom.xml')
-    # Create reference manifest pointing to existing file but wrong hash
     $driftManifest = [ordered]@{ 'backend/pom.xml' = '0000000000000000000000000000000000000000000000000000000000000000' }
     $driftManifest | ConvertTo-Json | Set-Content (Join-Path $driftScripts 'c8a-reference-manifest.json')
     $driftTarget = Join-Path $driftRoot '.runtime/drift-target'
@@ -114,14 +111,42 @@ try {
     # 4c: Negative control (Unrelated cause rejected)
     Record 'UnrelatedCauseRejected' (-not (Cause 'UNRELATED_BOOM' '[PREFLIGHT_GUARD]') -and -not (Cause 'UNRELATED_BOOM' '[PREFLIGHT_REFUSAL]')) 'Literal comparison rejects unrelated cause'
 
-    # 5. Owned Process Cleanup & Sentinel Survival (C8A-R01)
+    # 5. F02: Unsupported ControlMode refusal before any writes/mutation
+    $unsupportedTarget = Join-Path $EvidenceDir 'unsupported-mode-target'
+    $unsupportedCaught = ''
+    try {
+        & $runner -EvidenceDir $unsupportedTarget -ControlMode 'InvalidMode'
+    } catch {
+        $unsupportedCaught = $_.Exception.Message
+    }
+    Record 'UnsupportedControlModeRefused' ((Cause $unsupportedCaught '[PREFLIGHT_GUARD] Unsupported ControlMode') -and -not (Test-Path $unsupportedTarget)) "Caught: $unsupportedCaught"
+
+    # 6. F03: Fat JAR Port Occupancy Preflight Refusal
+    $occupiedPort = 8188
+    $testPortListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $occupiedPort)
+    $portCaught = ''
+    $occupiedTarget = Join-Path $EvidenceDir 'port-occupied-target'
+    try {
+        $testPortListener.Start()
+        try {
+            & $runner -EvidenceDir $occupiedTarget -JarPort $occupiedPort
+        } catch {
+            $portCaught = $_.Exception.Message
+        }
+    } finally {
+        $testPortListener.Stop()
+    }
+    Record 'FatJarPortOccupiedRefused' ((Cause $portCaught "[PREFLIGHT_GUARD] Fat JAR port $occupiedPort occupied") -and -not (Test-Path $occupiedTarget)) "Caught: $portCaught"
+
+    # 7. Owned Process Cleanup & Sentinel Survival (Normal helper proof)
     $sentinel = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 300') -WindowStyle Hidden -PassThru
     $owned = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 300') -WindowStyle Hidden -PassThru
     $cleanupRes = Invoke-OwnedProcessCleanup -OwnedProcesses @($owned)
     Record 'OwnedProcessStopNormal' ($cleanupRes.Success -and $owned.HasExited -and -not $sentinel.HasExited) 'Owned process exited, sentinel survived'
 
-    # 6. Actual Runner Cleanup Failure Invalidates Pass (C8A-R01)
+    # 8. F01: Actual Runner Cleanup Failure with Owned Process Object & Caller Sentinel
     $adverseDir = Join-Path $EvidenceDir 'adverse-cleanup'
+    $callerSentinel = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 300') -WindowStyle Hidden -PassThru
     $adverseCaught = ''
     try {
         & $runner -EvidenceDir $adverseDir -ControlMode AdverseCleanup
@@ -129,19 +154,33 @@ try {
         $adverseCaught = $_.Exception.Message
     }
     $adverseSummary = if (Test-Path (Join-Path $adverseDir 'summary.json')) { Get-Content (Join-Path $adverseDir 'summary.json') -Raw | ConvertFrom-Json } else { $null }
-    $cleanupFailedProof = ($adverseSummary -ne $null -and $adverseSummary.Status -eq 'FAILED' -and $adverseSummary.ProcessCleanupPassed -eq $false -and (Cause $adverseCaught '[RUNNER_FAILURE]'))
-    Record 'ActualRunnerCleanupFailureInvalidatesPass' $cleanupFailedProof "Status: $($adverseSummary.Status), ProcessCleanupPassed: $($adverseSummary.ProcessCleanupPassed), Caught: $adverseCaught"
+    $adverseProcessReport = if (Test-Path (Join-Path $adverseDir 'maven-process-adverse.json')) { Get-Content (Join-Path $adverseDir 'maven-process-adverse.json') -Raw | ConvertFrom-Json } else { $null }
+    $sentinelSurvived = (-not $callerSentinel.HasExited)
+    try { $callerSentinel.Kill() } catch {}
 
-    # 7. Caller Environment Restoration on Real Mutated Variables (C8A-R01)
-    # Test variable: KDRIVE_TEST_DB_URL (real mutated variable in runner)
-    # 7a: Existing x Normal
+    $cleanupFailedProof = (
+        $adverseSummary -ne $null -and
+        $adverseSummary.Status -eq 'FAILED' -and
+        $adverseSummary.BusinessVerified -eq $false -and
+        $adverseSummary.ProcessCleanupPassed -eq $false -and
+        $adverseProcessReport -ne $null -and
+        $adverseProcessReport.CleanupResult.Success -eq $false -and
+        $sentinelSurvived -and
+        (Cause $adverseCaught '[RUNNER_FAILURE]')
+    )
+    Record 'ActualRunnerCleanupFailureWithOwnedProcessAndSentinel' $cleanupFailedProof "Status: $($adverseSummary.Status), ProcessCleanupPassed: $($adverseSummary.ProcessCleanupPassed), SentinelSurvived: $sentinelSurvived, Caught: $adverseCaught"
+
+    # 9. F02: Caller Environment Restoration & CONTROL_ONLY Semantics
+    # 9a: Existing x Normal
     [Environment]::SetEnvironmentVariable('KDRIVE_TEST_DB_URL', 'jdbc:mysql://127.0.0.1:3306/caller_sentinel', 'Process')
     $dirExistingNormal = Join-Path $EvidenceDir 'caller-existing-normal'
     & $runner -EvidenceDir $dirExistingNormal -ControlMode Normal
     $afterValEN = [Environment]::GetEnvironmentVariable('KDRIVE_TEST_DB_URL', 'Process')
-    Record 'CallerEnv-Existing-Normal' ($afterValEN -ceq 'jdbc:mysql://127.0.0.1:3306/caller_sentinel') "Restored: $afterValEN"
+    $sumEN = Get-Content (Join-Path $dirExistingNormal 'summary.json') -Raw | ConvertFrom-Json
+    $enPassed = ($afterValEN -ceq 'jdbc:mysql://127.0.0.1:3306/caller_sentinel') -and ($sumEN.Status -eq 'CONTROL_ONLY') -and ($sumEN.BusinessVerified -eq $false) -and ($null -eq $sumEN.Container)
+    Record 'CallerEnv-Existing-Normal' $enPassed "Restored: $afterValEN, Status: $($sumEN.Status), BusinessVerified: $($sumEN.BusinessVerified)"
 
-    # 7b: Existing x Exception (verify exact cause preserved)
+    # 9b: Existing x Exception (verify exact cause preserved)
     [Environment]::SetEnvironmentVariable('KDRIVE_TEST_DB_URL', 'jdbc:mysql://127.0.0.1:3306/caller_sentinel', 'Process')
     $dirExistingException = Join-Path $EvidenceDir 'caller-existing-exception'
     $caughtEE = ''
@@ -151,17 +190,20 @@ try {
         $caughtEE = $_.Exception.Message
     }
     $afterValEE = [Environment]::GetEnvironmentVariable('KDRIVE_TEST_DB_URL', 'Process')
-    $eePassed = ($afterValEE -ceq 'jdbc:mysql://127.0.0.1:3306/caller_sentinel') -and (Cause $caughtEE '[INJECTED_EXCEPTION] Custom failure')
-    Record 'CallerEnv-Existing-Exception' $eePassed "Restored: $afterValEE, Exact Cause: $caughtEE"
+    $sumEE = Get-Content (Join-Path $dirExistingException 'summary.json') -Raw | ConvertFrom-Json
+    $eePassed = ($afterValEE -ceq 'jdbc:mysql://127.0.0.1:3306/caller_sentinel') -and (Cause $caughtEE '[INJECTED_EXCEPTION] Custom failure') -and ($sumEE.Status -eq 'FAILED') -and ($sumEE.BusinessVerified -eq $false)
+    Record 'CallerEnv-Existing-Exception' $eePassed "Restored: $afterValEE, Exact Cause: $caughtEE, Status: $($sumEE.Status)"
 
-    # 7c: Absent x Normal
+    # 9c: Absent x Normal
     [Environment]::SetEnvironmentVariable('KDRIVE_TEST_DB_URL', $null, 'Process')
     $dirAbsentNormal = Join-Path $EvidenceDir 'caller-absent-normal'
     & $runner -EvidenceDir $dirAbsentNormal -ControlMode Normal
     $afterValAN = [Environment]::GetEnvironmentVariable('KDRIVE_TEST_DB_URL', 'Process')
-    Record 'CallerEnv-Absent-Normal' ($null -eq $afterValAN) "Restored: $afterValAN"
+    $sumAN = Get-Content (Join-Path $dirAbsentNormal 'summary.json') -Raw | ConvertFrom-Json
+    $anPassed = ($null -eq $afterValAN) -and ($sumAN.Status -eq 'CONTROL_ONLY') -and ($sumAN.BusinessVerified -eq $false) -and ($null -eq $sumAN.Container)
+    Record 'CallerEnv-Absent-Normal' $anPassed "Restored: $afterValAN, Status: $($sumAN.Status), BusinessVerified: $($sumAN.BusinessVerified)"
 
-    # 7d: Absent x Exception (verify exact cause preserved)
+    # 9d: Absent x Exception (verify exact cause preserved)
     [Environment]::SetEnvironmentVariable('KDRIVE_TEST_DB_URL', $null, 'Process')
     $dirAbsentException = Join-Path $EvidenceDir 'caller-absent-exception'
     $caughtAE = ''
@@ -171,8 +213,9 @@ try {
         $caughtAE = $_.Exception.Message
     }
     $afterValAE = [Environment]::GetEnvironmentVariable('KDRIVE_TEST_DB_URL', 'Process')
-    $aePassed = ($null -eq $afterValAE) -and (Cause $caughtAE '[INJECTED_EXCEPTION] Custom failure')
-    Record 'CallerEnv-Absent-Exception' $aePassed "Restored: $afterValAE, Exact Cause: $caughtAE"
+    $sumAE = Get-Content (Join-Path $dirAbsentException 'summary.json') -Raw | ConvertFrom-Json
+    $aePassed = ($null -eq $afterValAE) -and (Cause $caughtAE '[INJECTED_EXCEPTION] Custom failure') -and ($sumAE.Status -eq 'FAILED') -and ($sumAE.BusinessVerified -eq $false)
+    Record 'CallerEnv-Absent-Exception' $aePassed "Restored: $afterValAE, Exact Cause: $caughtAE, Status: $($sumAE.Status)"
 
 } finally {
     if ($sentinel -and -not $sentinel.HasExited) { try { $sentinel.Kill() } catch {} }
@@ -184,7 +227,6 @@ try {
         if ($original[$k] -cne $finalEnv[$k]) { $allRestored = $false }
     }
 
-    # C8A-R01: Compute boolean Passed strictly from all results
     $allPassed = ($results.Count -gt 0 -and @($results | Where-Object { -not $_.Passed }).Count -eq 0 -and $allRestored)
     $matrixSummary = [pscustomobject]@{
         Passed = $allPassed

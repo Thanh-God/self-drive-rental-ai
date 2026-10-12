@@ -1,6 +1,7 @@
 param(
     [Parameter(Mandatory=$true)][string]$EvidenceDir,
     [int]$Port = 33626,
+    [int]$JarPort = 8188,
     [switch]$KeepVolumeOnSuccess,
     [string]$ControlMode = $null,
     [scriptblock]$ControlProbe = $null,
@@ -14,8 +15,12 @@ if ($PSVersionTable.PSEdition -ne 'Desktop' -or $PSVersionTable.PSVersion.Major 
     throw '[UNSUPPORTED_SHELL] Windows PowerShell 5.1 required'
 }
 
-$repo = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
+# F02: Unsupported ControlMode refusal before any writes or spawn
+if ($ControlMode -and $ControlMode -notin @('Normal', 'AdverseCleanup', 'Exception')) {
+    throw "[PREFLIGHT_GUARD] Unsupported ControlMode: $ControlMode"
+}
 
+$repo = (Get-Item $PSScriptRoot).Parent.Parent.Parent.FullName
 $EvidenceDir = [System.IO.Path]::GetFullPath($EvidenceDir)
 
 # 2. Preflight refusal for existing evidence
@@ -96,6 +101,8 @@ if (-not $ControlMode) {
     if ($names -contains $name -or $volumes -contains $volume) { throw '[PREFLIGHT_GUARD] Existing fixture' }
     $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $Port)
     try { $listener.Start() } catch { throw '[PREFLIGHT_GUARD] Fixture port occupied' } finally { $listener.Stop() }
+    $jarPreListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $JarPort)
+    try { $jarPreListener.Start() } catch { throw "[PREFLIGHT_GUARD] Fat JAR port $JarPort occupied" } finally { $jarPreListener.Stop() }
 }
 
 New-Item -ItemType Directory $EvidenceDir | Out-Null
@@ -120,24 +127,33 @@ $testsPassed = $false
 $cleanupPassed = $false
 $processCleanupPassed = $true
 $originalException = $null
+$controlOwnedProc = $null
 
 try {
     try {
         if ($ControlMode -eq 'Normal') {
-            # Mutate real tracked variables to verify caller preservation
+            # F01 & F02: Control Normal executes owned process cleanup normally
+            $controlOwnedProc = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 300') -WindowStyle Hidden -PassThru
             $env:KDRIVE_TEST_DB_URL = 'jdbc:mysql://127.0.0.1:9999/control_mutated'
             $env:JAVA_HOME = 'control-mutated-java'
             if ($ControlProbe) { & $ControlProbe }
-            $testsPassed = $true
+
+            $cleanupProc = Invoke-OwnedProcessCleanup -OwnedProcesses @($controlOwnedProc)
+            $processCleanupPassed = $cleanupProc.Success
+            $testsPassed = $false
             $cleanupPassed = $true
-            $processCleanupPassed = $true
         }
         elseif ($ControlMode -eq 'AdverseCleanup') {
+            # F01: Control AdverseCleanup injects failure at actual common cleanup function on owned process
+            $controlOwnedProc = Start-Process powershell.exe -ArgumentList @('-NoProfile', '-Command', 'Start-Sleep -Seconds 300') -WindowStyle Hidden -PassThru
             $env:KDRIVE_TEST_DB_URL = 'jdbc:mysql://127.0.0.1:9999/control_mutated'
             if ($ControlProbe) { & $ControlProbe }
-            $testsPassed = $true
+
+            $cleanupProc = Invoke-OwnedProcessCleanup -OwnedProcesses @($controlOwnedProc) -CustomStopProcess { param($p) throw 'Injected cleanup failure' }
+            $processCleanupPassed = $cleanupProc.Success
+            [pscustomobject]@{ PID = $controlOwnedProc.Id; HasExited = $controlOwnedProc.HasExited; CleanupResult = $cleanupProc } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'maven-process-adverse.json')
+            $testsPassed = $false
             $cleanupPassed = $true
-            $processCleanupPassed = $false
         }
         elseif ($ControlMode -eq 'Exception') {
             $env:KDRIVE_TEST_DB_URL = 'jdbc:mysql://127.0.0.1:9999/control_mutated'
@@ -190,14 +206,16 @@ try {
                 # Build fat jar
                 $built = & $build -EvidenceDir (Join-Path $EvidenceDir 'build') -OutputDir (Join-Path $EvidenceDir 'backend-copy')
 
-                # C8A-R04: Fat JAR Startup Verification on isolated MySQL fixture
-                $jarPort = 8188
+                # F03: Preflight occupancy check for Fat JAR port before spawn
+                $jarListener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, $JarPort)
+                try { $jarListener.Start() } catch { throw "[PREFLIGHT_GUARD] Fat JAR port $JarPort occupied" } finally { $jarListener.Stop() }
+
                 $jarLog = Join-Path $EvidenceDir 'fatjar-startup.log'
                 $jarErr = Join-Path $EvidenceDir 'fatjar-startup-error.log'
                 $javaExe = 'E:/Tools/Java/jdk-21.0.12.1+1/bin/java.exe'
                 if (-not (Test-Path $javaExe)) { $javaExe = 'java.exe' }
                 $jarArgs = @(
-                    "-Dserver.port=$jarPort",
+                    "-Dserver.port=$JarPort",
                     "-Dspring.datasource.url=jdbc:mysql://127.0.0.1:${Port}/${db}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC",
                     "-Dspring.datasource.username=root",
                     "-Dspring.datasource.password=$password",
@@ -209,13 +227,17 @@ try {
                     $built.EffectiveJarPath
                 )
                 $jarProc = Start-Process -FilePath $javaExe -ArgumentList $jarArgs -WindowStyle Hidden -PassThru -RedirectStandardOutput $jarLog -RedirectStandardError $jarErr
+                if ($jarProc.Id -le 0 -or $jarProc.HasExited) {
+                    throw '[JAR_STARTUP_FAILURE] Fat JAR process failed to spawn'
+                }
+
                 $jarStarted = $false
                 try {
                     for ($k = 0; $k -lt 45; $k++) {
                         if ($jarProc.HasExited) { break }
                         try {
                             $tcp = [System.Net.Sockets.TcpClient]::new()
-                            $tcp.Connect('127.0.0.1', $jarPort)
+                            $tcp.Connect('127.0.0.1', $JarPort)
                             $tcp.Close()
                             $jarStarted = $true
                             break
@@ -227,32 +249,50 @@ try {
                         throw "[JAR_STARTUP_FAILURE] Fat JAR did not start within 45s. Exit code: $($jarProc.ExitCode)"
                     }
 
-                    # Auth probe on fat JAR
+                    # F03: Auth probe on fat JAR
                     $loginBody = '{"email":"admin@example.test","password":"IntegrationOnly123!"}'
-                    $loginRes = Invoke-RestMethod -Uri "http://127.0.0.1:$jarPort/api/v1/auth/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
-                    if (-not $loginRes.token) {
-                        throw '[JAR_AUTH_FAILURE] Login failed on fat JAR'
+                    $loginRes = Invoke-RestMethod -Uri "http://127.0.0.1:$JarPort/api/v1/auth/login" -Method Post -Body $loginBody -ContentType 'application/json' -TimeoutSec 10
+                    $token = $loginRes.token
+                    if (-not $token) {
+                        throw '[JAR_AUTH_FAILURE] Login failed on fat JAR, token missing'
                     }
 
+                    # F03: Protected authenticated HTTP request using issued JWT
+                    $headers = @{ Authorization = "Bearer $token" }
+                    $branchesRes = Invoke-RestMethod -Uri "http://127.0.0.1:$JarPort/api/v1/me/branches" -Method Get -Headers $headers -TimeoutSec 10
+                    $protectedGetPassed = ($null -ne $branchesRes)
+                    if (-not $protectedGetPassed) {
+                        throw '[JAR_AUTH_FAILURE] Protected GET /me/branches failed with issued token'
+                    }
+
+                    # F03: Accurate Flyway & Hibernate validation evidence from log
                     $jarLogText = Get-Content $jarLog -Raw
-                    $flywayMatch = $jarLogText.Contains('Flyway') -or $jarLogText.Contains('schema_history')
-                    $hibernateMatch = $jarLogText.Contains('Hibernate') -or $jarLogText.Contains('Tomcat started')
+                    $flywayMatch = $jarLogText.Contains('org.flywaydb.core.FlywayExecutor') -and $jarLogText.Contains('flyway_schema_history')
+                    $hibernateMatch = $jarLogText.Contains('HHH000412: Hibernate ORM core version') -and $jarLogText.Contains('HHH10001005: Database info')
                     if (-not ($flywayMatch -and $hibernateMatch)) {
-                        throw '[JAR_LOG_FAILURE] Flyway or Hibernate verification missing from fat JAR log'
+                        throw '[JAR_LOG_FAILURE] Flyway or Hibernate exact validation missing from fat JAR log'
+                    }
+
+                    $cleanupJar = Invoke-OwnedProcessCleanup -OwnedProcesses @($jarProc)
+                    if (-not $cleanupJar.Success -or -not $jarProc.HasExited) {
+                        $processCleanupPassed = $false
                     }
 
                     [pscustomobject]@{
                         FatJarPath = $built.EffectiveJarPath
-                        Port = $jarPort
+                        Port = $JarPort
+                        PID = $jarProc.Id
+                        HasExited = $jarProc.HasExited
+                        CleanupResult = $cleanupJar
                         Started = $true
                         AuthLoginPassed = $true
+                        ProtectedGetPassed = $protectedGetPassed
                         FlywayValidated = $flywayMatch
                         HibernateValidated = $hibernateMatch
                     } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'fatjar-verification.json')
                 } finally {
-                    $cleanupJar = Invoke-OwnedProcessCleanup -OwnedProcesses @($jarProc)
-                    if (-not $cleanupJar.Success) {
-                        $processCleanupPassed = $false
+                    if (-not $jarProc.HasExited) {
+                        try { Stop-Process -Id $jarProc.Id -Force } catch {}
                     }
                 }
 
@@ -298,6 +338,9 @@ try {
             $testsPassed = $true
         }
     } finally {
+        if ($controlOwnedProc -and -not $controlOwnedProc.HasExited) {
+            try { Stop-Process -Id $controlOwnedProc.Id -Force } catch {}
+        }
         if ($owned) {
             $cleanup = Stop-C7Fixture -Container $name -Port $Port -Owned $owned -ReadbackPath (Join-Path $EvidenceDir 'cleanup.json')
             $cleanupPassed = $cleanup.Passed
@@ -333,17 +376,35 @@ try {
         SafeEnvironmentAfter = $safeAfter
     } | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'environment-after.json')
 
-    $status = if ($testsPassed -and $cleanupPassed -and $processCleanupPassed -and $envRestoredActual -and ($null -eq $originalException)) { 'PASS_SCOPED' } else { 'FAILED' }
-    $summary = [pscustomobject]@{
-        Status = $status
-        TestsPassed = $testsPassed
-        CleanupPassed = $cleanupPassed
-        ProcessCleanupPassed = $processCleanupPassed
-        EnvironmentRestored = $envRestoredActual
-        Container = $name
-        Volume = $volume
-        Port = $Port
-        Database = $db
+    # F02: Explicit CONTROL_ONLY status and BusinessVerified=false when in ControlMode
+    if ($ControlMode) {
+        $status = if ($envRestoredActual -and $cleanupPassed -and $processCleanupPassed -and ($null -eq $originalException)) { 'CONTROL_ONLY' } else { 'FAILED' }
+        $summary = [pscustomobject]@{
+            Status = $status
+            BusinessVerified = $false
+            TestsPassed = $false
+            CleanupPassed = $cleanupPassed
+            ProcessCleanupPassed = $processCleanupPassed
+            EnvironmentRestored = $envRestoredActual
+            Container = $null
+            Volume = $null
+            Port = $null
+            Database = $null
+        }
+    } else {
+        $status = if ($testsPassed -and $cleanupPassed -and $processCleanupPassed -and $envRestoredActual -and ($null -eq $originalException)) { 'PASS_SCOPED' } else { 'FAILED' }
+        $summary = [pscustomobject]@{
+            Status = $status
+            BusinessVerified = $testsPassed
+            TestsPassed = $testsPassed
+            CleanupPassed = $cleanupPassed
+            ProcessCleanupPassed = $processCleanupPassed
+            EnvironmentRestored = $envRestoredActual
+            Container = $name
+            Volume = $volume
+            Port = $Port
+            Database = $db
+        }
     }
     $summary | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'summary.json')
 
@@ -351,7 +412,7 @@ try {
     if ($null -ne $originalException) {
         throw $originalException
     }
-    elseif ($status -ne 'PASS_SCOPED') {
+    elseif ($status -notin @('PASS_SCOPED', 'CONTROL_ONLY')) {
         throw '[RUNNER_FAILURE] Execution did not meet all pass criteria'
     }
 }
