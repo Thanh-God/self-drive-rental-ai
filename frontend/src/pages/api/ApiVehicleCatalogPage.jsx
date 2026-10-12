@@ -1,0 +1,45 @@
+import { useRef, useState } from "react";
+import apiClient from "../../api/client";
+import { useApiData } from "../../hooks/useApiData";
+import { getErrorMessage } from "../../utils/roles";
+import { Page, Notice, Field } from "../../components/common/PageKit";
+
+const groups = [["vehicle-brands", "Hãng xe"], ["vehicle-categories", "Loại xe"]];
+
+function CatalogGroup({ kind, title }) {
+  const request = useApiData(`/admin/${kind}`);
+  const [editing, setEditing] = useState(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pending = useRef(false);
+  async function save(event) {
+    event.preventDefault();
+    if (pending.current) return;
+    pending.current = true;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      if (editing) await apiClient.put(`/admin/${kind}/${encodeURIComponent(editing.id)}`, { name, expectedRevision: editing.revision });
+      else await apiClient.post(`/admin/${kind}`, { name });
+      setEditing(null); setName(""); setNotice("Đã lưu danh mục."); request.reload();
+    } catch (failure) { setError(getErrorMessage(failure, "Không thể lưu danh mục.")); }
+    finally { pending.current = false; setBusy(false); }
+  }
+  return <section className="panel space-y-4" aria-label={title}>
+    <h2 className="text-xl font-semibold">{title}</h2>
+    {error && <Notice error>{error}</Notice>}{notice && <Notice>{notice}</Notice>}
+    {request.loading ? <p role="status">Đang tải danh mục...</p> : request.error ? <><Notice error>{request.error}</Notice><button className="btn-secondary" onClick={request.reload}>Thử tải lại</button></> : <>
+      {request.data?.length ? <ul className="space-y-2">{request.data.map(item => <li key={item.id} className="flex items-center justify-between gap-3"><span>{item.name}</span><button className="btn-secondary" disabled={busy} onClick={() => { setEditing(item); setName(item.name); setError(""); setNotice(""); }}>Sửa {item.name}</button></li>)}</ul> : <p>Chưa có danh mục</p>}
+      <form onSubmit={save} className="space-y-3">
+        <Field label={editing ? "Tên mới" : "Tên danh mục"}><input name="name" value={name} onChange={event => setName(event.target.value)} required maxLength={100} disabled={busy} /></Field>
+        <button className="btn" disabled={busy}>{busy ? "Đang lưu..." : editing ? "Lưu thay đổi" : "Tạo mới"}</button>
+        {editing && <button type="button" className="btn-secondary" disabled={busy} onClick={() => { setEditing(null); setName(""); setError(""); }}>Hủy sửa</button>}
+        {editing && <button type="button" className="btn-secondary" disabled={busy} onClick={() => { setEditing(null); request.reload(); }}>Tải lại bản mới</button>}
+      </form>
+    </>}
+  </section>;
+}
+export default function ApiVehicleCatalogPage() {
+  return <Page title="Danh mục xe" description="Quản lý hãng và loại xe."><div className="grid gap-6 lg:grid-cols-2">{groups.map(([kind, title]) => <CatalogGroup key={kind} kind={kind} title={title} />)}</div></Page>;
+}

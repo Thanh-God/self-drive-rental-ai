@@ -1,3 +1,4 @@
+import ApiVehicleCatalogPage from "../pages/api/ApiVehicleCatalogPage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AdminLayout from "../layouts/AdminLayout";
 import GuestLayout from "../layouts/GuestLayout";
@@ -242,9 +243,10 @@ export default function AppRoutes() {
         />
         <Route
           path="catalog"
-          element={screen(<CatalogPage />, <ApiBranchesPage />)}
+          element={screen(<CatalogPage />, <ApiVehicleCatalogPage />)}
         />
         <Route path="locations" element={screen(<LocationsPage />)} />
+        {!DEMO_MODE && <Route path="branches" element={<ApiBranchesPage />} />}
         <Route
           path="reviews"
           element={screen(<ReviewsModerationPage />, <ApiReviewsAdminPage />)}

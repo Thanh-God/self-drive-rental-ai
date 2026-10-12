@@ -9,13 +9,15 @@ import {
 } from "lucide-react";
 import Sidebar from "../components/common/Sidebar";
 import WorkspaceTopbar from "./WorkspaceTopbar";
+import { DEMO_MODE } from "../demo/config";
 
 const adminNav = [
   { to: "/admin/bookings", label: "Tra cứu đơn thuê", icon: Car },
   { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/admin/accounts", label: "Quản lý tài khoản", icon: Users },
   { to: "/admin/vehicles", label: "Quản lý xe", icon: Car },
-  { to: "/admin/catalog", label: "Danh mục / Chi nhánh", icon: Building2 },
+  { to: "/admin/catalog", label: "Danh mục xe", icon: Building2 },
+  ...(!DEMO_MODE ? [{ to: "/admin/branches", label: "Chi nhánh / Tuyến", icon: Building2 }] : []),
   { to: "/admin/locations", label: "Điểm du lịch", icon: MapPin },
   { to: "/admin/reviews", label: "Kiểm duyệt đánh giá", icon: Star },
 ];

@@ -7,6 +7,8 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import java.util.Map;
 @RestControllerAdvice
 public class ApiErrors {
+ @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
+ ResponseEntity<?> unsupportedMethod(Exception e){return ResponseEntity.status(405).body(Map.of("message","Phương thức không được hỗ trợ."));}
  @ExceptionHandler(DomainException.class) ResponseEntity<?> domain(DomainException e){return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage()));}
  @ExceptionHandler(MethodArgumentNotValidException.class) ResponseEntity<?> validation(MethodArgumentNotValidException e){
   return ResponseEntity.badRequest().body(Map.of("message","Dữ liệu không hợp lệ.","fields",e.getBindingResult().getFieldErrors().stream().map(f->f.getField()+": "+f.getDefaultMessage()).toList()));

@@ -1,0 +1,175 @@
+package com.carrental;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.http.*;
+import com.carrental.security.TokenService;
+import com.carrental.modules.user.service.AccountService;
+
+import java.util.*;
+import java.util.concurrent.*;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
+    "app.jwt-secret=integration-test-only-secret-at-least-32-bytes",
+    "app.token-minutes=30",
+    "app.seed-enabled=true",
+    "app.seed-password=IntegrationOnly123!",
+    "spring.jpa.properties.hibernate.jdbc.time_zone=UTC",
+    "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"
+})
+public class VehicleCatalogHttpServerTest {
+
+    @LocalServerPort
+    private int port;
+
+    @Autowired
+    private TestRestTemplate restTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private TokenService tokens;
+
+    @Autowired
+    private AccountService accountService;
+
+    private String adminToken;
+    private String userToken;
+    private String staffToken;
+
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry r) {
+        String url = System.getenv("KDRIVE_TEST_DB_URL");
+        if (url != null && !url.isBlank()) {
+            CancelBoundaryTest.verifySafeIsolatedDatabase(url,
+                System.getenv("KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX"),
+                System.getenv("KDRIVE_TEST_FIXTURE_MARKER_TOKEN"),
+                System.getenv("KDRIVE_TEST_DB_USER"),
+                System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+        }
+        r.add("spring.datasource.url", () -> url == null ? "jdbc:h2:mem:vehiclecataloghttp;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1" : url);
+        r.add("spring.datasource.username", () -> url == null ? "sa" : System.getenv("KDRIVE_TEST_DB_USER"));
+        r.add("spring.datasource.password", () -> url == null ? "" : System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+    }
+
+    @BeforeEach
+    void setup() {
+        ensureUserExists("demo-admin", "Admin C8", "admin@example.test", "ADMIN");
+        ensureUserExists("demo-user", "User C8", "user@example.test", "USER");
+        ensureUserExists("demo-staff-hn", "Staff HN C8", "staff-hn@example.test", "STAFF");
+
+        adminToken = "Bearer " + tokens.issue(accountService.require("demo-admin"));
+        userToken = "Bearer " + tokens.issue(accountService.require("demo-user"));
+        staffToken = "Bearer " + tokens.issue(accountService.require("demo-staff-hn"));
+    }
+
+    private void ensureUserExists(String id, String fullName, String email, String role) {
+        Long cnt = jdbc.queryForObject("select count(*) from users where id=?", Long.class, id);
+        if (cnt == 0) {
+            jdbc.update("insert into users(id, full_name, email, phone, password_hash, role, status, token_version, version) values(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, fullName, email, "0900000000", "$2a$10$dummyHashNotUsableDirectly12345678901234567890123456", role, "ACTIVE", 0L, 0L);
+        }
+    }
+
+    private HttpHeaders authHeaders(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        if (token != null) {
+            headers.set("Authorization", token);
+        }
+        return headers;
+    }
+
+    private ResponseEntity<Map> call(String kind, HttpMethod method, String suffix, Map<String,Object> body, String token) {
+        return restTemplate.exchange("/api/v1/admin/"+kind+suffix,method,new HttpEntity<>(body,authHeaders(token)),Map.class);
+    }
+    private Map<String,Object> createItem(String kind) {
+        ResponseEntity<Map> response=call(kind,HttpMethod.POST,"",Map.of("name","  Catalog "+UUID.randomUUID()+"  "),adminToken);
+        assertEquals(HttpStatus.CREATED,response.getStatusCode());
+        return response.getBody();
+    }
+    @Test void validationPermissionsAndNoWrites() {
+        for(String kind:List.of("vehicle-brands","vehicle-categories")) {
+            String table=kind.equals("vehicle-brands")?"vehicle_brands":"vehicle_categories";
+            long before=jdbc.queryForObject("select count(*) from "+table,Long.class);
+            for(String token:List.of(userToken,staffToken)) {
+                assertEquals(HttpStatus.FORBIDDEN,call(kind,HttpMethod.POST,"",Map.of("name","Denied"),token).getStatusCode());
+                assertEquals(HttpStatus.FORBIDDEN,restTemplate.exchange("/api/v1/admin/"+kind,HttpMethod.GET,new HttpEntity<>(authHeaders(token)),String.class).getStatusCode());
+                assertEquals(HttpStatus.FORBIDDEN,call(kind,HttpMethod.PUT,"/unknown",Map.of("name","Denied","expectedRevision","0".repeat(64)),token).getStatusCode());
+            }
+            assertEquals(HttpStatus.UNAUTHORIZED,call(kind,HttpMethod.POST,"",Map.of("name","Denied"),null).getStatusCode());
+            for(Map<String,Object> input:List.of(Map.<String,Object>of(),Map.<String,Object>of("name","  "),Map.<String,Object>of("name","x".repeat(101))))
+                assertEquals(HttpStatus.BAD_REQUEST,call(kind,HttpMethod.POST,"",input,adminToken).getStatusCode());
+            assertEquals(before,jdbc.queryForObject("select count(*) from "+table,Long.class));
+        }
+    }
+    @Test void createReadUpdateConflictAndForeignKeyPreservation() {
+        for(String kind:List.of("vehicle-brands","vehicle-categories")) {
+            String table=kind.equals("vehicle-brands")?"vehicle_brands":"vehicle_categories";
+            Map item=createItem(kind);String id=(String)item.get("id"),name=(String)item.get("name"),revision=(String)item.get("revision");
+            assertEquals(name.strip(),name);assertTrue(revision.matches("[a-f0-9]{64}"));
+            assertEquals(name,jdbc.queryForObject("select name from "+table+" where id=?",String.class,id));
+            assertEquals(HttpStatus.CONFLICT,call(kind,HttpMethod.POST,"",Map.of("name"," "+name+" "),adminToken).getStatusCode());
+            for(Map<String,Object> input:List.of(Map.<String,Object>of("name","Rename"),Map.<String,Object>of("name","Rename","expectedRevision","invalid")))
+                assertEquals(HttpStatus.BAD_REQUEST,call(kind,HttpMethod.PUT,"/"+id,input,adminToken).getStatusCode());
+            assertEquals(HttpStatus.NOT_FOUND,call(kind,HttpMethod.PUT,"/missing",Map.of("name","Rename","expectedRevision",revision),adminToken).getStatusCode());
+            String key=kind.equals("vehicle-brands")?"brand_id":"category_id";
+            String oldKey=jdbc.queryForObject("select "+key+" from vehicles where id='v1'",String.class);
+            jdbc.update("update vehicles set "+key+"=? where id='v1'",id);
+            String booking=UUID.randomUUID().toString();
+            jdbc.update("insert into bookings(id,user_id,vehicle_id,pickup_branch_id,return_branch_id,start_at,end_at,created_at,expires_at,status,daily_price,rental_days,rental_total,one_way_fee,total,customer_name,vehicle_name,pickup_name,return_name,policy_version) values (?,'demo-user','v1','dn','dn','2026-10-01 08:00:00','2026-10-02 08:00:00','2026-09-30 08:00:00','2026-09-30 10:00:00','COMPLETED',100,1,100,0,100,'Historical renter','Historical vehicle','Snapshot pickup','Snapshot return','catalog-test')",booking);
+            String snapshot="{\"catalogName\":\"Historical label\"}";
+            jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values (?,?,'2026-09-30 09:00:00',?,'catalog-test')",UUID.randomUUID().toString(),booking,snapshot);
+            jdbc.update("insert into invoices(id,booking_id,issued_at,total,snapshot) values (?,?,'2026-10-02 09:00:00',100,?)",UUID.randomUUID().toString(),booking,snapshot);
+            List<Map<String,Object>> bookingBefore=jdbc.queryForList("select * from bookings where id=?",booking);
+            List<Map<String,Object>> contractBefore=jdbc.queryForList("select * from contracts where booking_id=?",booking);
+            List<Map<String,Object>> invoiceBefore=jdbc.queryForList("select * from invoices where booking_id=?",booking);
+            List<Map<String,Object>> vehicleBefore=jdbc.queryForList("select * from vehicles order by id");
+            String newName="Renamed "+UUID.randomUUID();
+            ResponseEntity<Map> edited=call(kind,HttpMethod.PUT,"/"+id,Map.of("name",newName,"expectedRevision",revision),adminToken);
+            assertEquals(HttpStatus.OK,edited.getStatusCode());assertNotEquals(revision,edited.getBody().get("revision"));
+            assertEquals(HttpStatus.CONFLICT,call(kind,HttpMethod.PUT,"/"+id,Map.of("name","Stale","expectedRevision",revision),adminToken).getStatusCode());
+            assertEquals(newName,jdbc.queryForObject("select name from "+table+" where id=?",String.class,id));
+            assertEquals(vehicleBefore,jdbc.queryForList("select * from vehicles order by id"),"Catalog rename must not rewrite referenced vehicles");
+            assertEquals(bookingBefore,jdbc.queryForList("select * from bookings where id=?",booking));
+            assertEquals(contractBefore,jdbc.queryForList("select * from contracts where booking_id=?",booking));
+            assertEquals(invoiceBefore,jdbc.queryForList("select * from invoices where booking_id=?",booking));
+            jdbc.update("update vehicles set "+key+"=? where id='v1'",oldKey);
+            ResponseEntity<List> list=restTemplate.exchange("/api/v1/admin/"+kind,HttpMethod.GET,new HttpEntity<>(authHeaders(adminToken)),List.class);
+            assertEquals(HttpStatus.OK,list.getStatusCode());assertTrue(list.getBody().stream().anyMatch(row->id.equals(((Map)row).get("id"))));
+            Map other=createItem(kind);
+            assertEquals(HttpStatus.CONFLICT,call(kind,HttpMethod.PUT,"/"+id,Map.of("name",other.get("name"),"expectedRevision",edited.getBody().get("revision")),adminToken).getStatusCode());
+            assertEquals(newName,jdbc.queryForObject("select name from "+table+" where id=?",String.class,id));
+            assertEquals(HttpStatus.METHOD_NOT_ALLOWED,restTemplate.exchange("/api/v1/admin/"+kind+"/"+id,HttpMethod.DELETE,new HttpEntity<>(authHeaders(adminToken)),String.class).getStatusCode());
+        }
+        assertEquals(HttpStatus.OK,restTemplate.getForEntity("/api/v1/vehicles/catalog",Map.class).getStatusCode());
+    }
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named="KDRIVE_TEST_DB_URL",matches="jdbc:mysql:.*")
+    void concurrentMySqlWritesHaveOneWinner() throws Exception {
+        for(String kind:List.of("vehicle-brands","vehicle-categories")) {
+            Map item=createItem(kind);String id=(String)item.get("id"),revision=(String)item.get("revision");
+            ExecutorService workers=Executors.newFixedThreadPool(2);
+            try {
+                CountDownLatch start=new CountDownLatch(1);
+                List<Future<HttpStatusCode>> jobs=new ArrayList<>();
+                for(int i=0;i<2;i++){final int index=i;jobs.add(workers.submit(()->{start.await();return call(kind,HttpMethod.PUT,"/"+id,Map.of("name","Parallel "+index+UUID.randomUUID(),"expectedRevision",revision),adminToken).getStatusCode();}));}
+                start.countDown();List<Integer> statuses=new ArrayList<>();for(Future<HttpStatusCode> job:jobs)statuses.add(job.get(30,TimeUnit.SECONDS).value());
+                Collections.sort(statuses);assertEquals(List.of(200,409),statuses);
+                CountDownLatch createStart=new CountDownLatch(1);String duplicate="Concurrent "+UUID.randomUUID();jobs.clear();
+                for(int i=0;i<2;i++)jobs.add(workers.submit(()->{createStart.await();return call(kind,HttpMethod.POST,"",Map.of("name",duplicate),adminToken).getStatusCode();}));
+                createStart.countDown();statuses.clear();for(Future<HttpStatusCode> job:jobs)statuses.add(job.get(30,TimeUnit.SECONDS).value());Collections.sort(statuses);assertEquals(List.of(201,409),statuses);
+            } finally {workers.shutdownNow();}
+        }
+    }
+}
