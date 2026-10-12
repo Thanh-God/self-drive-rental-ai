@@ -66,3 +66,13 @@ Hiện không dùng Redux; AuthContext quản lý phiên, DemoContext chỉ mô 
    - API PUT /api/v1/admin/branch-routes bắt buộc truyền expectedVersion để đối soát với version của bản ghi tuyến trước khi áp dụng thay đổi phí hoặc trạng thái hoạt động.
 4. **Nhất quán thời gian nghiệp vụ (L10):**
    - Toàn bộ các module phụ thuộc thời gian (tạo biên bản giao nhận, phát hành hợp đồng, hóa đơn, xác minh bằng lái, đánh giá và sự cố) đều nhận bean Clock được quản trị tập trung tại ClockConfig.
+
+
+## C9 catalog contract — 12/10/2026
+
+Module vehicle quản lý đọc/tạo/cập nhật hãng, loại xe và tiện nghi. Controller HTTP gọi VehicleCatalogService; service kiểm tra ADMIN, input và transaction; VehicleCatalogRepository giữ SQL với bảng whitelist và parameter binding. Không có entity mutable xuyên module.
+
+- Admin: GET/POST `/api/v1/admin/{vehicle-brands|vehicle-categories|amenities}`; PUT cùng đường dẫn `/{id}`. Read DTO `{id,name,revision}`, create `{name}`, update `{name,expectedRevision}`. Tên trim, 1–100 ký tự; unique theo DB. Create201, read/update200; invalid400, missing404, duplicate/stale409, anonymous401, USER/STAFF403. Không có DELETE; method không hỗ trợ405.
+- Revision là SHA256 của kind/ID/name hiện tại. PUT khóa hàng trong transaction rồi đối chiếu revision; hai cập nhật làm thay đổi tên từ cùng revision có một200, một409. Digest không là số phiên bản tăng dần/audit và không phát hiện ABA khi tên đổi rồi trở lại.
+- Public GET `/api/v1/vehicles/catalog` giữ brands/categories `{id,name}` và thêm amenities `{id,name}`. Form xe dùng ID hiện tại. `/admin/catalog` là màn hình danh mục; `/admin/branches` giữ màn hình chi nhánh riêng trong API mode. Demo giữ màn hình demo.
+- C9 không thêm migration/bảng/version column, không đổi ID/FK, không ghi vehicle media/amenity links qua API. Liên kết và snapshot đại diện được kiểm tra bảo toàn trên fixture MySQL; đây không là nghiệm thu toàn bộ workflow phát hành hợp đồng/hóa đơn. DELETE/retention, C10 media/link và Location/AI/Map vẫn ngoài phạm vi.

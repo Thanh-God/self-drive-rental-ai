@@ -5,7 +5,7 @@ param(
 
     [string]$EvidenceRoot,
 
-    [string]$AcceptedBuildDir = '.runtime/coordination-c9-codexa-20261012-162636/evidence/backend-live-a-repository',
+    [string]$AcceptedBuildDir = '.runtime/coordination-c9-codexa-20261012-162636/evidence/backend-live-b',
 
     [string]$BrowserScript = 'verify-c9-browser.cjs',
 
@@ -402,35 +402,18 @@ try {
         $cleanupLog.Add("Adverse-test owned process fallback stopped: $($fallback.Success)")
     }
 
-    if ($ControlProbe -eq 'ContainerFailure' -or ($owned -and -not [string]::IsNullOrEmpty($container))) {
-        if ($ControlProbe -eq 'ContainerFailure') {
+    if ($ControlProbe -eq 'ContainerFailure' -or ($owned -and $container)) {
+        try {
+            $stopResult = if ($ControlProbe -eq 'ContainerFailure') {
+                Stop-C9OwnedContainer -Container 'kltn-c9-control-fixture' -Owned $true -InvokeCommand { param($verb, $name) [pscustomobject]@{ExitCode=23;Output=@('Injected native stop failure')} }
+            } else { Stop-C9OwnedContainer -Container $container -Owned $owned }
+            $stopResult | ConvertTo-Json | Set-Content (Join-Path $EvidenceDir 'container-stop.json')
+            if (-not $stopResult.Passed) { throw "[CONTAINER_FAILURE] $($stopResult.Stage) exited $($stopResult.ExitCode) or invalid stopped-state readback" }
+            $cleanupLog.Add("Stopped fixture container $container (volume $volume retained)")
+        } catch {
             $cleanupPassed = $false
-            $cleanupLog.Add('Injected container stop failure')
-            if (-not $cleanupError) {
-                $cleanupError = '[CONTAINER_FAILURE] Injected container stop failure'
-            }
-        } else {
-            try {
-                & docker stop $container | Out-Null
-                if ($LASTEXITCODE -ne 0) {
-                    $cleanupPassed = $false
-                    $cleanupLog.Add("Docker stop failed with exit code $LASTEXITCODE")
-                    if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Docker stop exited with code $LASTEXITCODE" }
-                } else {
-                    $runningCheck = @(& docker inspect --format '{{.State.Running}}' $container 2>&1)
-                    if ($LASTEXITCODE -ne 0 -or $runningCheck.Count -ne 1 -or ($runningCheck -join '').Trim() -cne 'false') {
-                        $cleanupPassed = $false
-                        $cleanupLog.Add("Container $container is still running after stop")
-                        if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Container $container failed to stop" }
-                    } else {
-                        $cleanupLog.Add("Stopped fixture container $container (volume $volume retained)")
-                    }
-                }
-            } catch {
-                $cleanupPassed = $false
-                $cleanupLog.Add("Failed to stop container: $($_.Exception.Message)")
-                if (-not $cleanupError) { $cleanupError = "[CONTAINER_FAILURE] Failed to stop container: $($_.Exception.Message)" }
-            }
+            $cleanupLog.Add($_.Exception.Message)
+            if (-not $cleanupError) { $cleanupError = $_ }
         }
     }
 

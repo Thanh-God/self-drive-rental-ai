@@ -162,6 +162,8 @@ try {
     }
     Check 'Adverse container stop failure caught fail-closed' ($containerCaught.Contains('[CONTAINER_FAILURE]'))
     $containerSummary = Get-Content (Join-Path $adverseContainerTarget 'summary.json') -Raw | ConvertFrom-Json
+    $stopReadback = Get-Content (Join-Path $adverseContainerTarget 'container-stop.json') -Raw | ConvertFrom-Json
+    Check 'Actual container stop helper propagates native nonzero exit' ($stopReadback.ExitCode -eq 23 -and $stopReadback.Passed -eq $false)
     Check 'Adverse container summary recorded FAILED status' ($containerSummary.Status -eq 'FAILED')
     Check 'Adverse container summary recorded CleanupPassed=false' ($containerSummary.CleanupPassed -eq $false)
 

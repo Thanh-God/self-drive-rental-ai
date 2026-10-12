@@ -6,17 +6,16 @@ import com.carrental.exception.DomainException;
 import com.carrental.security.Actor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.jdbc.core.JdbcTemplate;
 import java.util.*;
 @Service public class VehicleService {
- private final VehicleRepository repo;private final BranchService branches;private final JdbcTemplate jdbc;
- public VehicleService(VehicleRepository r,BranchService b,JdbcTemplate j){repo=r;branches=b;jdbc=j;}
+ private final VehicleRepository repo;private final BranchService branches;private final VehicleCatalogService catalogService;
+ public VehicleService(VehicleRepository r,BranchService b,VehicleCatalogService catalogService){repo=r;branches=b;this.catalogService=catalogService;}
  public record View(String id,String name,String plate,String brandId,String categoryId,String homeBranchId,String currentBranchId,int seats,String transmission,long dailyPrice,String status,String description,long version){}
  public View view(Vehicle v){return new View(v.id,v.name,v.plate,v.brandId,v.categoryId,v.homeBranchId,v.currentBranchId,v.seats,v.transmission,v.dailyPrice,v.status,v.description,v.version);}
  public List<View> list(){return repo.findAll().stream().map(this::view).toList();}
  public Vehicle get(String id){return repo.findById(id).orElseThrow(DomainException::missing);}
  public Vehicle lock(String id){return repo.lock(id).orElseThrow(DomainException::missing);}
- public Object catalog(){return Map.of("brands",jdbc.queryForList("select id,name from vehicle_brands"),"categories",jdbc.queryForList("select id,name from vehicle_categories"));}
+ public VehicleCatalogService.PublicCatalog catalog(){return catalogService.publicCatalog();}
  @Transactional public View create(Actor a,View input){
   a.require("ADMIN");branches.active(input.homeBranchId());
   Vehicle v=new Vehicle();apply(v,input);v.homeBranchId=input.homeBranchId();v.currentBranchId=input.homeBranchId();return view(repo.saveAndFlush(v));

@@ -10,3 +10,22 @@ function Get-C9Inputs([string]$Root, [string]$Accepted) {
     foreach ($f in ($files | Sort-Object FullName -Unique)) { $map[$f.FullName.Substring($Root.Length + 1).Replace('\','/')] = (Get-FileHash $f.FullName).Hash }
     return $map
 }
+
+function Stop-C9OwnedContainer([string]$Container, [bool]$Owned, [scriptblock]$InvokeCommand) {
+    if (-not $Owned -or $Container -notmatch '^kltn-c9-') { throw '[CONTAINER_GUARD] Refusing unowned fixture' }
+    if (-not $InvokeCommand) {
+        $InvokeCommand = {
+            param($Verb, $Name)
+            $output = if ($Verb -eq 'stop') { @(& docker stop $Name 2>&1) } else { @(& docker inspect --format '{{.State.Running}}' $Name 2>&1) }
+            [pscustomobject]@{ ExitCode = $LASTEXITCODE; Output = @($output) }
+        }
+    }
+    $stop = & $InvokeCommand 'stop' $Container
+    if ($stop.ExitCode -ne 0) { return [pscustomobject]@{ Passed = $false; Stage = 'stop'; ExitCode = $stop.ExitCode } }
+    $readback = & $InvokeCommand 'inspect' $Container
+    [pscustomobject]@{
+        Passed = ($readback.ExitCode -eq 0 -and $readback.Output.Count -eq 1 -and $readback.Output[0].ToString().Trim() -ceq 'false')
+        Stage = 'inspect'
+        ExitCode = $readback.ExitCode
+    }
+}

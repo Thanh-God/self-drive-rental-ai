@@ -15,6 +15,7 @@ public class VehicleCatalogRepository {
         return switch (kind) {
             case "vehicle-brands" -> "vehicle_brands";
             case "vehicle-categories" -> "vehicle_categories";
+            case "amenities" -> "amenities";
             default -> throw DomainException.bad("Danh mục không hợp lệ.");
         };
     }

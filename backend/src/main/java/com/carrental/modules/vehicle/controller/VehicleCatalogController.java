@@ -8,7 +8,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/v1/admin/{kind:vehicle-brands|vehicle-categories}")
+@RequestMapping("/api/v1/admin/{kind:vehicle-brands|vehicle-categories|amenities}")
 public class VehicleCatalogController {
     private final VehicleCatalogService service;
     public VehicleCatalogController(VehicleCatalogService service) { this.service = service; }

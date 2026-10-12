@@ -199,14 +199,14 @@ async function renderCatalog() {
   const mounted=await mount(createElement(AuthProvider,null,createElement(ApiVehicleCatalogPage)));
   await act(async()=>{
     fulfill(takeRequest("/admin/vehicle-brands"),[{id:"brand",name:"Existing Brand",revision:"a".repeat(64)}]);
-    fulfill(takeRequest("/admin/vehicle-categories"),[]);
+    fulfill(takeRequest("/admin/vehicle-categories"),[]);fulfill(takeRequest("/admin/amenities"),[]);
   });
   return mounted;
 }
 test("catalog shows loading/error/empty and actual retry request",async()=>{
   const {container,unmount}=await mount(createElement(AuthProvider,null,createElement(ApiVehicleCatalogPage)));
   assert.match(container.textContent,/Đang tải/);
-  await act(async()=>{rejectWithStatus(takeRequest("/admin/vehicle-brands"),500,{message:"Catalog failure"});fulfill(takeRequest("/admin/vehicle-categories"),[]);});
+  await act(async()=>{rejectWithStatus(takeRequest("/admin/vehicle-brands"),500,{message:"Catalog failure"});fulfill(takeRequest("/admin/vehicle-categories"),[]);fulfill(takeRequest("/admin/amenities"),[]);});
   assert.match(container.textContent,/Catalog failure/);assert.match(container.textContent,/Chưa có danh mục/);
   const section=container.querySelector('section[aria-label="Hãng xe"]');
   await act(async()=>section.querySelector("button").click());
@@ -226,6 +226,16 @@ test("catalog mounted double-submit suppression, stale conflict and recovery",as
   await act(async()=>{form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true}));form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true}));});
   const put=takeRequest("/admin/vehicle-brands/brand");assert.equal(put.config.method,"put");assert.equal(JSON.parse(put.config.data).expectedRevision,"a".repeat(64));assert.equal(requests.filter(r=>r.config.method==="put").length,1);
   await act(async()=>rejectWithStatus(put,409,{message:"Stale catalog"}));assert.match(section.textContent,/Stale catalog/);assert.equal(input.value,"Renamed Brand");assert.equal(form.querySelector("button").disabled,false);
-  await act(async()=>form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true})));const recovery=takeRequest("/admin/vehicle-brands/brand");assert.equal(requests.filter(r=>r.config.method==="put").length,2);
+  await act(async()=>Array.from(form.querySelectorAll("button")).find(button=>button.textContent==="Tải lại bản mới").click());
+  await act(async()=>fulfill(takeRequest("/admin/vehicle-brands"),[{id:"brand",name:"Concurrent Brand",revision:"b".repeat(64)}]));
+  form=section.querySelector("form");input=form.querySelector("input");await act(async()=>section.querySelector("li button").click());await act(async()=>changeValue(input,"Renamed Brand"));
+  await act(async()=>form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true})));const recovery=takeRequest("/admin/vehicle-brands/brand");assert.equal(JSON.parse(recovery.config.data).expectedRevision,"b".repeat(64));assert.equal(requests.filter(r=>r.config.method==="put").length,2);
   await act(async()=>fulfill(recovery,{id:"brand",name:"Renamed Brand",revision:"c".repeat(64)}));await act(async()=>fulfill(takeRequest("/admin/vehicle-brands"),[{id:"brand",name:"Renamed Brand",revision:"c".repeat(64)}]));assert.match(section.textContent,/Renamed Brand/);await unmount();
+});
+
+test("amenity validation error keeps input, releases guard and does not claim success",async()=>{
+ const {container,unmount}=await renderCatalog();const section=container.querySelector('section[aria-label="Tiện nghi"]');const form=section.querySelector("form");
+ await act(async()=>changeValue(form.querySelector("input"),"   "));await act(async()=>form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true})));
+ const request=takeRequest("/admin/amenities");assert.equal(request.config.method,"post");await act(async()=>rejectWithStatus(request,400,{message:"Invalid amenity"}));
+ assert.match(section.textContent,/Invalid amenity/);assert.equal(form.querySelector("input").value,"   ");assert.equal(form.querySelector("button").disabled,false);assert.doesNotMatch(section.textContent,/Đã lưu danh mục/);await unmount();
 });

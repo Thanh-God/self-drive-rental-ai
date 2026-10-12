@@ -4,7 +4,7 @@ import { useApiData } from "../../hooks/useApiData";
 import { getErrorMessage } from "../../utils/roles";
 import { Page, Notice, Field } from "../../components/common/PageKit";
 
-const groups = [["vehicle-brands", "Hãng xe"], ["vehicle-categories", "Loại xe"]];
+const groups = [["vehicle-brands", "Hãng xe"], ["vehicle-categories", "Loại xe"], ["amenities", "Tiện nghi"]];
 
 function CatalogGroup({ kind, title }) {
   const request = useApiData(`/admin/${kind}`);
@@ -30,7 +30,7 @@ function CatalogGroup({ kind, title }) {
     <h2 className="text-xl font-semibold">{title}</h2>
     {error && <Notice error>{error}</Notice>}{notice && <Notice>{notice}</Notice>}
     {request.loading ? <p role="status">Đang tải danh mục...</p> : request.error ? <><Notice error>{request.error}</Notice><button className="btn-secondary" onClick={request.reload}>Thử tải lại</button></> : <>
-      {request.data?.length ? <ul className="space-y-2">{request.data.map(item => <li key={item.id} className="flex items-center justify-between gap-3"><span>{item.name}</span><button className="btn-secondary" disabled={busy} onClick={() => { setEditing(item); setName(item.name); setError(""); setNotice(""); }}>Sửa {item.name}</button></li>)}</ul> : <p>Chưa có danh mục</p>}
+      {request.data?.length ? <ul className="space-y-2">{request.data.map(item => <li key={item.id} className="flex items-center justify-between gap-3"><span className="min-w-0 break-words">{item.name}</span><button aria-label={`Sửa ${item.name}`} className="btn-secondary shrink-0 whitespace-nowrap" disabled={busy} onClick={() => { setEditing(item); setName(item.name); setError(""); setNotice(""); }}>Sửa</button></li>)}</ul> : <p>Chưa có danh mục</p>}
       <form onSubmit={save} className="space-y-3">
         <Field label={editing ? "Tên mới" : "Tên danh mục"}><input name="name" value={name} onChange={event => setName(event.target.value)} required maxLength={100} disabled={busy} /></Field>
         <button className="btn" disabled={busy}>{busy ? "Đang lưu..." : editing ? "Lưu thay đổi" : "Tạo mới"}</button>
@@ -41,5 +41,5 @@ function CatalogGroup({ kind, title }) {
   </section>;
 }
 export default function ApiVehicleCatalogPage() {
-  return <Page title="Danh mục xe" description="Quản lý hãng và loại xe."><div className="grid gap-6 lg:grid-cols-2">{groups.map(([kind, title]) => <CatalogGroup key={kind} kind={kind} title={title} />)}</div></Page>;
+  return <Page title="Danh mục xe" description="Quản lý hãng, loại xe và tiện nghi."><div className="grid gap-6 lg:grid-cols-2">{groups.map(([kind, title]) => <CatalogGroup key={kind} kind={kind} title={title} />)}</div></Page>;
 }

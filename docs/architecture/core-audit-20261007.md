@@ -157,3 +157,8 @@ Inspect→Understand→minimal Implement→target Tests→Regression→Review→
 ## C8 scoped closure — 12/10/2026
 
 C8 accounts/add-only Staff assignment scope is DONE: C8A acceptance retained with163unchangedinputs and C8B completed directly by Codex A at userrequest. Acceptance .runtime/coordination-c8-codexa-complete-20261012-140824/ACCEPTANCE.md;54/54frontendtests,lint/demoAPIbuild,37/37guards,59/59realbrowserHTTPMySQLchecks,147finalsource/buildhashesnodrift,ownedservicesstopped. Staff UI lock401 clearsession/loginredirect/unlockfreshlogin, invalid/RBAC/pending/stale/assignmentreadback proved. Add-onlycontractretained; revocationpolicy stillunapproved. Historical07/10snapshotrows/percentagesabove preserved, not retrospectivelyrecalculated. C8completiondoesnotcloseC9/location/AIMap/otherStage5work; no wholesystemPASS.
+
+
+## C9 scoped closure — 12/10/2026
+
+C9 A08 đọc/tạo/cập nhật hãng, loại xe, tiện nghi qua Admin API/UI/MySQL DONE scoped. Acceptance .runtime/coordination-c9-codexa-20261012-162636/ACCEPTANCE.md; frontend57/lint/demoAPI, verify110 (9optional skips tách riêng), MySQL11 zero skip, browser54/guards38, backendguards18 và source167/315 no drift. Public catalog additive amenities; rename giữ ID/FK/snapshot. Không triển khai DELETE chưa duyệt hoặc C10 media/amenity link, không nghiệm thu Location/AI/Map/toàn core. Lịch sử và phần trăm audit07/10 giữ nguyên. Codex A trực tiếp thực hiện/kiểm chứng theo người dùng, không tuyên bố review bởi agent độc lập.

@@ -19,6 +19,14 @@ public class VehicleCatalogService {
     public VehicleCatalogService(VehicleCatalogRepository repository) { this.repository = repository; }
     public record Item(String id, String name, String revision) {}
 
+    public record NamedItem(String id, String name) {}
+    public record PublicCatalog(List<NamedItem> brands, List<NamedItem> categories, List<NamedItem> amenities) {}
+    private List<NamedItem> names(String kind) {
+        return repository.list(kind).stream().map(row -> new NamedItem(row.id(), row.name())).toList();
+    }
+    public PublicCatalog publicCatalog() {
+        return new PublicCatalog(names("vehicle-brands"), names("vehicle-categories"), names("amenities"));
+    }
     private Item view(String kind, String id, String name) {
         try {
             byte[] bytes = (kind + "\0" + id + "\0" + name).getBytes(StandardCharsets.UTF_8);

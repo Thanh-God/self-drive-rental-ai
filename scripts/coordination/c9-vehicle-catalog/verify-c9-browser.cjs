@@ -14,6 +14,12 @@ function sql(query) {
   assert.equal(result.status,0,'SQL command must succeed'); return result.stdout.trim();
 }
 const q = value => `'${String(value).replaceAll("'","''")}'`;
+function monitor(page) {
+  page.on('response',r=>{if(r.status()>=400)http.push({method:r.request().method(),url:r.url(),status:r.status()});});
+  page.on('requestfailed',r=>http.push({method:r.method(),url:r.url(),failure:r.failure()?.errorText}));
+  page.on('pageerror',e=>consoleIssues.push({type:'pageerror',text:e.message}));
+  page.on('console',m=>{if(m.type()==='error')consoleIssues.push({type:'console',text:m.text(),url:m.location().url});});
+}
 async function main() {
   assert.match(schema,/^kdrive_c9_[a-f0-9]+$/);
   record('Isolated marker',sql(`SELECT COUNT(*) FROM ${process.env.C9_MARKER_SCHEMA}.__kdrive_test_fixture_marker WHERE target_schema=${q(schema)} AND marker_token=${q(process.env.C9_MARKER_TOKEN)};`),'1');
@@ -24,14 +30,11 @@ async function main() {
   await context.addInitScript(token=>{if(!localStorage.getItem('kdrive.jwt'))localStorage.setItem('kdrive.jwt',token);},token);
   const scenarios=new Map(); await context.route('**/api/v1/**',dispatcher(scenarios));
   const page=await context.newPage();page.setDefaultTimeout(15000);
-  page.on('response',r=>{if(r.status()>=400)http.push({method:r.request().method(),url:r.url(),status:r.status()});});
-  page.on('requestfailed',r=>http.push({method:r.method(),url:r.url(),failure:r.failure()?.errorText}));
-  page.on('pageerror',e=>consoleIssues.push({type:'pageerror',text:e.message}));
-  page.on('console',m=>{if(m.type()==='error')consoleIssues.push({type:'console',text:m.text(),url:m.location().url});});
+  monitor(page);
   await page.goto(`${base}/admin/catalog`);await page.getByRole('heading',{name:'Danh mục xe',exact:true}).waitFor();
   record('Catalog route contains no branch management heading',await page.getByRole('heading',{name:'Chi nhánh & tuyến nhận/trả',exact:true}).count(),0);
   const created=[];
-  for(const [kind,title,table] of [['vehicle-brands','Hãng xe','vehicle_brands'],['vehicle-categories','Loại xe','vehicle_categories']]) {
+  for(const [kind,title,table] of [['vehicle-brands','Hãng xe','vehicle_brands'],['vehicle-categories','Loại xe','vehicle_categories'],['amenities','Tiện nghi','amenities']]) {
     const section=page.getByRole('region',{name:title,exact:true});const form=section.locator('form');const name=`Browser ${kind} ${Date.now()}`;
     await form.locator('input').fill(name);const key=`POST ${base}/api/v1/admin/${kind}`;
     const reached=deferred(),release=deferred(),finished=deferred();scenarios.set(key,{reached,release,finished,count:0});
@@ -65,17 +68,19 @@ async function main() {
     const getKey=`GET ${base}/api/v1/admin/${kind}`;scenarios.set(getKey,{error:500,message:'Catalog read control',count:0});expected.push({method:'GET',url:`${base}/api/v1/admin/${kind}`,status:500});
     await page.waitForLoadState("networkidle");await page.reload();await section.getByText('Catalog read control',{exact:true}).waitFor();scenarios.delete(getKey);await section.getByRole('button',{name:'Thử tải lại',exact:true}).click();await section.getByText(final,{exact:true}).waitFor();record(`${kind} real retry restores data`,true,true);
   }
+  const publicResponse=await fetch(`${api}/vehicles/catalog`);record('Public catalog remains accessible',publicResponse.status,200);const publicCatalog=await publicResponse.json();
+  for(const [kind,key] of [['vehicle-brands','brands'],['vehicle-categories','categories'],['amenities','amenities']]) {const item=created.find(row=>row.kind===kind);record(`${key} public catalog IDs and labels`,publicCatalog[key].some(row=>row.id===item.id&&row.name===item.name),true);}
   await page.screenshot({path:path.join(evidence,'catalog-page.png'),fullPage:true});
   for(const role of ['USER','STAFF']) {
     const email=sql(`SELECT email FROM users WHERE role=${q(role)} AND status='ACTIVE' ORDER BY id LIMIT 1;`);
     const response=await fetch(`${api}/auth/login`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email,password:process.env.C9_SEED_PASSWORD})});record(`${role} login verified`,response.status,200);
     const session=await response.json();record(`${role} session role verified`,session.user.role,role);
     const peer=await browser.newContext();await peer.addInitScript(token=>localStorage.setItem('kdrive.jwt',token),session.token);await peer.route('**/api/v1/**',dispatcher(new Map()));
-    const peerPage=await peer.newPage();await peerPage.goto(`${base}/admin/catalog`);await peerPage.waitForURL(url=>url.pathname!=='/admin/catalog');
+    const peerPage=await peer.newPage();monitor(peerPage);await peerPage.goto(`${base}/admin/catalog`);await peerPage.waitForURL(url=>url.pathname!=='/admin/catalog');
     record(`${role} cannot see catalog heading`,await peerPage.getByRole('heading',{name:'Danh mục xe',exact:true}).count(),0);
     await peerPage.waitForLoadState('networkidle');await peer.close();
   }
-  const guest=await browser.newContext();const guestPage=await guest.newPage();await guestPage.goto(`${base}/admin/catalog`);await guestPage.waitForURL('**/login');record('Guest catalog redirects login',new URL(guestPage.url()).pathname,'/login');await guestPage.waitForLoadState('networkidle');await guest.close();
+  const guest=await browser.newContext();const guestPage=await guest.newPage();monitor(guestPage);await guestPage.goto(`${base}/admin/catalog`);await guestPage.waitForURL('**/login');record('Guest catalog redirects login',new URL(guestPage.url()).pathname,'/login');await guestPage.waitForLoadState('networkidle');await guest.close();
   await page.waitForLoadState("networkidle");await page.goto(`${base}/admin/branches`);await page.getByRole('heading',{name:'Chi nhánh & tuyến nhận/trả',exact:true}).waitFor();record('Branch management preserved at separate route',true,true);
   await page.waitForLoadState('networkidle');await page.goto(`${base}/admin/vehicles`);for(const [kind,label] of [['vehicle-brands','Hãng xe'],['vehicle-categories','Loại xe']]) {
     const item=created.find(row=>row.kind===kind);const option=page.getByLabel(label,{exact:true}).locator(`option[value="${item.id}"]`);
