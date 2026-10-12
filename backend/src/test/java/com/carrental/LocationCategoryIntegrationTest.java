@@ -26,7 +26,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
 @SpringBootTest(properties = {
     "app.jwt-secret=location-category-test-secret-at-least-32-bytes",
     "app.seed-enabled=true",
-    "app.seed-password=LocationCategoryTestOnly123!"
+    "app.seed-password=LocationApiTestOnly123!"
 })
 @AutoConfigureMockMvc
 class LocationCategoryIntegrationTest {
@@ -56,7 +56,7 @@ class LocationCategoryIntegrationTest {
     @Autowired JdbcTemplate jdbc;
 
     private String token(String email) throws Exception {
-        String body = json.writeValueAsString(Map.of("email", email, "password", "LocationCategoryTestOnly123!"));
+        String body = json.writeValueAsString(Map.of("email", email, "password", "LocationApiTestOnly123!"));
         String response = mvc.perform(post("/api/v1/auth/login").contentType("application/json").content(body))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
