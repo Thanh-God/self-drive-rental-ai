@@ -80,7 +80,7 @@ function normalizeVehicle(vehicle, catalog) {
       "Chưa phân loại",
     transmission: vehicle.transmission === "AUTO" ? "Tự động" : "Số sàn",
     fuel: "Chưa cập nhật",
-    amenities: [],
+    amenities: Array.isArray(vehicle.amenities) ? vehicle.amenities : [],
   };
 }
 
@@ -830,6 +830,27 @@ export function ApiVehicleDetailPage() {
               <p className="mt-4 text-sm text-slate-600">
                 Chi nhánh hiện tại: {vehicle.currentBranchId || "Chưa xác định"}
               </p>
+              {vehicle.amenities && vehicle.amenities.length > 0 ? (
+                <div className="mt-5 border-t border-slate-100 pt-5">
+                  <h3 className="mb-3 text-sm font-semibold text-slate-700">
+                    Tiện nghi ({vehicle.amenities.length})
+                  </h3>
+                  <ul className="flex flex-wrap gap-2">
+                    {vehicle.amenities.map((a) => (
+                      <li
+                        key={a.id}
+                        className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-2.5 py-1 text-xs font-medium text-teal-800"
+                      >
+                        {a.name}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : (
+                <p className="mt-5 border-t border-slate-100 pt-5 text-sm text-slate-500">
+                  Xe chưa có thông tin tiện nghi.
+                </p>
+              )}
             </section>
             <aside className="panel h-fit">
               <VehicleOperationalStatus status={vehicle.status} />

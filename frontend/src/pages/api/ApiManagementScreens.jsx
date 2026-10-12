@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import apiClient from "../../api/client";
 import { useApiData } from "../../hooks/useApiData";
 import { getErrorMessage } from "../../utils/roles";
@@ -343,6 +343,176 @@ export function ApiAccountsPage() {
   );
 }
 
+/**
+ * VehicleAmenityEditor — Admin only, chỉ render khi vehicleId đã tồn tại.
+ * GET /admin/vehicles/{id}/amenities → {amenities:[{id,name}], revision}
+ * PUT /admin/vehicles/{id}/amenities → {amenityIds, expectedRevision}
+ * GET /vehicles/catalog → lấy danh sách catalog để chọn
+ */
+function VehicleAmenityForm({
+  vehicleId,
+  initialAmenities,
+  revision,
+  catalogAmenities,
+  onReload,
+}) {
+  const [selectedIds, setSelectedIds] = useState(
+    () => new Set((initialAmenities || []).map((a) => a.id)),
+  );
+  const [saveError, setSaveError] = useState("");
+  const [saveNotice, setSaveNotice] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pendingRef = useRef(false);
+
+  const toggleId = useCallback((id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  async function saveAmenities(event) {
+    event.preventDefault();
+    if (pendingRef.current) return;
+    pendingRef.current = true;
+    setBusy(true);
+    setSaveError("");
+    setSaveNotice("");
+    try {
+      await apiClient.put(
+        `/admin/vehicles/${encodeURIComponent(vehicleId)}/amenities`,
+        {
+          amenityIds: [...selectedIds],
+          expectedRevision: revision,
+        },
+      );
+      setSaveNotice("Đã lưu tiện nghi. Đang tải lại...");
+      onReload();
+    } catch (err) {
+      const status = err?.response?.status;
+      if (status === 409) {
+        setSaveError(
+          "Tiện nghi đã được cập nhật bởi người khác (409). Đang tải lại phiên bản mới...",
+        );
+        onReload();
+      } else {
+        // 400: giữ lựa chọn, thông báo lỗi, giải phóng guard
+        setSaveError(
+          getErrorMessage(err, "Không thể lưu tiện nghi. Kiểm tra lại lựa chọn."),
+        );
+        pendingRef.current = false;
+        setBusy(false);
+        return;
+      }
+    } finally {
+      if (pendingRef.current) {
+        pendingRef.current = false;
+        setBusy(false);
+      }
+    }
+  }
+
+  const allAmenities = catalogAmenities || [];
+
+  return (
+    <form
+      className="mt-4 border-t border-slate-100 pt-4 space-y-3"
+      onSubmit={saveAmenities}
+      aria-label="Tiện nghi xe"
+    >
+      <h3 className="text-sm font-semibold text-slate-700">Tiện nghi</h3>
+      {saveNotice ? (
+        <p className="text-sm text-teal-700">{saveNotice}</p>
+      ) : null}
+      {saveError ? (
+        <p className="text-sm text-red-600">{saveError}</p>
+      ) : null}
+      {allAmenities.length === 0 ? (
+        <p className="text-xs text-slate-500">
+          Chưa có tiện nghi nào trong catalog. Thêm tiện nghi tại trang Danh
+          mục.
+        </p>
+      ) : (
+        <fieldset className="grid grid-cols-1 gap-1.5 sm:grid-cols-2" disabled={busy}>
+          <legend className="sr-only">Chọn tiện nghi</legend>
+          {allAmenities.map((a) => (
+            <label
+              key={a.id}
+              className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-slate-50"
+            >
+              <input
+                type="checkbox"
+                className="h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                checked={selectedIds.has(a.id)}
+                onChange={() => toggleId(a.id)}
+                disabled={busy}
+              />
+              <span>{a.name}</span>
+            </label>
+          ))}
+        </fieldset>
+      )}
+      {allAmenities.length > 0 ? (
+        <button
+          type="submit"
+          className="btn-secondary text-xs"
+          disabled={busy}
+        >
+          {busy ? "Đang lưu..." : "Lưu tiện nghi"}
+        </button>
+      ) : null}
+    </form>
+  );
+}
+
+/**
+ * VehicleAmenityEditor — Admin only, chỉ render khi vehicleId đã tồn tại.
+ * GET /admin/vehicles/{id}/amenities → {amenities:[{id,name}], revision}
+ * PUT /admin/vehicles/{id}/amenities → {amenityIds, expectedRevision}
+ * GET /vehicles/catalog → lấy danh sách catalog để chọn
+ */
+function VehicleAmenityEditor({ vehicleId, catalogAmenities }) {
+  const amenityRequest = useApiData(
+    `/admin/vehicles/${encodeURIComponent(vehicleId)}/amenities`,
+  );
+
+  if (amenityRequest.loading) {
+    return (
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <p className="text-sm text-slate-500">Đang tải tiện nghi...</p>
+      </div>
+    );
+  }
+  if (amenityRequest.error) {
+    return (
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <p className="text-sm text-red-600">{amenityRequest.error}</p>
+        <button
+          type="button"
+          className="btn-secondary mt-2 text-xs"
+          onClick={amenityRequest.reload}
+        >
+          Thử tải lại tiện nghi
+        </button>
+      </div>
+    );
+  }
+  if (!amenityRequest.data) return null;
+
+  return (
+    <VehicleAmenityForm
+      key={`${vehicleId}-${amenityRequest.data.revision}`}
+      vehicleId={vehicleId}
+      initialAmenities={amenityRequest.data.amenities}
+      revision={amenityRequest.data.revision}
+      catalogAmenities={catalogAmenities}
+      onReload={amenityRequest.reload}
+    />
+  );
+}
+
 const initialVehicleForm = {
   id: "",
   name: "",
@@ -575,10 +745,11 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
             ) : null}
           </div>
           {!fleet ? (
-            <form className="panel h-fit space-y-4" onSubmit={saveVehicle}>
-              <h2 className="text-lg font-semibold">
-                {form.id ? "Cập nhật xe" : "Thêm xe"}
-              </h2>
+            <div className="space-y-4">
+              <form className="panel h-fit space-y-4" onSubmit={saveVehicle}>
+                <h2 className="text-lg font-semibold">
+                  {form.id ? "Cập nhật xe" : "Thêm xe"}
+                </h2>
               <Field label="Tên xe">
                 <input
                   required
@@ -720,6 +891,15 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                 ) : null}
               </div>
             </form>
+            {form.id ? (
+              <div className="panel h-fit">
+                <VehicleAmenityEditor
+                  vehicleId={form.id}
+                  catalogAmenities={catalog.amenities || []}
+                />
+              </div>
+            ) : null}
+          </div>
           ) : null}
         </div>
       )}

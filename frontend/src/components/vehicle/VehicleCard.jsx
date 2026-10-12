@@ -112,11 +112,11 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0 }) {
             <div className="mb-4 flex flex-wrap gap-1.5">
               {vehicle.amenities.slice(0, 3).map((a) => (
                 <span
-                  key={a}
+                  key={typeof a === "object" ? a.id : a}
                   className="inline-flex items-center gap-1 rounded-md bg-teal-50/70 px-2 py-0.5 text-[11px] font-medium text-teal-800"
                 >
                   <Check size={11} className="text-teal-600" />
-                  {a}
+                  {typeof a === "object" ? a.name : a}
                 </span>
               ))}
             </div>
