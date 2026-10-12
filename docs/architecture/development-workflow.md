@@ -944,3 +944,7 @@ Baseline7cc263e; preexisting12 blank-line deletions preserved. Acceptance .runti
      - Ghi nhận câu lệnh cụ thể không rút gọn; bảo toàn thay đổi blank-line hiện có.
 - **Trạng thái**: C8A Final Guards **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu. DB người dùng tại 33385 và 3306 nguyên vẹn; frontend C8B giữ nguyên chờ gate mở.
 
+
+### C8A final independent acceptance — 12/10/2026 — PASS scoped, Codex A
+
+Acceptance .runtime/coordination-c8a-final-review-20261012-110646/ACCEPTANCE.md; implementation160d636 clean at review. Independent matrix18/18 exit0; fresh isolatedMySQL Account3+Route4 (no failure/error/skip), newfatJAR startup/login/protectedGET/ownedcleanup PASS;163 sourceinputs no drift and74JAR entries match. Mandatory verify evidence retained unchanged backend106total98executed8optionalskips. Fixture kltn-c8a-ag-2eeea3d267ed exited,volumeKEEP,ports8188/33626 free; originalMySQL knownidentity running. Report-only discrepancies in supplied HANDOFF (test/matrix names,mode names,login and migration names) corrected from actual source/XML/readback in ACCEPTANCE; do not use narrative as evidence. C8A scope accepted; C8B gate OPEN via appended TASK gateupdate, awaiting user-forwarded prompt. No C8B launch,policy approval,push/reset/prune or whole-systemPASS implied.
