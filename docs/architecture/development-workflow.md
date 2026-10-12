@@ -907,3 +907,28 @@ Baseline5052919 branchupdate-20261012-0920 clean; C7 accepted scoped(d3ebcb6,C7C
 Implementation e5b81aa retained; review baseline fcf6847 clean. Acceptance: .runtime/coordination-c8a-review-20261012-101206/ACCEPTANCE.md. Independent checks: 160 recorded input hashes match; 74 fat-JAR class/resource entries match; three existing-evidence guards pass; reported rerun command rejected unsupported EvidenceRoot. Agent XML records AccountAssignment 3 and RouteVersionGuard 4 without failure/skip, not independently replayed here. Current fixture exited and original MySQL identity running; no claim of whole data integrity.
 
 C8A is not accepted: caller env matrix checks untouched variables/any exception with no normal case; missing transitive dependency hash guards; containment bypass for absent parent/prefix sibling; mandatory verify and actual new-fat-JAR startup not evidenced; handoff commands/API contracts inaccurate. This review supersedes completion claims above without deleting historical audit. Follow-up .runtime/coordination-c8a-antigravity-followup-20261012-101206/TASK.md addresses C8A-R01..R05 only. C8B gate CLOSED. No live fixture created, data cleanup, product edit or push during review.
+
+### C8A Follow-up — Khắc phục dứt điểm findings C8A-R01..R05 — Antigravity, 12/10/2026
+
+- **Phạm vi xử lý**: Khắc phục triệt để các findings C8A-R01..R05 theo TASK `.runtime/coordination-c8a-antigravity-followup-20261012-101206/TASK.md` và `ACCEPTANCE.md`:
+  1. `C8A-R01 (Caller Env Matrix trên Real Mutated Variables, Exact Cause Preservation, Actual Runner Cleanup Failure & Sentinel Survival)`:
+     - `run-c8a.ps1`: Bảo toàn ngoại lệ ban đầu trong khối `try` (không đè bẹp bằng `[RUNNER_FAILURE]` trong `finally`), hỗ trợ `ControlMode` (`Normal`, `Exception`, `AdverseCleanup`) để kiểm thử logic an toàn mà không cần dựng container rỗng.
+     - `test-c8a-guards.ps1`: Kiểm tra caller environment restoration trực tiếp trên biến thực tế bị mutate (`KDRIVE_TEST_DB_URL`), đủ 4 tổ hợp: Existing/Absent × Normal/Exception, assert exact cause `[INJECTED_EXCEPTION] Custom failure`.
+     - Kiểm chứng actual runner cleanup failure: chạy với `-ControlMode AdverseCleanup`, khẳng định runner fail-closed (`Summary.Status = 'FAILED'`, `Summary.ProcessCleanupPassed = $false`, mã lỗi `[RUNNER_FAILURE]`).
+     - Kiểm chứng owned process cleanup dừng đúng target process và bảo vệ sentinel process tiếp tục hoạt động.
+     - Matrix aggregation: `Passed` tính bằng logic boolean nghiêm ngặt từ kết quả tất cả các checks, fail-closed nếu có bất kỳ lỗi nào. Kết quả: 16/16 checks PASS (Exit 0).
+  2. `C8A-R02 (Bổ sung c7-helpers & fixture-cleanup vào Transitive Reference Manifest, Adverse Drift Tests)`:
+     - Tạo `c8a-reference-manifest.json` đóng băng 160 transitive inputs (bao gồm `c7-helpers.psm1`, `fixture-cleanup.ps1`, `build-fat-jar.ps1`, `backend/src`, `backend/.mvn`, `pom.xml`, `mvnw`, `mvnw.cmd`).
+     - `run-c8a.ps1`: Kiểm tra trước mọi mutation đối chiếu với reference manifest; nếu thiếu ném `[PREFLIGHT_GUARD] Missing dependency`, nếu sai lệch ném `[PREFLIGHT_GUARD] Source drift`.
+     - `test-c8a-guards.ps1`: Adverse test kiểm chứng cả ca missing dependency và drifted dependency đều bị từ chối fail-closed trước mutation; negative control khẳng định literal so sánh từ chối `UNRELATED_BOOM`.
+  3. `C8A-R03 (Canonical Containment Guard & Bổ sung Adverse Sibling/Nonexistent Tests)`:
+     - `run-c8a.ps1`: Chuẩn hóa canonical path với directory separator cuối (`.runtime\`), kiểm tra canonical containment độc lập với việc parent có tồn tại hay không.
+     - `test-c8a-guards.ps1`: Kiểm chứng cả 3 ca bị từ chối trước mutation: outside directory, sibling prefix directory (`.runtime-sibling*`), và nonexistent parent directory (`C:\nonexistent-parent*`).
+  4. `C8A-R04 (Mandatory JDK 21 mvnw verify & Fat JAR Startup / Auth Probe)`:
+     - `./mvnw.cmd verify` chạy với JDK 21: 106 tests run, 0 failures, 0 errors, 8 skipped (BUILD SUCCESS, exit 0), toàn bộ log và surefire reports được lưu vào `evidence/verify-run`.
+     - `run-c8a.ps1`: Khởi động fat JAR thật `kdrive-0.1.0-SNAPSHOT.jar` trong tiến trình sở hữu trên cổng 8188 trỏ tới MySQL fixture 8.4; xác nhận logs nạp Flyway và Hibernate validation thành công; gửi HTTP request thật `/api/v1/auth/login` với tài khoản seed admin và nhận `200 OK` kèm JWT token; dừng sạch tiến trình fat JAR bằng `Invoke-OwnedProcessCleanup`.
+  5. `C8A-R05 (Chuẩn hóa Rerun Commands & Cập nhật Chính xác API Contracts)`:
+     - Chuẩn hóa parameters của `run-c8a.ps1` (`-EvidenceDir`, `-Port`, `-KeepVolumeOnSuccess`, `-ControlMode`, `-ControlProbe`).
+     - Sửa toàn bộ ví dụ hợp đồng API trong HANDOFF mới: `POST /api/v1/admin/staff-branches` với body `{"userId": "...", "branchId": "..."}`; `PATCH /api/v1/admin/accounts/{id}` với body `{"status": "...", "version": 0}`.
+- **Trạng thái**: C8A Follow-up **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu. DB người dùng tại 33385 và 3306 nguyên vẹn; frontend C8B giữ nguyên chờ gate mở.
+
