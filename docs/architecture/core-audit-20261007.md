@@ -162,3 +162,8 @@ C8 accounts/add-only Staff assignment scope is DONE: C8A acceptance retained wit
 ## C9 scoped closure — 12/10/2026
 
 C9 A08 đọc/tạo/cập nhật hãng, loại xe, tiện nghi qua Admin API/UI/MySQL DONE scoped. Acceptance .runtime/coordination-c9-codexa-20261012-162636/ACCEPTANCE.md; frontend57/lint/demoAPI, verify110 (9optional skips tách riêng), MySQL11 zero skip, browser54/guards38, backendguards18 và source167/315 no drift. Public catalog additive amenities; rename giữ ID/FK/snapshot. Không triển khai DELETE chưa duyệt hoặc C10 media/amenity link, không nghiệm thu Location/AI/Map/toàn core. Lịch sử và phần trăm audit07/10 giữ nguyên. Codex A trực tiếp thực hiện/kiểm chứng theo người dùng, không tuyên bố review bởi agent độc lập.
+
+
+## C10A backend checkpoint — 12/10/2026
+
+Amenity links API/backend PASS scoped tại .runtime/coordination-c10a-codexa-complete-20261012-212639/ACCEPTANCE.md. MySQL9zero-skip,verify115/10optional skips,guards18,actual newJARHTTP/source173no-drift. UI C10A chờ Cursor; ảnh C10B chưa triển khai, nên C10 vẫn PARTIAL. Giữ lịch sử audit, không tự cập nhật phần trăm/wholecorePASS.

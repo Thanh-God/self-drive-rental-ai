@@ -76,3 +76,12 @@ Module vehicle quản lý đọc/tạo/cập nhật hãng, loại xe và tiện 
 - Revision là SHA256 của kind/ID/name hiện tại. PUT khóa hàng trong transaction rồi đối chiếu revision; hai cập nhật làm thay đổi tên từ cùng revision có một200, một409. Digest không là số phiên bản tăng dần/audit và không phát hiện ABA khi tên đổi rồi trở lại.
 - Public GET `/api/v1/vehicles/catalog` giữ brands/categories `{id,name}` và thêm amenities `{id,name}`. Form xe dùng ID hiện tại. `/admin/catalog` là màn hình danh mục; `/admin/branches` giữ màn hình chi nhánh riêng trong API mode. Demo giữ màn hình demo.
 - C9 không thêm migration/bảng/version column, không đổi ID/FK, không ghi vehicle media/amenity links qua API. Liên kết và snapshot đại diện được kiểm tra bảo toàn trên fixture MySQL; đây không là nghiệm thu toàn bộ workflow phát hành hợp đồng/hóa đơn. DELETE/retention, C10 media/link và Location/AI/Map vẫn ngoài phạm vi.
+
+
+## C10A backend amenity links — 12/10/2026
+
+Public GET /api/v1/vehicles và /vehicles/{id} thêm amenities:[{id,name}], giữ trường xe cũ. List dùng bulk links và bulk names; không có links trả[]. Admin GET/PUT /api/v1/admin/vehicles/{id}/amenities, GET/PUT DTO {amenities,revision}; PUT input {amenityIds,expectedRevision}. ADMIN200,anonymous401,USER/STAFF403;unknownvehicle404;missing/null/badrevision hoặc IDs null/blank/duplicate/unknown400;stale409/no-write. [] xóa links riêng xe, không xóa master amenities. Hai state-changing updates cùng revision có một200/một409.
+
+Service khóa Vehicle trong transaction, validate tất cả IDs trước mutation và so current revision. Revision SHA256 vehicleID + NUL + sorted IDs, không phụ thuộc name; label catalog đổi thì link/revision giữ nguyên. Same-ID-set kể cả đảo thứ tự là no-op200/0DML; digest không là audit/version tăng dần hoặc phát hiện ABA. Replace links atomic; vehicle fields/version và historical snapshots không đổi do thao tác tiện nghi. PUT thông tin xe cũ thiếu amenities không xóa links; không thêm migration/bảng. Controller/service/repository tách HTTP/business/SQL.
+
+Backend đã kiểm chứng riêng; frontend normalizeVehicle hiện vẫn cần Cursor nối amenities. Không tuyên bố public UI/C10A end-to-end hoặc C10B ảnh/gallery hoàn tất từ backend proof.
