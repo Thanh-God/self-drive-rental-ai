@@ -1043,3 +1043,8 @@ Plan .runtime/coordination-c10-plan-20261012-191136/PLAN.md; baseline25107051 af
 ### C10A backend handoff prepared — 12/10/2026 — READY, Codex A
 
 TASK .runtime/coordination-c10a-backend-opencode-20261012-193525/TASK.md; baseline4c88a570, branch update-20261012-0920, preexisting workflow blank-line kept outside commit. User assigns OpenCode backend, Cursor UI sequentially. This task only additive public amenity read and Admin GET/PUT links, exact revision/no-op/empty/validation/RBAC/atomic rollback/concurrency contract, MySQL and newJAR/source/cleanup proof. C9 retained when unaffected; no frontend/image/provider/migration/DB backfill/push or agent launch. Cursor UI after backend acceptance; preparation is not implementation or C10 PASS. TASK content/path/scope validation completed; no functional tests required for this documentation-only preparation.
+
+
+### C10A backend checkpoint review — 12/10/2026 — FAIL / PARTIAL, Codex A
+
+Acceptance .runtime/coordination-c10a-backend-review-20261012-201813/ACCEPTANCE.md; HEAD77d9c3d, no implementation commit/HANDOFF/tests supplied. Current VehicleService change and5newuntracked sources preserved. Independent JDK21 Maven compile exit1: missing List import and two incompatible amenity DTO types. Source review finds per-link name query growth and order-sensitive no-op replacement. MySQL/RBAC/rollback/concurrency/newJAR/startup NOT VERIFIED; frontend/Cursor waiting. Follow-up TASK in review directory F01..F05 retains original backend contract. No functional fixes/services/fixture/reset/push or stage of implementation files; preexisting workflow blank-line preserved. C9 historical audit retained but changed unbuildable vehicle dependency cannot inherit current runtime PASS.
