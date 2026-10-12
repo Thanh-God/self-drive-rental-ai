@@ -1048,3 +1048,8 @@ TASK .runtime/coordination-c10a-backend-opencode-20261012-193525/TASK.md; baseli
 ### C10A backend checkpoint review — 12/10/2026 — FAIL / PARTIAL, Codex A
 
 Acceptance .runtime/coordination-c10a-backend-review-20261012-201813/ACCEPTANCE.md; HEAD77d9c3d, no implementation commit/HANDOFF/tests supplied. Current VehicleService change and5newuntracked sources preserved. Independent JDK21 Maven compile exit1: missing List import and two incompatible amenity DTO types. Source review finds per-link name query growth and order-sensitive no-op replacement. MySQL/RBAC/rollback/concurrency/newJAR/startup NOT VERIFIED; frontend/Cursor waiting. Follow-up TASK in review directory F01..F05 retains original backend contract. No functional fixes/services/fixture/reset/push or stage of implementation files; preexisting workflow blank-line preserved. C9 historical audit retained but changed unbuildable vehicle dependency cannot inherit current runtime PASS.
+
+
+### C10A backend checkpoint review2 — 12/10/2026 — PARTIAL, Codex A
+
+Acceptance .runtime/coordination-c10a-backend-review-20261012-205239/ACCEPTANCE.md; HEAD155345fd. F01/F02 closed by JDK21 compile0; Maven verify110total101executed9optional skip0fail/error. Bulknames/setno-op source corrections confirmed, runtime assertions pending. No C10A test/HANDOFF/MySQL evidence or implementation commit supplied; concurrency/rollback/0DML/publiclabel/preservation/newJARstartup/provenance/cleanup NOT VERIFIED. Follow-up TASK focuses remaining F05 proof, no redundant source implementation or frontend/C10B; Cursor waits. Source freeze0drift, implementation files/preexisting workflowblankline preserved unstaged; no fixture/reset/push.
