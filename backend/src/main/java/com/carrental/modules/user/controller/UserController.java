@@ -12,7 +12,7 @@ public class UserController {
  public record Profile(@NotBlank @Size(max=100)String fullName,@Size(max=20)String phone,long version){}
  public record Password(@NotBlank @Size(max=72)String current,@NotBlank @Size(min=8,max=72)String next){}
  public record Staff(@NotBlank @Email @Size(max=254)String email,@NotBlank @Size(max=100)String fullName,@Size(min=8,max=72)@NotBlank String password){}
- public record Status(@NotBlank String status,long version){}
+ public record Status(@NotBlank String status,@NotNull @PositiveOrZero Long version){}
  @PutMapping("/me/profile") public Object profile(@AuthenticationPrincipal Actor a,@Valid @RequestBody Profile r){return accounts.update(a,r.fullName(),r.phone(),r.version());}
  @PutMapping("/me/password") public void password(@AuthenticationPrincipal Actor a,@Valid @RequestBody Password r){accounts.password(a,r.current(),r.next());}
  @GetMapping("/me/license") public Object license(@AuthenticationPrincipal Actor a){return licenses.mine(a);}

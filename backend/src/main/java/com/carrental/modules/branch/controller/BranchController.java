@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import java.util.List;
 @RestController @RequestMapping("/api/v1") public class BranchController {
  private final BranchService service;public BranchController(BranchService s){service=s;}
  public record BranchInput(@NotBlank @Size(max=120)String name,@NotBlank @Size(max=300)String address,long version){}
@@ -13,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
  @GetMapping("/branches") public Object branches(){return service.list();}
  @GetMapping("/branch-routes") public Object routes(){return service.routes();}
  @GetMapping("/me/branches") public Object assignments(@AuthenticationPrincipal Actor a){return service.assignments(a);}
+ @GetMapping("/admin/staff-branches") public List<BranchService.StaffBranchView> staffBranches(@AuthenticationPrincipal Actor a){return service.allStaffBranches(a);}
  @PostMapping("/admin/branches") public Object create(@AuthenticationPrincipal Actor a,@Valid @RequestBody BranchInput i){return service.save(a,null,i.name(),i.address(),0);}
  @PutMapping("/admin/branches/{id}") public Object edit(@AuthenticationPrincipal Actor a,@PathVariable String id,@Valid @RequestBody BranchInput i){return service.save(a,id,i.name(),i.address(),i.version());}
  @PutMapping("/admin/branch-routes") public void route(@AuthenticationPrincipal Actor a,@Valid @RequestBody RouteInput i){service.route(a,i.pickupBranchId(),i.returnBranchId(),i.fee(),i.enabled(),i.expectedVersion());}

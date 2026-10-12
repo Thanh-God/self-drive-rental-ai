@@ -51,4 +51,10 @@ import java.util.*;
    jdbc.update("insert into staff_branches(user_id,branch_id) values (?,?)",userId,branch);
  }
  public List<String> assignments(Actor actor){return jdbc.queryForList("select branch_id from staff_branches where user_id=?",String.class,actor.id());}
+ public record StaffBranchView(String userId,String branchId){}
+ public List<StaffBranchView> allStaffBranches(Actor actor){
+  actor.require("ADMIN");
+  return jdbc.query("select sb.user_id, sb.branch_id from staff_branches sb join users u on u.id=sb.user_id where u.role='STAFF' order by sb.user_id, sb.branch_id",
+   (rs, rowNum) -> new StaffBranchView(rs.getString("user_id"), rs.getString("branch_id")));
+ }
 }

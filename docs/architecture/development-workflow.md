@@ -881,3 +881,23 @@ C7 incidentworkflow rowC7 now closed: C7A backend input/JAR unchanged(hashretain
 
 Baseline5052919 branchupdate-20261012-0920 clean; C7 accepted scoped(d3ebcb6,C7C138/C7B54/frontend40) and retained bymatchingdependencies. C8 account/Staffassignment: AntigravityC8A ready foruserforward(API/MySQL create/duplicate/lock/token401/unlock,add-onlyassignment+AdminbulkGET /admin/staff-branches typeduserId/branchId); OpenCodeC8B preparedGATE CLOSED until independentC8APASS+ownedservices stopped(UIexistingassignedbranches/loading/retry/pending andrealbrowser). Plan .runtime/coordination-c8-plan-20261012-093009/PLAN.md; tasks .runtime/coordination-c8a-antigravity-20261012-093009/TASK.md and .runtime/coordination-c8b-opencode-20261012-093009/TASK.md. No agentlaunched/messaged, servicesstarted, productwrites, revocationapproval, C9scope, push/reset/cleanup. Planningonly, not C8PASS; otherStage5/backlog remains.
 
+### C8A — Account & Add-only Staff Branch Assignment API / MySQL — PASS scoped, Antigravity, 12/10/2026
+
+- **Phạm vi xử lý**: Thực hiện nhiệm vụ theo TASK `.runtime/coordination-c8a-antigravity-20261012-093009/TASK.md` và `PLAN.md`:
+  1. `Backend Source & DTOs`:
+     - `BranchService`: Thêm `public record StaffBranchView(String userId, String branchId)` và method `allStaffBranches(Actor actor)` với guard `actor.require("ADMIN")`, truy vấn `staff_branches` liên kết `users` role `STAFF`.
+     - `BranchController`: Thêm endpoint `GET /api/v1/admin/staff-branches` trả về danh sách `List<StaffBranchView>`, không lộ mật khẩu/profile hay tokenVersion.
+     - `UserController`: Cập nhật `Status` request body record với `@NotNull @PositiveOrZero Long version` và `@NotBlank String status`.
+     - `AccountService`: Cập nhật `status(Actor actor, String id, String status, Long version)` fail-closed từ chối ngay lập tức nếu version null/âm, kiểm tra stale version (409) và ngăn chặn Admin tự khóa chính mình (403).
+  2. `Test Suite HTTP & MySQL Thật`:
+     - Tạo mới `AccountAssignmentHttpServerTest.java` (3 test cases, network socket ngẫu nhiên, MySQL 8.4 thật):
+       - `testAdminCreatesStaffAndEnforcesSecurityAndValidation`: Tạo Staff với email chuẩn hóa, login thành công với BCrypt hash, từ chối trùng lặp 409, validation lỗi 400, RBAC (USER/STAFF 403, Guest 401), xử lý trùng lặp đồng thời an toàn.
+       - `testLockAndUnlockStaffWithVersionAndTokenRevocation`: Khóa Staff với expected version tăng tokenVersion, vô hiệu hóa JWT cũ trên protected GET (`/me/branches`) với 401, chặn login 401; mở khóa tăng version và tokenVersion, JWT cũ vẫn 401, fresh login thành công 200; stale version 409, missing/negative version 400, Admin tự khóa 403.
+       - `testStaffBranchAssignmentAndBulkQuery`: Gán Staff vào branch A rồi B, truy vấn bulk GET `/admin/staff-branches` và `/me/branches`, gán lặp idempotent (không tạo bản ghi trùng lặp), từ chối gán cho non-STAFF (400), branch không tồn tại (404/409), kiểm tra phân quyền truy cập bulk read (403/401).
+  3. `Guards & Runner Kiểm Chứng`:
+     - `test-c8a-guards.ps1`: 13 checks kiểm chứng entrypoint guards (UnsupportedShell, ExistingRoot, OutsideEvidenceRoot, MissingDependency, UnrelatedCause negative control, OwnedProcess cleanup + sentinel, CallerEnv restoration) -> PASS (Exit 0).
+     - `run-c8a.ps1`: Xây dựng fat JAR mới của C8A, khởi chạy fixture MySQL cô lập (`kltn-c8a-ag-*`), thực thi `AccountAssignmentHttpServerTest` và `RouteVersionGuardTest`, capture XML và SQL readback -> PASS (Exit 0, `PASS_SCOPED`).
+     - Regression: `./mvnw.cmd test` chạy 106 tests, 0 failures, 0 errors, 8 skipped -> BUILD SUCCESS.
+- **Trạng thái**: C8A **PASS scoped**. Fixture container đã dừng an toàn, volume lưu giữ phục vụ nghiệm thu độc lập. Giữ nguyên DB người dùng (33385, 3306), không chỉnh sửa frontend (chờ mở gate C8B), không git push.
+
+

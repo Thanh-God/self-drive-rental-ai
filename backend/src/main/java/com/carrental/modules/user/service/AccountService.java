@@ -50,8 +50,10 @@ public class AccountService {
  @Transactional public Profile staff(Actor actor,String email,String name,String password){
   actor.require("ADMIN");Account a=register(email,name,password);a.role="STAFF";repo.flush();return view(a);
  }
- @Transactional public Profile status(Actor actor,String id,String status,long version){
-  actor.require("ADMIN");Account a=repo.lock(id).orElseThrow(DomainException::missing);
+ @Transactional public Profile status(Actor actor,String id,String status,Long version){
+  actor.require("ADMIN");
+  if(version==null||version<0)throw DomainException.bad("expectedVersion không hợp lệ.");
+  Account a=repo.lock(id).orElseThrow(DomainException::missing);
   if("ADMIN".equals(a.role))throw DomainException.forbidden();
   if(a.version!=version)throw DomainException.conflict("Tài khoản đã thay đổi.");
   if(!Set.of("ACTIVE","LOCKED").contains(status))throw DomainException.bad("Trạng thái không hợp lệ.");
