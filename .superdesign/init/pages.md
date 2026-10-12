@@ -1,0 +1,307 @@
+# API render dependency trees
+## /
+- frontend\src\pages\api\ApiScreens.jsx
+  - frontend\src\components\common\PageKit.jsx
+    - frontend\src\context\DemoContext.jsx
+      - frontend\src\demo\config.js
+      - frontend\src\demo\seed.js
+      - frontend\src\demo\model.js
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\components\common\EmptyState.jsx
+    - frontend\src\components\common\LoadingSkeleton.jsx
+    - frontend\src\components\common\Badge.jsx
+    - frontend\src\demo\model.js (already listed)
+  - frontend\src\components\common\EmptyState.jsx (already listed)
+  - frontend\src\components\common\LoadingSkeleton.jsx (already listed)
+  - frontend\src\components\vehicle\VehicleCard.jsx
+    - frontend\src\components\common\PageKit.jsx (already listed)
+    - frontend\src\components\common\Badge.jsx (already listed)
+    - frontend\src\assets\images\vehicles\index.js
+      - frontend\src\assets\images\vehicles\toyota-vios.jpg
+      - frontend\src\assets\images\vehicles\toyota-vios-interior.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander-interior.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent-interior.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross-interior.jpg
+      - frontend\src\assets\images\vehicles\attributions.json
+  - frontend\src\api\bookingInput.js
+  - frontend\src\api\bookingActions.js
+  - frontend\src\api\client.js
+    - frontend\src\utils\storage.js
+    - frontend\src\utils\requestGeneration.js
+  - frontend\src\utils\incidentEvents.js
+  - frontend\src\api\rental.js
+    - frontend\src\api\client.js (already listed)
+  - frontend\src\utils\roles.js
+  - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\context\AuthContext.jsx
+    - frontend\src\api\auth.js
+      - frontend\src\api\client.js (already listed)
+      - frontend\src\utils\storage.js (already listed)
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\demo\seed.js (already listed)
+    - frontend\src\utils\storage.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\hooks\useApiData.js
+    - frontend\src\api\client.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+    - frontend\src\utils\apiRequestState.js
+    - frontend\src\utils\roles.js (already listed)
+  - frontend\src\hooks\useNow.js
+## /vehicles
+- frontend\src\pages\api\ApiScreens.jsx
+  - frontend\src\components\common\PageKit.jsx
+    - frontend\src\context\DemoContext.jsx
+      - frontend\src\demo\config.js
+      - frontend\src\demo\seed.js
+      - frontend\src\demo\model.js
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\components\common\EmptyState.jsx
+    - frontend\src\components\common\LoadingSkeleton.jsx
+    - frontend\src\components\common\Badge.jsx
+    - frontend\src\demo\model.js (already listed)
+  - frontend\src\components\common\EmptyState.jsx (already listed)
+  - frontend\src\components\common\LoadingSkeleton.jsx (already listed)
+  - frontend\src\components\vehicle\VehicleCard.jsx
+    - frontend\src\components\common\PageKit.jsx (already listed)
+    - frontend\src\components\common\Badge.jsx (already listed)
+    - frontend\src\assets\images\vehicles\index.js
+      - frontend\src\assets\images\vehicles\toyota-vios.jpg
+      - frontend\src\assets\images\vehicles\toyota-vios-interior.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander-interior.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent-interior.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross-interior.jpg
+      - frontend\src\assets\images\vehicles\attributions.json
+  - frontend\src\api\bookingInput.js
+  - frontend\src\api\bookingActions.js
+  - frontend\src\api\client.js
+    - frontend\src\utils\storage.js
+    - frontend\src\utils\requestGeneration.js
+  - frontend\src\utils\incidentEvents.js
+  - frontend\src\api\rental.js
+    - frontend\src\api\client.js (already listed)
+  - frontend\src\utils\roles.js
+  - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\context\AuthContext.jsx
+    - frontend\src\api\auth.js
+      - frontend\src\api\client.js (already listed)
+      - frontend\src\utils\storage.js (already listed)
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\demo\seed.js (already listed)
+    - frontend\src\utils\storage.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\hooks\useApiData.js
+    - frontend\src\api\client.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+    - frontend\src\utils\apiRequestState.js
+    - frontend\src\utils\roles.js (already listed)
+  - frontend\src\hooks\useNow.js
+## /vehicles/:vehicleId
+- frontend\src\pages\api\ApiScreens.jsx
+  - frontend\src\components\common\PageKit.jsx
+    - frontend\src\context\DemoContext.jsx
+      - frontend\src\demo\config.js
+      - frontend\src\demo\seed.js
+      - frontend\src\demo\model.js
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\components\common\EmptyState.jsx
+    - frontend\src\components\common\LoadingSkeleton.jsx
+    - frontend\src\components\common\Badge.jsx
+    - frontend\src\demo\model.js (already listed)
+  - frontend\src\components\common\EmptyState.jsx (already listed)
+  - frontend\src\components\common\LoadingSkeleton.jsx (already listed)
+  - frontend\src\components\vehicle\VehicleCard.jsx
+    - frontend\src\components\common\PageKit.jsx (already listed)
+    - frontend\src\components\common\Badge.jsx (already listed)
+    - frontend\src\assets\images\vehicles\index.js
+      - frontend\src\assets\images\vehicles\toyota-vios.jpg
+      - frontend\src\assets\images\vehicles\toyota-vios-interior.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander-interior.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent-interior.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross-interior.jpg
+      - frontend\src\assets\images\vehicles\attributions.json
+  - frontend\src\api\bookingInput.js
+  - frontend\src\api\bookingActions.js
+  - frontend\src\api\client.js
+    - frontend\src\utils\storage.js
+    - frontend\src\utils\requestGeneration.js
+  - frontend\src\utils\incidentEvents.js
+  - frontend\src\api\rental.js
+    - frontend\src\api\client.js (already listed)
+  - frontend\src\utils\roles.js
+  - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\context\AuthContext.jsx
+    - frontend\src\api\auth.js
+      - frontend\src\api\client.js (already listed)
+      - frontend\src\utils\storage.js (already listed)
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\demo\seed.js (already listed)
+    - frontend\src\utils\storage.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\hooks\useApiData.js
+    - frontend\src\api\client.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+    - frontend\src\utils\apiRequestState.js
+    - frontend\src\utils\roles.js (already listed)
+  - frontend\src\hooks\useNow.js
+## /user/bookings
+- frontend\src\pages\api\ApiScreens.jsx
+  - frontend\src\components\common\PageKit.jsx
+    - frontend\src\context\DemoContext.jsx
+      - frontend\src\demo\config.js
+      - frontend\src\demo\seed.js
+      - frontend\src\demo\model.js
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\components\common\EmptyState.jsx
+    - frontend\src\components\common\LoadingSkeleton.jsx
+    - frontend\src\components\common\Badge.jsx
+    - frontend\src\demo\model.js (already listed)
+  - frontend\src\components\common\EmptyState.jsx (already listed)
+  - frontend\src\components\common\LoadingSkeleton.jsx (already listed)
+  - frontend\src\components\vehicle\VehicleCard.jsx
+    - frontend\src\components\common\PageKit.jsx (already listed)
+    - frontend\src\components\common\Badge.jsx (already listed)
+    - frontend\src\assets\images\vehicles\index.js
+      - frontend\src\assets\images\vehicles\toyota-vios.jpg
+      - frontend\src\assets\images\vehicles\toyota-vios-interior.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander-interior.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent-interior.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross-interior.jpg
+      - frontend\src\assets\images\vehicles\attributions.json
+  - frontend\src\api\bookingInput.js
+  - frontend\src\api\bookingActions.js
+  - frontend\src\api\client.js
+    - frontend\src\utils\storage.js
+    - frontend\src\utils\requestGeneration.js
+  - frontend\src\utils\incidentEvents.js
+  - frontend\src\api\rental.js
+    - frontend\src\api\client.js (already listed)
+  - frontend\src\utils\roles.js
+  - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\context\AuthContext.jsx
+    - frontend\src\api\auth.js
+      - frontend\src\api\client.js (already listed)
+      - frontend\src\utils\storage.js (already listed)
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\demo\seed.js (already listed)
+    - frontend\src\utils\storage.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\hooks\useApiData.js
+    - frontend\src\api\client.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+    - frontend\src\utils\apiRequestState.js
+    - frontend\src\utils\roles.js (already listed)
+  - frontend\src\hooks\useNow.js
+## /user/bookings/new
+- frontend\src\pages\api\ApiScreens.jsx
+  - frontend\src\components\common\PageKit.jsx
+    - frontend\src\context\DemoContext.jsx
+      - frontend\src\demo\config.js
+      - frontend\src\demo\seed.js
+      - frontend\src\demo\model.js
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\components\common\EmptyState.jsx
+    - frontend\src\components\common\LoadingSkeleton.jsx
+    - frontend\src\components\common\Badge.jsx
+    - frontend\src\demo\model.js (already listed)
+  - frontend\src\components\common\EmptyState.jsx (already listed)
+  - frontend\src\components\common\LoadingSkeleton.jsx (already listed)
+  - frontend\src\components\vehicle\VehicleCard.jsx
+    - frontend\src\components\common\PageKit.jsx (already listed)
+    - frontend\src\components\common\Badge.jsx (already listed)
+    - frontend\src\assets\images\vehicles\index.js
+      - frontend\src\assets\images\vehicles\toyota-vios.jpg
+      - frontend\src\assets\images\vehicles\toyota-vios-interior.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander-interior.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent-interior.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross-interior.jpg
+      - frontend\src\assets\images\vehicles\attributions.json
+  - frontend\src\api\bookingInput.js
+  - frontend\src\api\bookingActions.js
+  - frontend\src\api\client.js
+    - frontend\src\utils\storage.js
+    - frontend\src\utils\requestGeneration.js
+  - frontend\src\utils\incidentEvents.js
+  - frontend\src\api\rental.js
+    - frontend\src\api\client.js (already listed)
+  - frontend\src\utils\roles.js
+  - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\context\AuthContext.jsx
+    - frontend\src\api\auth.js
+      - frontend\src\api\client.js (already listed)
+      - frontend\src\utils\storage.js (already listed)
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\demo\seed.js (already listed)
+    - frontend\src\utils\storage.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\hooks\useApiData.js
+    - frontend\src\api\client.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+    - frontend\src\utils\apiRequestState.js
+    - frontend\src\utils\roles.js (already listed)
+  - frontend\src\hooks\useNow.js
+## /user/profile
+- frontend\src\pages\api\ApiScreens.jsx
+  - frontend\src\components\common\PageKit.jsx
+    - frontend\src\context\DemoContext.jsx
+      - frontend\src\demo\config.js
+      - frontend\src\demo\seed.js
+      - frontend\src\demo\model.js
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\components\common\EmptyState.jsx
+    - frontend\src\components\common\LoadingSkeleton.jsx
+    - frontend\src\components\common\Badge.jsx
+    - frontend\src\demo\model.js (already listed)
+  - frontend\src\components\common\EmptyState.jsx (already listed)
+  - frontend\src\components\common\LoadingSkeleton.jsx (already listed)
+  - frontend\src\components\vehicle\VehicleCard.jsx
+    - frontend\src\components\common\PageKit.jsx (already listed)
+    - frontend\src\components\common\Badge.jsx (already listed)
+    - frontend\src\assets\images\vehicles\index.js
+      - frontend\src\assets\images\vehicles\toyota-vios.jpg
+      - frontend\src\assets\images\vehicles\toyota-vios-interior.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander.jpg
+      - frontend\src\assets\images\vehicles\mitsubishi-xpander-interior.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent.jpg
+      - frontend\src\assets\images\vehicles\hyundai-accent-interior.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross.jpg
+      - frontend\src\assets\images\vehicles\toyota-corolla-cross-interior.jpg
+      - frontend\src\assets\images\vehicles\attributions.json
+  - frontend\src\api\bookingInput.js
+  - frontend\src\api\bookingActions.js
+  - frontend\src\api\client.js
+    - frontend\src\utils\storage.js
+    - frontend\src\utils\requestGeneration.js
+  - frontend\src\utils\incidentEvents.js
+  - frontend\src\api\rental.js
+    - frontend\src\api\client.js (already listed)
+  - frontend\src\utils\roles.js
+  - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\context\AuthContext.jsx
+    - frontend\src\api\auth.js
+      - frontend\src\api\client.js (already listed)
+      - frontend\src\utils\storage.js (already listed)
+    - frontend\src\demo\config.js (already listed)
+    - frontend\src\demo\seed.js (already listed)
+    - frontend\src\utils\storage.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+  - frontend\src\hooks\useApiData.js
+    - frontend\src\api\client.js (already listed)
+    - frontend\src\utils\requestGeneration.js (already listed)
+    - frontend\src\utils\apiRequestState.js
+    - frontend\src\utils\roles.js (already listed)
+  - frontend\src\hooks\useNow.js
