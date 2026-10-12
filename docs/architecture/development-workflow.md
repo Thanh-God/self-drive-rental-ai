@@ -1058,3 +1058,8 @@ Acceptance .runtime/coordination-c10a-backend-review-20261012-205239/ACCEPTANCE.
 ### C10A backend direct completion — 12/10/2026 — PASS scoped, Codex A
 
 User requested direct completion after another absent OpenCode HANDOFF/tests/commit. Preserved inherited implementation, added real HTTP/MySQL5amenity tests plus4catalog regression, transaction rollback after real delete/partialinsert seam, no-op0DML/reorderedIDs, bulkqueries2/publiclabel/oldedit/snapshot/RBAC validation. Final verify115total105executed10optional skips0fail/error; isolated MySQL9/9zero skip; guards18/18; newJAR92class/resource comparisons and actual AdminPUT/publicGET PASS; finalsource173inputs0drift. Schema26tables/37FK, ownedJAR8191/MySQL33651 stopped/caller restored, fixture/evidenceKEEP, originalDB identity read-only. HANDOFF/ACCEPTANCE/notes .runtime/coordination-c10a-codexa-complete-20261012-212639/. BackendC10A DONE scoped; Cursor UI and allC10B still pending. No frontend/wholeC10PASS/push/reset/prune, preexisting workflowblankline kept outside commit.
+
+
+### C10A UI handoff prepared — 12/10/2026 — READY, Codex A
+
+TASK .runtime/coordination-c10a-ui-cursor-20261012-215705/TASK.md; backend baseline57be1ee PASS retained when hashes unchanged. Cursor scope amenity Admin editor/public display and modest visual improvements; if broad redesign required, aesthetic changes limited to API homepage while required amenity integration remains in existing Admin/card/detail layout. Backend/imageC10B/provider unchanged; meaningful mounted/UI/MySQLbrowser/desktopmobile/buildsource/cleanup proofs required. No agent launch or implementation from preparing TASK; existing workflowblankline preserved outside commit.
