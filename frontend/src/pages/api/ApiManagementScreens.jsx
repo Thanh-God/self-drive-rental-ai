@@ -25,12 +25,32 @@ function LoadState({ requests, retry, children }) {
 
 export function ApiAccountsPage() {
   const accountsRequest = useApiData("/admin/accounts");
-  const branchesRequest = useApiData("/branches");
+  const allBranchesRequest = useApiData("/branches");
+  const staffBranchesRequest = useApiData("/admin/staff-branches");
   const accounts = Array.isArray(accountsRequest.data)
     ? accountsRequest.data
     : [];
-  const branches = (branchesRequest.data || []).filter(
+  const allBranches = allBranchesRequest.data || [];
+  const activeBranches = allBranches.filter(
     (branch) => branch.status === "ACTIVE",
+  );
+  const branchNameMap = useMemo(
+    () => new Map(allBranches.map((b) => [b.id, b.name])),
+    [allBranches],
+  );
+  const staffBranchLinks = Array.isArray(staffBranchesRequest.data)
+    ? staffBranchesRequest.data
+    : [];
+  const assignedBranchIdsByUser = useMemo(
+    () => {
+      const map = new Map();
+      for (const link of staffBranchLinks) {
+        if (!map.has(link.userId)) map.set(link.userId, []);
+        map.get(link.userId).push(link.branchId);
+      }
+      return map;
+    },
+    [staffBranchLinks],
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -94,6 +114,8 @@ export function ApiAccountsPage() {
       });
       setNotice(`Đã gán chi nhánh cho ${account.fullName}.`);
       target.reset();
+      accountsRequest.reload();
+      staffBranchesRequest.reload();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể gán chi nhánh."));
     } finally {
@@ -103,8 +125,17 @@ export function ApiAccountsPage() {
 
   const reload = () => {
     accountsRequest.reload();
-    branchesRequest.reload();
+    allBranchesRequest.reload();
+    staffBranchesRequest.reload();
   };
+
+  const isLoading =
+    accountsRequest.loading ||
+    allBranchesRequest.loading ||
+    staffBranchesRequest.loading;
+  const loadError =
+    accountsRequest.error || allBranchesRequest.error || staffBranchesRequest.error;
+
   return (
     <Page
       title="Quản lý tài khoản"
@@ -113,112 +144,169 @@ export function ApiAccountsPage() {
       {notice ? <Notice>{notice}</Notice> : null}
       {error ? <Notice error>{error}</Notice> : null}
       <div className="mb-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <LoadState requests={[accountsRequest, branchesRequest]} retry={reload}>
-          {accounts.length ? (
-            <div className="space-y-3">
-              {accounts.map((account) => (
-                <article className="panel" key={account.id}>
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h2 className="font-semibold">{account.fullName}</h2>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {account.email}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Badge
-                        tone={
-                          account.status === "ACTIVE" ? "success" : "danger"
-                        }
-                      >
-                        {account.status}
-                      </Badge>
-                      <Badge>{account.role}</Badge>
-                    </div>
-                  </div>
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    {account.role !== "ADMIN" ? (
-                      <button
-                        className="btn-secondary"
-                        disabled={busyId === account.id}
-                        onClick={() =>
-                          changeStatus(
-                            account,
-                            account.status === "ACTIVE" ? "LOCKED" : "ACTIVE",
-                          )
-                        }
-                      >
-                        {account.status === "ACTIVE"
-                          ? "Khóa tài khoản"
-                          : "Mở khóa"}
-                      </button>
-                    ) : (
-                      <p className="text-xs text-slate-500">
-                        Không thể khóa tài khoản quản trị.
-                      </p>
-                    )}
-                    {account.role === "STAFF" && branches.length ? (
-                      <form
-                        className="flex flex-wrap gap-2"
-                        onSubmit={(event) => assignBranch(event, account)}
-                      >
-                        <select
-                          className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm"
-                          name="branchId"
-                          required
-                          defaultValue=""
+        {isLoading ? (
+          <LoadingSkeleton rows={3} />
+        ) : loadError ? (
+          <div>
+            <Notice error>{loadError}</Notice>
+            <button className="btn-secondary" onClick={reload}>
+              Thử tải lại
+            </button>
+          </div>
+        ) : (
+          <>
+            {accounts.length ? (
+              <div className="space-y-3">
+                {accounts.map((account) => (
+                  <article className="panel" key={account.id}>
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <h2 className="font-semibold">{account.fullName}</h2>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {account.email}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          tone={
+                            account.status === "ACTIVE" ? "success" : "danger"
+                          }
                         >
-                          <option value="" disabled>
-                            Chọn chi nhánh
-                          </option>
-                          {branches.map((branch) => (
-                            <option key={branch.id} value={branch.id}>
-                              {branch.name}
-                            </option>
-                          ))}
-                        </select>
+                          {account.status}
+                        </Badge>
+                        <Badge>{account.role}</Badge>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center gap-3">
+                      {account.role !== "ADMIN" ? (
                         <button
                           className="btn-secondary"
                           disabled={busyId === account.id}
+                          onClick={() =>
+                            changeStatus(
+                              account,
+                              account.status === "ACTIVE"
+                                ? "LOCKED"
+                                : "ACTIVE",
+                            )
+                          }
                         >
-                          Gán chi nhánh
+                          {account.status === "ACTIVE"
+                            ? "Khóa tài khoản"
+                            : "Mở khóa"}
                         </button>
-                      </form>
-                    ) : null}
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : (
-            <EmptyState title="Chưa có tài khoản" />
-          )}
-        </LoadState>
-        <form className="panel h-fit space-y-4" onSubmit={addStaff}>
-          <h2 className="text-lg font-semibold">Tạo nhân viên</h2>
-          <Field label="Họ và tên">
-            <input name="fullName" required maxLength={100} />
-          </Field>
-          <Field label="Email">
-            <input name="email" type="email" required maxLength={254} />
-          </Field>
-          <Field label="Mật khẩu khởi tạo">
-            <input
-              name="password"
-              type="password"
-              required
-              minLength={8}
-              maxLength={72}
-              autoComplete="new-password"
-            />
-          </Field>
-          <p className="text-xs text-slate-500">
-            Tài khoản tạo mới có role Staff; mật khẩu không được hiển thị hoặc
-            lưu ở giao diện.
-          </p>
-          <button className="btn" disabled={busyId === "create"}>
-            {busyId === "create" ? "Đang tạo..." : "Tạo Staff"}
-          </button>
-        </form>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          Không thể khóa tài khoản quản trị.
+                        </p>
+                      )}
+                      {account.role === "STAFF" ? (
+                        <>
+                          <div className="flex flex-wrap gap-2 text-sm text-slate-600">
+                            {(() => {
+                              const assignedIds =
+                                assignedBranchIdsByUser.get(account.id) || [];
+                              if (assignedIds.length === 0) {
+                                return <span>Chưa phân công chi nhánh</span>;
+                              }
+                              return assignedIds.map((branchId) => {
+                                const branchName =
+                                  branchNameMap.get(branchId) || branchId;
+                                const branch = allBranches.find(
+                                  (b) => b.id === branchId,
+                                );
+                                const isInactive =
+                                  branch && branch.status !== "ACTIVE";
+                                return (
+                                  <Badge
+                                    key={branchId}
+                                    tone={isInactive ? "warning" : "default"}
+                                  >
+                                    {branchName}{isInactive ? " (tạm ngừng)" : ""}
+                                  </Badge>
+                                );
+                              });
+                            })()}
+                          </div>
+                          {activeBranches.length > 0 && (
+                            <form
+                              className="flex flex-wrap gap-2"
+                              onSubmit={(event) =>
+                                assignBranch(event, account)
+                              }
+                            >
+                              <select
+                                className="min-h-10 rounded-lg border border-slate-300 px-3 text-sm"
+                                name="branchId"
+                                required
+                                defaultValue=""
+                                disabled={busyId === account.id}
+                              >
+                                <option value="" disabled>
+                                  Chọn chi nhánh để gán
+                                </option>
+                                {activeBranches.map((branch) => {
+                                  const alreadyAssigned =
+                                    assignedBranchIdsByUser
+                                      .get(account.id)
+                                      ?.includes(branch.id);
+                                  return (
+                                    <option
+                                      key={branch.id}
+                                      value={branch.id}
+                                      disabled={alreadyAssigned}
+                                    >
+                                      {branch.name}{alreadyAssigned ? " (đã gán)" : ""}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              <button
+                                type="submit"
+                                className="btn-secondary"
+                                disabled={busyId === account.id}
+                              >
+                                Gán chi nhánh
+                              </button>
+                            </form>
+                          )}
+                        </>
+                      ) : null}
+                    </div>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <EmptyState title="Chưa có tài khoản" />
+            )}
+            <form className="panel h-fit space-y-4" onSubmit={addStaff}>
+              <h2 className="text-lg font-semibold">Tạo nhân viên</h2>
+              <Field label="Họ và tên">
+                <input name="fullName" required maxLength={100} />
+              </Field>
+              <Field label="Email">
+                <input name="email" type="email" required maxLength={254} />
+              </Field>
+              <Field label="Mật khẩu khởi tạo">
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  minLength={8}
+                  maxLength={72}
+                  autoComplete="new-password"
+                />
+              </Field>
+              <p className="text-xs text-slate-500">
+                Tài khoản tạo mới có role Staff; mật khẩu không được hiển thị hoặc
+                lưu ở giao diện.
+              </p>
+              <button type="submit" className="btn" disabled={busyId === "create"}>
+                {busyId === "create" ? "Đang tạo..." : "Tạo Staff"}
+              </button>
+            </form>
+          </>
+        )}
       </div>
     </Page>
   );
