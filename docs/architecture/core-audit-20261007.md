@@ -184,3 +184,6 @@ ACCEPTANCE .runtime/coordination-c10b-backend-review-20261013-093030/ACCEPTANCE.
 
 ### C10B-B1 OpenCode follow-up prepared — 13/10/2026
 TASK .runtime/coordination-c10b-backend-opencode-followup-20261013-093435/TASK.md: backend-only sửa B1-R01–R10 theo ACCEPTANCE review093030, smallcompile/business/guardfix trướcMySQL/JARheavyproof; contractgốc giữ, HANDOFF/evidencefoldermới. Chưaagentexecution hoặcPASS. Preexistingworkflow/source giữ nguyên.
+
+### C10B-B1 follow-up review and Antigravity remaining handoff — 13/10/2026 — PARTIAL
+Review .runtime/coordination-c10b-backend-review2-20261013-095741/ACCEPTANCE.md: compile/PSparsepass, observed sourcefixes retained; noHANDOFF/manifest/commit/proof. SmallHTTPtest runtime stalledMockito, cancelledexecs, ownedPIDgone; no businessPASS/MySQL/JAR. R2-01–R2-06 remain, usertransferred backend-onlyremaining to .runtime/coordination-c10b-backend-antigravity-20261013-095859/TASK.md. Noagentautolaunch/frontend/DBgốcchanges.
