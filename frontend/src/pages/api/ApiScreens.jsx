@@ -1,4 +1,5 @@
 import VehicleGallery from "../../components/vehicle/VehicleGallery";
+import BrandBar from "../../components/vehicle/BrandBar";
 import PasswordField from "../../components/common/PasswordField";
 import { passwordError, passwordHint } from "../../utils/passwordPolicy";
 import {
@@ -521,7 +522,8 @@ export function ApiHomePage() {
   const isUser = currentUser?.role === "USER";
 
   return (
-    <div className="page-shell">
+    <><BrandBar vehicles={vehiclesRequest.data} catalog={catalogRequest.data} loading={loading} error={error} />
+    <div className="page-shell urban-home">
       <section className="urban-hero">
         <div className="urban-hero-copy">
           <p className="urban-kicker">KDRIVE · THUÊ XE TỰ LÁI</p>
@@ -617,11 +619,13 @@ export function ApiHomePage() {
           )}
         </RequestState>
       </section>
-    </div>
+    </div></>
   );
 }
 
 export function ApiVehicleListPage() {
+  const [params] = useSearchParams();
+  const brand = params.get("brand") || "";
   const vehiclesRequest = useApiData("/vehicles");
   const catalogRequest = useApiData("/vehicles/catalog");
   const [query, setQuery] = useState("");
@@ -641,6 +645,7 @@ export function ApiVehicleListPage() {
             `${vehicle.name} ${vehicle.brand} ${vehicle.plate}`
               .toLocaleLowerCase("vi")
               .includes(query.toLocaleLowerCase("vi"))) &&
+          (!brand || String(vehicle.brandId) === brand) &&
           (!status || vehicle.status === status) &&
           (!category || vehicle.categoryId === category) &&
           (!seats || vehicle.seats >= Number(seats)) &&
@@ -656,6 +661,7 @@ export function ApiVehicleListPage() {
   }, [
     vehiclesRequest.data,
     catalogRequest.data,
+    brand,
     query,
     status,
     category,
@@ -670,6 +676,7 @@ export function ApiVehicleListPage() {
     catalogRequest.reload();
   };
   return (
+    <><BrandBar vehicles={vehiclesRequest.data} catalog={catalogRequest.data} loading={loading} error={error} />
     <Page
       title="Danh sách xe"
       description="Lọc xe theo tên, hãng hoặc trạng thái khai thác."
@@ -772,7 +779,7 @@ export function ApiVehicleListPage() {
         Lịch còn trống được xác nhận qua báo giá trên máy chủ; trạng thái xe
         không thay thế kiểm tra thời gian và tuyến nhận/trả.
       </p>
-    </Page>
+    </Page></>
   );
 }
 
