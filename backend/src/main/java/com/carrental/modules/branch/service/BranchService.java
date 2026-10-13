@@ -21,6 +21,19 @@ import java.util.*;
   var route=routes.findByPickupBranchIdAndReturnBranchId(pickup,destination).orElseThrow(()->DomainException.bad("Tuyến nhận/trả chưa được doanh nghiệp cho phép."));
   if(!route.enabled)throw DomainException.conflict("Tuyến nhận/trả đã ngừng phục vụ.");return route.fee;
  }
+ public record BookingRoute(String pickupName,String returnName,long fee){}
+ @Transactional(propagation=org.springframework.transaction.annotation.Propagation.MANDATORY)
+ public BookingRoute bookingRoute(String pickup,String destination){
+  if(pickup==null||pickup.isBlank()||destination==null||destination.isBlank())throw DomainException.bad("Cần chọn chi nhánh nhận và trả.");
+  // Booking's outer transaction retains these ordered row locks until quote/create commits.
+  var locked=new HashMap<String,Branch>();
+  for(var id:java.util.stream.Stream.of(pickup,destination).distinct().sorted().toList()){
+   var b=branches.lock(id).orElseThrow(DomainException::missing);
+   if(!"ACTIVE".equals(b.status))throw DomainException.conflict("Chi nhánh không hoạt động.");
+   locked.put(id,b);
+  }
+  return new BookingRoute(locked.get(pickup).name,locked.get(destination).name,fee(pickup,destination));
+ }
  public boolean assigned(Actor actor,String branch){return actor.is("STAFF")&&jdbc.queryForObject("select count(*) from staff_branches where user_id=? and branch_id=?",Long.class,actor.id(),branch)>0;}
  public void requireStaff(Actor actor,String branch){if(!assigned(actor,branch))throw DomainException.forbidden();}
  @Transactional public BranchView save(Actor actor,String id,String name,String address,long version){

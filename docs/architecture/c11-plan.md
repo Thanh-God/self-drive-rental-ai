@@ -1,6 +1,6 @@
 # C11 — kế hoạch chi nhánh và địa điểm
 
-Ngày13/10/2026. Trạng thái **IN PROGRESS: C11-L và C11-A1 PASS scoped; còn A2/A3/A4**. Kế hoạch ban đầu và audit giữ bên dưới; cập nhật thực thi ở cuối tài liệu.
+Ngày13/10/2026. Trạng thái **IN PROGRESS: C11-L, C11-A1 và C11-A2 PASS scoped; còn A3/A4**. Kế hoạch ban đầu và audit giữ bên dưới; cập nhật thực thi ở cuối tài liệu.
 
 ## Baseline và phần giữ lại
 
@@ -95,3 +95,11 @@ C11-A1 DONE scoped: ADMIN PUT /api/v1/admin/branches/{id}/status với ACTIVE/IN
 Backend verify137reported/125executed/12optionalSKIP,0failure/error; targeted actualHTTP MySQL4/4noSKIP. Kiểm được đóng hết ACTIVE,rename khôngreopen,no-write sauerror/stale, bảo toàn8nhóm dữ liệu gồm xe/tuyến/Staff/đơn/history/contracts/invoices/Flyway. JAR182class/resource entries khớp byte compiled tree dùng HTTP tests; source manifest trước/sau không drift. Runner guard1test/2subcases refuseexisting/outside, không claim toànadversecleanup. Fixture exactidentity đã dừng/volumeKEEP; DB gốc khôngtestghi. Evidence TASK/HANDOFF/ACCEPTANCE: `.runtime/coordination-c11-a1-codexa-20261013/`; contract docs/modules/branch-status.md.
 
 Tiếp theo A2: quote/create vs close race và workflow đơn cũ; A3: UI đóng/mở; A4: browserE2E/đóngC11. Chưa triển khai ba lượt này, C11 tổng thể PARTIAL. Frontend/location/C10 source không đổi, giữ PASS cũ khi dependency liên quan không bị tác động; chưa gọi backend JAR mới là browserPASS.
+
+## C11-A2 — thực thi13/10/2026 — PASS scoped
+
+Finding A2-01 đóng bằng ordered distinct branch locks trong giao dịch quote/create và typed BookingRoute DTO, không trả thêm entity mutable qua module. Close dùng cùng record lock. Finding A2-02 đóng bằng bỏ ACTIVEbranch check khi xác nhận đơn cũ; giữ permission/GPLX/vehicle/schedule/state/version. Không đổi migration/dependency/productionclock/frontend.
+
+Backend verify143reported/129executed/14SKIP,0failure/error:12optional cũ và2race chỉ dành MySQL. Targeted MySQL10/10noSKIP (A2six+A1four); actual HTTP negatives/positives và lifecycle closedbranch; actual transactional service race2ca đều có MySQLdata_lock_waits readback. Close thắng:no booking/historywrite,409 đúng cause. Create thắng:close chờ commit,bookingcũPENDING được confirm. Snapshot/route/Staff/Flyway preservation và permissions/GPLX/time/version vẫn đạt. JAR183entries khớp compiled tree dùng tests; inputsourcehash freeze trước/sauPASS. Fixture đã dừng/volumeKEEP; không test ghi DBgốc hoặc push.
+
+Evidence/TASK/HANDOFF/ACCEPTANCE tại `.runtime/coordination-c11-a2-codexa-20261013/`; runner `scripts/coordination/c11-branch-booking/`. H2raceSKIP không làPASS; nativeMySQLthựcthiđủ. A3UI và A4browserE2E bảnbackendmới chưa thực hiện, C11 tổng thể PARTIAL. Các ghi chú chưa triển khaiA2 trước đây là lịch sử, được cập nhật bởi kết quả này. Không chạy lại location/C10frontend không bị đổi vô cớ.

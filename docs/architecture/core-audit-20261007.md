@@ -211,3 +211,6 @@ Tích hợp feature/location-catalog-20261012-02 SHA790cc82, giữ lịch sử �
 
 ### C11-A1 —13/10/2026 —PASS scoped; cònA2/A3/A4
 Người dùng duyệt khôngminACTIVE,giữxe/tuyến/Staff/đơncũ. APIADMINstatus/version vàrenamegiữstatus đã đạt4MySQLHTTPtestsnoSKIP,backendverify137reported125executed12optionalSKIP,0failure/error. Chặnvalidation/stale/RBACnofailedwrites;đónghếtchi nhánhđượcphép;8nhómdata/snapshot/Flywaybảo toàn. JAR182entries/sourcehashmatch. Evidence `.runtime/coordination-c11-a1-codexa-20261013/`; contract docs/modules/branch-status.md. Khôngmigration/deps/UI/push/DBgốc,fixturestoppedKEEP. Bookingrace/workflowA2/UIA3/browserA4chưaDONE; C11PARTIAL.
+
+### C11-A2 —13/10/2026 —PASS scoped; cònA3/A4
+Quote/create giữ orderedbranchlocks tới commit, closedpickup/return409no-write; confirmđơncũ khôngđòi ACTIVEbranch,permission/GPLX/state/version/lịchxe giữ. MySQL10testsA2six+A1four đềuPASSnoSKIP;2race latch+actualdata_lock_waits chứngminh closewins/createwins;workflowđơncũquaCONFIRMED/IN_PROGRESS/RETURNED/COMPLETED,snapshotstable sauclose/rename/reopen. Backendverify143reported129executed14SKIP (12optional+2MySQL-onlyrace),0failure/error; nativeMySQLexecutedđủ. JAR183entries/sourcehashmatch. Evidence `.runtime/coordination-c11-a2-codexa-20261013/`;fixturestoppedKEEP/noDBgốc/push. C11chưaDONE,A3/A4cònchưa triểnkhai.

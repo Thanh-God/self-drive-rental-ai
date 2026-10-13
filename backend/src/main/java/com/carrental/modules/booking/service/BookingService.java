@@ -44,8 +44,9 @@ import java.util.*;
   if(!"ACTIVE".equals(v.status))throw DomainException.conflict("Xe không hoạt động.");
   licenses.eligible(a.id(),v.transmission,v.seats,i.endAt());
   Booking b=new Booking();b.userId=a.id();b.vehicleId=v.id;b.pickupBranchId=i.pickupBranchId();b.returnBranchId=i.returnBranchId();
-  b.pickupName=branches.active(i.pickupBranchId()).name;b.returnName=branches.active(i.returnBranchId()).name;
-  b.oneWayFee=branches.fee(i.pickupBranchId(),i.returnBranchId());b.startAt=i.startAt();b.endAt=i.endAt();b.createdAt=now;
+  var route=branches.bookingRoute(i.pickupBranchId(),i.returnBranchId());
+  b.pickupName=route.pickupName();b.returnName=route.returnName();
+  b.oneWayFee=route.fee();b.startAt=i.startAt();b.endAt=i.endAt();b.createdAt=now;
   b.expiresAt=now.plus(Duration.ofHours(2)).isBefore(b.startAt)?now.plus(Duration.ofHours(2)):b.startAt;
   b.rentalDays=(int)Math.ceil(Duration.between(b.startAt,b.endAt).toMillis()/86400000.0);b.dailyPrice=v.dailyPrice;
   b.rentalTotal=Math.multiplyExact(b.dailyPrice,b.rentalDays);b.total=Math.addExact(b.rentalTotal,b.oneWayFee);
@@ -77,7 +78,7 @@ import java.util.*;
     branches.requireStaff(a,b.pickupBranchId);
     if(!"PENDING".equals(old))throw DomainException.conflict("Đơn không còn chờ xác nhận.");
     if("REJECTED".equals(next)){reason(action.reason());schedule(vehicle,null,b.id);}
-    else {if(!"ACTIVE".equals(vehicle.status))throw DomainException.conflict("Xe không hoạt động.");licenses.eligible(b.userId,vehicle.transmission,vehicle.seats,b.endAt);branches.active(b.pickupBranchId);branches.active(b.returnBranchId);schedule(vehicle,null,null);}
+    else {if(!"ACTIVE".equals(vehicle.status))throw DomainException.conflict("Xe không hoạt động.");licenses.eligible(b.userId,vehicle.transmission,vehicle.seats,b.endAt);schedule(vehicle,null,null);}
    }
    case "IN_PROGRESS" -> {
     branches.requireStaff(a,b.pickupBranchId);
