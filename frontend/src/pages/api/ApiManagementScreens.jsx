@@ -1,6 +1,8 @@
 import VehicleImageEditor from "../../components/vehicle/VehicleImageEditor";
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import apiClient from "../../api/client";
+import { changeBranchStatus } from "../../api/branches";
+import { useAuth } from "../../context/AuthContext";
 import { useApiData } from "../../hooks/useApiData";
 import { getErrorMessage } from "../../utils/roles";
 import { Field, money, Notice, Page } from "../../components/common/PageKit";
@@ -932,12 +934,16 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
 }
 
 export function ApiBranchesPage() {
-  const branchesRequest = useApiData("/branches");
-  const routesRequest = useApiData("/branch-routes");
+  const { user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
+  const branchesRequest = useApiData("/branches", isAdmin);
+  const routesRequest = useApiData("/branch-routes", isAdmin);
   const [selected, setSelected] = useState(null);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const mutationPending = useRef(false);
+  const [conflict, setConflict] = useState(false);
   const branches = useMemo(() => branchesRequest.data || [], [branchesRequest.data]);
   const routes = useMemo(() => routesRequest.data || [], [routesRequest.data]);
   const [routeForm, setRouteForm] = useState({
@@ -981,6 +987,8 @@ export function ApiBranchesPage() {
 
   async function saveBranch(event) {
     event.preventDefault();
+    if (!isAdmin || mutationPending.current || conflict) return;
+    mutationPending.current = true;
     setError("");
     setNotice("");
     setBusy(true);
@@ -1006,13 +1014,17 @@ export function ApiBranchesPage() {
       routesRequest.reload();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể lưu chi nhánh."));
+      if (requestError.response?.status === 409) setConflict(true);
     } finally {
+      mutationPending.current = false;
       setBusy(false);
     }
   }
 
   async function saveRoute(event) {
     event.preventDefault();
+    if (!isAdmin || mutationPending.current || conflict) return;
+    mutationPending.current = true;
     setError("");
     setNotice("");
     setBusy(true);
@@ -1035,8 +1047,40 @@ export function ApiBranchesPage() {
       setError(getErrorMessage(requestError, "Không thể lưu tuyến."));
       if (requestError.response?.status === 409) routesRequest.reload();
     } finally {
+      mutationPending.current = false;
       setBusy(false);
     }
+  }
+
+  async function toggleBranch(branch) {
+    if (!isAdmin || mutationPending.current || conflict) return;
+    mutationPending.current = true;
+    setBusy(true);
+    setError("");
+    setNotice("");
+    const next = branch.status === "ACTIVE" ? "INACTIVE" : "ACTIVE";
+    try {
+      await changeBranchStatus(branch, next);
+      setNotice(next === "ACTIVE" ? "Đã mở nhận đơn mới tại chi nhánh." : "Đã ngừng nhận đơn mới tại chi nhánh. Đơn cũ tiếp tục được xử lý theo quyền.");
+      setSelected(null);
+      branchesRequest.reload();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Không thể đổi trạng thái chi nhánh."));
+      if (requestError.response?.status === 409) setConflict(true);
+    } finally {
+      mutationPending.current = false;
+      setBusy(false);
+    }
+  }
+
+  function reloadFreshBranches() {
+    if (mutationPending.current) return;
+    setSelected(null);
+    setConflict(false);
+    setError("");
+    setNotice("");
+    branchesRequest.reload();
+    routesRequest.reload();
   }
 
   function changeRoute(key, value) {
@@ -1055,6 +1099,7 @@ export function ApiBranchesPage() {
 
   const loading = branchesRequest.loading || routesRequest.loading;
   const loadError = branchesRequest.error || routesRequest.error;
+  if (!isAdmin) return <Page title="Chi nhánh & tuyến nhận/trả"><Notice error>Chỉ quản trị viên được quản lý chi nhánh.</Notice></Page>;
   return (
     <Page
       title="Chi nhánh & tuyến nhận/trả"
@@ -1062,6 +1107,8 @@ export function ApiBranchesPage() {
     >
       {notice ? <Notice>{notice}</Notice> : null}
       {error ? <Notice error>{error}</Notice> : null}
+      <p className="mb-4 text-sm text-slate-600">Ngừng nhận đơn mới sẽ chặn báo giá và đặt xe mới. Đơn cũ tiếp tục theo quyền; xe, tuyến và phân công nhân viên được giữ nguyên.</p>
+      {conflict ? <div className="mb-4"><Notice error>Chi nhánh đã thay đổi. Tải dữ liệu mới trước khi thử lại; bản sửa chưa được lưu.</Notice><button type="button" className="btn-secondary" disabled={busy} onClick={reloadFreshBranches}>Tải dữ liệu mới</button></div> : null}
       {loading ? (
         <LoadingSkeleton rows={3} />
       ) : loadError ? (
@@ -1081,6 +1128,7 @@ export function ApiBranchesPage() {
         <div className="grid gap-6 xl:grid-cols-2">
           <div className="space-y-4">
             <div className="space-y-3">
+              {!branches.length ? <p>Chưa có chi nhánh.</p> : null}
               {branches.map((branch) => (
                 <article
                   className="panel flex flex-wrap items-center justify-between gap-3"
@@ -1092,15 +1140,17 @@ export function ApiBranchesPage() {
                       {branch.address}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      {branch.status}
+                      {branch.status === "ACTIVE" ? "Đang nhận đơn mới" : "Ngừng nhận đơn mới"} · Phiên bản {branch.version}
                     </p>
                   </div>
-                  <button
+                  <div className="flex gap-2"><button
                     className="btn-secondary"
+                    disabled={busy || conflict}
                     onClick={() => setSelected(branch)}
                   >
                     Chỉnh sửa
                   </button>
+                  <button type="button" className="btn-secondary" disabled={busy || conflict} onClick={() => toggleBranch(branch)} aria-label={`${branch.status === "ACTIVE" ? "Ngừng" : "Mở"} nhận đơn mới: ${branch.name}`}>{busy ? "Đang xử lý..." : branch.status === "ACTIVE" ? "Ngừng nhận đơn mới" : "Mở nhận đơn mới"}</button></div>
                 </article>
               ))}
             </div>
@@ -1112,6 +1162,7 @@ export function ApiBranchesPage() {
                 <input
                   key={`${selected?.id || "new"}-name`}
                   name="name"
+                  disabled={busy}
                   required
                   maxLength={120}
                   defaultValue={selected?.name || ""}
@@ -1121,13 +1172,14 @@ export function ApiBranchesPage() {
                 <input
                   key={`${selected?.id || "new"}-address`}
                   name="address"
+                  disabled={busy}
                   required
                   maxLength={300}
                   defaultValue={selected?.address || ""}
                 />
               </Field>
               <div className="flex gap-2">
-                <button className="btn" disabled={busy}>
+                <button className="btn" disabled={busy || conflict}>
                   {busy
                     ? "Đang lưu..."
                     : selected
@@ -1138,6 +1190,7 @@ export function ApiBranchesPage() {
                   <button
                     type="button"
                     className="btn-secondary"
+                    disabled={busy}
                     onClick={() => setSelected(null)}
                   >
                     Hủy
@@ -1241,7 +1294,7 @@ export function ApiBranchesPage() {
                 />{" "}
                 Tuyến đang hoạt động
               </label>
-              <button className="btn" disabled={busy || branches.length < 1}>
+              <button className="btn" disabled={busy || conflict || branches.length < 1}>
                 Lưu tuyến
               </button>
             </form>

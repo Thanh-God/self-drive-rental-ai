@@ -220,3 +220,6 @@ Giữ luồng đổi mật khẩu hiện có theo yêu cầu giảm phạm vi; p
 
 ### LOGOUT-REGISTER —13/10/2026 —PASS scoped
 Sửa root cause AuthContext chờ API trước clear local session; nay logout guest/local clear và navigate login ngay, vẫn revoke bằng token đã chụp; warning persist khi server/network/403 thất bại, logout403 không redirect unauthorized. Login/register mới đợi pending logout kết thúc, lỗi cũ không chặn hoặc xóa phiên mới. Theo userrequest bỏ password confirmation chỉ ở register, giữ passwordchange confirmation/policy.90frontendtests0skip/lint/demoAPIbuild và49browser assertions trên backend/MySQL fixture thật; actualsuccess revoke JWT401, injectedfailure serverJWT200 cảnh báo không claimrevoke. Backend source/JAR unchanged giữ6MySQLproof; originalDB không testghi, owned services+fixture stoppedKEEP. Evidence .runtime/coordination-logout-register-20261013/; C11A3/A4/emailOTP vẫnPENDING, không push.
+
+### C11-A3 —13/10/2026 — frontendPASS; A4 tiếp theo
+BranchstatusUI ADMIN đóng/mở/version,mutationref/pending,400 giữ input/409 freshrecovery,route/demo giữ.99frontendtests0skip/lint/demoAPIbuild;9mountedcases. Backend giữ source sauauth, A4 sẽ kiểm lại A1/A2MySQL trên JAR hiện tại vàbrowser. Evidence .runtime/coordination-c11-a3-codexa-20261013/. KhôngwholeC11PASS/push/DBgốc.
