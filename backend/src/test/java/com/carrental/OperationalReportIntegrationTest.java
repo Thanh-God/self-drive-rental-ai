@@ -20,6 +20,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 @AutoConfigureMockMvc
 @Import(OperationalReportIntegrationTest.FixedTime.class)
 class OperationalReportIntegrationTest {
+ @org.springframework.test.context.DynamicPropertySource
+ static void database(org.springframework.test.context.DynamicPropertyRegistry registry){
+  String url=System.getenv("KDRIVE_TEST_DB_URL");
+  if(url!=null&&!url.isBlank()){
+   CancelBoundaryTest.verifySafeIsolatedDatabase(url,System.getenv("KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX"),System.getenv("KDRIVE_TEST_FIXTURE_MARKER_TOKEN"),System.getenv("KDRIVE_TEST_DB_USER"),System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+   registry.add("spring.datasource.url",()->url);registry.add("spring.datasource.username",()->System.getenv("KDRIVE_TEST_DB_USER"));registry.add("spring.datasource.password",()->System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+  }
+ }
  @TestConfiguration static class FixedTime {@Bean @Primary Clock reportClock(){return Clock.fixed(Instant.parse("2026-10-13T00:00:00Z"),ZoneOffset.UTC);}}
  @Autowired MockMvc mvc;@Autowired JdbcTemplate jdbc;@Autowired ObjectMapper json;@Autowired OperationalReportService service;
  String login(String email)throws Exception{

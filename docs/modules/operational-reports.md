@@ -100,3 +100,13 @@ Metric/date scope đã duyệt; miền ngày kỹ thuật được giới hạn 
 Backend verify153reported/139executed/14skip,0failure/error. ReportIntegration4/4noskip chứng minh bằng Spring MockMvc/H2: validation/date/RBAC, empty/canonicaltimezone, effectiveexpired/currentgroups/firstcompletion/count/money/no-write, SUM lớn hơnLong vàJSsafeInteger. Rows test là fixture cho truy vấn, không chứng minh workflow đã chạy. MySQL native/snapshot/concurrency/performance và browser C12-3/5 chưa nghiệm thu.
 
 Source được build trong runtimecopy mới; không ghi đè backend/target của tiến trình người dùng. Sourcecopy và JARcompiledresources hashmatch. Evidence .runtime/coordination-c12-2-20261013/. Không restart backend đang chạy; API mới chưa nạp vào tiến trình đó. Các dòng “chưa triển khai” trước section này là baseline C12-1. C12-3–5 tiếp theo; timeout hồ sơ vẫn hoãn.
+
+## C12-3 —13/10/2026 —PASS MySQL scoped
+
+MySQL8fixture guard marker/port33675; report integration4/4 and realHTTP4/4,zero skip/fail/error. Native boundarymicroseconds/VMdays1970..2038/366vs367/effectiveexpiry/firstCOMPLETED/empty/sum beyondLong validated. HTTPquote/create→confirm→handover→return→complete produces invoice/history truly; report matches independentSQL, reads leave business rows unchanged, rename/price change doesn't change invoice amount/snapshot. No originalDBwrite.
+
+Concurrent completion commits between real booking aggregation and invoice aggregation inside paused report; first response returns precommit RETURNED/0completion/0invoice/0money, next returnsCOMPLETED/1invoice/650000. Test-only MockitoSpy latch, no productionclock or source bypass; verifies MySQLREPEATABLE_READ actual snapshot.
+
+Local performance:10000syntheticbookings,0invoice/history in that loadcase,5HTTP calls26/20/21/20/21ms; no productionSLA. COUNT diagnosticEXPLAIN scans existing booking_user_created coveringindex (~10514estimatedrows), not date-leadingrange. Source3fixedaggregatequeries/noN+1 entityloading; no general-log querycounter or full3queryEXPLAIN claim. Mixedhistory/invoice correctness tested separately; no newindex/migration justified at this size.
+
+Full backendverify157reported139executed18skip0fail/error;18skipnotPASS includes4native-only executed later in native4/4. Source/runtimecopy/JAR129entries and sourcehashmatch. Exactfixture stopped/volumeKEEP; original user services/JAR/DB untouched; evidence .runtime/coordination-c12-3-20261013/. C12-4frontend/C12-5browser not started. No push; UI/backenduserprocess not switched by this test.

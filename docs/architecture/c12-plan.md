@@ -61,3 +61,7 @@ C12-1 DONE contract tại [operational-reports](../modules/operational-reports.m
 ## Tiến độ C12-2 —13/10/2026
 
 C12-2 DONE backend/H2 scoped: report API/typedaggregates/datevalidation/RBAC/readonly transaction; verify153reported139executed14skip0fail, reporttests4/4noskip. Không frontend/migration/deps/DBgốc/restartuserprocess/push. Provenance runtimecopy+JAR khớp sourcefinal. Chưa nativeMySQL/snapshot/performance/browser, không coi toàn C12DONE; chuyển C12-3 khi được yêu cầu.
+
+## Tiến độ C12-3 —13/10/2026
+
+DONE MySQL scoped:8/8native no skip,HTTPworkflow/invoiceSQLreadback/no-write/RBAC/biên ngày và concurrent snapshotold→new đạt. 10000bookings latency20–26ms local vớiinvoice/history0; khôngproductionSLA/đềxuấtindextựđộng. Verify139executed18skip không tínhPASS; native-required executed đủ. SourceJARhashmatch, fixturestoppedKEEP, DBgốc/servicesusergiữ. C12-4/5 chưa triểnkhai.
