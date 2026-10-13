@@ -175,3 +175,6 @@ C10A amenity links backend+UI DONE scoped: backend acceptance57be1ee retained173
 
 ### C10B planning — 13/10/2026 — PLANNED, chưa bàn giao
 Kế hoạch docs/ui/c10b-plan.md: B1 API ảnh/order/attribution và MySQL; B2 gallery/card/Admin editor desktop; B3 mục tiêu24ảnh thật17–30 có nguồn/license/mapping/nhãnminhhọa. Giữ C10A PASS scoped, đối chiếu280backend/frontendsource0drift trong .runtime/coordination-c10b-plan-20261013/dependency-hashes.json. Urban nềnxámấm là mốcthịgiác, không tựtriểnkhai trọnredesign hoặcfont/provider. Mobile không làgatebắtbuộc theo user. Chưa tạo TASK/prompt/chạyagent/ghiDBgốc/downloadảnh; license và cáccontractđềxuất chốt trước triểnkhai. Không kếtluậnC10B/C10DONE.
+
+### C10B-B1 backend handoff prepared — 13/10/2026
+TASK .runtime/coordination-c10b-backend-opencode-20261013-082058/TASK.md sẵn sàng cho người dùng chuyển OpenCode. Scope backend media add/edit/reorder/public typedread, MySQL validation/RBAC/race/rollback/bulk/provenance và regression C10A/C9; khôngfrontend/browser/licenseảnh. Contract và gate cụthể trong TASK. Không tự gửi/chạyagent; chưaimplement/nghiệmthuC10B.
