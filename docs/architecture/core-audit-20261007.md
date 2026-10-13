@@ -187,3 +187,6 @@ TASK .runtime/coordination-c10b-backend-opencode-followup-20261013-093435/TASK.m
 
 ### C10B-B1 follow-up review and Antigravity remaining handoff — 13/10/2026 — PARTIAL
 Review .runtime/coordination-c10b-backend-review2-20261013-095741/ACCEPTANCE.md: compile/PSparsepass, observed sourcefixes retained; noHANDOFF/manifest/commit/proof. SmallHTTPtest runtime stalledMockito, cancelledexecs, ownedPIDgone; no businessPASS/MySQL/JAR. R2-01–R2-06 remain, usertransferred backend-onlyremaining to .runtime/coordination-c10b-backend-antigravity-20261013-095859/TASK.md. Noagentautolaunch/frontend/DBgốcchanges.
+
+### C10B backend Codex A takeover preparation — 13/10/2026 — PARTIAL/FAIL
+UserreportsAntigravitystoppedtoken;8C10Bfilehashunchangedreview2,noHANDOFF/checkpoint/evidence. Plan/review .runtime/coordination-c10b-codexa-takeover-20261013-101157/. Surefiredumpactualerror5JavaAttachpipe; rerunoutside sandbox completes42.644s with11tests2PASS5FAIL2ERROR2SKIP,exit1/XMLpreserved. Remainingactualissues nullableMap.of, per-methodfixture/columnreadback, URLtrailingfilename, exactrollbackafterrealmutation andmanifest/guards/MySQL/JAR. Prep only,no sourcefix/DBgócwrite/agentdelegation; relevantoldPASSretained, noC10BDONE.
