@@ -8,3 +8,6 @@ Use ONLY the fonts, colors, spacing, and component styles defined here and the s
 
 ## Active background revision — 13/10/2026
 User returned to Urban Lifestyle. Keep layout, orange/charcoal palette and typography; apply urban-muted-background.css to homepage and all three sibling drafts. No bright white canvas or large white panels. Luxury direction remains inactive history. Only canvas drafts changed; website implementation pending user visual review.
+
+## Website implementation — 13/10/2026
+Urban warm gray/orange identity is now implemented in React public/customer pages and media UI. Production uses the existing system sans stack and Georgia/Times serif Vietnamese fallback; General Sans/Gambetta font binaries were not introduced or redistributed. Canvas v3 remains the visual reference, adapted to actual API fields/actions; no unsupported prototype features. Proof: docs/ui/c10b-ui-acceptance.md.

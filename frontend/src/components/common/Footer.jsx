@@ -3,8 +3,8 @@ import { DEMO_MODE } from "../../demo/config";
 
 export default function Footer() {
   return (
-    <footer className="border-t border-slate-200 bg-slate-900 text-slate-300">
-      <div className="mx-auto grid max-w-6xl gap-8 px-4 py-10 sm:grid-cols-3">
+    <footer className="urban-footer border-t border-slate-200 bg-slate-900 text-slate-300">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:grid-cols-3">
         <div>
           <p className="text-lg font-semibold text-white">KDrive</p>
           <p className="mt-2 text-sm leading-6">
@@ -21,6 +21,7 @@ export default function Footer() {
                 Duyệt xe
               </Link>
             </li>
+            <li><a href="/media/vehicles/licenses.html" className="hover:text-white">Nguồn ảnh &amp; giấy phép</a></li>
             {DEMO_MODE ? (
               <>
                 <li>

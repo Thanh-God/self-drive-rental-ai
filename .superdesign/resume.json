@@ -9,17 +9,19 @@
       "designSystemPath": ".superdesign/design-system.md",
       "contextFiles": [
         ".superdesign/design-system.md",
-        "frontend/src/pages/api/ApiScreens.jsx:644:919",
-        "frontend/src/pages/api/ApiScreens.jsx:1260:1383",
+        "frontend/src/pages/api/ApiScreens.jsx:481:903",
+        "frontend/src/pages/api/ApiScreens.jsx:1238:1361",
         "frontend/src/components/vehicle/VehicleCard.jsx",
-        ".superdesign/init/theme.md:1:3",
+        "frontend/src/components/vehicle/VehicleGallery.jsx",
+        "frontend/src/index.css",
         ".superdesign/urban-muted-background.css"
       ],
       "fingerprints": {
-        "frontend/src/pages/api/ApiScreens.jsx": "17e12085cb87cc3e0c5a2bd70626045dcab88e83a6eb04b990bc30054d90ecb1",
-        ".superdesign/design-system.md": "c7dad62c60ebddcf218eca963fbc568c60f26299ff7f57e0e1938dcfb829dd76",
-        ".superdesign/init/theme.md": "e662d2b8d96bb37c2e2ef89a30e0687a0813cfa94823578653e1b95d18179700",
-        "frontend/src/components/vehicle/VehicleCard.jsx": "a9e0da527866b1687d39210c32a26652b4f59af3b031d1ae9fd79070b994f352",
+        ".superdesign/design-system.md": "5eddd75a499b5a4826ed42aafe85c0f09ac9e61c1b216d6ded70415edec1db22",
+        "frontend/src/pages/api/ApiScreens.jsx": "3b7151bb7f533cc76a51e6d3fb18a8bb523ba2d5e403a5625e3b8a22a0a91b6d",
+        "frontend/src/components/vehicle/VehicleCard.jsx": "95c4798f653cb055abff2c0494f8ec318728c9e83a7df113482867ebab113374",
+        "frontend/src/components/vehicle/VehicleGallery.jsx": "9e9a59325ec3a70d1efbe3f352751f064e643dfad660ab214b2ef15d74378be3",
+        "frontend/src/index.css": "13ee1bc09249a867321fbcff612c9e760515d23548e8c655c65c82e05302691f",
         ".superdesign/urban-muted-background.css": "25a3965597ab3602c3e72ae1d70df23e039bb807bf0ff973248d16739d1f960a"
       },
       "drafts": {
@@ -29,7 +31,8 @@
           "currentVersion": 3
         }
       },
-      "updatedAt": "2026-10-13T00:37:08.246747+07:00"
+      "updatedAt": "2026-10-13T12:45:00+07:00",
+      "implementationEvidence": "docs/ui/c10b-ui-acceptance.md"
     },
     "/vehicles/:vehicleId": {
       "targetKind": "existing-ui",
@@ -39,17 +42,19 @@
       "designSystemPath": ".superdesign/design-system.md",
       "contextFiles": [
         ".superdesign/design-system.md",
-        "frontend/src/pages/api/ApiScreens.jsx:644:919",
-        "frontend/src/pages/api/ApiScreens.jsx:1260:1383",
+        "frontend/src/pages/api/ApiScreens.jsx:481:903",
+        "frontend/src/pages/api/ApiScreens.jsx:1238:1361",
         "frontend/src/components/vehicle/VehicleCard.jsx",
-        ".superdesign/init/theme.md:1:3",
+        "frontend/src/components/vehicle/VehicleGallery.jsx",
+        "frontend/src/index.css",
         ".superdesign/urban-muted-background.css"
       ],
       "fingerprints": {
-        "frontend/src/pages/api/ApiScreens.jsx": "17e12085cb87cc3e0c5a2bd70626045dcab88e83a6eb04b990bc30054d90ecb1",
-        ".superdesign/design-system.md": "c7dad62c60ebddcf218eca963fbc568c60f26299ff7f57e0e1938dcfb829dd76",
-        ".superdesign/init/theme.md": "e662d2b8d96bb37c2e2ef89a30e0687a0813cfa94823578653e1b95d18179700",
-        "frontend/src/components/vehicle/VehicleCard.jsx": "a9e0da527866b1687d39210c32a26652b4f59af3b031d1ae9fd79070b994f352",
+        ".superdesign/design-system.md": "5eddd75a499b5a4826ed42aafe85c0f09ac9e61c1b216d6ded70415edec1db22",
+        "frontend/src/pages/api/ApiScreens.jsx": "3b7151bb7f533cc76a51e6d3fb18a8bb523ba2d5e403a5625e3b8a22a0a91b6d",
+        "frontend/src/components/vehicle/VehicleCard.jsx": "95c4798f653cb055abff2c0494f8ec318728c9e83a7df113482867ebab113374",
+        "frontend/src/components/vehicle/VehicleGallery.jsx": "9e9a59325ec3a70d1efbe3f352751f064e643dfad660ab214b2ef15d74378be3",
+        "frontend/src/index.css": "13ee1bc09249a867321fbcff612c9e760515d23548e8c655c65c82e05302691f",
         ".superdesign/urban-muted-background.css": "25a3965597ab3602c3e72ae1d70df23e039bb807bf0ff973248d16739d1f960a"
       },
       "drafts": {
@@ -59,7 +64,8 @@
           "currentVersion": 3
         }
       },
-      "updatedAt": "2026-10-13T00:37:08.268912+07:00"
+      "updatedAt": "2026-10-13T12:45:00+07:00",
+      "implementationEvidence": "docs/ui/c10b-ui-acceptance.md"
     },
     "/user/bookings": {
       "targetKind": "existing-ui",
@@ -69,17 +75,19 @@
       "designSystemPath": ".superdesign/design-system.md",
       "contextFiles": [
         ".superdesign/design-system.md",
-        "frontend/src/pages/api/ApiScreens.jsx:644:919",
-        "frontend/src/pages/api/ApiScreens.jsx:1260:1383",
+        "frontend/src/pages/api/ApiScreens.jsx:481:903",
+        "frontend/src/pages/api/ApiScreens.jsx:1238:1361",
         "frontend/src/components/vehicle/VehicleCard.jsx",
-        ".superdesign/init/theme.md:1:3",
+        "frontend/src/components/vehicle/VehicleGallery.jsx",
+        "frontend/src/index.css",
         ".superdesign/urban-muted-background.css"
       ],
       "fingerprints": {
-        "frontend/src/pages/api/ApiScreens.jsx": "17e12085cb87cc3e0c5a2bd70626045dcab88e83a6eb04b990bc30054d90ecb1",
-        ".superdesign/design-system.md": "c7dad62c60ebddcf218eca963fbc568c60f26299ff7f57e0e1938dcfb829dd76",
-        ".superdesign/init/theme.md": "e662d2b8d96bb37c2e2ef89a30e0687a0813cfa94823578653e1b95d18179700",
-        "frontend/src/components/vehicle/VehicleCard.jsx": "a9e0da527866b1687d39210c32a26652b4f59af3b031d1ae9fd79070b994f352",
+        ".superdesign/design-system.md": "5eddd75a499b5a4826ed42aafe85c0f09ac9e61c1b216d6ded70415edec1db22",
+        "frontend/src/pages/api/ApiScreens.jsx": "3b7151bb7f533cc76a51e6d3fb18a8bb523ba2d5e403a5625e3b8a22a0a91b6d",
+        "frontend/src/components/vehicle/VehicleCard.jsx": "95c4798f653cb055abff2c0494f8ec318728c9e83a7df113482867ebab113374",
+        "frontend/src/components/vehicle/VehicleGallery.jsx": "9e9a59325ec3a70d1efbe3f352751f064e643dfad660ab214b2ef15d74378be3",
+        "frontend/src/index.css": "13ee1bc09249a867321fbcff612c9e760515d23548e8c655c65c82e05302691f",
         ".superdesign/urban-muted-background.css": "25a3965597ab3602c3e72ae1d70df23e039bb807bf0ff973248d16739d1f960a"
       },
       "drafts": {
@@ -89,7 +97,8 @@
           "currentVersion": 3
         }
       },
-      "updatedAt": "2026-10-13T00:37:08.294754+07:00"
+      "updatedAt": "2026-10-13T12:45:00+07:00",
+      "implementationEvidence": "docs/ui/c10b-ui-acceptance.md"
     }
   }
 }

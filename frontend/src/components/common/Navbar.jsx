@@ -51,13 +51,13 @@ export default function Navbar() {
   };
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <header className="urban-navbar sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
       {logoutError ? (
         <p role="alert" className="bg-rose-50 px-4 py-2 text-sm text-rose-800">
           {logoutError}
         </p>
       ) : null}
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
+      <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         <Link
           to="/"
           className="flex items-center gap-2 font-semibold text-teal-800"
@@ -68,7 +68,7 @@ export default function Navbar() {
           <span>
             KDrive
             <span className="ml-1 hidden text-xs font-normal text-slate-500 sm:inline">
-              AI thuê xe tự lái
+              Thuê xe tự lái
             </span>
           </span>
         </Link>

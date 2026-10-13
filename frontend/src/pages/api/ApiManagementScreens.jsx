@@ -1,3 +1,4 @@
+import VehicleImageEditor from "../../components/vehicle/VehicleImageEditor";
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import apiClient from "../../api/client";
 import { useApiData } from "../../hooks/useApiData";
@@ -912,6 +913,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                 ) : null}
               </div>
             </form>
+            {form.id ? <VehicleImageEditor key={`images-${form.id}`} vehicleId={form.id} /> : null}
             {form.id ? (
               <div className="panel h-fit">
                 <VehicleAmenityEditor

@@ -11,7 +11,7 @@ KDrive là ứng dụng web quản lý thuê xe tự lái đa chi nhánh, phục
 | Khách chưa đăng nhập | Tìm kiếm, lọc và xem thông tin xe; xem đánh giá công khai; đăng ký, đăng nhập. |
 | Khách hàng — USER | Quản lý hồ sơ và GPLX; yêu cầu báo giá, tạo và theo dõi đơn thuê; thao tác hủy theo điều kiện của hệ thống; xem hợp đồng/hóa đơn; gửi đánh giá và báo cáo sự cố. |
 | Nhân viên — STAFF | Xử lý đơn, xác nhận/từ chối, ghi nhận giao nhận và hoàn tất thuê trong phạm vi chi nhánh được phân công; theo dõi đội xe và hồ sơ sự cố. |
-| Quản trị viên — ADMIN | Quản lý tài khoản, phân công chi nhánh, xe, hãng/loại xe, tiện nghi, chi nhánh và tuyến; kiểm duyệt đánh giá; quản lý URL ảnh, thứ tự và thông tin ghi công qua API. |
+| Quản trị viên — ADMIN | Quản lý tài khoản, phân công chi nhánh, xe, hãng/loại xe, tiện nghi, chi nhánh và tuyến; kiểm duyệt đánh giá; quản lý URL ảnh, thứ tự và thông tin ghi công qua giao diện Admin. |
 
 Backend kiểm tra quyền, chủ sở hữu, chi nhánh, lịch xe và giá trước khi ghi dữ liệu. ADMIN không tự kế thừa quyền giao nhận của STAFF. Tiền thuê tính theo block 24 giờ, đơn vị VND; thời gian lưu UTC và hiển thị theo giờ Việt Nam. Trạng thái xe đang khai thác không thay thế kiểm tra lịch trong báo giá.
 
@@ -20,7 +20,7 @@ Hợp đồng và hóa đơn lưu snapshot theo đơn thuê. Hệ thống không
 ### Phạm vi của phiên bản trong repository
 
 - Giao diện nghiệp vụ sử dụng REST API và MySQL; lỗi API được hiển thị để thử lại, không thay bằng dữ liệu demo.
-- Backend cung cấp dữ liệu tiện nghi và API ảnh xe. Gallery, giao diện quản lý ảnh và bộ ảnh xe có hồ sơ giấy phép chưa được tích hợp vào giao diện hiện tại; ảnh thiếu vẫn có placeholder.
+- Homepage, danh sách xe, chi tiết và đơn thuê dùng giao diện Urban nền xám ấm. Card/gallery đọc ảnh từ API; Admin thêm, sửa và sắp xếp ảnh với kiểm tra revision. Có 17 ảnh minh họa mẫu xe cùng hồ sơ tác giả/giấy phép tại `/media/vehicles/licenses.html`; ảnh thiếu hoặc hỏng có fallback trung thực. Seed DB mới không tự gắn ảnh; dùng form Admin hoặc mapping đã kiểm tra, không reset dữ liệu.
 - Recommendation, itinerary, AI/Map và dashboard chưa có dịch vụ tích hợp tương ứng. Các màn hình chưa có API hiển thị thông báo trong API mode.
 - Demo dành riêng cho xem thử giao diện, không đại diện cho giao dịch hay dữ liệu thuê xe thật.
 

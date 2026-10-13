@@ -13,7 +13,7 @@ export function VehicleVisual({
 }) {
   const [failedSrc, setFailedSrc] = useState(null);
   const media = vehicle?.noLocalAsset ? null : getVehicleMedia(vehicle);
-  const imageSrc = customSrc || media?.main || vehicle?.image;
+  const imageSrc = customSrc || (vehicle?.noLocalAsset ? vehicle?.images?.[0]?.url : media?.main || vehicle?.image);
 
   if (imageSrc && failedSrc !== imageSrc) {
     return (
@@ -26,7 +26,7 @@ export function VehicleVisual({
           src={imageSrc}
           alt={alt || vehicle?.name || "Ảnh xe"}
           className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-          loading="lazy"
+          loading={large ? "eager" : "lazy"}
           onError={() => setFailedSrc(imageSrc)}
         />
         <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-slate-900/50 via-slate-900/10 to-transparent opacity-70" />
@@ -37,7 +37,7 @@ export function VehicleVisual({
         </div>
         <div className="absolute bottom-2.5 right-3">
           <span className="rounded bg-black/60 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-slate-200 backdrop-blur-sm">
-            {vehicle?.plate || "DEMO"}
+            {vehicle?.noLocalAsset ? "Ảnh minh họa mẫu xe" : vehicle?.plate || "DEMO"}
           </span>
         </div>
       </div>
@@ -69,7 +69,7 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0 }) {
   const totalPrice = rentalDays > 0 ? vehicle.price * rentalDays : 0;
 
   return (
-    <article className="group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-[transform,box-shadow,border-color] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md">
+    <article className="vehicle-card group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-[transform,box-shadow,border-color] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md">
       <div>
         <Link to={`/vehicles/${vehicle.id}${search}`} className="block">
           <VehicleVisual vehicle={vehicle} />

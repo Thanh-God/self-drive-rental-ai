@@ -1,3 +1,4 @@
+import VehicleGallery from "../../components/vehicle/VehicleGallery";
 import {
   useEffect,
   useLayoutEffect,
@@ -71,6 +72,7 @@ export function normalizeVehicle(vehicle, catalog) {
   return {
     ...vehicle,
     noLocalAsset: true,
+    images: Array.isArray(vehicle.images) ? [...vehicle.images].sort((a, b) => a.sortOrder - b.sortOrder || String(a.id).localeCompare(String(b.id))) : [],
     price: vehicle.dailyPrice,
     brand:
       brandNames.get(vehicle.brandId) || vehicle.brandId || "Chưa phân loại",
@@ -518,53 +520,29 @@ export function ApiHomePage() {
 
   return (
     <div className="page-shell">
-      {/* Hero section: Phong cách Deep Teal / Dark Slate kết hợp viền mỏng và gradient CSS */}
-      <section className="relative mb-10 overflow-hidden rounded-3xl border border-teal-800/40 bg-gradient-to-br from-slate-950 via-teal-950 to-slate-900 p-6 text-white shadow-xl sm:p-10">
-        <div className="relative z-10 max-w-3xl">
-          <div className="inline-flex items-center gap-2 rounded-full border border-teal-500/30 bg-teal-500/10 px-3.5 py-1 text-xs font-semibold tracking-wider text-teal-300 backdrop-blur-md">
-            <span className="h-2 w-2 rounded-full bg-teal-400" />
-            DỮ LIỆU THẬT · BÁO GIÁ HỆ THỐNG
+      <section className="urban-hero">
+        <div className="urban-hero-copy">
+          <p className="urban-kicker">KDRIVE · THUÊ XE TỰ LÁI</p>
+          <h1>Mỗi chuyến đi,<br /><em>một câu chuyện.</em></h1>
+          <p className="urban-intro">Tự do chọn hành trình. Tìm chiếc xe phù hợp, chọn điểm nhận và trả, khám phá theo cách của bạn.</p>
+          <div className="mt-7 flex flex-wrap gap-3">
+            <Link className="btn" to="/vehicles">Xem toàn bộ xe ↗</Link>
+            {isUser ? <Link className="btn-secondary" to="/user/bookings">Đơn thuê của tôi</Link> : !currentUser ? <Link className="btn-secondary" to="/register">Đăng ký tài khoản</Link> : null}
+            {isUser ? <Link className="btn-secondary" to="/user/profile">Hồ sơ &amp; GPLX</Link> : null}
           </div>
-          <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-white sm:text-4xl md:text-5xl leading-tight">
-            Khám phá hành trình cùng xe tự lái <span className="text-teal-400">KDrive</span>
-          </h1>
-          <p className="mt-3 text-base leading-relaxed text-slate-300 sm:text-lg sm:leading-8">
-            Giá niêm yết minh bạch, tính chuẩn block 24 giờ và tuyến chi nhánh nhận/trả được xác nhận trực tiếp từ máy chủ. Máy chủ kiểm tra lịch, tuyến và giá khi bạn yêu cầu báo giá.
-          </p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <Link className="btn bg-teal-600 hover:bg-teal-500 text-white font-semibold shadow-md px-5 py-2.5" to="/vehicles">
-              Xem toàn bộ xe ↗
-            </Link>
-            {isUser ? <Link className="btn-secondary bg-white/10 hover:bg-white/20 border-white/20 text-white" to="/user/bookings">Đơn thuê của tôi</Link> : null}
-            {isUser ? (
-              <Link className="btn-secondary bg-white/10 hover:bg-white/20 border-white/20 text-white" to="/user/profile">
-                Hồ sơ &amp; GPLX
-              </Link>
-            ) : !currentUser ? (
-              <Link className="btn-secondary bg-white/10 hover:bg-white/20 border-white/20 text-white" to="/register">
-                Đăng ký tài khoản
-              </Link>
-            ) : null}
-          </div>
+          <p className="urban-smallprint">Giá theo block 24 giờ · Nhận / trả theo tuyến chi nhánh</p>
         </div>
-
-        {/* 3 Thẻ giá trị cốt lõi trung thực từ hệ thống */}
-        <div className="relative z-10 mt-8 grid gap-4 border-t border-teal-800/50 pt-6 sm:grid-cols-3">
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">Giá theo block 24h</p>
-            <p className="mt-1 text-xs text-slate-300">Thời gian thuê được làm tròn theo block 24 giờ; các khoản trong báo giá được trình bày trước khi gửi yêu cầu.</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">Tuyến chi nhánh mở</p>
-            <p className="mt-1 text-xs text-slate-300">Nhận và trả tại các điểm giao dịch được hệ thống vận hành hỗ trợ.</p>
-          </div>
-          <div className="rounded-xl border border-white/10 bg-white/5 p-3.5 backdrop-blur-sm">
-            <p className="text-xs font-semibold uppercase tracking-wider text-teal-400">Tiện nghi trực tiếp</p>
-            <p className="mt-1 text-xs text-slate-300">Danh mục tiện nghi gắn liền với từng xe thực tế trong cơ sở dữ liệu.</p>
-          </div>
+        <div className="urban-hero-photo">
+          {!loading && !error && vehicles[0] ? <VehicleGallery vehicle={vehicles[0]} /> : <div className="urban-photo-empty">Hành trình của bạn bắt đầu tại đây.</div>}
+          <div className="urban-photo-caption"><span>ĐỒNG HÀNH CÙNG BẠN</span><strong>{!loading && !error ? vehicles[0]?.name || "Khám phá danh mục xe" : "Khám phá danh mục xe"}</strong></div>
         </div>
       </section>
+      <section className="urban-promises" aria-label="Thông tin thuê xe">
+        <div><span>01 / MINH BẠCH</span><h2>Giá rõ ràng</h2><p>Giá niêm yết từ hệ thống; báo giá kiểm tra lịch, tuyến và giá trước khi gửi yêu cầu.</p></div>
+        <div><span>02 / LINH HOẠT</span><h2>Chọn tuyến phù hợp</h2><p>Nhận và trả tại các chi nhánh theo tuyến đang được hỗ trợ.</p></div>
+        <div><span>03 / CHỦ ĐỘNG</span><h2>Theo dõi đơn thuê</h2><p>Xem trạng thái, thời gian thuê và chứng từ của bạn tại một nơi.</p></div>
+      </section>
+      <div className="urban-section-heading"><div><p className="urban-kicker">DÀNH CHO HÀNH TRÌNH TIẾP THEO</p><h2>Chiếc xe của bạn.</h2></div><Link to="/vehicles" className="btn-secondary">Khám phá danh mục →</Link></div>
 
       {/* Danh sách xe nổi bật và Search bar */}
       <section className="space-y-6">
@@ -694,7 +672,7 @@ export function ApiVehicleListPage() {
       title="Danh sách xe"
       description="Lọc xe theo tên, hãng hoặc trạng thái khai thác."
     >
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Field label="Tìm xe">
           <input
             value={query}
@@ -825,7 +803,7 @@ export function ApiVehicleDetailPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_360px]">
             <section className="panel">
-              <VehicleVisual vehicle={vehicle} large />
+              <VehicleGallery vehicle={vehicle} />
               <h2 className="mt-5 text-xl font-semibold">{vehicle.name}</h2>
               <p className="mt-2 text-sm text-slate-600">
                 {vehicle.brand} · {vehicle.category} · {vehicle.seats} chỗ ·{" "}
@@ -1290,7 +1268,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
       title={title}
       description="Thông tin và trạng thái được tải trực tiếp từ hệ thống."
     >
-      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+      <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2">
         <Field label="Tìm mã đơn, xe hoặc khách hàng">
           <input
             value={query}
@@ -1329,7 +1307,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
           <div className="space-y-4">
             {rows.map((booking) => (
               <article
-                className="panel flex flex-wrap items-center justify-between gap-4"
+                className={`panel flex flex-wrap items-center justify-between gap-4 ${area === "user" ? "urban-booking-card" : ""}`}
                 key={booking.id}
               >
                 <div>

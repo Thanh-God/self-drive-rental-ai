@@ -1,6 +1,6 @@
 # C10B — ảnh xe API, gallery và nguồn ảnh — kế hoạch 13/10/2026
 
-Trạng thái: PLANNED, CHƯA BÀN GIAO, CHƯA TRIỂN KHAI. Codex A lập kế hoạch; không tạo prompt/TASK triển khai hoặc điều khiển agent trong lượt này.
+Trạng thái hiện tại: DONE scoped — backend, frontend desktop và 17 ảnh có hồ sơ nguồn đã hoàn tất ngày 13/10/2026. Xem [nghiệm thu giao diện](c10b-ui-acceptance.md). Nội dung kế hoạch ban đầu phía dưới giữ để audit; các ghi chú “chưa triển khai/chưa giao” mô tả thời điểm lập kế hoạch, không phải trạng thái hiện tại.
 
 ## Baseline và phạm vi
 
@@ -74,3 +74,6 @@ Gate B3: count17–30, uniquehash, license registry đầy đủ và link hỗ t
 4. Chưa bàn giao; chỉ khi người dùng yêu cầu mới tạo TASK từng lượt và prompt tương ứng, agents làm tuần tự. Mỗi lượt có commit riêng/evidence/HANDOFF, Codex A ACCEPTANCE độc lập; không gửi toàn backlog trong một prompt.
 5. Giữ PASS cũ bằng đối chiếu hash/source; tái chạy gates bị tác động khi source đổi. Source freeze, caller env, owned cleanup/provenance theo skill KLTN. Fixture riêng, evidence giữ nguyên; không tạo container lặp vô cớ, không prune.
 6. C10B DONE khi B1/B2/B3 mandatory gates cùng đạt source cuối, asset rights rõ, artifacts/readback đầy đủ. Whole C10 chỉ đóng khi C10A retained/relevant regression và C10B đều đạt. Không suy toàn hệ thống PASS từ việc đóng C10.
+
+## Kết quả triển khai 13/10/2026
+Người dùng mở rộng phạm vi sang homepage/list/detail/my-bookings theo Urban và duyệt gắn 17 ảnh vào v1/v2/v3 (6 Vios, 6 Xpander, 5 Accent). B1 retained source/JAR đã nghiệm thu; B2/B3 DONE scoped theo docs/ui/c10b-ui-acceptance.md và .runtime/coordination-c10b-ui-codexa-20261013/ACCEPTANCE.md. Target 24 ban đầu được thay bằng 17 đã duyệt, vẫn trong17–30. Không chuyển Luxury, thêm tính năng prototype, mobile gate, upload/delete/provider hoặc reset/reseed DB.
