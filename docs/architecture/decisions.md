@@ -117,3 +117,7 @@ Người dùng duyệt A-D01/A-D02: khi chi nhánh INACTIVE, chỉ chặn quote 
 ### C11-A1 — chính sách được duyệt13/10/2026
 
 Người dùng duyệt A-D03/A-D04: không giới hạn số chi nhánh ACTIVE tối thiểu, cho phép tất cả INACTIVE. Đóng/mở giữ nguyên xe/vị trí, tuyến/fee/enabled, phân công Staff và dữ liệu đơn; không tự điều chuyển, hủy hoặc xóa. A-D01/A-D02 giữ hiệu lực: đơn cũ tiếp tục xử lý theo quyền/state machine, chỉ chặn quote và đơn mới. A1 thực hiện API status/version và rename giữ status; race với quote/create thuộc A2, UI thuộc A3, E2E toàn phạm vi thuộc A4.
+
+## C12-1 — báo cáo vận hành, phê duyệt13/10/2026
+
+Người dùng đồng ý4chỉ số: đơn tạo trong khoảng kèm trạng thái hiện tại, đơn hoàn tất theo historyCOMPLETED, số hóa đơn phát hành và tổng giá trị hóa đơn (không tiền đã thu). Ngày Asia/Ho_Chi_Minh, khoảng inclusive tối đa366ngày, mặc định tháng hiện tại; chưa thêm chi nhánh/biểu đồ/tăng trưởng. Contract tại [operational-reports](../modules/operational-reports.md). Quyết định cho phép chuẩn bị API C12-2 theo contract khi được yêu cầu, không xác nhận endpoint đã triển khai/nghiệm thu. Không thay đổi policy vận hành/payment/DB gốc.

@@ -232,3 +232,6 @@ Userfixeddesign: dynamicbrandId/catalog counttop7/more/querybrand/history kết 
 
 ### C12 —13/10/2026 — PLANNED, chưa bàn giao
 Kế hoạch docs/architecture/c12-plan.md chia5phần: định nghĩa metric/contract -> API -> MySQL proof -> Admin UI -> integrated acceptance. UC-A05/reportmetrics giữ scope vận hành, invoice amount không payment. Các metric/time-range đề xuất phải chốt trước API. Baseline67a3d31; C11DONE giữ; timeout hồ sơPARTIAL được user hoãn, không đóng finding. Chưa source implementation/agentdispatch/push.
+
+### C12-1 —13/10/2026 —DONE contract
+Userapproved4metrics/date366/defaultmonth; docs/modules/operational-reports.md quy định created/effectivestatus, firsthistoryCOMPLETED, invoices issued/count/sumVNDstring, snapshot/UTC/RBAC/validation. Source/demo route/placeholder invoice đúng thực tế; independentdataset4created/2completed/2invoices/1150000VND vàdocumentchecks đạt. KhôngAPI/UI/DBwrite/functionalPASS; C12-2–5 chưa bắt đầu; timeout userPARTIAL hoãn giữ.
