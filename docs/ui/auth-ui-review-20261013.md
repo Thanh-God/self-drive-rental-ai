@@ -39,3 +39,11 @@ Lượt `.runtime/coordination-logout-register-20261013/` tiếp nối baseline 
 Theo yêu cầu mới, đăng ký chỉ còn Họ và tên, Email, Mật khẩu: bỏ nhập lại mật khẩu; giữ validation server/client, hiện/ẩn và chống gửi lặp. Form đổi mật khẩu giữ nhập lại mật khẩu mới. Ảnh tham khảo chỉ dùng để đơn giản hóa form, không triển khai Google OAuth/CAPTCHA hoặc gửi email giả. Desktop và policy mật khẩu không đổi.
 
 Evidence cuối và commit xem ACCEPTANCE/HANDOFF trong thư mục lượt mới; không sửa biên bản lượt trước. C11-A3/A4 và email/OTP tiếp tục pending.
+
+## Phản hồi đổi mật khẩu — 13/10/2026
+
+Lượt `.runtime/coordination-password-feedback-20261013/`: giữ chính sách 8 ký tự, chữ hoa/thường, số/ký tự đặc biệt, giới hạn 72 byte UTF-8 và chặn mật khẩu phổ biến. Frontend liệt kê điều kiện thiếu và hiển thị đồng thời lỗi nhập lại chưa khớp. Ảnh người dùng có mật khẩu chỉ chứa số và confirmation khác nhau, nên không phải bằng chứng backend từ chối mật khẩu hợp lệ.
+
+Sau PUT /me/password thành công (HTTP 200 theo controller hiện tại), xóa phiên local rồi hiện native window.alert với nút OK, yêu cầu đăng nhập lại; không thông báo thành công khi pending hoặc lỗi. Giữ nguyên backend/tokenVersion, không thêm thư viện/email/OTP.
+
+Frontend 108/108, zero skip; lint và demo/API build đạt. Browser thực trên fixture cô lập kiểm ca âm, mật khẩu hiện tại sai, native alert, xóa token, token cũ 401, mật khẩu cũ 401 và mới 200. Dịch vụ do lượt tạo và fixture đã dừng; volume KEEP, DB gốc không ghi. Chi tiết/hash/commit ở HANDOFF và ACCEPTANCE của lượt. C11-A3/A4 đã hoàn tất theo bằng chứng C11 tương ứng; trạng thái pending trong đoạn lịch sử phía trên là tại thời điểm viết đoạn đó.

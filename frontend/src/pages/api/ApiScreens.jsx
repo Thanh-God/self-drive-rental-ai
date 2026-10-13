@@ -2099,8 +2099,9 @@ export function ApiProfilePage() {
     const passwordForm = event.currentTarget;
     const next = String(form.get("next") || "");
     const invalid = passwordError(next);
-    if (invalid || next !== String(form.get("confirmation") || "")) {
-      setError(invalid || "Mật khẩu nhập lại chưa khớp.");
+    const validationErrors = [invalid, next !== String(form.get("confirmation") || "") ? "Mật khẩu nhập lại chưa khớp." : ""].filter(Boolean);
+    if (validationErrors.length) {
+      setError(validationErrors.join(" "));
       return;
     }
     passwordInFlight.current = true;
@@ -2112,6 +2113,7 @@ export function ApiProfilePage() {
       });
       passwordForm.reset();
       await logout({ callApi: false });
+      window.alert("Đổi mật khẩu thành công. Các phiên đăng nhập cũ đã được thu hồi. Vui lòng đăng nhập lại.");
       navigate("/login", { replace: true });
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể đổi mật khẩu."));
