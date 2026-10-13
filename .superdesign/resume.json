@@ -17,11 +17,11 @@
         ".superdesign/urban-muted-background.css"
       ],
       "fingerprints": {
-        ".superdesign/design-system.md": "5eddd75a499b5a4826ed42aafe85c0f09ac9e61c1b216d6ded70415edec1db22",
+        ".superdesign/design-system.md": "c1c625e44ebf106b64873783ead7eeddba647b9e55e76908747b577571b3fad2",
         "frontend/src/pages/api/ApiScreens.jsx": "3b7151bb7f533cc76a51e6d3fb18a8bb523ba2d5e403a5625e3b8a22a0a91b6d",
         "frontend/src/components/vehicle/VehicleCard.jsx": "95c4798f653cb055abff2c0494f8ec318728c9e83a7df113482867ebab113374",
         "frontend/src/components/vehicle/VehicleGallery.jsx": "9e9a59325ec3a70d1efbe3f352751f064e643dfad660ab214b2ef15d74378be3",
-        "frontend/src/index.css": "13ee1bc09249a867321fbcff612c9e760515d23548e8c655c65c82e05302691f",
+        "frontend/src/index.css": "7e382ef8693a9b51c1f08eee49d0797450e6bb850d22592bf3a22f4a0740d15d",
         ".superdesign/urban-muted-background.css": "25a3965597ab3602c3e72ae1d70df23e039bb807bf0ff973248d16739d1f960a"
       },
       "drafts": {
@@ -31,7 +31,7 @@
           "currentVersion": 3
         }
       },
-      "updatedAt": "2026-10-13T12:45:00+07:00",
+      "updatedAt": "2026-10-13T13:00:00+07:00",
       "implementationEvidence": "docs/ui/c10b-ui-acceptance.md"
     },
     "/vehicles/:vehicleId": {
@@ -50,11 +50,11 @@
         ".superdesign/urban-muted-background.css"
       ],
       "fingerprints": {
-        ".superdesign/design-system.md": "5eddd75a499b5a4826ed42aafe85c0f09ac9e61c1b216d6ded70415edec1db22",
+        ".superdesign/design-system.md": "c1c625e44ebf106b64873783ead7eeddba647b9e55e76908747b577571b3fad2",
         "frontend/src/pages/api/ApiScreens.jsx": "3b7151bb7f533cc76a51e6d3fb18a8bb523ba2d5e403a5625e3b8a22a0a91b6d",
         "frontend/src/components/vehicle/VehicleCard.jsx": "95c4798f653cb055abff2c0494f8ec318728c9e83a7df113482867ebab113374",
         "frontend/src/components/vehicle/VehicleGallery.jsx": "9e9a59325ec3a70d1efbe3f352751f064e643dfad660ab214b2ef15d74378be3",
-        "frontend/src/index.css": "13ee1bc09249a867321fbcff612c9e760515d23548e8c655c65c82e05302691f",
+        "frontend/src/index.css": "7e382ef8693a9b51c1f08eee49d0797450e6bb850d22592bf3a22f4a0740d15d",
         ".superdesign/urban-muted-background.css": "25a3965597ab3602c3e72ae1d70df23e039bb807bf0ff973248d16739d1f960a"
       },
       "drafts": {
@@ -64,7 +64,7 @@
           "currentVersion": 3
         }
       },
-      "updatedAt": "2026-10-13T12:45:00+07:00",
+      "updatedAt": "2026-10-13T13:00:00+07:00",
       "implementationEvidence": "docs/ui/c10b-ui-acceptance.md"
     },
     "/user/bookings": {
@@ -83,11 +83,11 @@
         ".superdesign/urban-muted-background.css"
       ],
       "fingerprints": {
-        ".superdesign/design-system.md": "5eddd75a499b5a4826ed42aafe85c0f09ac9e61c1b216d6ded70415edec1db22",
+        ".superdesign/design-system.md": "c1c625e44ebf106b64873783ead7eeddba647b9e55e76908747b577571b3fad2",
         "frontend/src/pages/api/ApiScreens.jsx": "3b7151bb7f533cc76a51e6d3fb18a8bb523ba2d5e403a5625e3b8a22a0a91b6d",
         "frontend/src/components/vehicle/VehicleCard.jsx": "95c4798f653cb055abff2c0494f8ec318728c9e83a7df113482867ebab113374",
         "frontend/src/components/vehicle/VehicleGallery.jsx": "9e9a59325ec3a70d1efbe3f352751f064e643dfad660ab214b2ef15d74378be3",
-        "frontend/src/index.css": "13ee1bc09249a867321fbcff612c9e760515d23548e8c655c65c82e05302691f",
+        "frontend/src/index.css": "7e382ef8693a9b51c1f08eee49d0797450e6bb850d22592bf3a22f4a0740d15d",
         ".superdesign/urban-muted-background.css": "25a3965597ab3602c3e72ae1d70df23e039bb807bf0ff973248d16739d1f960a"
       },
       "drafts": {
@@ -97,7 +97,7 @@
           "currentVersion": 3
         }
       },
-      "updatedAt": "2026-10-13T12:45:00+07:00",
+      "updatedAt": "2026-10-13T13:00:00+07:00",
       "implementationEvidence": "docs/ui/c10b-ui-acceptance.md"
     }
   }

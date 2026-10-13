@@ -38,3 +38,7 @@ Giữ PASS backend21actualMySQL,115executed verify (+12optionalSKIP tách riêng
 Khởi động frontend API như README; hard refresh sau khi khởi động lại. Source/asset trong Git; dữ liệu ảnh trong MySQL không được vận chuyển bởi `git clone`. DB mới có thể dùng form Admin với URL/credit trong registry, không tự trỏ importer local sang DB khác.
 
 Runner dừng backend/frontend và fixture do lượt sở hữu, giữ volume/evidence và MySQL gốc. Các fixture failed/superseded cũng giữ audit; dọn theo kế hoạch có identity/archive phù hợp, không prune.
+
+## Chỉnh chữ và chốt C10 — 13/10/2026
+
+Theo yêu cầu người dùng, tiêu đề/caption chuyển sang Segoe UI/system sans weight600, hero48–68px/line-height1.14, bỏitalic và giảmnegative tracking. Đây là superseding typography của bảnGeorgia ban đầu, không đổi màu/ảnh/API. Lượt .runtime/coordination-c10-typography-20261013/ đạt77tests/lint/demo+APIbuild và70actualbrowser assertions (computedfont/uprightaccent,4pages×3desktop sizes, nooverflow),376source/buildinputsfreeze0drift; ảnhchụp được xem trực tiếp. Wrapper/helpers/guards giữ source đã PASS38; backend/DB/assets không đổi. Ownedservices/fixture stopped, giữMySQLgốc. C10A tiệnnghi + C10B images/gallery/Admin/17licensedphotos/UrbanUI DONE theo phạmvi đãchốt; không cònfinding mandatory trongC10.

@@ -11,3 +11,6 @@ User returned to Urban Lifestyle. Keep layout, orange/charcoal palette and typog
 
 ## Website implementation — 13/10/2026
 Urban warm gray/orange identity is now implemented in React public/customer pages and media UI. Production uses the existing system sans stack and Georgia/Times serif Vietnamese fallback; General Sans/Gambetta font binaries were not introduced or redistributed. Canvas v3 remains the visual reference, adapted to actual API fields/actions; no unsupported prototype features. Proof: docs/ui/c10b-ui-acceptance.md.
+
+## Typography override — user approved13/10/2026
+Website headings now use Segoe UI/system sans, weight600; hero48–68px, line-height1.14, orange accent upright. This replaces the initial Georgia fallback to keep Vietnamese glyphs consistent. Canvas serif remains historical visual reference; no external font assets or canvas generation.
