@@ -1,6 +1,6 @@
 # C11 — kế hoạch chi nhánh và địa điểm
 
-Ngày13/10/2026. Trạng thái **IN PROGRESS: C11-L đã kiểm chứng bản tích hợp; C11-A chờ quyết định còn lại**. Kế hoạch ban đầu và audit giữ bên dưới; cập nhật thực thi ở cuối tài liệu.
+Ngày13/10/2026. Trạng thái **IN PROGRESS: C11-L và C11-A1 PASS scoped; còn A2/A3/A4**. Kế hoạch ban đầu và audit giữ bên dưới; cập nhật thực thi ở cuối tài liệu.
 
 ## Baseline và phần giữ lại
 
@@ -85,3 +85,13 @@ Baseline chia việc: HEAD860ea05f902bfda545b1eefa4114bf74c0e04cb7. C11-L đã P
 | C11-A4 | Browser E2E trên JAR/MySQL cô lập: Admin đóng/mở, User bị chặn đơn mới, Staff tiếp tục đơn cũ; bảo toàn dữ liệu. Nghiệm thu C11 và cập nhật tài liệu cuối. | Desktop1280/1440/1920; ca chính/âm/stale/recovery/persistence/RBAC; SQL readback; source/JAR hashes; cleanup owned/fixture KEEP. Tái chạy suites bị tác động, không chạy lại location/C10 vô cớ. Chỉ DONE khi mọi gate bắt buộc đạt. | A1–A3 PASS; source cuối đã đóng băng. |
 
 Mỗi lượt tạo thư mục coordination và TASK riêng trước triển khai; ghi HANDOFF/ACCEPTANCE/evidence cùng lượt, commit source/tests/docs tương ứng. Không giao cả bốn lượt trong một prompt. Lượt sau lấy HEAD/hash đã nghiệm thu của lượt trước; thiếu quyết định hoặc evidence thì ghi PARTIAL/BLOCKED đúng phạm vi. Không push hoặc ghi DB gốc theo kế hoạch này.
+
+## C11-A1 — thực thi và nghiệm thu13/10/2026
+
+A-D03/A-D04 đã được người dùng duyệt: không giới hạn số chi nhánh ACTIVE tối thiểu; đóng/mở giữ xe/vị trí/tuyến/phân công Staff/đơn cũ, không tự điều chuyển/hủy/xóa. Các ghi chú chờ quyết định ở phần lịch sử được thay bằng phê duyệt này; A-D01/A-D02 giữ nguyên.
+
+C11-A1 DONE scoped: ADMIN PUT /api/v1/admin/branches/{id}/status với ACTIVE/INACTIVE và expectedVersion bắt buộc không âm; record lock + current version; stale409, validation400,missing404,Guest401,USER/STAFF403. Sửa tên/địa chỉ giữ status; create ACTIVE; cùng status và version hiện tại là no-op, version cũ vẫn409. Không thêm migration/bảng/dependency.
+
+Backend verify137reported/125executed/12optionalSKIP,0failure/error; targeted actualHTTP MySQL4/4noSKIP. Kiểm được đóng hết ACTIVE,rename khôngreopen,no-write sauerror/stale, bảo toàn8nhóm dữ liệu gồm xe/tuyến/Staff/đơn/history/contracts/invoices/Flyway. JAR182class/resource entries khớp byte compiled tree dùng HTTP tests; source manifest trước/sau không drift. Runner guard1test/2subcases refuseexisting/outside, không claim toànadversecleanup. Fixture exactidentity đã dừng/volumeKEEP; DB gốc khôngtestghi. Evidence TASK/HANDOFF/ACCEPTANCE: `.runtime/coordination-c11-a1-codexa-20261013/`; contract docs/modules/branch-status.md.
+
+Tiếp theo A2: quote/create vs close race và workflow đơn cũ; A3: UI đóng/mở; A4: browserE2E/đóngC11. Chưa triển khai ba lượt này, C11 tổng thể PARTIAL. Frontend/location/C10 source không đổi, giữ PASS cũ khi dependency liên quan không bị tác động; chưa gọi backend JAR mới là browserPASS.

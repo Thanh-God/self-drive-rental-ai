@@ -208,3 +208,6 @@ Kế hoạch docs/architecture/c11-plan.md chưa bàn giao, tách location hoàn
 
 ### C11-L tích hợp —13/10/2026 —PASS scoped; C11 PARTIAL
 Tích hợp feature/location-catalog-20261012-02 SHA790cc82, giữ lịch sử đồng đội và route C8–C10; LOC-R01 đóng bằng source+mounted regression+realHTTP/browser. Frontend79tests/lint/API+demoPASS; backendverify133reported121executed12optionalSKIP, locationMySQL6/6noSKIP; JARHTTP/RBAC/race/no-write/readback và22browserassertionsPASS. Evidence `.runtime/coordination-c11-location-integrate-20261013/`. Không sửa DB gốc/migration/dependency, no push, stoppedfixtureKEEP. Người dùng duyệt giữ đơn cũ saubranchclose; số ACTIVE tối thiểu/bảo toàn cấu hình chờ trả lời, C11-Achưa triển khai. Không tuyên bố toànC11/systemDONE.
+
+### C11-A1 —13/10/2026 —PASS scoped; cònA2/A3/A4
+Người dùng duyệt khôngminACTIVE,giữxe/tuyến/Staff/đơncũ. APIADMINstatus/version vàrenamegiữstatus đã đạt4MySQLHTTPtestsnoSKIP,backendverify137reported125executed12optionalSKIP,0failure/error. Chặnvalidation/stale/RBACnofailedwrites;đónghếtchi nhánhđượcphép;8nhómdata/snapshot/Flywaybảo toàn. JAR182entries/sourcehashmatch. Evidence `.runtime/coordination-c11-a1-codexa-20261013/`; contract docs/modules/branch-status.md. Khôngmigration/deps/UI/push/DBgốc,fixturestoppedKEEP. Bookingrace/workflowA2/UIA3/browserA4chưaDONE; C11PARTIAL.

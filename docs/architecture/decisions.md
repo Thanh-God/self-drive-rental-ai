@@ -113,3 +113,7 @@ Người dùng yêu cầu audit toànproject và hoàn thiện nghiệp vụ cá
 ## C11 — đóng/mở chi nhánh, phê duyệt 13/10/2026
 
 Người dùng duyệt A-D01/A-D02: khi chi nhánh INACTIVE, chỉ chặn quote và đơn mới. Đơn đã tồn tại, kể cả PENDING, tiếp tục được xác nhận/giao/nhận/hoàn tất theo quyền và state machine hiện hành. Không tự hủy đơn cũ. Quyết định số chi nhánh ACTIVE tối thiểu và bảo toàn cấu hình đang chờ xác nhận riêng; chưa triển khai endpoint đổi trạng thái.
+
+### C11-A1 — chính sách được duyệt13/10/2026
+
+Người dùng duyệt A-D03/A-D04: không giới hạn số chi nhánh ACTIVE tối thiểu, cho phép tất cả INACTIVE. Đóng/mở giữ nguyên xe/vị trí, tuyến/fee/enabled, phân công Staff và dữ liệu đơn; không tự điều chuyển, hủy hoặc xóa. A-D01/A-D02 giữ hiệu lực: đơn cũ tiếp tục xử lý theo quyền/state machine, chỉ chặn quote và đơn mới. A1 thực hiện API status/version và rename giữ status; race với quote/create thuộc A2, UI thuộc A3, E2E toàn phạm vi thuộc A4.

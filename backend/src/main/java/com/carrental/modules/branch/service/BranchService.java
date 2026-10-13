@@ -26,7 +26,14 @@ import java.util.*;
  @Transactional public BranchView save(Actor actor,String id,String name,String address,long version){
   actor.require("ADMIN");Branch b=id==null?new Branch():branches.lock(id).orElseThrow(DomainException::missing);
   if(id!=null&&b.version!=version)throw DomainException.conflict("Chi nhánh đã thay đổi.");
-  b.name=name.strip();b.address=address.strip();b.status="ACTIVE";branches.saveAndFlush(b);return new BranchView(b.id,b.name,b.address,b.status,b.version);
+  b.name=name.strip();b.address=address.strip();if(id==null)b.status="ACTIVE";branches.saveAndFlush(b);return new BranchView(b.id,b.name,b.address,b.status,b.version);
+ }
+ @Transactional public BranchView changeStatus(Actor actor,String id,String status,long expectedVersion){
+  actor.require("ADMIN");
+  if((!"ACTIVE".equals(status)&&!"INACTIVE".equals(status))||expectedVersion<0)throw DomainException.bad("Trạng thái phải là ACTIVE/INACTIVE và expectedVersion không âm.");
+  var b=branches.lock(id).orElseThrow(DomainException::missing);
+  if(b.version!=expectedVersion)throw DomainException.conflict("Chi nhánh đã thay đổi. Vui lòng tải lại trước khi lưu.");
+  b.status=status;branches.saveAndFlush(b);return new BranchView(b.id,b.name,b.address,b.status,b.version);
  }
 @Transactional public void route(Actor actor,String pickup,String destination,long fee,boolean enabled,long expectedVersion){
   actor.require("ADMIN");
