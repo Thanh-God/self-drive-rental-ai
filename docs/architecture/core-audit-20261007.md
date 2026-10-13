@@ -190,3 +190,8 @@ Review .runtime/coordination-c10b-backend-review2-20261013-095741/ACCEPTANCE.md:
 
 ### C10B backend Codex A takeover preparation — 13/10/2026 — PARTIAL/FAIL
 UserreportsAntigravitystoppedtoken;8C10Bfilehashunchangedreview2,noHANDOFF/checkpoint/evidence. Plan/review .runtime/coordination-c10b-codexa-takeover-20261013-101157/. Surefiredumpactualerror5JavaAttachpipe; rerunoutside sandbox completes42.644s with11tests2PASS5FAIL2ERROR2SKIP,exit1/XMLpreserved. Remainingactualissues nullableMap.of, per-methodfixture/columnreadback, URLtrailingfilename, exactrollbackafterrealmutation andmanifest/guards/MySQL/JAR. Prep only,no sourcefix/DBgócwrite/agentdelegation; relevantoldPASSretained, noC10BDONE.
+
+
+### C10B backend direct completion — 13/10/2026 — PASS scoped, Codex A
+
+Antigravity stopped; Codex A adopted unchanged partial OpenCode source, fixed fixture/null payload/URL escaped traversal and trailing filename, real insert/order rollback, canonical typed JSON revision, order-range collision/overflow and public bulk/old PUT/snapshot proof. Backend source final verify127total115executed12optionalSKIP0failure/error; actualMySQL images12+amenities5+catalog4=21executed0SKIP; guard18/18, actualsource-boundJAR create201/edit/reorder/publiclist/detail/SQLcredit,171buildinputs102class/resourcesmatch and executionfreeze0drift. Schema26tables37FK,V1/V2checksumsretained, caller/ownedcleanupPASS, originalMySQLidentityunchanged. Reports/evidence .runtime/coordination-c10b-backend-codexa-complete-20261013-101802/. BackendDONEonly; frontend/gallery/17–30licensedphotos remainC10Bpending. No migration/frontend/provider/userDBwrite/push/prune; oldreports/evidence retained and preexistingworkflowchangeexcluded.
