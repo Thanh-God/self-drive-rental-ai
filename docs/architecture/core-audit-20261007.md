@@ -235,3 +235,6 @@ Kế hoạch docs/architecture/c12-plan.md chia5phần: định nghĩa metric/co
 
 ### C12-1 —13/10/2026 —DONE contract
 Userapproved4metrics/date366/defaultmonth; docs/modules/operational-reports.md quy định created/effectivestatus, firsthistoryCOMPLETED, invoices issued/count/sumVNDstring, snapshot/UTC/RBAC/validation. Source/demo route/placeholder invoice đúng thực tế; independentdataset4created/2completed/2invoices/1150000VND vàdocumentchecks đạt. KhôngAPI/UI/DBwrite/functionalPASS; C12-2–5 chưa bắt đầu; timeout userPARTIAL hoãn giữ.
+
+### C12-2 —13/10/2026 —PASS backend/H2 scoped
+APIADMINreportoperations qua operation→typedbooking/invoice aggregations,4metrics/effectiveexpiry/firstCOMPLETED/preciseVNDstring/date366. Date/RBAC/empty/no-write/overflowmoney tests4/4; backendverify139executed14skip0fail/error. Runtimecopy source/JAR resourcesmatched; userJAR/DB/services giữ. Evidence .runtime/coordination-c12-2-20261013/. MySQL/snapshot/performance C12-3/UI4/browser5 chưaPASS; khôngpush/toànC12DONE.

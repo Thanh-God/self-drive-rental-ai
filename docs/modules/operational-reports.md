@@ -92,3 +92,11 @@ Expected: created A/B/C/D=4, EXPIRED1/COMPLETED1/RETURNED1/CANCELLED1, các nhó
 ## Quyết định mở và trạng thái
 
 Metric/date scope đã duyệt; miền ngày kỹ thuật được giới hạn theo TIMESTAMP V1 và tài liệu MySQL8.4, chưa coi boundary nativeMySQL đã nghiệm thu. Chưa có quyết định index, export, trend, branchfilter, payment, AI, chart; giữ ngoài phạm vi. C12-1 chỉ nghiệm thu tài liệu/source/equations/link và ví dụ, không chạy test chức năng giả. C12-2–5 chưa bắt đầu. Lỗi timeout hồ sơ đang hoãn vẫn PARTIAL.
+
+## C12-2 thực thi —13/10/2026 —PASS backend/H2 scoped
+
+Đã triển khai GET /api/v1/admin/reports/operations?from=YYYY-MM-DD&to=YYYY-MM-DD theo DTO/metric/date/RBAC ở trên. operation điều phối transaction readonlyREPEATABLE_READ; booking/invoice giữ aggregate SQL nội bộ và DTO có kiểu. Không load toàn bảng/entity xuyên module, migration hoặc dependency mới. Query params ngoài from/to, lặp tham số hoặc miền ngày không hợp lệ400. Guest401/USER-STAFF403/ADMIN200. Tiền SUMDECIMAL trả string, không ép long.
+
+Backend verify153reported/139executed/14skip,0failure/error. ReportIntegration4/4noskip chứng minh bằng Spring MockMvc/H2: validation/date/RBAC, empty/canonicaltimezone, effectiveexpired/currentgroups/firstcompletion/count/money/no-write, SUM lớn hơnLong vàJSsafeInteger. Rows test là fixture cho truy vấn, không chứng minh workflow đã chạy. MySQL native/snapshot/concurrency/performance và browser C12-3/5 chưa nghiệm thu.
+
+Source được build trong runtimecopy mới; không ghi đè backend/target của tiến trình người dùng. Sourcecopy và JARcompiledresources hashmatch. Evidence .runtime/coordination-c12-2-20261013/. Không restart backend đang chạy; API mới chưa nạp vào tiến trình đó. Các dòng “chưa triển khai” trước section này là baseline C12-1. C12-3–5 tiếp theo; timeout hồ sơ vẫn hoãn.

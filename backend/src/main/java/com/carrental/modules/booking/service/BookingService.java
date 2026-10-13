@@ -20,6 +20,15 @@ import java.util.*;
  public record View(String id,String userId,String vehicleId,String customerName,String vehicleName,String pickupBranchId,String returnBranchId,String pickupName,String returnName,String actualReturnBranchId,Instant startAt,Instant endAt,Instant expiresAt,String status,long dailyPrice,int rentalDays,long rentalTotal,long oneWayFee,long total,long version){}
  public View view(Booking b){return new View(b.id,b.userId,b.vehicleId,b.customerName,b.vehicleName,b.pickupBranchId,b.returnBranchId,b.pickupName,b.returnName,b.actualReturnBranchId,b.startAt,b.endAt,b.expiresAt,effective(b),b.dailyPrice,b.rentalDays,b.rentalTotal,b.oneWayFee,b.total,b.version);}
  public String effective(Booking b){return "PENDING".equals(b.status)&&!b.expiresAt.isAfter(clock.instant())?"EXPIRED":b.status;}
+ public record Report(long total,Map<String,Long> byStatus,long completed){}
+ public Report report(Instant from,Instant to,Instant asOf){
+  var counts=new LinkedHashMap<String,Long>();
+  for(String status:List.of("PENDING","CONFIRMED","IN_PROGRESS","RETURNED","COMPLETED","CANCELLED","REJECTED","EXPIRED"))counts.put(status,0L);
+  jdbc.query("select case when status='PENDING' and expires_at<=? then 'EXPIRED' else status end as report_status,count(*) as amount from bookings where created_at>=? and created_at<? group by report_status",
+   rs->{counts.put(rs.getString("report_status"),rs.getLong("amount"));},java.sql.Timestamp.from(asOf),java.sql.Timestamp.from(from),java.sql.Timestamp.from(to));
+  long completed=jdbc.queryForObject("select count(*) from (select booking_id,min(occurred_at) as completed_at from booking_status_history where next_status='COMPLETED' group by booking_id) first_completion where completed_at>=? and completed_at<?",Long.class,java.sql.Timestamp.from(from),java.sql.Timestamp.from(to));
+  return new Report(counts.values().stream().mapToLong(Long::longValue).sum(),Collections.unmodifiableMap(counts),completed);
+ }
  public boolean canRead(Actor a,Booking b){return a.is("ADMIN")||(a.is("USER")&&b.userId.equals(a.id()))||(a.is("STAFF")&&(branches.assigned(a,b.pickupBranchId)||branches.assigned(a,b.returnBranchId)));}
  public Booking require(Actor a,String id){Booking b=repo.findById(id).orElseThrow(DomainException::missing);if(!canRead(a,b))throw DomainException.missing();return b;}
  public List<View> list(Actor a){return (a.is("USER")?repo.findByUserIdOrderByCreatedAtDesc(a.id()):repo.findAll()).stream().filter(b->canRead(a,b)).map(this::view).toList();}

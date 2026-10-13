@@ -57,3 +57,7 @@ C12-1 -> C12-2 -> C12-3 -> C12-4 -> C12-5. Phần2/3 nặng hơn do query và ch
 ## Tiến độ C12-1 —13/10/2026
 
 C12-1 DONE contract tại [operational-reports](../modules/operational-reports.md); người dùng duyệt4chỉ số/ngày366/defaultmonth và scope exclusions. Source historyCOMPLETED cóoccurred_at, PENDINGeffective expiry và InvoiceService JDBC đã đối chiếu; dữ liệu mẫu/biên thời gian/trạng thái/tiền/DTO/RBAC/gates được xác định. Chỉ kiểm tài liệu/source/số học, chưa API/SQL/browser proof. C12-2–5 chưa bắt đầu; các câu đề xuất/chờ chốt trong kế hoạch ban đầu là lịch sử, được thay bằng contract đã duyệt.
+
+## Tiến độ C12-2 —13/10/2026
+
+C12-2 DONE backend/H2 scoped: report API/typedaggregates/datevalidation/RBAC/readonly transaction; verify153reported139executed14skip0fail, reporttests4/4noskip. Không frontend/migration/deps/DBgốc/restartuserprocess/push. Provenance runtimecopy+JAR khớp sourcefinal. Chưa nativeMySQL/snapshot/performance/browser, không coi toàn C12DONE; chuyển C12-3 khi được yêu cầu.

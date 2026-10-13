@@ -7,6 +7,11 @@ import java.util.*;
 @Service public class InvoiceService {
  private final JdbcTemplate jdbc;private final ObjectMapper json;private final java.time.Clock clock;
  public InvoiceService(JdbcTemplate j,ObjectMapper m,java.time.Clock c){jdbc=j;json=m;clock=c;}
+ public record Report(long count,String totalVnd){}
+ public Report report(java.time.Instant from,java.time.Instant to){
+  return jdbc.queryForObject("select count(*) as amount,coalesce(sum(total),0) as total_vnd from invoices where issued_at>=? and issued_at<?",
+   (rs,row)->new Report(rs.getLong("amount"),rs.getBigDecimal("total_vnd").toBigIntegerExact().toString()),java.sql.Timestamp.from(from),java.sql.Timestamp.from(to));
+ }
  public void issue(Booking b){
   String id=UUID.randomUUID().toString();
   try{jdbc.update("insert into invoices(id,booking_id,issued_at,total,snapshot) values(?,?,?,?,?)",id,b.id,java.sql.Timestamp.from(clock.instant()),b.total,json.writeValueAsString(Map.of("customer",b.customerName,"vehicle",b.vehicleName,"pickup",b.pickupName,"return",b.returnName,"startAt",b.startAt,"endAt",b.endAt,"note","Tiền thuê và phí tuyến theo báo giá. Không xác nhận đã thanh toán; cọc, phụ phí hoặc sự cố theo hồ sơ riêng.")));}
