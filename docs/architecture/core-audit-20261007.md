@@ -181,3 +181,6 @@ TASK .runtime/coordination-c10b-backend-opencode-20261013-082058/TASK.md sẵn s
 
 ### C10B-B1 OpenCode review — 13/10/2026 — PARTIAL / FAIL
 ACCEPTANCE .runtime/coordination-c10b-backend-review-20261013-093030/ACCEPTANCE.md: noHANDOFF/evidence/implementationcommit; productioncompilepass, testCompile4errors exit1; guardparse4diagnostics, actualrunner exit1 missingmanifest beforemutation. Findings B1-R01–R10: immutablebulkcast, nullURLreorder/uniqueoverflow,POST201,canonicalJSON,rollbackwrongspy,allowedURLwrongassertion,guardunsafe/causeproof,manifestmissing,URLtrailingfilename. MySQL/JAR/cleanup/relevantregressionsNOTVERIFIED onchangedsource. Reviewer didnotedit/commitagentfiles orstartDockerfixture; C10B remainspending.
+
+### C10B-B1 OpenCode follow-up prepared — 13/10/2026
+TASK .runtime/coordination-c10b-backend-opencode-followup-20261013-093435/TASK.md: backend-only sửa B1-R01–R10 theo ACCEPTANCE review093030, smallcompile/business/guardfix trướcMySQL/JARheavyproof; contractgốc giữ, HANDOFF/evidencefoldermới. Chưaagentexecution hoặcPASS. Preexistingworkflow/source giữ nguyên.
