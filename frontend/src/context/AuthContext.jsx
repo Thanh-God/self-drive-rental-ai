@@ -62,6 +62,7 @@ export function AuthProvider({ children }) {
     setUser(nextUser);
   }, []);
   const refreshUser = useCallback((nextUser) => {
+    if (!token || getStoredToken() !== token || nextUser.id !== user?.id) return;
     const normalizedUser = {
       id: nextUser.id,
       fullName: nextUser.fullName,
@@ -70,7 +71,7 @@ export function AuthProvider({ children }) {
     };
     setStoredUser(normalizedUser);
     setUser(normalizedUser);
-  }, []);
+  }, [token, user?.id]);
 
   const logout = useCallback(
     async ({ callApi = true } = {}) => {

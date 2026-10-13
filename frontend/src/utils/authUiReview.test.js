@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { before, after, afterEach, test } from "node:test";
-import { act, createElement as h } from "react";
+import { act, createElement as h, useEffect } from "react";
 import { JSDOM } from "jsdom";
 import { createServer } from "vite";
 import { fileURLToPath, URL } from "node:url";
@@ -120,4 +120,22 @@ for(const status of [400,429]) test(`failed password update preserves session an
 test("profile phone format is checked and email remains read-only",async()=>{
   const c=await mount("/user/profile",ApiProfilePage,true);assert.equal(c.querySelector('input[readonly]').value,profile.email);
   await fill(c,"phone","abc");await submit(c.querySelector('[name="phone"]').closest("form"));assert.equal(writes.length,0);assert.match(c.textContent,/7–15 chữ số/);
+});
+
+test("late profile refresh cannot restore a logged out session or overwrite another user", async()=>{
+  let captured;
+  function Probe(){const auth=useAuth();useEffect(()=>{captured=auth;},[auth]);return h("p",null,auth.user?.id||"guest");}
+  const c=await mount("/probe",Probe,true);
+  const oldRefresh=captured.refreshUser;
+  await act(async()=>captured.logout({callApi:false}));
+  await act(async()=>oldRefresh({...profile,fullName:"Late profile"}));
+  assert.equal(localStorage.getItem("kdrive.user"),null);assert.match(c.textContent,/guest/);
+  let pending;
+  await act(async()=>{pending=captured.login({email:"another@example.test",password:"Fixture password 2026!"});});
+  const another={...profile,id:"another-user",email:"another@example.test"};
+  await act(async()=>{reply(writes[0],{token:"another-token",user:another});await pending;});
+  await act(async()=>oldRefresh({...profile,fullName:"Late profile"}));
+  assert.match(c.textContent,/another-user/);assert.equal(JSON.parse(localStorage.getItem("kdrive.user")).id,"another-user");
+  await act(async()=>captured.refreshUser({...another,fullName:"Updated current"}));
+  assert.equal(JSON.parse(localStorage.getItem("kdrive.user")).fullName,"Updated current");
 });

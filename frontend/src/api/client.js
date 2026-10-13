@@ -59,6 +59,10 @@ apiClient.interceptors.response.use(
         ? authorization.replace(/^Bearer\s+/i, "")
         : null;
 
+    if (requestToken && requestToken !== getStoredToken()) {
+      return Promise.reject(error);
+    }
+
     if (
       status === 401 &&
       !isAuthCall &&

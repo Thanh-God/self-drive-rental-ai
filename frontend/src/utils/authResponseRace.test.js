@@ -470,3 +470,23 @@ test("an old-token 401 cannot clear a newer mounted session", async () => {
   );
   await view.unmount();
 });
+for (const status of [403, 500]) {
+  test(`old-session ${status} cannot trigger global callbacks for a newer session`, async () => {
+    localStorage.setItem("kdrive.jwt", "old-token");
+    let callbacks = 0;
+    setAuthInterceptors({forbidden: () => callbacks++, serverError: () => callbacks++});
+    const outcome = apiClient.get("/private/resource").catch(error => error);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    const request = takeRequest("/private/resource");
+    localStorage.setItem("kdrive.jwt", "new-token");
+    rejectWithStatus(request, status);
+    assert.equal((await outcome).response.status, status);
+    assert.equal(callbacks, 0);
+    assert.equal(localStorage.getItem("kdrive.jwt"), "new-token");
+    const current = apiClient.get("/private/current").catch(error => error);
+    await new Promise(resolve => setTimeout(resolve, 0));
+    rejectWithStatus(takeRequest("/private/current"), status);
+    await current;
+    assert.equal(callbacks, 1, "current-session error still reaches global handler");
+  });
+}
