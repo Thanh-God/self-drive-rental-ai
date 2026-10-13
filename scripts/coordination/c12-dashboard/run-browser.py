@@ -18,7 +18,11 @@ def main():
     parser.add_argument("--evidence", required=True)
     parser.add_argument("--fresh-schema", action="store_true")
     parser.add_argument("--backend-root", required=True)
+    parser.add_argument("--browser-script", help="Repository scripts/coordination browser proof to run")
     args = parser.parse_args()
+    browser_script = Path(args.browser_script).resolve() if args.browser_script else Path(__file__).with_name("verify-browser.cjs")
+    if not browser_script.is_relative_to(REPO / "scripts/coordination") or not browser_script.is_file() or browser_script.suffix != ".cjs":
+        raise RuntimeError("[PREFLIGHT_REFUSAL] Repository browser script required")
     build = Path(args.backend_root).resolve()
     if not build.is_relative_to(REPO / ".runtime"):
         raise RuntimeError("[PREFLIGHT_REFUSAL] Backend copy required")
@@ -50,6 +54,7 @@ def main():
         assert hashlib.sha256((REPO / rel).read_bytes()).hexdigest() == sha, rel
     paths = [p for p in (REPO / "frontend/src").rglob("*") if p.is_file()]
     paths += list(Path(__file__).parent.glob("*.*"))
+    paths.append(browser_script)
     before = {str(p.relative_to(REPO)):hashlib.sha256(p.read_bytes()).hexdigest() for p in paths}
     out.mkdir(parents=True)
     (out / "inputs-before.json").write_text(json.dumps(before,indent=2))
@@ -94,13 +99,14 @@ def main():
                 time.sleep(1)
         else:
             raise RuntimeError("Services deadline")
-        browser=subprocess.run(["node",str(Path(__file__).with_name("verify-browser.cjs"))],cwd=REPO,env=env,capture_output=True,creationflags=flags,timeout=300)
+        browser=subprocess.run(["node",str(browser_script)],cwd=REPO,env=env,capture_output=True,creationflags=flags,timeout=300)
         (out / "browser.log").write_bytes(browser.stdout+browser.stderr)
         (out / "browser-exit.txt").write_text(str(browser.returncode))
         assert browser.returncode==0, "Browser failure; see browser.log"
         for rel,sha in before.items():
             assert hashlib.sha256((REPO / rel).read_bytes()).hexdigest()==sha, "Source drift "+rel
         final_paths = [p for p in (REPO / "frontend/src").rglob("*") if p.is_file()] + list(Path(__file__).parent.glob("*.*"))
+        final_paths.append(browser_script)
         assert set(before)=={str(p.relative_to(REPO)) for p in final_paths}, "Source keyset drift"
         (out / "result.json").write_text(json.dumps({"status":"PASS browser scoped","assertions":len(json.loads((out / "browser-assertions.json").read_text()))}))
     finally:
