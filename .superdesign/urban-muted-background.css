@@ -1,0 +1,17 @@
+/* Urban Lifestyle Mobility: softer warm neutral backgrounds, layout unchanged. */
+:root {
+  --sand: #e4e0d8;
+  --urban-muted-canvas: #e4e0d8;
+  --urban-muted-surface: #eeebe4;
+}
+body { background-color: var(--urban-muted-canvas) !important; }
+.bg-sand, .bg-\[\#FDFCF8\], .bg-\[\#fdfcf8\] {
+  background-color: var(--urban-muted-canvas) !important;
+}
+.bg-white { background-color: var(--urban-muted-surface) !important; }
+.bg-white\/80 { background-color: rgb(238 235 228 / 80%) !important; }
+.bg-white\/90 { background-color: rgb(238 235 228 / 90%) !important; }
+.bg-white\/95 { background-color: rgb(238 235 228 / 95%) !important; }
+.bg-gray-50, .bg-slate-50, .bg-amber-50 {
+  background-color: #e8e3d9 !important;
+}
