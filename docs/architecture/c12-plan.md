@@ -1,6 +1,6 @@
 # C12 — báo cáo vận hành và dashboard Admin
 
-Ngày 13/10/2026. Trạng thái PLANNED, chưa triển khai/chưa bàn giao. Căn cứ UC-A05 (Nên có) và backlog core-audit C12; không mở rộng báo cáo tài chính nâng cao, AI/Map hoặc thanh toán online.
+Ngày 13/10/2026. Trạng thái **DONE scoped: C12-1–5 đã đạt các gates của kế hoạch**. Các mục kế hoạch/lịch sử bên dưới được giữ để đối chiếu. Căn cứ UC-A05 (Nên có) và backlog core-audit C12; không mở rộng báo cáo tài chính nâng cao, AI/Map hoặc thanh toán online.
 
 ## Baseline và giới hạn
 
@@ -69,3 +69,7 @@ DONE MySQL scoped:8/8native no skip,HTTPworkflow/invoiceSQLreadback/no-write/RBA
 ## Tiến độ C12-4 —13/10/2026
 
 Dashboard API /admin riêng đã triển khai4cards/status table/datefilters/defaultVNmonth, BigIntVNDprecision, loading/error/empty/retry/no stale result theo useApiData. 116frontendtests/lint/demo/APIbuild đạt, khôngbackend/migration changes. C12-5browser đang chuẩn bị, chưa toànC12DONE. Khôngnạpvàobackenduserđangchạy/push/DBgốc.
+
+## C12-5 và kết quả cuối —13/10/2026
+
+DONE C12 scoped. Frontendfinal116tests/lint/demo/API, browser30realbackend/MySQLassertions/SQLno-write/desktopscreenshots/RBAC/zero/retry; nativeC12-3eight/hashmatch retained. Visualreview sửa nút Xembáocáo sangclassbtnđúng hiện có rồirerunfinalchecks. C12-4SHA99e6cf0, C12-5SHA ởACCEPTANCE .runtime/coordination-c12-ui-final-20261013/. NoDBgốc/push/restartuser; fixtureKEEP/ownedcleanup. TimeoutuserPARTIALhoãn/C13/C14/AIngoàiC12.

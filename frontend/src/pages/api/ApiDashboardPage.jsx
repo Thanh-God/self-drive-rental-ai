@@ -24,7 +24,7 @@ export default function ApiDashboardPage() {
     <form onSubmit={apply} className="panel mb-6 flex flex-wrap items-end gap-4">
       <Field label="Từ ngày"><input type="date" min="1970-01-02" max="2038-01-18" required value={draft.from} onChange={event => setDraft({ ...draft, from: event.target.value })} /></Field>
       <Field label="Đến ngày"><input type="date" min="1970-01-02" max="2038-01-18" required value={draft.to} onChange={event => setDraft({ ...draft, to: event.target.value })} /></Field>
-      <button className="btn-primary" type="submit" disabled={request.loading}>Xem báo cáo</button>
+      <button className="btn" type="submit" disabled={request.loading}>Xem báo cáo</button>
       <button className="btn-secondary" type="button" disabled={request.loading} onClick={request.reload}>Làm mới</button>
     </form>
     {validation && <Notice error>{validation}</Notice>}

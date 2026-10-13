@@ -148,3 +148,9 @@ Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `
 - [Frontend](frontend/README.md), [vận hành và phát triển](docs/architecture/development-workflow.md).
 
 Lịch sử kiểm chứng và phạm vi nghiệm thu nằm trong [audit kỹ thuật](docs/architecture/core-audit-20261007.md); README là tài liệu giới thiệu và sử dụng sản phẩm.
+
+## Báo cáo vận hành Admin
+
+Trong chế độ API, Admin mở `/admin` để xem đơn tạo trong khoảng, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; bảng phân rã trạng thái hiện tại của các đơn tạo trong khoảng. Chọn Từ ngày/Đến ngày theo giờ Việt Nam (bao gồm hai ngày, tối đa366ngày), mặc định tháng hiện tại; dùng Xem báo cáo/Làm mới để tải dữ liệu. Khoảng rỗng hiển thị0, lỗi tải có nút Thử tải lại. Tổng hóa đơn là giá trị phát hành, không xác nhận tiền đã thu. USER/STAFF/Guest không có quyền báo cáo.
+
+Backend: GET `/api/v1/admin/reports/operations?from=YYYY-MM-DD&to=YYYY-MM-DD`. Khởi động lại backend/frontend bằng script dev hiện có sau khi cập nhật source; không cần migration/bảng/phụ thuộc mới cho báo cáo. DemoDashboard vẫn là dữ liệu demo riêng.

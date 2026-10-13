@@ -149,3 +149,9 @@ API mode now displays linked amenity DTOs on home/list/detail; Admin vehicle edi
 Homepage keeps KDrive teal/slate/system font, uses one dark hero/H1/CTA group and actual API cards. ACTIVE cards in API mode say operational state, not guaranteed schedule availability; quote remains authoritative. Demo card label remains separate. Reduced motion/static hero, no video/font CDN/provider/dashboard metrics or fake API fallback. Vehicle image placeholders remain until C10B.
 
 Accepted scoped proof and before/after desktop/mobile/tablet screenshots: .runtime/coordination-c10a-ui-codexa-complete-20261012-230616/. Source runner scripts/coordination/c10a-ui-browser/README.md; mandatory build uses VITE_DATA_MODE=api and VITE_API_BASE_URL=/api/v1 at compile time. Evidence includes isolated MySQL browser integration; user DB/services are preserved.
+
+## Báo cáo vận hành Admin
+
+Trong chế độ API, Admin mở `/admin` để xem đơn tạo trong khoảng, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; bảng phân rã trạng thái hiện tại của các đơn tạo trong khoảng. Chọn Từ ngày/Đến ngày theo giờ Việt Nam (bao gồm hai ngày, tối đa366ngày), mặc định tháng hiện tại; dùng Xem báo cáo/Làm mới để tải dữ liệu. Khoảng rỗng hiển thị0, lỗi tải có nút Thử tải lại. Tổng hóa đơn là giá trị phát hành, không xác nhận tiền đã thu. USER/STAFF/Guest không có quyền báo cáo.
+
+Backend: GET `/api/v1/admin/reports/operations?from=YYYY-MM-DD&to=YYYY-MM-DD`. Khởi động lại backend/frontend bằng script dev hiện có sau khi cập nhật source; không cần migration/bảng/phụ thuộc mới cho báo cáo. DemoDashboard vẫn là dữ liệu demo riêng.

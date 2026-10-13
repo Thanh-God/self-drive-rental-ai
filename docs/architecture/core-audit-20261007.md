@@ -241,3 +241,6 @@ APIADMINreportoperations qua operation→typedbooking/invoice aggregations,4metr
 
 ### C12-3 —13/10/2026 —PASS MySQL scoped
 Reporttests8/8zero skip trênMySQL8,4MockMvc+4realHTTP; actualrentalworkflow invoice/history/no-write/readback vàconcurrent reportRRsnapshotold/new đạt. Nativeboundaries/largeSUMprecise/effectiveexpiry/firstcompletion;10000booking latency20–26mslocal,existingcoveringindexscan;no productionSLA. Fullverify139executed18skip0fail;JAR129/sourcehashmatch. ExactC12fixturestoppedKEEP/noDBgốc/push/serviceuserchange. C12-4UI/5browser tiếp theo.
+
+### C12-4/5 —13/10/2026 —DONE scoped C12
+APIAdmindashboard riêng/fromtodate/VNmonth/4cards/8statusrows/BigInt tiền, demo riêng;116frontendtests/lint/demoAPI và30realbrowser1440/1280/RBAC/SQLreadback/no-write/zero/retry đạt. C12-3native8/backendsourcehashgiữ; parentC12-1–5 DONE. Buttonstylevisualfindingđóng sourcefinal/retest; harnessCRLFfailuregiữredacted. Evidence .runtime/coordination-c12-ui-final-20261013/, commitUI99e6cf0 vàfinalSHA ởACCEPTANCE. UserDB/services/JARgiữ/fixtureKEEP/nopush; timeoutPARTIALhoãn/C13/C14/AIchưaDONE.

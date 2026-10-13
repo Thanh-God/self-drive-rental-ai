@@ -110,3 +110,11 @@ Concurrent completion commits between real booking aggregation and invoice aggre
 Local performance:10000syntheticbookings,0invoice/history in that loadcase,5HTTP calls26/20/21/20/21ms; no productionSLA. COUNT diagnosticEXPLAIN scans existing booking_user_created coveringindex (~10514estimatedrows), not date-leadingrange. Source3fixedaggregatequeries/noN+1 entityloading; no general-log querycounter or full3queryEXPLAIN claim. Mixedhistory/invoice correctness tested separately; no newindex/migration justified at this size.
 
 Full backendverify157reported139executed18skip0fail/error;18skipnotPASS includes4native-only executed later in native4/4. Source/runtimecopy/JAR129entries and sourcehashmatch. Exactfixture stopped/volumeKEEP; original user services/JAR/DB untouched; evidence .runtime/coordination-c12-3-20261013/. C12-4frontend/C12-5browser not started. No push; UI/backenduserprocess not switched by this test.
+
+## C12-4/5 —13/10/2026 —DONE C12 scoped
+
+/admin ở API mode dùng ApiDashboardPage riêng, demoDashboard giữ nguồn riêng. BộlọcVNmonth/date366,4metriccards/8statusrows/loading/error/empty/retry vàBigIntVNDformat; reuseuseApiData che dữ liệu cũ theo requestkey, khôngfallbackdemo. Khôngthêmchart/library/globalredesign.
+
+Finalfrontend116/116zero skip,lint/demo/APIbuildPASS; browser30assertionsChromiumdesktop1440/1280 localeVN trênbackend/MySQL thật: Admindate/refresh/empty/invalid/no-request/actualretry/RBAC, UI=API=independentSQL, expiredClock/no-writeSQLsnapshot,buttonstyle/runtimeerrors0. Transport500injected cónhãn riêng; fixturequeryrows khôngthay nativeC12-3realworkflowproof. Backend/native8 cùngsourcehashgiữ, khôngrerunbackendkhôngđổi.
+
+C12-1contract/C12-2backend/C12-3native/C12-4UI/C12-5browser DONE scoped. Evidence .runtime/coordination-c12-ui-final-20261013/. C12-4commit99e6cf0, C12-5SHA trongACCEPTANCE. Ownedservicesstopped, exactfixturestoppedKEEP, originalDB/services/JARgiữ; lỗi timeoutuserPARTIAL được hoãn vàC13/C14/AI chưaDONE. Devbackend/frontenduser cầnrestart để nạpsource mới; khôngtựpush/deploy.
