@@ -214,3 +214,6 @@ Người dùng duyệt khôngminACTIVE,giữxe/tuyến/Staff/đơncũ. APIADMINs
 
 ### C11-A2 —13/10/2026 —PASS scoped; cònA3/A4
 Quote/create giữ orderedbranchlocks tới commit, closedpickup/return409no-write; confirmđơncũ khôngđòi ACTIVEbranch,permission/GPLX/state/version/lịchxe giữ. MySQL10testsA2six+A1four đềuPASSnoSKIP;2race latch+actualdata_lock_waits chứngminh closewins/createwins;workflowđơncũquaCONFIRMED/IN_PROGRESS/RETURNED/COMPLETED,snapshotstable sauclose/rename/reopen. Backendverify143reported129executed14SKIP (12optional+2MySQL-onlyrace),0failure/error; nativeMySQLexecutedđủ. JAR183entries/sourcehashmatch. Evidence `.runtime/coordination-c11-a2-codexa-20261013/`;fixturestoppedKEEP/noDBgốc/push. C11chưaDONE,A3/A4cònchưa triểnkhai.
+
+### AUTH-UI —13/10/2026 — scoped verification
+Giữ luồng đổi mật khẩu hiện có theo yêu cầu giảm phạm vi; policy 8 ký tự có hoa/thường/số/đặc biệt, giới hạn UTF8 BCrypt và rate limit IP/email/actor; form confirmation/show-hide/pending guard, phone format, header/focus/badge desktop. Native MySQL6/6, browser29assertions, clean backend verify135executed14skip (skip không PASS). Evidence .runtime/coordination-auth-ui-review-20261013/; contract docs/ui/auth-ui-review-20261013.md. Email verification/OTP/SMTP và C11A3/A4 còn PENDING; không migration/DBgốc/push/whole-systemPASS.

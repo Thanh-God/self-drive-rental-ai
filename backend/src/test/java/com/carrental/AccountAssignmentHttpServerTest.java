@@ -233,7 +233,7 @@ public class AccountAssignmentHttpServerTest {
     @Test
     void testLockAndUnlockStaffWithVersionAndTokenRevocation() {
         String email = "lockable-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test";
-        String password = "Password123!";
+        String password = "Staff review fixture 2026!";
 
         // 1. Create staff
         ResponseEntity<Map> created = restTemplate.exchange(
@@ -389,7 +389,7 @@ public class AccountAssignmentHttpServerTest {
     @Test
     void testStaffBranchAssignmentAndBulkQuery() {
         String email = "staff-assign-" + UUID.randomUUID().toString().substring(0, 8) + "@example.test";
-        String password = "Password123!";
+        String password = "Staff review fixture 2026!";
 
         // 1. Create staff
         ResponseEntity<Map> created = restTemplate.exchange(

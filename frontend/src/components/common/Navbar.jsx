@@ -6,7 +6,7 @@ import { homePathForRole } from "../../utils/roles";
 import { DEMO_MODE } from "../../demo/config";
 
 const publicLinks = [
-  { to: "/vehicles", label: "Duyệt xe" },
+  { to: "/vehicles", label: "Tìm xe" },
   ...(DEMO_MODE
     ? [
         { to: "/ai/recommend", label: "Gợi ý AI" },
@@ -67,14 +67,14 @@ export default function Navbar() {
           </span>
           <span>
             KDrive
-            <span className="ml-1 hidden text-xs font-normal text-slate-500 sm:inline">
-              Thuê xe tự lái
-            </span>
           </span>
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
-          {publicLinks.map((link) => (
+          {[...publicLinks, ...(isAuthenticated && user?.role === "USER" ? [
+            { to: "/user/bookings", label: "Đơn thuê của tôi" },
+            { to: "/user/profile", label: "Hồ sơ & GPLX" },
+          ] : [])].map((link) => (
             <NavLink key={link.to} to={link.to} className={navClass}>
               {link.label}
             </NavLink>

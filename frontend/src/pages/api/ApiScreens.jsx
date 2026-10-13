@@ -1,4 +1,6 @@
 import VehicleGallery from "../../components/vehicle/VehicleGallery";
+import PasswordField from "../../components/common/PasswordField";
+import { passwordError, passwordHint } from "../../utils/passwordPolicy";
 import {
   useEffect,
   useLayoutEffect,
@@ -534,7 +536,7 @@ export function ApiHomePage() {
         </div>
         <div className="urban-hero-photo">
           {!loading && !error && vehicles[0] ? <VehicleGallery vehicle={vehicles[0]} /> : <div className="urban-photo-empty">Hành trình của bạn bắt đầu tại đây.</div>}
-          <div className="urban-photo-caption"><span>ĐỒNG HÀNH CÙNG BẠN</span><strong>{!loading && !error ? vehicles[0]?.name || "Khám phá danh mục xe" : "Khám phá danh mục xe"}</strong></div>
+          <div className="urban-photo-caption"><span>ĐỒNG HÀNH CÙNG BẠN</span><strong>{!loading && !error ? vehicles[0]?.name || "Khám phá danh mục xe" : "Khám phá danh mục xe"}</strong>{vehicles[0]?.images?.length ? <small>Ảnh minh họa mẫu xe</small> : null}</div>
         </div>
       </section>
       <section className="urban-promises" aria-label="Thông tin thuê xe">
@@ -2020,6 +2022,7 @@ export function ApiDocumentPage({ kind, area }) {
 }
 
 export function ApiProfilePage() {
+  const passwordInFlight = useRef(false);
   const profileRequest = useApiData("/auth/me");
   const licenseRequest = useApiData("/me/license");
   const navigate = useNavigate();
@@ -2061,9 +2064,14 @@ export function ApiProfilePage() {
     setBusy(true);
     const form = new FormData(event.currentTarget);
     try {
+      const phone = String(form.get("phone") || "").trim().replace(/[\s-]/g, "");
+      if (phone && !/^\+?[0-9]{7,15}$/.test(phone)) {
+        setError("Số điện thoại cần 7–15 chữ số, có thể bắt đầu bằng +.");
+        return;
+      }
       const updatedProfile = await updateProfile({
         fullName: String(form.get("fullName") || ""),
-        phone: String(form.get("phone") || ""),
+        phone,
         version: profile.version,
       });
       refreshUser(updatedProfile);
@@ -2077,15 +2085,23 @@ export function ApiProfilePage() {
   }
   async function changePassword(event) {
     event.preventDefault();
+    if (passwordInFlight.current) return;
     setError("");
     setMessage("");
     const form = new FormData(event.currentTarget);
     const passwordForm = event.currentTarget;
+    const next = String(form.get("next") || "");
+    const invalid = passwordError(next);
+    if (invalid || next !== String(form.get("confirmation") || "")) {
+      setError(invalid || "Mật khẩu nhập lại chưa khớp.");
+      return;
+    }
+    passwordInFlight.current = true;
     setBusy(true);
     try {
       await updatePassword({
         current: String(form.get("current") || ""),
-        next: String(form.get("next") || ""),
+        next,
       });
       passwordForm.reset();
       await logout({ callApi: false });
@@ -2093,6 +2109,7 @@ export function ApiProfilePage() {
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể đổi mật khẩu."));
     } finally {
+      passwordInFlight.current = false;
       setBusy(false);
     }
   }
@@ -2154,9 +2171,12 @@ export function ApiProfilePage() {
             <Field label="Email">
               <input readOnly value={profile.email || ""} />
             </Field>
-            <Field label="Số điện thoại">
+            <Field label="Số điện thoại" hint="7–15 chữ số, có thể bắt đầu bằng +; chỉ kiểm tra định dạng, chưa xác minh sở hữu.">
               <input
                 name="phone"
+                type="tel"
+                autoComplete="tel"
+                pattern="[+0-9 -]*"
                 maxLength={20}
                 defaultValue={profile.phone || ""}
               />
@@ -2167,27 +2187,12 @@ export function ApiProfilePage() {
           </form>
           <form className="panel space-y-4" onSubmit={changePassword}>
             <h2 className="text-lg font-semibold">Đổi mật khẩu</h2>
-            <Field label="Mật khẩu hiện tại">
-              <input
-                name="current"
-                type="password"
-                required
-                maxLength={72}
-                autoComplete="current-password"
-              />
-            </Field>
-            <Field label="Mật khẩu mới">
-              <input
-                name="next"
-                type="password"
-                required
-                minLength={8}
-                maxLength={72}
-                autoComplete="new-password"
-              />
-            </Field>
-            <p className="text-xs text-slate-500">
-              Đổi mật khẩu sẽ thu hồi các phiên hiện có.
+            <PasswordField label="Mật khẩu hiện tại" name="current" required maxLength={72} autoComplete="current-password" />
+            <PasswordField label="Mật khẩu mới" name="next" required minLength={8} maxLength={72} autoComplete="new-password" />
+            <p className="text-sm text-slate-600">{passwordHint}</p>
+            <PasswordField label="Nhập lại mật khẩu mới" name="confirmation" required autoComplete="new-password" />
+            <p className="text-sm text-slate-600">
+              Đổi thành công sẽ đăng xuất thiết bị này và thu hồi các phiên trên thiết bị khác. Bạn cần đăng nhập lại.
             </p>
             <button className="btn-secondary" disabled={busy}>
               Đổi mật khẩu

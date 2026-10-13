@@ -25,6 +25,7 @@ public class AccountService {
   return new Actor(a.id,a.role,a.fullName);
  }
  @Transactional public Account register(String email,String name,String password){
+  com.carrental.security.PasswordPolicy.validate(password);
   String normalized=email.strip().toLowerCase(Locale.ROOT);
   if(repo.findByEmail(normalized).isPresent())throw DomainException.conflict("Email đã được sử dụng.");
   Account a=new Account();a.email=normalized;a.fullName=name.strip();a.passwordHash=passwords.encode(password);a.role="USER";a.status="ACTIVE";return repo.saveAndFlush(a);
@@ -38,9 +39,12 @@ public class AccountService {
  @Transactional public Profile update(Actor actor,String name,String phone,long version){
   Account a=repo.lock(actor.id()).orElseThrow(DomainException::missing);
   if(a.version!=version)throw DomainException.conflict("Hồ sơ đã thay đổi.");
-  a.fullName=name.strip();a.phone=phone;repo.flush();return view(a);
+  String normalizedPhone=phone==null||phone.isBlank()?null:phone.strip().replaceAll("[\\s-]","");
+  if(normalizedPhone!=null&&!normalizedPhone.matches("\\+?[0-9]{7,15}"))throw DomainException.bad("Số điện thoại cần 7–15 chữ số, có thể bắt đầu bằng +.");
+  a.fullName=name.strip();a.phone=normalizedPhone;repo.flush();return view(a);
  }
  @Transactional public void password(Actor actor,String current,String next){
+  com.carrental.security.PasswordPolicy.validate(next);
   Account a=repo.lock(actor.id()).orElseThrow(DomainException::missing);
   if(!passwords.matches(current,a.passwordHash))throw DomainException.bad("Mật khẩu hiện tại không đúng.");
   if(passwords.matches(next,a.passwordHash))throw DomainException.bad("Mật khẩu mới phải khác mật khẩu cũ.");

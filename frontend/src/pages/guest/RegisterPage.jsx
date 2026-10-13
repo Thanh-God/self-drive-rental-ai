@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
+import PasswordField from "../../components/common/PasswordField";
+import { passwordError, passwordHint } from "../../utils/passwordPolicy";
 import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { getErrorMessage, homePathForRole } from "../../utils/roles";
@@ -10,6 +12,8 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ fullName: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [confirmation, setConfirmation] = useState("");
+  const inFlight = useRef(false);
 
   if (!loading && isAuthenticated && user) {
     return <Navigate to={homePathForRole(user.role)} replace />;
@@ -21,6 +25,13 @@ export default function RegisterPage() {
 
   const onSubmit = async (event) => {
     event.preventDefault();
+    if (inFlight.current) return;
+    const invalid = passwordError(form.password);
+    if (invalid || form.password !== confirmation) {
+      setError(invalid || "Mật khẩu nhập lại chưa khớp.");
+      return;
+    }
+    inFlight.current = true;
     setError("");
     setSubmitting(true);
     try {
@@ -35,6 +46,7 @@ export default function RegisterPage() {
         getErrorMessage(err, "Không thể đăng ký. Vui lòng kiểm tra thông tin."),
       );
     } finally {
+      inFlight.current = false;
       setSubmitting(false);
     }
   };
@@ -58,6 +70,7 @@ export default function RegisterPage() {
           Họ và tên
           <input
             name="fullName"
+            autoComplete="name"
             required
             value={form.fullName}
             onChange={onChange}
@@ -68,6 +81,7 @@ export default function RegisterPage() {
           Email
           <input
             name="email"
+            autoComplete="email"
             type="email"
             required
             value={form.email}
@@ -75,18 +89,9 @@ export default function RegisterPage() {
             className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
           />
         </label>
-        <label className="block text-sm font-medium text-slate-700">
-          Mật khẩu
-          <input
-            name="password"
-            type="password"
-            required
-            minLength={8}
-            value={form.password}
-            onChange={onChange}
-            className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-teal-600 focus:ring-2 focus:ring-teal-100"
-          />
-        </label>
+        <PasswordField label="Mật khẩu" name="password" required minLength={8} maxLength={72} autoComplete="new-password" value={form.password} onChange={onChange} />
+        <p className="text-sm text-slate-600">{passwordHint}</p>
+        <PasswordField label="Nhập lại mật khẩu" name="confirmation" required autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} />
         <button
           type="submit"
           disabled={submitting}
