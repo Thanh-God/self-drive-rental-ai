@@ -75,6 +75,16 @@ fi
 export JAVA_HOME
 export PATH="$JAVA_HOME/bin:$PATH"
 
+BACKEND_PORT="${PORT:-8080}"
+if [[ ! "$BACKEND_PORT" =~ ^[0-9]{1,5}$ ]] || (( 10#$BACKEND_PORT < 1 || 10#$BACKEND_PORT > 65535 )); then
+  printf 'PORT must be an integer in 1..65535.\n' >&2
+  exit 2
+fi
+if ( : > "/dev/tcp/127.0.0.1/$BACKEND_PORT" ) 2>/dev/null; then
+  printf 'Backend port %s is already in use; stop the intended instance or choose another PORT before building.\n' "$BACKEND_PORT" >&2
+  exit 2
+fi
+
 cd "$BACKEND_DIR"
 printf 'Building backend with ./mvnw package ...\n'
 ./mvnw package

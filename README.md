@@ -90,9 +90,24 @@ bash scripts/run-backend-gitbash.sh
 bash scripts/run-frontend-gitbash.sh
 ```
 
-Mở **http://127.0.0.1:5173**. Frontend script bật `VITE_DATA_MODE=api`, dùng `/api/v1` qua proxy tới backend port 8080 và từ chối khởi động khi port 5173 bận. Backend script build bằng Maven Wrapper trước khi chạy JAR. Nếu đổi backend port, đồng bộ Vite proxy và cấu hình origin.
+Mở **http://127.0.0.1:5173**. Frontend script bật `VITE_DATA_MODE=api`, dùng `/api/v1` qua proxy tới backend port 8080. Script kiểm tra cổng và backend health trước build; nếu backend chưa sẵn sàng hoặc cổng frontend đang bận thì dừng với thông báo. Backend script cũng từ chối cổng đang dùng trước build, tránh ghi đè JAR của phiên đang chạy. Backend script build bằng Maven Wrapper trước khi chạy JAR. Nếu đổi backend port, đồng bộ Vite proxy và cấu hình origin.
 
 Health: `http://127.0.0.1:8080/api/v1/health`; qua proxy: `http://127.0.0.1:5173/api/v1/health`. Health xác nhận dịch vụ phản hồi, không thay thế kiểm thử nghiệp vụ. Giữ hai terminal mở, dùng Ctrl+C để dừng process tương ứng. Script không tự khởi động, dừng hoặc reset MySQL.
+
+### Khi không khởi động hoặc đăng nhập được
+
+Khởi động backend trước và chờ thông báo `Started KDriveApplication`, rồi chạy frontend. Lỗi `ECONNREFUSED` trong terminal Vite nghĩa là proxy không kết nối được backend; không chứng minh email/mật khẩu sai. Nếu backend build hoặc startup thất bại, xử lý lỗi ở terminal backend trước. Không chạy đồng thời nhiều phiên trên cùng cổng.
+
+Cổng mặc định: backend 8080, frontend 5173. Có thể đổi bằng `PORT` cho backend và `FRONTEND_PORT` cho frontend; khi đổi backend cần đặt `VITE_PROXY_TARGET` tương ứng, khi đổi frontend cần đồng bộ `FRONTEND_ORIGIN` của backend. Ví dụ một môi trường **đã cấu hình database riêng**:
+
+```bash
+# Terminal backend: file env chứa DB riêng và FRONTEND_ORIGIN=http://127.0.0.1:5299
+PORT=8299 bash scripts/run-backend-gitbash.sh --env-file <duong-dan-env-rieng>
+# Terminal frontend, sau khi backend sẵn sàng
+FRONTEND_PORT=5299 VITE_PROXY_TARGET=http://127.0.0.1:8299 bash scripts/run-frontend-gitbash.sh
+```
+
+Thay placeholder trước khi chạy; không nhập nguyên dấu `<...>` vào shell. Hai script chỉ kiểm tra/build/khởi động ứng dụng, không tự dừng tiến trình đang giữ cổng hoặc sửa dữ liệu để vượt lỗi.
 
 ### Xem thử demo giao diện
 
