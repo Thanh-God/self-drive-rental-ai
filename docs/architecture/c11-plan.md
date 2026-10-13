@@ -1,6 +1,6 @@
 # C11 — kế hoạch chi nhánh và địa điểm
 
-Ngày13/10/2026. Trạng thái **IN PROGRESS: C11-L, C11-A1 và C11-A2 PASS scoped; còn A3/A4**. Kế hoạch ban đầu và audit giữ bên dưới; cập nhật thực thi ở cuối tài liệu.
+Ngày13/10/2026. Trạng thái **DONE scoped: C11-L và C11-A1–A4 đã đạt các gates của kế hoạch**. Kế hoạch ban đầu và audit giữ bên dưới; cập nhật thực thi ở cuối tài liệu. Không suy ra toàn hệ thống/AI/Map đã hoàn tất.
 
 ## Baseline và phần giữ lại
 
@@ -106,3 +106,8 @@ Evidence/TASK/HANDOFF/ACCEPTANCE tại `.runtime/coordination-c11-a2-codexa-2026
 ## C11-A3 — frontend13/10/2026
 ADMIN ApiBranchesPage hiển thị trạng thái/version và đóng/mở qua API client branches.js. Shared mutation ref giữ một request branch/status/route đang chạy; response thành công mới thông báo.400 giữ input,409 khóa thao tác và yêu cầu Tải dữ liệu mới/reset selection rồi chọn bản/version mới; rename không truyền status. API page chỉ fetch cho ADMIN, backend quyền vẫn thẩm quyền cuối. Tuyến và demo giữ hiện có.
 Frontend99/99 zero skip,lint/demoAPIbuild đạt;9mountedtests đủ loading/error/retry/empty/pending/400/409/recovery/ADMINvsUSERSTAFF/routecontract. A3 frontend gates PASS; browser và nghiệm thu C11 tiếp trong A4, chưa coi toànC11DONE. Evidence .runtime/coordination-c11-a3-codexa-20261013/.
+## C11-A4 — nghiệm thu cuối13/10/2026 — DONE scoped
+A3 được lưu ở commit6736671; A4 giữ source frontend/backend, chỉ thêm runner/evidence/docs. Frontend99/99zeroSKIP,lint/demoAPIbuild của A3 source còn nguyên; browser72assertions trên JAR123entries/current backend source: Adminpending/close/open/refresh/renameinactive400/stale409/freshrecovery, USER/Guest/STAFF guard; User stalequotecreate và quote closedpickup/return409no-write; Staff xử lý oldPENDING quaCONFIRMED/IN_PROGRESS/RETURNED/COMPLETED tại closedbranches với actor/time/GPLX checks thật. Clock production không sửa; đợi start30s thật. SQL đối chiếu xe/tuyến/Staff/đơn/history/contracts/invoices/Flyway: close/open không đổi; return mới đổi vị trí xe. Schema26tables37FK;0runtimeerror, console abortedGET/400/409 thuộccaâmchủđích.
+10nativeMySQLA1/A2zeroSKIP trên backend hiện tại,2actual lockwaits;6locationSpringMockMvc/MySQLzeroSKIP kiểm dependency auth đã đổi sauL. Location source/UI giữ, previousLbrowser22assertions là audit cũ; A4 không tuyên bố chạy lại toàn22locationbrowser, regression thay đổi dùng native6/currentAdminauth và99frontend. Backend cleanverify135executed14SKIP (skipkhôngPASS)/auth6MySQL giữ bằng exactsourcehash không rerunvôcớ. JAR123byteentries khớp classes native suite dùng, hash giữ qua locationregression.
+Browser-a giữ như FAIL harness đọc SQLcharset tiếngViệt sai; browser-b UTF8mb4/raw exactJSONpickup mạnhhơn đãPASS, không sửa storedsnapshot/hạassertions. CùngA4fixture1container/volume,2browser schema vàschemaLocation riênggiữ, không tạocontainerlặp. Owned Java/Node/fixtuređãdừng; originalMySQL exactidentity giữ chạy; DBgốc không testghi/push.
+TASK/HANDOFF/ACCEPTANCE .runtime/coordination-c11-a4-codexa-20261013/, runners scripts/coordination/c11-final-browser/. C11 DONE cho locationcatalogtíchhợp vàbranchstatus; C12/report,C13hardening,C14full-core,AI/Map,emailOTP/mobile nằmngoàiphạmvi, không tự chuyển triển khai.

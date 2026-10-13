@@ -223,3 +223,6 @@ Sửa root cause AuthContext chờ API trước clear local session; nay logout 
 
 ### C11-A3 —13/10/2026 — frontendPASS; A4 tiếp theo
 BranchstatusUI ADMIN đóng/mở/version,mutationref/pending,400 giữ input/409 freshrecovery,route/demo giữ.99frontendtests0skip/lint/demoAPIbuild;9mountedcases. Backend giữ source sauauth, A4 sẽ kiểm lại A1/A2MySQL trên JAR hiện tại vàbrowser. Evidence .runtime/coordination-c11-a3-codexa-20261013/. KhôngwholeC11PASS/push/DBgốc.
+
+### C11-A4 —13/10/2026 —DONE scoped C11
+Frontend99tests/lint/demoAPI sourceA3giữ; nativeMySQLbranch10/10+location6/6noskip;browser72assertionscurrentJAR123entries,Adminclose/open/stale/recover,Userclosedquote/create409no-write,Staffclosedbrancholdbookingcompleted thật. SQLpreservation/snapshots26tables37FK,clockthật. Browser-a SQLCLIcharsetFAILharness→bUTF8/rawexactJSONPASS;khôngsourcebackendchange. Ownedcleanup/fixtureKEEP/originalDBuntouched. Evidence .runtime/coordination-c11-a4-codexa-20261013/. C11catalog+branchstatusDONE, AI/Map/fullcore/emailOTPcònngoàiphạmvi,nopush.
