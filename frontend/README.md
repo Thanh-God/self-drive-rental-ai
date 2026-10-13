@@ -1,6 +1,6 @@
 # KDrive frontend
 
-Frontend React/Vite có hai chế độ dữ liệu: demo để duyệt UI và API để dùng các endpoint backend đã được triển khai. Layout Guest/User/Staff/Admin, route guard và giao diện teal/slate được dùng chung.
+Frontend React/Vite có hai chế độ dữ liệu: demo để duyệt UI và API để dùng các endpoint backend đã được triển khai. Layout Guest/User/Staff/Admin, route guard và giao diện Urban với nền be ấm và điểm nhấn cam phục vụ các trang người dùng; các màn hình vận hành dùng bố cục theo vai trò.
 
 Các màn hình API chỉ dùng dữ liệu do backend trả về; backend vẫn là nguồn có thẩm quyền cho quyền truy cập, trạng thái, khả dụng và giá.
 
@@ -56,17 +56,17 @@ Giữ terminal mở; Ctrl+C để dừng. Nếu cổng 5173 bận, dùng URL Vit
 
 - `VITE_DATA_MODE=demo` là mặc định của bản UI này. Thanh **DEMO UI** luôn hiển thị; chọn Guest/User/Staff/Admin để kiểm tra từng khu vực. Không nhập tài khoản thật hoặc mật khẩu trong demo. Không gọi API backend, Gemini hoặc Map.
 - Dữ liệu demo lưu trong `sessionStorage` với khóa `kdrive.demo.data.v1`, vai trò lưu riêng tại `kdrive.demo.role`. Reload cùng tab giữ dữ liệu; nút **Khôi phục mẫu** đặt lại tập dữ liệu demo. Không đọc/ghi token thật để mô phỏng đăng nhập. Các vai trò mẫu độc lập với tài khoản thêm/sửa trong màn hình Admin.
-- `VITE_DATA_MODE=api` tắt toàn bộ nguồn demo và bộ chọn vai trò. Đăng nhập/đăng ký, duyệt xe, tạo báo giá/đơn đa chi nhánh, danh sách/chi tiết đơn, hợp đồng/hóa đơn, biên bản giao nhận, hồ sơ/GPLX, sự cố, quản lý tài khoản/xe/chi nhánh/tuyến, kiểm duyệt đánh giá và tình trạng đội xe gọi API. Không tự thay lỗi API bằng dữ liệu giả. Các trang chưa có API nghiệp vụ (dashboard, locations, recommendation và itinerary) hiển thị thông báo chờ kết nối thay vì dùng dữ liệu demo. Sau khi đổi biến môi trường cần khởi động lại Vite.
+- `VITE_DATA_MODE=api` tắt toàn bộ nguồn demo và bộ chọn vai trò. Đăng nhập/đăng ký, duyệt xe, tạo báo giá/đơn đa chi nhánh, danh sách/chi tiết đơn, hợp đồng/hóa đơn, biên bản giao nhận, hồ sơ/GPLX, sự cố, quản lý tài khoản/xe/chi nhánh/tuyến, kiểm duyệt đánh giá và tình trạng đội xe gọi API. Không tự thay lỗi API bằng dữ liệu giả. Báo cáo vận hành Admin và quản lý danh mục địa điểm cũng sử dụng API. Các trang chưa có API nghiệp vụ (recommendation và itinerary) hiển thị thông báo chờ kết nối thay vì dùng dữ liệu demo. Sau khi đổi biến môi trường cần khởi động lại Vite.
 
 ### Luồng API
 
 1. Tạo tài khoản User hoặc đăng nhập bằng API; token ngắn hạn được lưu để gửi các yêu cầu xác thực.
-2. Duyệt xe và xem trạng thái/giá từ API. Ảnh xe chưa được backend quản lý nên xe trong API mode dùng icon dự phòng, không gắn nhầm ảnh mẫu.
+2. Duyệt xe và xem trạng thái/giá từ API. Card và gallery đọc ảnh, thứ tự và thông tin ghi công từ API; ảnh thiếu hoặc không tải được dùng icon dự phòng.
 3. Chọn thời gian, chi nhánh nhận/trả và kiểm tra báo giá. Backend xác thực tuyến, lịch xe, GPLX và giá; gửi đơn kèm tổng báo giá để backend kiểm tra lại.
 4. Theo dõi đơn, gửi yêu cầu hủy theo chính sách, xem snapshot hợp đồng/hóa đơn; Staff xử lý trạng thái và biên bản trong phạm vi chi nhánh được gán.
 5. User khai báo hồ sơ/GPLX, đánh giá booking hoàn tất và ghi nhận sự cố; Admin quản lý tài khoản, xe, chi nhánh, tuyến và kiểm duyệt đánh giá.
 
-API mode phụ thuộc backend đang chạy và cấu hình database/seed phù hợp. Trên PowerShell, có thể đặt `$env:VITE_API_BASE_URL = "/api/v1"` trước khi khởi động Vite để dùng proxy cùng origin trong `vite.config.js`; trên Git Bash dùng script ở trên để tránh MSYS chuyển đổi giá trị này. Nếu gọi URL backend trực tiếp, backend phải cho phép CORS từ origin frontend. Khi API lỗi, giao diện hiển thị lỗi và thao tác thử lại; không dùng dữ liệu mẫu thay thế. Build/test frontend không chứng minh API, phân quyền backend, MySQL hoặc concurrency đã nghiệm thu.
+API mode phụ thuộc backend đang chạy và cấu hình database/seed phù hợp. Trên PowerShell, có thể đặt `$env:VITE_API_BASE_URL = "/api/v1"` trước khi khởi động Vite để dùng proxy cùng origin trong `vite.config.js`; trên Git Bash dùng script ở trên để tránh MSYS chuyển đổi giá trị này. Nếu gọi URL backend trực tiếp, backend phải cho phép CORS từ origin frontend. Khi API lỗi, giao diện hiển thị lỗi và thao tác thử lại; không dùng dữ liệu mẫu thay thế. Build/test frontend không thay thế kiểm thử API, phân quyền backend, MySQL hoặc concurrency.
 - `.env.example` chỉ là mẫu cấu hình. Vite dùng `.env.local` khi bạn tạo file đó; tuyệt đối không đặt Gemini/Map secret trong biến `VITE_*`.
 
 ### Kiểm tra frontend
@@ -114,22 +114,22 @@ Guard tách role; Admin không vào Staff/User. Route guard và mô phỏng quy�
 - `src/context/DemoContext.jsx`: dữ liệu phiên demo; `AuthContext.jsx`: tách phiên demo và phiên API.
 - `src/components/common/PageKit.jsx`: bố cục, field, thông báo, loading/empty/error gate; toolbar chọn tình huống demo. Đổi tình huống sẽ đặt lại biểu mẫu chưa lưu, dữ liệu đã lưu vẫn giữ.
 - Màn hình demo theo nhóm `VehicleScreens`, `BookingScreens`, `AiScreens`, `ManagementScreens`; `src/pages/api` chứa các màn hình gọi API. Router chọn đúng bộ màn hình theo `VITE_DATA_MODE`.
-- Có 8 ảnh minh họa cho 4 mẫu xe demo (ngoại thất/nội thất), gallery và nguồn/giấy phép theo ảnh đang chọn; xe API chưa có ảnh dùng icon dự phòng. Ảnh minh họa demo có thể khác đời/phiên bản xe cho thuê, không phải ảnh kiểm định xe thực tế. Nguồn nằm trong `src/assets/images/vehicles/attributions.json`; `public/images/vehicles` phục vụ URL tĩnh của seed/hero. API profile hỗ trợ đổi mật khẩu thật và khai báo GPLX, không hỗ trợ upload ảnh GPLX/xe. Map tương tác, itinerary/recommendation API và thao tác phát hành lại chưa được triển khai.
+- Có 8 ảnh minh họa cho 4 mẫu xe demo (ngoại thất/nội thất), gallery và nguồn/giấy phép theo ảnh đang chọn; API quản lý URL ảnh, thứ tự và ghi công; bộ tài nguyên gồm 17 ảnh minh họa có hồ sơ giấy phép tại `/media/vehicles/licenses.html`. Database mới cần gắn ảnh qua giao diện Admin; ảnh thiếu dùng icon dự phòng. Ảnh minh họa demo có thể khác đời/phiên bản xe cho thuê, không phải ảnh kiểm định xe thực tế. Nguồn nằm trong `src/assets/images/vehicles/attributions.json`; `public/images/vehicles` phục vụ URL tĩnh của seed/hero. API profile hỗ trợ đổi mật khẩu thật và khai báo GPLX, không hỗ trợ upload ảnh GPLX/xe. Map tương tác, itinerary/recommendation API và thao tác phát hành lại chưa được triển khai.
 - Chưa bổ sung xóa cứng dữ liệu giao dịch, thanh toán online, trình chỉnh sửa itinerary hoặc quyền Admin giao nhận.
-- Quyết định nghiệp vụ tại `docs/architecture/decisions.md`, schema tại `docs/database/database-design.md`; không dùng demo model làm baseline backend. Note 28/09 đã được hợp nhất vào các tài liệu chính.
+- Quyết định nghiệp vụ tại `docs/architecture/decisions.md`, schema tại `docs/database/database-design.md`; không dùng demo model làm baseline backend.
 
 ## Kiểm tra thủ công sau khi thay đổi
 
 - Guest vào route bảo vệ → login và giữ query; khi đổi tài khoản, đường dẫn chờ chỉ được giữ nếu thuộc role vừa đăng nhập, nếu không sẽ chuyển về trang chính role đó; sai role → unauthorized; đường dẫn sai → 404.
 - Tạo đơn trùng lịch → thông báo lỗi; đơn hết hạn không xác nhận được; thao tác dùng version cũ bị từ chối trong demo.
 - Hợp đồng xuất hiện sau xác nhận, hóa đơn sau hoàn tất; giá catalog sửa không làm đổi snapshot đơn/hồ sơ cũ.
-- Modal giữ focus, Escape đóng và trả focus về nút mở. Phạm vi bàn giao hiện tại ưu tiên web desktop 1366px và 1440px; không phát triển ứng dụng hoặc bộ thiết kế mobile riêng.
+- Modal giữ focus, Escape đóng và trả focus về nút mở. Giao diện ưu tiên web desktop 1366px và 1440px; không phát triển ứng dụng hoặc bộ thiết kế mobile riêng.
 - Loading/empty/error qua toolbar, trạng thái rỗng do bộ lọc, lỗi AI, tài nguyên không tồn tại; kiểm tra console không có lỗi.
-- Kết quả demo không chứng minh transaction chống đặt trùng, phân quyền server hoặc AI/Map đã hoạt động. Các phần này cần kiểm thử tích hợp riêng khi backend sẵn sàng.
+- Kết quả demo không chứng minh transaction chống đặt trùng, phân quyền server hoặc AI/Map đã hoạt động. Các luồng nghiệp vụ cần kiểm thử tích hợp riêng với backend/MySQL; AI/Map cần triển khai dịch vụ tương ứng trước khi kiểm thử tích hợp.
 
 
 ## Báo cáo vận hành Admin
 
-Trong chế độ API, Admin mở `/admin` để xem đơn tạo trong khoảng, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; bảng phân rã trạng thái hiện tại của các đơn tạo trong khoảng. Chọn Từ ngày/Đến ngày theo giờ Việt Nam (bao gồm hai ngày, tối đa366ngày), mặc định tháng hiện tại; dùng Xem báo cáo/Làm mới để tải dữ liệu. Khoảng rỗng hiển thị0, lỗi tải có nút Thử tải lại. Tổng hóa đơn là giá trị phát hành, không xác nhận tiền đã thu. USER/STAFF/Guest không có quyền báo cáo.
+Trong chế độ API, Admin mở `/admin` để xem đơn tạo trong khoảng, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; bảng phân rã trạng thái hiện tại của các đơn tạo trong khoảng. Chọn Từ ngày/Đến ngày theo giờ Việt Nam (bao gồm hai ngày, tối đa 366 ngày), mặc định tháng hiện tại; dùng Xem báo cáo/Làm mới để tải dữ liệu. Khoảng rỗng hiển thị 0, lỗi tải có nút Thử tải lại. Tổng hóa đơn là giá trị phát hành, không xác nhận tiền đã thu. USER/STAFF/Guest không có quyền báo cáo.
 
 Backend: GET `/api/v1/admin/reports/operations?from=YYYY-MM-DD&to=YYYY-MM-DD`. Khởi động lại backend/frontend bằng script dev hiện có sau khi cập nhật source; không cần migration/bảng/phụ thuộc mới cho báo cáo. DemoDashboard vẫn là dữ liệu demo riêng.

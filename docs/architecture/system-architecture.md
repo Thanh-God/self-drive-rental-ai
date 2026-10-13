@@ -32,7 +32,7 @@ Liên hệ: FR-05–FR-10, UC-U02, UC-S01–UC-S04.
 5. Khi giao/nhận, `operation` điều phối transaction: ghi hồ sơ, gọi `booking` chuyển trạng thái và `vehicle` cập nhật tình trạng khi phù hợp. Lỗi ở một bước phải rollback toàn bộ thay đổi liên quan.
 6. `RentalWorkflow` hiện phát hành hợp đồng khi CONFIRMED, hóa đơn khi COMPLETED trong cùng transaction với chuyển trạng thái. Hai hồ sơ là snapshot, không xác nhận đã thu tiền.
 
-Hướng chống đặt trùng: khóa bản ghi xe để tuần tự hóa các yêu cầu cùng xe, sau đó kiểm tra overlap bằng truy vấn đọc trạng thái hiện hành trong transaction. Kiểm tra lại trạng thái đơn khi cập nhật để chống hai Staff xử lý cùng lúc. Mọi thao tác làm chiếm/thay đổi lịch phải theo cùng giao thức khóa; cần quy định thứ tự khóa nhất quán và kiểm thử đồng thời trên MySQL thật ở giai đoạn triển khai. Không chỉ khóa các đơn tìm được vì khi chưa có đơn sẽ không có gì để khóa.
+Hướng chống đặt trùng: khóa bản ghi xe để tuần tự hóa các yêu cầu cùng xe, sau đó kiểm tra overlap bằng truy vấn đọc trạng thái hiện hành trong transaction. Kiểm tra lại trạng thái đơn khi cập nhật để chống hai Staff xử lý cùng lúc. Mọi thao tác làm chiếm/thay đổi lịch phải theo cùng giao thức khóa; cần quy định thứ tự khóa nhất quán và kiểm thử đồng thời trên MySQL thật. Không chỉ khóa các đơn tìm được vì khi chưa có đơn sẽ không có gì để khóa.
 
 Khoảng thuê dùng điều kiện `newStart < existingEnd AND newEnd > existingStart`. PENDING giữ tối đa 2 giờ, không vượt giờ nhận; khoảng đệm/no-show/gia hạn chưa có. Kết quả tìm xe/báo giá không bảo đảm đặt thành công về sau.
 
@@ -66,9 +66,10 @@ Input → validate → `location` lấy catalog ứng viên → Map adapter lấ
 - Mật khẩu được hash; API key nằm ở backend qua cấu hình môi trường, không đưa vào frontend, Git hoặc log. Chỉ gửi dữ liệu cần thiết cho AI, không gửi giấy tờ/mật khẩu/token.
 - Route guard của React hỗ trợ điều hướng; không thay kiểm tra quyền backend.
 - Hiện có TTL 30 phút mặc định, không refresh; TokenFilter kiểm tra trạng thái và token_version mỗi request; logout/đổi mật khẩu/khóa tăng phiên bản. Frontend lưu token localStorage. Cần kiểm thử thêm phiên hết hạn và các request đang chạy khi thu hồi.
-- API dùng lỗi nhất quán, thông báo dễ hiểu; lỗi validation, thiếu quyền, xung đột lịch và lỗi tích hợp được phân biệt. Hợp đồng response chi tiết thuộc giai đoạn API.
+- API dùng lỗi nhất quán, thông báo dễ hiểu; lỗi validation, thiếu quyền, xung đột lịch và lỗi tích hợp được phân biệt. Hợp đồng response chi tiết được mô tả theo từng API/module.
 - Adapter giới hạn timeout, kích thước input/output và số lần gọi. Chỉ retry có giới hạn cho lỗi tạm thời phù hợp, tránh tăng chi phí/quota không kiểm soát.
-- Log có mã liên hệ request để truy vết, không ghi bí mật; dashboard và audit nâng cao là phần mở rộng.
+- Log không được ghi bí mật, mật khẩu hoặc token.
+- Báo cáo vận hành Admin sử dụng `GET /api/v1/admin/reports/operations`. Service tổng hợp qua API nội bộ có kiểu của booking/invoice trong transaction chỉ đọc với mức cô lập REPEATABLE_READ. Báo cáo thể hiện đơn tạo, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; không xác nhận tiền đã thu. Xem [contract báo cáo](../modules/operational-reports.md).
 
 ## 6. Chiến lược kiểm thử
 

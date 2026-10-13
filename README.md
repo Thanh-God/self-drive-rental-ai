@@ -11,7 +11,7 @@ KDrive là ứng dụng web quản lý thuê xe tự lái đa chi nhánh, phục
 | Khách chưa đăng nhập | Tìm kiếm, lọc và xem thông tin xe; xem đánh giá công khai; đăng ký, đăng nhập. |
 | Khách hàng — USER | Quản lý hồ sơ và GPLX; yêu cầu báo giá, tạo và theo dõi đơn thuê; thao tác hủy theo điều kiện của hệ thống; xem hợp đồng/hóa đơn; gửi đánh giá và báo cáo sự cố. |
 | Nhân viên — STAFF | Xử lý đơn, xác nhận/từ chối, ghi nhận giao nhận và hoàn tất thuê trong phạm vi chi nhánh được phân công; theo dõi đội xe và hồ sơ sự cố. |
-| Quản trị viên — ADMIN | Quản lý tài khoản, phân công chi nhánh, xe, hãng/loại xe, tiện nghi, chi nhánh và tuyến; kiểm duyệt đánh giá; quản lý URL ảnh, thứ tự và thông tin ghi công qua giao diện Admin. |
+| Quản trị viên — ADMIN | Quản lý tài khoản, phân công chi nhánh, xe, hãng/loại xe, tiện nghi, chi nhánh và tuyến, danh mục địa điểm; xem báo cáo vận hành; kiểm duyệt đánh giá; quản lý URL ảnh, thứ tự và thông tin ghi công qua giao diện Admin. |
 
 Backend kiểm tra quyền, chủ sở hữu, chi nhánh, lịch xe và giá trước khi ghi dữ liệu. ADMIN không tự kế thừa quyền giao nhận của STAFF. Tiền thuê tính theo block 24 giờ, đơn vị VND; thời gian lưu UTC và hiển thị theo giờ Việt Nam. Trạng thái xe đang khai thác không thay thế kiểm tra lịch trong báo giá.
 
@@ -21,7 +21,8 @@ Hợp đồng và hóa đơn lưu snapshot theo đơn thuê. Hệ thống không
 
 - Giao diện nghiệp vụ sử dụng REST API và MySQL; lỗi API được hiển thị để thử lại, không thay bằng dữ liệu demo.
 - Homepage, danh sách xe, chi tiết và đơn thuê dùng giao diện Urban nền xám ấm. Card/gallery đọc ảnh từ API; Admin thêm, sửa và sắp xếp ảnh với kiểm tra revision. Có 17 ảnh minh họa mẫu xe cùng hồ sơ tác giả/giấy phép tại `/media/vehicles/licenses.html`; ảnh thiếu hoặc hỏng có fallback trung thực. Seed DB mới không tự gắn ảnh; dùng form Admin hoặc mapping đã kiểm tra, không reset dữ liệu.
-- Recommendation, itinerary, AI/Map và dashboard chưa có dịch vụ tích hợp tương ứng. Các màn hình chưa có API hiển thị thông báo trong API mode.
+- Admin có báo cáo vận hành tại `/admin` và quản lý danh mục địa điểm tại `/admin/locations`, sử dụng dữ liệu từ API.
+- Recommendation, itinerary và AI/Map chưa có dịch vụ tích hợp tương ứng. Các màn hình chưa có API hiển thị thông báo trong API mode.
 - Demo dành riêng cho xem thử giao diện, không đại diện cho giao dịch hay dữ liệu thuê xe thật.
 
 ## Công nghệ và kiến trúc
@@ -134,7 +135,7 @@ frontend/     React SPA, components, API client và frontend tests
 database/     Hướng dẫn database
 docs/         Yêu cầu, kiến trúc, database, API và UI
 scripts/      Khởi động, kiểm chứng và vận hành fixture
-skills/       Hướng dẫn thực hiện và bàn giao kiểm thử
+skills/       Hướng dẫn đóng góp và quy trình kiểm thử
 ```
 
 Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `dist/` và `node_modules/` chứa dữ liệu chạy, build, dependency hoặc evidence local; không phải module nghiệp vụ.
@@ -145,11 +146,12 @@ Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `
 - [Kiến trúc](docs/architecture/system-architecture.md), [ranh giới module](docs/architecture/module-boundaries.md), [cấu trúc project](docs/architecture/project-structure.md).
 - [Quyết định nghiệp vụ](docs/architecture/decisions.md).
 - [Database](docs/database/database-design.md) và [API ảnh xe](docs/api/c10b-vehicle-images.md).
+- [Báo cáo vận hành](docs/modules/operational-reports.md), [danh mục địa điểm](docs/modules/location-catalog.md), [trạng thái chi nhánh](docs/modules/branch-status.md).
 - [Frontend](frontend/README.md), [vận hành và phát triển](docs/architecture/development-workflow.md).
 
 
 ## Báo cáo vận hành Admin
 
-Trong chế độ API, Admin mở `/admin` để xem đơn tạo trong khoảng, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; bảng phân rã trạng thái hiện tại của các đơn tạo trong khoảng. Chọn Từ ngày/Đến ngày theo giờ Việt Nam (bao gồm hai ngày, tối đa366ngày), mặc định tháng hiện tại; dùng Xem báo cáo/Làm mới để tải dữ liệu. Khoảng rỗng hiển thị0, lỗi tải có nút Thử tải lại. Tổng hóa đơn là giá trị phát hành, không xác nhận tiền đã thu. USER/STAFF/Guest không có quyền báo cáo.
+Trong chế độ API, Admin mở `/admin` để xem đơn tạo trong khoảng, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; bảng phân rã trạng thái hiện tại của các đơn tạo trong khoảng. Chọn Từ ngày/Đến ngày theo giờ Việt Nam (bao gồm hai ngày, tối đa 366 ngày), mặc định tháng hiện tại; dùng Xem báo cáo/Làm mới để tải dữ liệu. Khoảng rỗng hiển thị 0, lỗi tải có nút Thử tải lại. Tổng hóa đơn là giá trị phát hành, không xác nhận tiền đã thu. USER/STAFF/Guest không có quyền báo cáo.
 
 Backend: GET `/api/v1/admin/reports/operations?from=YYYY-MM-DD&to=YYYY-MM-DD`. Khởi động lại backend/frontend bằng script dev hiện có sau khi cập nhật source; không cần migration/bảng/phụ thuộc mới cho báo cáo. DemoDashboard vẫn là dữ liệu demo riêng.
