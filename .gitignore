@@ -39,3 +39,6 @@ frontend/npm-debug.log*
 .env.production.local
 application-secret.yml
 
+
+# Private coordination, audit history and review records
+.local/internal-docs/

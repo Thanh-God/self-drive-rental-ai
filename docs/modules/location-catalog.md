@@ -8,4 +8,4 @@ API dưới `/api/v1/admin/locations`: GET danh sách/`/{id}`, POST201, PUT `/{i
 
 Revision SHA256 có length prefix UTF8 theo nội dung record; không thêm cột version hoặc migration. Update khóa pessimistic record rồi đối chiếu revision trước ghi. Category rename giữ FK location và tên hiển thị mới; categoryName không thuộc revision location. Backend giữ thẩm quyền; stale response không tạo success UI, chọn bản mới để phục hồi.
 
-Schema dùng `location_categories`/`locations` đã có trong Flyway; không sửa V1/V2 hoặc bảng itinerary. Evidence tích hợp13/10/2026 tại `.runtime/coordination-c11-location-integrate-20261013/`:79frontend tests,6locationMySQL tests, HTTP race/no-write/SQL readback và22browser assertions desktop. Xem [runner](../../scripts/coordination/c11-location/README.md), [kế hoạch C11](../architecture/c11-plan.md). Kết quả scoped, C11-A và toàn hệ thống chưa được suy PASS từ module này.
+Schema dùng `location_categories`/`locations` trong Flyway. Catalog địa điểm độc lập với chi nhánh vận hành và dữ liệu itinerary.

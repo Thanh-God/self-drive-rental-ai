@@ -147,7 +147,6 @@ Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `
 - [Database](docs/database/database-design.md) và [API ảnh xe](docs/api/c10b-vehicle-images.md).
 - [Frontend](frontend/README.md), [vận hành và phát triển](docs/architecture/development-workflow.md).
 
-Lịch sử kiểm chứng và phạm vi nghiệm thu nằm trong [audit kỹ thuật](docs/architecture/core-audit-20261007.md); README là tài liệu giới thiệu và sử dụng sản phẩm.
 
 ## Báo cáo vận hành Admin
 

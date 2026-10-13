@@ -82,7 +82,7 @@ Remove-Item Env:VITE_DATA_MODE
 
 Test bao gồm mô hình demo và regression cho snapshot quote, thứ tự response/session, phân công chi nhánh, cùng việc không hiển thị lịch sử incident cũ dưới incident mới đang tải. Đây không phải toàn bộ test browser/API integration. Trong API mode, `GET /me/branches` là nguồn phân công Staff; giao nhận dùng chi nhánh nhận/trả tương ứng. Admin không nhận quyền giao nhận. GPLX hiện được hiển thị riêng trong chi tiết đơn Staff; khả năng tương thích và xác minh có thẩm quyền vẫn do API báo giá/giao xe kiểm tra, frontend không tự suy hạng bằng từ tên hạng GPLX. Quote gắn với đúng xe, tuyến và thời gian; đổi input hoặc nhận response cũ sẽ vô hiệu quote. `useApiData` chỉ trả data/error của request key hiện tại, và reload chuyển UI về loading cho key mới. Audit sự cố phân biệt thời điểm xảy ra với thời điểm báo cáo; khung nhập xảy ra kết thúc ở thời điểm biên bản trả thực tế, còn báo cáo muộn không đổi thời điểm xảy ra. Lịch sử sự cố chỉ hiển thị events thuộc incident đang chọn; khi tải có loading, khi lỗi hiển thị lỗi thay vì dữ liệu cũ.
 
-Muốn nghiệm thu luồng API bằng trình duyệt phải chạy backend trên MySQL thật cùng seed/tài khoản/xe/chi nhánh đã chuẩn bị; test demo hay API mode khi backend không sẵn sàng không được ghi là PASS. Ca đặt xe cần gồm đúng/sai chi nhánh Staff, Admin không được giao/nhận, User đánh giá đơn hoàn tất và Admin kiểm duyệt.
+Kiểm thử luồng API bằng trình duyệt cần chạy backend trên MySQL thật cùng seed/tài khoản/xe/chi nhánh đã chuẩn bị; test demo hay API mode khi backend không sẵn sàng không thay thế kiểm thử tích hợp thực tế. Ca đặt xe cần gồm đúng/sai chi nhánh Staff, Admin không được giao/nhận, User đánh giá đơn hoàn tất và Admin kiểm duyệt.
 
 ## Luồng demo
 
@@ -118,20 +118,6 @@ Guard tách role; Admin không vào Staff/User. Route guard và mô phỏng quy�
 - Chưa bổ sung xóa cứng dữ liệu giao dịch, thanh toán online, trình chỉnh sửa itinerary hoặc quyền Admin giao nhận.
 - Quyết định nghiệp vụ tại `docs/architecture/decisions.md`, schema tại `docs/database/database-design.md`; không dùng demo model làm baseline backend. Note 28/09 đã được hợp nhất vào các tài liệu chính.
 
-## Audit tích hợp ngày 29/09/2026 (cập nhật lượt 2)
-
-- `npm test`: 6/6 ca mô phỏng demo pass; `npm run build`: PASS cả demo và API mode. `npx --no-install eslint src`: 0 errors, 0 warnings. JavaScript không có cấu hình tsc/typecheck.
-- API mode: các màn hình xe, báo giá/đơn đa chi nhánh, hợp đồng/hóa đơn, hồ sơ/GPLX, giao nhận, sự cố, tài khoản, xe/đội xe, chi nhánh/tuyến, kiểm duyệt đánh giá đã gọi API thật.
-- **Đã sửa (lượt 2)**:
-  - L04: Form báo giá gắn quote với input snapshot (vehicleId, thời gian, chi nhánh nhận/trả). Input đổi → vô hiệu hóa quote cũ, request ID tăng để bỏ response cũ.
-  - L07: Chi tiết đơn hiển thị GPLX (số, hệ/hạng, hạn dùng, chỉ số tự động, trạng thái xác minh) cho Staff/Admin đối chiếu. Action lọc theo role + phân công chi nhánh + mốc 24h (User) / giờ nhận (Staff). Reset form/checkbox/thông báo khi đổi booking.
-  - L11: `apiClient` không gắn bearer cho `/auth/login`, `/auth/register`. Hydrate xử lý network error không xoá session; logout/đổi mật khẩu thu hồi phiên.
-  - L09: `IncidentSection.loadEvents` có request ID guard chống race A/B.
-  - L09/L12: Hợp đồng/hóa đơn render nhãn nghiệp vụ (Khách hàng, Xe, Chi nhánh, Thời gian, Tiền thuê, Phí tuyến, Tổng, Điều khoản) và định dạng tiền/giờ; không còn render key JSON thô.
-  - Refactor: tách `useApiData` hook chung (`src/hooks/useApiData.js`), xoá `useApiGet`/`useApiData` trùng lặp trong ApiScreens/ApiManagementScreens; HTTP nghiệp vụ về lớp `api/rental.js`.
-  - ESLint: 0 errors, 0 warnings (sửa setState-in-effect, exhaustive-deps bằng useRef/useMemo).
-- Còn thiếu: `/admin/catalog` chưa CRUD hãng/loại/tiện nghi/ảnh; dashboard/locations/itinerary/recommendation API chưa triển khai; AI/Map chưa có; browser E2E API chưa chạy tự động.
-
 ## Kiểm tra thủ công sau khi thay đổi
 
 - Guest vào route bảo vệ → login và giữ query; khi đổi tài khoản, đường dẫn chờ chỉ được giữ nếu thuộc role vừa đăng nhập, nếu không sẽ chuyển về trang chính role đó; sai role → unauthorized; đường dẫn sai → 404.
@@ -141,14 +127,6 @@ Guard tách role; Admin không vào Staff/User. Route guard và mô phỏng quy�
 - Loading/empty/error qua toolbar, trạng thái rỗng do bộ lọc, lỗi AI, tài nguyên không tồn tại; kiểm tra console không có lỗi.
 - Kết quả demo không chứng minh transaction chống đặt trùng, phân quyền server hoặc AI/Map đã hoạt động. Các phần này cần kiểm thử tích hợp riêng khi backend sẵn sàng.
 
-
-## C10A UI / homepage — 12/10/2026
-
-API mode now displays linked amenity DTOs on home/list/detail; Admin vehicle edit has a separate amenity checkbox editor and PUT/revision contract. Staff fleet stays read-only for amenities. Stale409 keeps a visible error and requires explicit reload; subsequent PUT uses fresh revision. Editor instance is keyed by vehicle ID so a late save of another vehicle cannot report success in the current editor.
-
-Homepage keeps KDrive teal/slate/system font, uses one dark hero/H1/CTA group and actual API cards. ACTIVE cards in API mode say operational state, not guaranteed schedule availability; quote remains authoritative. Demo card label remains separate. Reduced motion/static hero, no video/font CDN/provider/dashboard metrics or fake API fallback. Vehicle image placeholders remain until C10B.
-
-Accepted scoped proof and before/after desktop/mobile/tablet screenshots: .runtime/coordination-c10a-ui-codexa-complete-20261012-230616/. Source runner scripts/coordination/c10a-ui-browser/README.md; mandatory build uses VITE_DATA_MODE=api and VITE_API_BASE_URL=/api/v1 at compile time. Evidence includes isolated MySQL browser integration; user DB/services are preserved.
 
 ## Báo cáo vận hành Admin
 

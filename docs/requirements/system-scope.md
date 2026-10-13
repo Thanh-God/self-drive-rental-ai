@@ -1,6 +1,6 @@
 # Giai đoạn 1 — Phạm vi và yêu cầu hệ thống
 
-> Cập nhật 29/09/2026: đã hợp nhất phạm vi đa chi nhánh, GPLX và sự cố duyệt ngày 28/09. Đây là yêu cầu, không phải danh sách chức năng hoàn thành. Chính sách chuẩn tại [sổ quyết định](../architecture/decisions.md), schema thực tại [thiết kế database](../database/database-design.md), sai lệch source tại [audit kiến trúc](../architecture/system-architecture.md#7-audit-hiện-trạng-ngày-29092026).
+> Cập nhật 29/09/2026: đã hợp nhất phạm vi đa chi nhánh, GPLX và sự cố duyệt ngày 28/09. Đây là yêu cầu, không phải danh sách chức năng hoàn thành. Chính sách chuẩn tại [sổ quyết định](../architecture/decisions.md), schema thực tại [thiết kế database](../database/database-design.md), sai lệch source tại [audit kiến trúc](../architecture/system-architecture.md).
 
 **Đề tài:** Xây dựng hệ thống cho thuê xe tự lái tích hợp trí tuệ nhân tạo hỗ trợ lựa chọn phương tiện và lập kế hoạch hành trình cá nhân hóa  
 **Phiên bản:** Baseline 29/09/2026 sau hợp nhất

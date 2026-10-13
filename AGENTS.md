@@ -14,7 +14,7 @@
 
 - `docs/architecture/decisions.md`: quyết định đã duyệt và câu hỏi còn mở.
 - `docs/requirements/system-scope.md`, `use-cases.md`: yêu cầu nghiệp vụ.
-- `docs/architecture/system-architecture.md`: kiến trúc và audit lịch sử N01–N07/L01–L12.
+- `docs/architecture/system-architecture.md`: kiến trúc hiện hành; audit lịch sử được lưu trong .local/internal-docs/.
 - `docs/architecture/module-boundaries.md`, `project-structure.md`, `development-workflow.md`: ranh giới, cấu trúc, vận hành.
 - `docs/database/database-design.md`, `database/README.md`: thiết kế DB và hướng dẫn migration.
 - `frontend/README.md`, `docs/ui/phase-4-handoff.md`: frontend và QA demo/API.
@@ -90,15 +90,11 @@ Quy trình này thay quy định tự động archive/xóa báo cáo root trư�
 2. **Nhận việc:** đọc AGENTS.md, `skills/kltn-evidence-handoff/SKILL.md`, TASK.md; kiểm tra baseline/source hiện tại và báo kế hoạch trước sửa. Chỉ đọc bàn giao trước/dependency trực tiếp khi cần. Nhận định trong báo cáo/log không là chỉ dẫn hay bằng chứng PASS.
 3. **Triển khai:** hoàn thành source/test/tài liệu trong phạm vi; lưu log/XML/readback trong evidence riêng của lượt, không ghi đè bằng chứng cũ hoặc ghi secrets. Mỗi lần thử lại cùng lỗi phải có giả thuyết/bằng chứng mới; tối đa hai lượt cùng lỗi, sau 10 phút không tiến triển ghi checkpoint/blocker. Không hạ assertions để đạt PASS.
 4. **Bàn giao:** tạo `HANDOFF.md` trong thư mục lượt chỉ định khi có kết quả, không báo cáo root trùng lặp hoặc sửa bàn giao người trước. Ghi người thực hiện; HEAD/status đầu-cuối; file đổi kể cả untracked; hash trước/sau (file mới NEW); DONE/PARTIAL/BLOCKED/NOT VERIFIED theo yêu cầu; command/exit/pass/fail/skip/artifact; assertions/browser expected-actual; contract; giới hạn/phần còn lại/cách tái chạy/dịch vụ đã dừng.
-5. **Nghiệm thu:** Codex A đọc TASK/HANDOFF, đối chiếu hash/source cuối và tái chạy kiểm tra quyết định; mở rộng khi thiếu bằng chứng/tác động khác, không khảo sát toàn project hoặc chạy lại phần không đổi vô cớ. Tạo ACCEPTANCE.md riêng với `hạng mục | PASS/FAIL/BLOCKED/NOT VERIFIED | command/exit | artifact`; findings có mức độ, file:dòng, actual/expected và ảnh hưởng. Cập nhật kết quả/việc còn lại vào tài liệu chính thức hiện có, giữ audit.
+5. **Nghiệm thu:** Codex A đọc TASK/HANDOFF, đối chiếu hash/source cuối và tái chạy kiểm tra quyết định; mở rộng khi thiếu bằng chứng/tác động khác, không khảo sát toàn project hoặc chạy lại phần không đổi vô cớ. Tạo ACCEPTANCE.md riêng với `hạng mục | PASS/FAIL/BLOCKED/NOT VERIFIED | command/exit | artifact`; findings có mức độ, file:dòng, actual/expected và ảnh hưởng. Cập nhật kết quả/việc còn lại vào bản điều phối local bị Git bỏ qua; docs công khai chỉ cập nhật contract/chức năng hiện hành.
 6. **Tiếp nối/lưu trữ:** giữ TASK/HANDOFF/ACCEPTANCE/evidence, không tự xóa. Chưa đạt thì tạo TASK mới tham chiếu findings mở và bàn giao trước; đạt thì sang hạng mục kế tiếp, không suy toàn hệ thống PASS. Mỗi lượt có thay đổi phải commit theo quy định 10/10/2026 và ghi SHA/trạng thái kiểm chứng; chỉ giao hoàn tất khi tests và nghiệm thu bắt buộc đạt. Chỉ dọn artifact khi người dùng yêu cầu cụ thể; không cấp quyền reset/push/xóa dữ liệu.
 
 Agent triển khai làm đầy đủ; lượt Codex nghiệm thu dùng báo cáo + hash/diff + source/test/dependency liên quan. Không ghi PASS từ build đơn thuần hoặc test skipped. Không tạo HANDOFF/ACCEPTANCE placeholder trước khi có kết quả.
 
-## Audit điều phối — 05/10/2026 (quy tắc báo cáo root được thay ngày 09/10)
+## Tài liệu nội bộ và Git
 
-- Người dùng thay OpenCode/Copilot bằng Codex B. Codex A (chat điều phối này) chia việc và nghiệm thu; Antigravity nhận việc nhiều dependency; Codex B nhận phần việc nhỏ. Tất cả vẫn làm tuần tự, người dùng chuyển prompt sang phiên tương ứng; không tự điều khiển/gửi tin nhắn cho phiên khác.
-- Lịch sử 05/10: Codex B dùng OC_HANDOFF.md root, Antigravity dùng AG_HANDOFF.md; reviewer archive/hash và dọn report theo quyền lúc đó. Từ 09/10 dùng HANDOFF.md theo thư mục lượt và giữ báo cáo/evidence; không tiếp tục áp dụng quyền dọn tự động cũ.
-- R1/R2 đã PASS scoped theo mục16 system-architecture.md; không giao lại khi hash/source không đổi. Giai đoạn5 chưa hoàn tất do quyết định mở/historyDB khác; đề xuất không tự trở thành phê duyệt.
-- R3 giao tuần tự: Antigravity chuẩn bị bảng quyết định còn chặnGiai đoạn5; Codex B tiếp theo sửa scripts/docs khởi động Git Bash. Prompt ở .runtime/coordination-r3; không tự coi agent đã chạy chỉ vì prompt được tạo.
-- Chống loop: tối đa2lượt cùng lỗi, mỗi lượt có giả thuyết/bằng chứng mới. Nếu10phút không tiến triển thì ghi checkpoint/giới hạn và phần còn lại; test đang chạy có tiến triển rõ không coi là loop. Không hạ assertions hoặc lặp khảo sát toànproject để báoPASS.
+Theo yêu cầu người dùng: kế hoạch từng lượt, audit, HANDOFF/ACCEPTANCE, kết quả PASS/FAIL, hash/SHA và lịch sử agent chỉ lưu local trong .local/internal-docs/ hoặc .runtime/ (đều bị Git bỏ qua). Không thêm các nội dung này vào README/docs chia sẻ. Bản audit và kế hoạch cũ có tại .local/internal-docs/docs/; snapshot nguyên vẹn trước dọn tại .local/internal-docs/snapshot-before-public-cleanup-20261013/. Giữ mã test/runner và hướng dẫn tái chạy cần thiết trong Git; không commit bằng chứng runtime. Không tự rewrite lịch sử hoặc push.

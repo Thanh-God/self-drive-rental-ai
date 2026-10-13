@@ -1,6 +1,6 @@
-# C10B backend vehicle images
+# Vehicle images API
 
-Frontend/gallery/licensed assets are separate pending scope. Backend stores URL/order/plain credit; it does not fetch, upload, delete or verify photo rights.
+The gallery consumes ordered images from the API. Backend stores URL/order/plain credit; it does not fetch, upload or verify photo rights.
 
 Public `GET /api/v1/vehicles` and `/{id}` add `images: [{id,url,sortOrder,attribution}]`, ordered by sortOrder then ID, empty array when absent. Existing fields/amenities remain. Admin-only endpoints:
 
