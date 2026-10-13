@@ -229,3 +229,6 @@ Frontend99tests/lint/demoAPI sourceA3giữ; nativeMySQLbranch10/10+location6/6no
 
 ### Urban BrandBar —13/10/2026 —PASS scoped
 Userfixeddesign: dynamicbrandId/catalog counttop7/more/querybrand/history kết hợpfiltercũ; noextrafetch/nomanufacturerhardcode,bar52ngaysauheader/thaypaddinghomepage. TokenspageF3EFE8/surfacewhiteE3DCD0,secondarywhite1.5BFB3A3/shadows150ms,primaryFF7E33 giữ/headerunderline. CamBar963600 giữwhitecontrast≥4.57 kểcảselected22%;C2500Fselected3.30fails.105frontendtests/lint/demo/APIbuild+38actualbrowserassertions1280/1440/390,0runtime/consoleerrors. Hero copy/photos/font/radius/backend/business giữ. Proof .runtime/coordination-urban-brandbar-20261013/;docs/ui/urban-brandbar-20261013.md. ExactA4fixture schema riêng/noDBgốc/newloopcontainers,ownedcleanupKEEP,nopush;C11status giữ.
+
+### C12 —13/10/2026 — PLANNED, chưa bàn giao
+Kế hoạch docs/architecture/c12-plan.md chia5phần: định nghĩa metric/contract -> API -> MySQL proof -> Admin UI -> integrated acceptance. UC-A05/reportmetrics giữ scope vận hành, invoice amount không payment. Các metric/time-range đề xuất phải chốt trước API. Baseline67a3d31; C11DONE giữ; timeout hồ sơPARTIAL được user hoãn, không đóng finding. Chưa source implementation/agentdispatch/push.
