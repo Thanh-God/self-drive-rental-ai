@@ -1,3 +1,4 @@
+import ApiDashboardPage from "../pages/api/ApiDashboardPage";
 import ApiVehicleCatalogPage from "../pages/api/ApiVehicleCatalogPage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AdminLayout from "../layouts/AdminLayout";
@@ -233,7 +234,7 @@ export default function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route index element={screen(<DashboardPage />)} />
+        <Route index element={screen(<DashboardPage />, <ApiDashboardPage />)} />
         <Route
           path="accounts"
           element={screen(<AccountsPage />, <ApiAccountsPage />)}

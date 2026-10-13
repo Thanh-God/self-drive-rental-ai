@@ -65,3 +65,7 @@ C12-2 DONE backend/H2 scoped: report API/typedaggregates/datevalidation/RBAC/rea
 ## Tiến độ C12-3 —13/10/2026
 
 DONE MySQL scoped:8/8native no skip,HTTPworkflow/invoiceSQLreadback/no-write/RBAC/biên ngày và concurrent snapshotold→new đạt. 10000bookings latency20–26ms local vớiinvoice/history0; khôngproductionSLA/đềxuấtindextựđộng. Verify139executed18skip không tínhPASS; native-required executed đủ. SourceJARhashmatch, fixturestoppedKEEP, DBgốc/servicesusergiữ. C12-4/5 chưa triểnkhai.
+
+## Tiến độ C12-4 —13/10/2026
+
+Dashboard API /admin riêng đã triển khai4cards/status table/datefilters/defaultVNmonth, BigIntVNDprecision, loading/error/empty/retry/no stale result theo useApiData. 116frontendtests/lint/demo/APIbuild đạt, khôngbackend/migration changes. C12-5browser đang chuẩn bị, chưa toànC12DONE. Khôngnạpvàobackenduserđangchạy/push/DBgốc.
