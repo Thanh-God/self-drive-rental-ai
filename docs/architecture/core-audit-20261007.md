@@ -172,3 +172,6 @@ Amenity links API/backend PASS scoped tại .runtime/coordination-c10a-codexa-co
 ## C10A end-to-end scoped closure — 12/10/2026
 
 C10A amenity links backend+UI DONE scoped: backend acceptance57be1ee retained173unchangedinputs and UI/homepage proof70tests/38guards/50realbrowserchecks at .runtime/coordination-c10a-ui-codexa-complete-20261012-230616/ACCEPTANCE.md. ActualAdminassign/clear/stale/recover→SQL/publichome/list/detail/RBAC/screenshots closed UI-R01..R03; latecallbackneweditorfalse-success regression fixed. C10B image URL/order/attribution/gallery remains pending, hence wholeC10 stillPARTIAL. Dashboard/C12/AIMap not implemented, historical percentages preserved.
+
+### C10B planning — 13/10/2026 — PLANNED, chưa bàn giao
+Kế hoạch docs/ui/c10b-plan.md: B1 API ảnh/order/attribution và MySQL; B2 gallery/card/Admin editor desktop; B3 mục tiêu24ảnh thật17–30 có nguồn/license/mapping/nhãnminhhọa. Giữ C10A PASS scoped, đối chiếu280backend/frontendsource0drift trong .runtime/coordination-c10b-plan-20261013/dependency-hashes.json. Urban nềnxámấm là mốcthịgiác, không tựtriểnkhai trọnredesign hoặcfont/provider. Mobile không làgatebắtbuộc theo user. Chưa tạo TASK/prompt/chạyagent/ghiDBgốc/downloadảnh; license và cáccontractđềxuất chốt trước triểnkhai. Không kếtluậnC10B/C10DONE.
