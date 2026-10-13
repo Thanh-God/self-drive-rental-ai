@@ -49,6 +49,7 @@ import {
   ApiReviewsAdminPage,
   ApiVehiclesAdminPage,
 } from "../pages/api/ApiManagementScreens";
+import ApiLocationsPage from "../pages/api/ApiLocationsPage";
 import {
   BookingDetailScreen,
   BookingListScreen,
@@ -245,7 +246,10 @@ export default function AppRoutes() {
           path="catalog"
           element={screen(<CatalogPage />, <ApiVehicleCatalogPage />)}
         />
-        <Route path="locations" element={screen(<LocationsPage />)} />
+        <Route
+          path="locations"
+          element={screen(<LocationsPage />, <ApiLocationsPage />)}
+        />
         {!DEMO_MODE && <Route path="branches" element={<ApiBranchesPage />} />}
         <Route
           path="reviews"

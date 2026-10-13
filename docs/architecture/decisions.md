@@ -109,3 +109,7 @@ Người dùng yêu cầu lập kế hoạch/hoàn thiện tài liệu và giao 
 
 ## Chỉ đạo core trước AI — 07/10/2026
 Người dùng yêu cầu audit toànproject và hoàn thiện nghiệp vụ cácactor trước mọiAI. G04/U07 hoãn sangphaseAI,khôngbịxóa/nóikhôngcầnvĩnhviễn. Onlinepaymentvẫnngoàiscope; policycònmởkhôngtựchốt. Audit/kếhoạch core-audit-20261007.md phânbiệt triểnkhai/nghiệmthu và phase0–8mới với auditgiaiđoạncũ. Chưatriểnkhai source trong lượt audit.
+
+## C11 — đóng/mở chi nhánh, phê duyệt 13/10/2026
+
+Người dùng duyệt A-D01/A-D02: khi chi nhánh INACTIVE, chỉ chặn quote và đơn mới. Đơn đã tồn tại, kể cả PENDING, tiếp tục được xác nhận/giao/nhận/hoàn tất theo quyền và state machine hiện hành. Không tự hủy đơn cũ. Quyết định số chi nhánh ACTIVE tối thiểu và bảo toàn cấu hình đang chờ xác nhận riêng; chưa triển khai endpoint đổi trạng thái.

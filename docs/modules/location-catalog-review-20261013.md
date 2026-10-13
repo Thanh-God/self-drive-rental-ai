@@ -70,3 +70,7 @@ Response400 trong test này được điều khiển để giải phóng request
 **LOC-R03 — integration blocker — AppRoutes.jsx.** Preview conflict ở route catalog/locations/branches. Expected: giữ C9 catalog xe, route branches hiện có và thêm location API route trong ADMIN guard. Không thay toàn file bằng bản cũ của feature. Tích hợp và regression chỉ làm khi được người dùng yêu cầu.
 
 DONE: module/API/UI source,5commits đã publish, suite gốc/lint/build và H2 targeted đạt. PARTIAL: form updatecategory còn lỗi, tài liệu/evidence chưa đủ. NOT VERIFIED: MySQL/browser, Ubuntu HEAD/status. BLOCKED: merge preview route. Chưa kết luận toàn nhánh PASS/ready và chưa đóng C11.
+
+## Tiếp nối tích hợp —13/10/2026
+
+LOC-R01 đã sửa trên nhánh tích hợp: category revision được đưa đúng vào expectedRevision. Mounted regression400/stale409/fresh recoveryPASS; frontend79tests/lint/demo/APIbuild, MySQL6tests và actualJAR/HTTP/browser22assertionsPASS scoped. AppRoutes giữ catalog xe/branches/demo/ADMIN. Ubuntu worktree không được đọc, không xác nhận sạch/sync ở máy đồng đội; remote790cc82 được giữ trong lịch sử merge, không push/ghi đè nhánh gốc. Xem `.runtime/coordination-c11-location-integrate-20261013/ACCEPTANCE.md` và docs/architecture/c11-plan.md. C11-A còn chờ quyết định; không suy toànC11DONE.

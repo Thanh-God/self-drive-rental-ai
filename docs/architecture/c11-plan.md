@@ -1,6 +1,6 @@
 # C11 — kế hoạch chi nhánh và địa điểm
 
-Ngày13/10/2026. Trạng thái **PLANNED, chưa bàn giao triển khai**. Codex A lập kế hoạch, chưa tạo TASK/prompt cho agent và chưa merge nhánh đồng đội.
+Ngày13/10/2026. Trạng thái **IN PROGRESS: C11-L đã kiểm chứng bản tích hợp; C11-A chờ quyết định còn lại**. Kế hoạch ban đầu và audit giữ bên dưới; cập nhật thực thi ở cuối tài liệu.
 
 ## Baseline và phần giữ lại
 
@@ -62,3 +62,13 @@ Gate A: actual MySQL close/open/stale/RBAC/race; bảo toàn dữ liệu đại 
 4. C11 DONE khi location bản tích hợp và branch status đều đạt mandatory gates. Hiện C11 chưa triển khai trên nhánh chính.
 
 Kế hoạch này không giao C12/report, C13/hardening, C14/full-core acceptance, AI/Map/payment hoặc mobile. Không tạo prompt cho toàn backlog. Khi người dùng yêu cầu bàn giao mới tạo TASK từng lượt, commit/evidence/HANDOFF và ACCEPTANCE theo quy trình KLTN.
+
+## Thực thi C11-L —13/10/2026
+
+Người dùng yêu cầu bắt đầu C11 và tích hợp location. Codex A tích hợp lịch sử remote790cc82 bằng merge hai parent, giải AppRoutes giữ catalog xe/branches/demo/ADMIN, sửa LOC-R01 bằng ánh xạ category.revision sang expectedRevision và thêm mounted regression400/409/recovery. Không sửa V1/V2, auth, package/dependencies hoặc DB gốc.
+
+Source cuối: frontend79/79tests, lint, API/demo builds exit0; backend verify133reported/121executed/12optional skips,0failure/error; location isolated MySQL6/6,0skip. Actual JAR HTTP category race200+409/no-write/FK/recovery và browser22assertions trên schema fresh trong cùng fixture, desktop1280/1440/1920. Browser có empty thực từ MySQL, abort GET có chủ đích/retry thật, pending real response,400,409/recovery,CRUD,refresh,locationrace,ADMIN routes/USER guard. 4runner refusal testsPASS. Kết quả scoped, không xác nhận toàn hệ thống hoặc adverse cleanup chưa test.
+
+Evidence/TASK/HANDOFF/ACCEPTANCE: `.runtime/coordination-c11-location-integrate-20261013/`; runner versioned `scripts/coordination/c11-location/`. Owned Java/Node/container đã dừng, volume KEEP; không push, không sửa dirty development-workflow.md.
+
+C11-A: A-D01/A-D02 đã được duyệt: giữ đơn cũ, cho xác nhận/giao/nhận/hoàn tất theo quyền, chỉ chặn quote/đơn mới. A-D03 số ACTIVE tối thiểu và A-D04 giữ cấu hình vẫn chờ câu trả lời thứ2; chưa triển khai endpoint status. C11 tổng thể PARTIAL, không DONE.
