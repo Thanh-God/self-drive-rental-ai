@@ -202,3 +202,6 @@ Urban xám ấm cho homepage/list/detail/my-bookings; API card/gallery và Admin
 
 ### C10 typography và kết thúc phạm vi — 13/10/2026
 Segoe UI/system sans được áp dụng cho tiêu đề Urban theo userrequest để tránh serifglyphspacing tiếngViệt; hero giảmcỡ/bỏitalic. Sourcefinal77frontendtests/lint/demoAPIbuild và70realbrowser assertions,376inputs0drift; wrapperguard38/backend21MySQL retainedunchanged. Acceptance .runtime/coordination-c10-typography-20261013/. C10A/C10B DONE scoped; originalDB17ảnhvẫngiữ, không đổi nghiệpvụ/push/dọnfixture.
+
+### C11 planning và review nhánh đồng đội —13/10/2026 — PLANNED/PARTIAL
+Kế hoạch docs/architecture/c11-plan.md chưa bàn giao, tách location hoàn thiện/tích hợp và branchstatus sau chốt chính sách. Remote feature/location-catalog-20261012-02 tại790cc82 có5commits/16files đúngscope; mainremote505/master3a8596b không chuyển sangfeature. Snapshotreview:41frontendtests/lint/demoAPIbuild và6H2testsPASS; reviewer mountedcategoryupdateFAIL vì expectedRevision thiếu (ApiLocationsPage213/77). MySQL/browser/HANDOFF/Ubuntuworktreestatus NOTVERIFIED, GitHub0CIruns, mergepreviewAppRoutes conflict. Reports docs/modules/location-catalog-review-20261013.md và .runtime/coordination-c11-plan-location-review-20261013/. Khôngcheckout/merge/sourcefix trênfeature, khôngTASK/prompt/agentdispatch; C10giữ, C11chưaDONE.
