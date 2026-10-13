@@ -72,3 +72,16 @@ Source cuối: frontend79/79tests, lint, API/demo builds exit0; backend verify13
 Evidence/TASK/HANDOFF/ACCEPTANCE: `.runtime/coordination-c11-location-integrate-20261013/`; runner versioned `scripts/coordination/c11-location/`. Owned Java/Node/container đã dừng, volume KEEP; không push, không sửa dirty development-workflow.md.
 
 C11-A: A-D01/A-D02 đã được duyệt: giữ đơn cũ, cho xác nhận/giao/nhận/hoàn tất theo quyền, chỉ chặn quote/đơn mới. A-D03 số ACTIVE tối thiểu và A-D04 giữ cấu hình vẫn chờ câu trả lời thứ2; chưa triển khai endpoint status. C11 tổng thể PARTIAL, không DONE.
+
+## Chia phần còn lại thành 4 lượt —13/10/2026
+
+Baseline chia việc: HEAD860ea05f902bfda545b1eefa4114bf74c0e04cb7. C11-L đã PASS scoped; không giao lại location hoặc C10 khi source/dependency không đổi. Bốn lượt dưới đây làm tuần tự; chưa tạo TASK triển khai hoặc gửi cho agent khác.
+
+| Lượt | Phạm vi và đầu ra | Tiêu chí nghiệm thu | Phụ thuộc |
+|---|---|---|---|
+| C11-A1 | Chốt A-D03/A-D04; cập nhật decisions/contract. Backend API ADMIN đổi ACTIVE/INACTIVE với expectedVersion; sửa tên/địa chỉ giữ status, create mặc định ACTIVE. Tests và tài liệu API. | MySQL close/open; version cũ409; input thiếu/sai400; Guest401/USER/STAFF403; rename không reopen; request bị từ chối không ghi. Chính sách min ACTIVE kiểm đúng quyết định đã duyệt. | Người dùng chốt số ACTIVE tối thiểu và bảo toàn xe/tuyến/Staff; A-D01/A-D02 đã duyệt giữ đơn cũ. |
+| C11-A2 | Tích hợp trạng thái với quote/create booking; thứ tự khóa nhất quán khi đóng đồng thời tạo đơn. Giữ khả năng xử lý đơn cũ theo quyền/state machine. | MySQL chặn quote/đơn mới nếu pickup hoặc return INACTIVE; race có thứ tự thắng rõ và readback; đóng thắng thì không tạo đơn mới. Đơn đã tồn tại vẫn xác nhận/giao/nhận/hoàn tất hợp lệ. Giữ xe/tuyến/Staff/snapshot/history; rejection không ghi đơn/audit sai. | A1 PASS; chính sách đã chốt. Đây là lượt có khối lượng và rủi ro lớn nhất. |
+| C11-A3 | Frontend ApiBranchesPage và API client: hiển thị trạng thái, đổi đóng/mở, pending guard, thông báo400/409 và tải lại bản mới. Giữ màn hình tuyến/Staff và demo hiện có. | Mounted tests loading/error/retry/pending/success/400/409/fresh recovery; quyền ADMIN; không báo thành công giả. Frontend test/lint/API+demo build PASS; không đổi toàn bộ giao diện. | A1/A2 PASS và contract ổn định. |
+| C11-A4 | Browser E2E trên JAR/MySQL cô lập: Admin đóng/mở, User bị chặn đơn mới, Staff tiếp tục đơn cũ; bảo toàn dữ liệu. Nghiệm thu C11 và cập nhật tài liệu cuối. | Desktop1280/1440/1920; ca chính/âm/stale/recovery/persistence/RBAC; SQL readback; source/JAR hashes; cleanup owned/fixture KEEP. Tái chạy suites bị tác động, không chạy lại location/C10 vô cớ. Chỉ DONE khi mọi gate bắt buộc đạt. | A1–A3 PASS; source cuối đã đóng băng. |
+
+Mỗi lượt tạo thư mục coordination và TASK riêng trước triển khai; ghi HANDOFF/ACCEPTANCE/evidence cùng lượt, commit source/tests/docs tương ứng. Không giao cả bốn lượt trong một prompt. Lượt sau lấy HEAD/hash đã nghiệm thu của lượt trước; thiếu quyết định hoặc evidence thì ghi PARTIAL/BLOCKED đúng phạm vi. Không push hoặc ghi DB gốc theo kế hoạch này.
