@@ -178,3 +178,6 @@ Kế hoạch docs/ui/c10b-plan.md: B1 API ảnh/order/attribution và MySQL; B2 
 
 ### C10B-B1 backend handoff prepared — 13/10/2026
 TASK .runtime/coordination-c10b-backend-opencode-20261013-082058/TASK.md sẵn sàng cho người dùng chuyển OpenCode. Scope backend media add/edit/reorder/public typedread, MySQL validation/RBAC/race/rollback/bulk/provenance và regression C10A/C9; khôngfrontend/browser/licenseảnh. Contract và gate cụthể trong TASK. Không tự gửi/chạyagent; chưaimplement/nghiệmthuC10B.
+
+### C10B-B1 OpenCode review — 13/10/2026 — PARTIAL / FAIL
+ACCEPTANCE .runtime/coordination-c10b-backend-review-20261013-093030/ACCEPTANCE.md: noHANDOFF/evidence/implementationcommit; productioncompilepass, testCompile4errors exit1; guardparse4diagnostics, actualrunner exit1 missingmanifest beforemutation. Findings B1-R01–R10: immutablebulkcast, nullURLreorder/uniqueoverflow,POST201,canonicalJSON,rollbackwrongspy,allowedURLwrongassertion,guardunsafe/causeproof,manifestmissing,URLtrailingfilename. MySQL/JAR/cleanup/relevantregressionsNOTVERIFIED onchangedsource. Reviewer didnotedit/commitagentfiles orstartDockerfixture; C10B remainspending.
