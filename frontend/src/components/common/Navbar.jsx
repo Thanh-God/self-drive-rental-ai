@@ -30,31 +30,24 @@ function navClass({ isActive }) {
 }
 
 export default function Navbar() {
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, logout, logoutWarning } = useAuth();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [logoutError, setLogoutError] = useState("");
 
   const handleLogout = async () => {
     setMenuOpen(false);
     setMobileOpen(false);
-    try {
-      await logout();
-      setLogoutError("");
-      navigate("/login");
-    } catch {
-      setLogoutError(
-        "Chưa thể xác nhận đăng xuất mọi phiên. Vui lòng thử lại.",
-      );
-    }
+    const request = logout();
+    navigate("/login", { replace: true });
+    await request;
   };
 
   return (
     <header className="urban-navbar sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
-      {logoutError ? (
+      {logoutWarning ? (
         <p role="alert" className="bg-rose-50 px-4 py-2 text-sm text-rose-800">
-          {logoutError}
+          {logoutWarning}
         </p>
       ) : null}
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">

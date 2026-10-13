@@ -41,6 +41,7 @@ export function AuthProvider({ children }) {
     () => !DEMO_MODE && Boolean(getStoredToken()),
   );
   const [sessionError, setSessionError] = useState("");
+  const [logoutWarning, setLogoutWarning] = useState("");
   const [retry, setRetry] = useState(0);
   const [sessionGeneration] = useState(createRequestGeneration);
   const pendingLogout = useRef(null);
@@ -79,26 +80,27 @@ export function AuthProvider({ children }) {
       }
       const generation = sessionGeneration.begin();
       const tokenToRevoke = getStoredToken();
+      clearSession();
+      setToken(null);
+      setUser(null);
+      setSessionError("");
+      setLogoutWarning("");
+      setLoading(false);
       if (callApi && tokenToRevoke) {
         const request = logoutRequest(tokenToRevoke);
         pendingLogout.current = request;
         try {
           await request;
-        } catch (error) {
+        } catch {
           if (sessionGeneration.isCurrent(generation)) {
-            setLoading(false);
+            setLogoutWarning(
+              "Đã đăng xuất trên thiết bị này. Chưa xác nhận được thu hồi phiên ở máy chủ do lỗi kết nối; phiên trên thiết bị khác có thể còn hiệu lực.",
+            );
           }
-          throw error;
         } finally {
           if (pendingLogout.current === request) pendingLogout.current = null;
         }
       }
-      if (!sessionGeneration.isCurrent(generation)) return;
-      clearSession();
-      setToken(null);
-      setUser(null);
-      setSessionError("");
-      setLoading(false);
     },
     [selectDemoRole, sessionGeneration],
   );
@@ -170,7 +172,8 @@ export function AuthProvider({ children }) {
       setLoading(true);
       setSessionError("");
       try {
-        if (pendingLogout.current) await pendingLogout.current;
+        if (pendingLogout.current) await pendingLogout.current.catch(() => {});
+        setLogoutWarning("");
         if (!sessionGeneration.isCurrent(generation)) {
           throw new Error("Yêu cầu đăng nhập đã bị thay thế.");
         }
@@ -210,7 +213,8 @@ export function AuthProvider({ children }) {
       setLoading(true);
       setSessionError("");
       try {
-        if (pendingLogout.current) await pendingLogout.current;
+        if (pendingLogout.current) await pendingLogout.current.catch(() => {});
+        setLogoutWarning("");
         if (!sessionGeneration.isCurrent(generation)) {
           throw new Error("Yêu cầu đăng ký đã bị thay thế.");
         }
@@ -244,6 +248,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: DEMO_MODE ? Boolean(user) : Boolean(token && user),
       selectDemoRole,
       sessionError,
+      logoutWarning,
       retrySession: () => {
         setLoading(true);
         setRetry((value) => value + 1);
@@ -263,6 +268,7 @@ export function AuthProvider({ children }) {
       refreshUser,
       selectDemoRole,
       sessionError,
+      logoutWarning,
     ],
   );
 

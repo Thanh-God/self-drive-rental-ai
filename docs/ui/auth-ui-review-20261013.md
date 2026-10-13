@@ -29,3 +29,13 @@ Cổng chạy local theo scripts: frontend API 5173, backend 8080, MySQL KLTN 33
 Thư mục lượt: `.runtime/coordination-auth-ui-review-20261013/`. Backend clean copy verify: 149 reported, 135 executed, 14 skipped theo cấu hình cũ; các skip không tính PASS. Native MySQL HTTP 6/6, zero skip; JAR 123 entries đối chiếu byte với compiled classes/resources. Browser thật 29 assertions trên fixture riêng, desktop 1280/1440/1920; kiểm gửi đơn, form và JWT thu hồi thực tế. Frontend 83 tests cùng lint và build demo/API được ghi trong ACCEPTANCE của lượt.
 
 Lỗi repackage target workspace và các lượt thử thất bại được giữ trong evidence; kết quả build cuối sử dụng bản backend copy sạch có source đối chiếu với workspace. Không dùng JAR target cũ làm bằng chứng. Fixture cuối dừng, volume KEEP; backend/frontend do lượt tạo đã dừng. Không push và không tuyên bố toàn hệ thống hoặc toàn bộ đề xuất email đã hoàn tất.
+
+## Điều chỉnh đăng xuất và đăng ký theo phản hồi tiếp theo
+
+Lượt `.runtime/coordination-logout-register-20261013/` tiếp nối baseline efb7593. Trước sửa, AuthContext chỉ clearSession sau khi logout API thành công; lỗi mạng/server giữ token và user local. Mounted regression đã tái hiện token còn tồn tại khi API pending. Nay lấy token cần thu hồi trước khi xóa phiên trên thiết bị ngay lập tức; Navbar và WorkspaceTopbar chuyển tới login ngay. Thành công/401 không báo lỗi; server/network/403 lỗi vẫn giữ trạng thái guest và cảnh báo chưa xác nhận thu hồi server. Không tuyên bố mọi phiên đã bị thu hồi khi API thất bại. Logout 403 không kích hoạt redirect unauthorized dùng cho nghiệp vụ khác; các API 403 khác vẫn giữ contract cũ.
+
+Đăng nhập/đăng ký tiếp theo vẫn đợi logout cũ kết thúc (Axios timeout hiện có 20 giây), tránh phản hồi revoke cũ ảnh hưởng phiên vừa tạo. Logout thất bại không chặn vĩnh viễn đăng nhập lại; generation guards giữ phiên mới khỏi phản hồi cũ.
+
+Theo yêu cầu mới, đăng ký chỉ còn Họ và tên, Email, Mật khẩu: bỏ nhập lại mật khẩu; giữ validation server/client, hiện/ẩn và chống gửi lặp. Form đổi mật khẩu giữ nhập lại mật khẩu mới. Ảnh tham khảo chỉ dùng để đơn giản hóa form, không triển khai Google OAuth/CAPTCHA hoặc gửi email giả. Desktop và policy mật khẩu không đổi.
+
+Evidence cuối và commit xem ACCEPTANCE/HANDOFF trong thư mục lượt mới; không sửa biên bản lượt trước. C11-A3/A4 và email/OTP tiếp tục pending.

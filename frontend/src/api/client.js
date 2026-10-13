@@ -66,7 +66,7 @@ apiClient.interceptors.response.use(
     ) {
       clearSession();
       onUnauthorized?.();
-    } else if (status === 403) {
+    } else if (status === 403 && requestUrl !== "/auth/logout") {
       onForbidden?.(error);
     } else if (status >= 500) {
       onServerError?.(error);

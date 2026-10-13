@@ -31,7 +31,8 @@ export async function logoutRequest(token = getStoredToken()) {
     );
   } catch (error) {
     // An expired token is already invalid. A network/server failure does not
-    // prove that all sessions were revoked; let the UI offer a retry.
+    // prove that all sessions were revoked; the provider clears the device
+    // session and reports that server revocation could not be confirmed.
     if (error.response?.status !== 401) throw error;
   }
 }

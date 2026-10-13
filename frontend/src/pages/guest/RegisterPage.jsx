@@ -12,7 +12,6 @@ export default function RegisterPage() {
   const [form, setForm] = useState({ fullName: "", email: "", password: "" });
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [confirmation, setConfirmation] = useState("");
   const inFlight = useRef(false);
 
   if (!loading && isAuthenticated && user) {
@@ -27,8 +26,8 @@ export default function RegisterPage() {
     event.preventDefault();
     if (inFlight.current) return;
     const invalid = passwordError(form.password);
-    if (invalid || form.password !== confirmation) {
-      setError(invalid || "Mật khẩu nhập lại chưa khớp.");
+    if (invalid) {
+      setError(invalid);
       return;
     }
     inFlight.current = true;
@@ -91,7 +90,6 @@ export default function RegisterPage() {
         </label>
         <PasswordField label="Mật khẩu" name="password" required minLength={8} maxLength={72} autoComplete="new-password" value={form.password} onChange={onChange} />
         <p className="text-sm text-slate-600">{passwordHint}</p>
-        <PasswordField label="Nhập lại mật khẩu" name="confirmation" required autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} />
         <button
           type="submit"
           disabled={submitting}

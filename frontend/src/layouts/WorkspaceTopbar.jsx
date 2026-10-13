@@ -1,28 +1,22 @@
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
 import { Car, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export default function WorkspaceTopbar({ areaLabel }) {
-  const { user, logout } = useAuth();
+  const { user, logout, logoutWarning } = useAuth();
   const navigate = useNavigate();
-  const [logoutError, setLogoutError] = useState("");
 
   const handleLogout = async () => {
-    try {
-      await logout();
-      setLogoutError("");
-      navigate("/login");
-    } catch {
-      setLogoutError("Chưa xác nhận được đăng xuất mọi phiên. Hãy thử lại.");
-    }
+    const request = logout();
+    navigate("/login", { replace: true });
+    await request;
   };
 
   return (
     <header className="flex min-h-14 flex-wrap items-center justify-between gap-2 border-b border-slate-200 bg-white px-4 py-2">
-      {logoutError ? (
+      {logoutWarning ? (
         <p role="alert" className="w-full text-sm text-rose-800">
-          {logoutError}
+          {logoutWarning}
         </p>
       ) : null}
       <Link
