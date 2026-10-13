@@ -51,6 +51,34 @@ async function main(){
  await page.goto(base+'/user/profile');check('Reload displays persisted phone',await page.getByLabel('Số điện thoại',{exact:true}).inputValue(),'0907654321');
 
 
+ const http=(method,url,body)=>fetch(api+url,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
+ const readMe=async()=> (await http('GET','/auth/me')).json();
+ const beforeInvalid=await readMe();
+ check('Invalid profile backend400',(await http('PUT','/me/profile',{fullName:'Must not persist',phone:'abc',version:beforeInvalid.version})).status,400);
+ check('Rejected profile preserves all fields',await readMe(),beforeInvalid);
+ const simultaneous=await Promise.all(['Race One','Race Two'].map(fullName=>http('PUT','/me/profile',{fullName,phone:'0907654321',version:beforeInvalid.version})));
+ check('Concurrent profile writes one success one stale',simultaneous.map(r=>r.status).sort(),[200,409]);
+ const winner=await simultaneous.find(r=>r.status===200).json();check('Profile race winner persisted',await readMe(),winner);
+ const licenseOld=await readLicense();
+ const changed=await http('PUT','/me/license',{...licenseOld,expiresOn:'2031-12-31'});check('License update200',changed.status,200);
+ const licenseNew=await changed.json();
+ check('License stale version409',(await http('PUT','/me/license',{...licenseOld,licenseNumber:'Must not overwrite'})).status,409);
+ check('License stale version no write',await readLicense(),licenseNew);
+ await page.goto(base+'/user/profile');
+ let sameTickWrites=0;const countWrite=r=>{if(r.method()==='PUT'&&r.url().endsWith('/me/profile'))sameTickWrites++;};page.on('request',countWrite);
+ await page.getByLabel('Số điện thoại',{exact:true}).fill('0901112233');
+ const single=page.waitForResponse(r=>r.url().endsWith('/me/profile')&&r.request().method()==='PUT');
+ await page.getByRole('button',{name:'Lưu hồ sơ',exact:true}).evaluate(button=>{const form=button.closest('form');form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));form.dispatchEvent(new Event('submit',{bubbles:true,cancelable:true}));});
+ check('Same tick form backend200',(await single).status(),200);check('Same tick form sends only one request',sameTickWrites,1);page.off('request',countWrite);
+ await page.goto(base+'/user/profile');
+ const prior500=await readMe();
+ await page.route('**/api/v1/me/profile',route=>route.fulfill({status:500,contentType:'text/html',body:'SQL stacktrace password_hash internal detail'}));
+ await page.getByRole('button',{name:'Lưu hồ sơ',exact:true}).click();
+ await page.getByText('Máy chủ gặp lỗi khi xử lý yêu cầu. Hãy tải lại thông tin để kiểm tra kết quả trước khi thử lại.',{exact:true}).waitFor();
+ check('Injected500 does not expose raw internal error',(await page.locator('body').innerText()).includes('password_hash'),false);
+ check('Injected500 has no backend write',await readMe(),prior500);
+ await page.screenshot({path:path.join(out,'safe-server-error.png'),fullPage:true});
+ await page.unroute('**/api/v1/me/profile');
  await page.goto(base+'/user/profile');await page.getByLabel('Mật khẩu hiện tại',{exact:true}).fill(oldPassword);
  let puts=0;page.on('request',r=>{if(r.method()==='PUT'&&r.url().endsWith('/me/password'))puts++;});
  const next=page.getByLabel('Mật khẩu mới',{exact:true}),confirmation=page.getByLabel('Nhập lại mật khẩu mới',{exact:true}),button=page.getByRole('button',{name:'Đổi mật khẩu',exact:true});
@@ -97,7 +125,7 @@ async function main(){
  await page.goto(base+'/login');await page.getByLabel('Email',{exact:true}).fill(email);await page.getByLabel('Mật khẩu',{exact:true}).fill(newPassword);
  await page.getByRole('button',{name:'Đăng nhập',exact:true}).last().click();await page.waitForURL(base+'/user/profile');check('Login restores authorized profile destination',new URL(page.url()).pathname,'/user/profile');
  const deviceToken=await page.evaluate(()=>localStorage.getItem('kdrive.jwt'));
- await page.getByRole('button',{name:/Password Fixture/}).click();
+ await page.getByRole('button',{name:/Race One|Race Two/}).click();
  const revoked=page.waitForResponse(r=>r.url().endsWith('/auth/logout')&&r.request().method()==='POST');
  await page.getByRole('button',{name:/Đăng xuất/}).click();check('Browser logout HTTP204',(await revoked).status(),204);
  check('Browser logout clears local token',await page.evaluate(()=>localStorage.getItem('kdrive.jwt')),null);

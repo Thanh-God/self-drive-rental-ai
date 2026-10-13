@@ -48,6 +48,7 @@ import {
 import { getErrorMessage } from "../../utils/roles";
 import { createRequestGeneration } from "../../utils/requestGeneration";
 import { useAuth } from "../../context/AuthContext";
+import { getStoredToken } from "../../utils/storage";
 import { useApiData } from "../../hooks/useApiData";
 import useNow from "../../hooks/useNow";
 
@@ -2029,11 +2030,11 @@ export function ApiDocumentPage({ kind, area }) {
 }
 
 export function ApiProfilePage() {
-  const passwordInFlight = useRef(false);
+  const writeInFlight = useRef(false);
   const profileRequest = useApiData("/auth/me");
   const licenseRequest = useApiData("/me/license");
   const navigate = useNavigate();
-  const { logout, refreshUser } = useAuth();
+  const { logout, refreshUser, token } = useAuth();
   const [licenseScheme, setLicenseScheme] = useState("VN_2025");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -2066,6 +2067,8 @@ export function ApiProfilePage() {
         ];
   async function update(event) {
     event.preventDefault();
+    if (writeInFlight.current) return;
+    writeInFlight.current = true;
     setError("");
     setMessage("");
     setBusy(true);
@@ -2081,18 +2084,21 @@ export function ApiProfilePage() {
         phone,
         version: profile.version,
       });
+      if (getStoredToken() !== token) return;
       refreshUser(updatedProfile);
       setMessage("Đã cập nhật hồ sơ.");
       profileRequest.reload();
     } catch (requestError) {
+      if (getStoredToken() !== token) return;
       setError(getErrorMessage(requestError, "Không thể cập nhật hồ sơ."));
     } finally {
+      writeInFlight.current = false;
       setBusy(false);
     }
   }
   async function changePassword(event) {
     event.preventDefault();
-    if (passwordInFlight.current) return;
+    if (writeInFlight.current) return;
     setError("");
     setMessage("");
     const form = new FormData(event.currentTarget);
@@ -2104,26 +2110,30 @@ export function ApiProfilePage() {
       setError(validationErrors.join(" "));
       return;
     }
-    passwordInFlight.current = true;
+    writeInFlight.current = true;
     setBusy(true);
     try {
       await updatePassword({
         current: String(form.get("current") || ""),
         next,
       });
+      if (getStoredToken() !== token) return;
       passwordForm.reset();
       await logout({ callApi: false });
       window.alert("Đổi mật khẩu thành công. Các phiên đăng nhập cũ đã được thu hồi. Vui lòng đăng nhập lại.");
       navigate("/login", { replace: true });
     } catch (requestError) {
+      if (getStoredToken() !== token) return;
       setError(getErrorMessage(requestError, "Không thể đổi mật khẩu."));
     } finally {
-      passwordInFlight.current = false;
+      writeInFlight.current = false;
       setBusy(false);
     }
   }
   async function updateLicense(event) {
     event.preventDefault();
+    if (writeInFlight.current) return;
+    writeInFlight.current = true;
     setError("");
     setMessage("");
     const form = new FormData(event.currentTarget);
@@ -2139,13 +2149,16 @@ export function ApiProfilePage() {
         status: license?.status || "PENDING",
         version: license?.version || 0,
       });
+      if (getStoredToken() !== token) return;
       setMessage(
         "Đã lưu thông tin GPLX để nhân viên xác minh. Không tải/lưu ảnh GPLX.",
       );
       licenseRequest.reload();
     } catch (requestError) {
+      if (getStoredToken() !== token) return;
       setError(getErrorMessage(requestError, "Không thể lưu GPLX."));
     } finally {
+      writeInFlight.current = false;
       setBusy(false);
     }
   }

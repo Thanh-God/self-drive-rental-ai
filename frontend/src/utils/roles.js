@@ -62,6 +62,12 @@ export function getErrorMessage(
   if (!error?.response && ["ECONNABORTED", "ETIMEDOUT"].includes(error?.code)) {
     return "Máy chủ chưa phản hồi trong thời gian cho phép. Chưa xác nhận thao tác đã được lưu. Hãy kiểm tra kết nối và tải lại thông tin trước khi thử lại; nếu đang đổi mật khẩu, hãy thử đăng nhập lại.";
   }
+  if (!error?.response && error?.code === "ERR_NETWORK") {
+    return "Không thể kết nối máy chủ. Chưa xác nhận thao tác đã được lưu. Hãy kiểm tra kết nối và tải lại thông tin trước khi thử lại.";
+  }
+  if (error?.response?.status >= 500 && !error.response.data?.message) {
+    return "Máy chủ gặp lỗi khi xử lý yêu cầu. Hãy tải lại thông tin để kiểm tra kết quả trước khi thử lại.";
+  }
   const data = error?.response?.data;
   if (typeof data === "string" && data.trim()) return data;
   if (data?.message) return data.message;

@@ -139,3 +139,29 @@ test("late profile refresh cannot restore a logged out session or overwrite anot
   await act(async()=>captured.refreshUser({...another,fullName:"Updated current"}));
   assert.equal(JSON.parse(localStorage.getItem("kdrive.user")).fullName,"Updated current");
 });
+
+for(const kind of ["profile","license"]){
+ test(`${kind} same-tick double submit sends exactly one write`,async()=>{
+  const c=await mount("/user/profile",ApiProfilePage,true);
+  if(kind==="profile")await fill(c,"phone","0901234567");
+  else {await fill(c,"licenseNumber","FIXTURE-NEW-LICENSE");await fill(c,"expiresOn","2030-12-31");}
+  const form=c.querySelector(`[name="${kind==="profile"?"phone":"licenseNumber"}"]`).closest("form");
+  await submit(form,true);assert.equal(writes.length,1);
+  assert.equal(writes[0].config.url,kind==="profile"?"/me/profile":"/me/license");
+  await act(async()=>reply(writes[0],kind==="profile"?{...profile,version:1}:{id:"fixture-license",version:0}));
+  assert.equal([...c.querySelectorAll('button')].find(b=>b.textContent==='Lưu hồ sơ').disabled,false);
+ });
+}
+test("late password success does not log out a newly established session",async()=>{
+ let captured;
+ function Combined(){const auth=useAuth();useEffect(()=>{captured=auth;},[auth]);return h(ApiProfilePage);}
+ const c=await mount("/user/profile",Combined,true);
+ await fill(c,"current","Current fixture 2026!");await fill(c,"next","Next fixture 2026!");await fill(c,"confirmation","Next fixture 2026!");
+ await submit(c.querySelector('[name="current"]').closest("form"));
+ const oldWrite=writes[0];await act(async()=>captured.logout({callApi:false}));
+ let login;await act(async()=>{login=captured.login({email:"new@example.test",password:"New fixture 2026!"});});
+ await act(async()=>{reply(writes[1],{token:"new-user-token",user:{...profile,id:"new-user",email:"new@example.test"}});await login;});
+ await act(async()=>reply(oldWrite,null));
+ assert.equal(localStorage.getItem("kdrive.jwt"),"new-user-token");assert.equal(alerts.length,0);
+ assert.equal(JSON.parse(localStorage.getItem("kdrive.user")).id,"new-user");
+});
