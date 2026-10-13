@@ -59,6 +59,9 @@ export function getErrorMessage(
   error,
   fallback = "Đã xảy ra lỗi. Vui lòng thử lại.",
 ) {
+  if (!error?.response && ["ECONNABORTED", "ETIMEDOUT"].includes(error?.code)) {
+    return "Máy chủ chưa phản hồi trong thời gian cho phép. Chưa xác nhận thao tác đã được lưu. Hãy kiểm tra kết nối và tải lại thông tin trước khi thử lại; nếu đang đổi mật khẩu, hãy thử đăng nhập lại.";
+  }
   const data = error?.response?.data;
   if (typeof data === "string" && data.trim()) return data;
   if (data?.message) return data.message;

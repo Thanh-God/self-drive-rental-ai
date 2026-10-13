@@ -47,3 +47,13 @@ Lượt `.runtime/coordination-password-feedback-20261013/`: giữ chính sách 
 Sau PUT /me/password thành công (HTTP 200 theo controller hiện tại), xóa phiên local rồi hiện native window.alert với nút OK, yêu cầu đăng nhập lại; không thông báo thành công khi pending hoặc lỗi. Giữ nguyên backend/tokenVersion, không thêm thư viện/email/OTP.
 
 Frontend 108/108, zero skip; lint và demo/API build đạt. Browser thực trên fixture cô lập kiểm ca âm, mật khẩu hiện tại sai, native alert, xóa token, token cũ 401, mật khẩu cũ 401 và mới 200. Dịch vụ do lượt tạo và fixture đã dừng; volume KEEP, DB gốc không ghi. Chi tiết/hash/commit ở HANDOFF và ACCEPTANCE của lượt. C11-A3/A4 đã hoàn tất theo bằng chứng C11 tương ứng; trạng thái pending trong đoạn lịch sử phía trên là tại thời điểm viết đoạn đó.
+
+## Điều tra timeout hồ sơ — PARTIAL
+
+Lượt `.runtime/coordination-profile-timeout-20261013/`: người dùng báo timeout20s với đổi mật khẩu, điện thoại, GPLX trên 127.0.0.1:5173/user/profile. Tại thời điểm kiểm tra, backend8080/frontend5173/MySQL33385 đang chạy; GET vehicles200 và PUT không token401 phản hồi dưới0.1s qua backend/proxy. Vite thực sự dùng API /api/v1. MySQL đọc kiểm tra có0 transaction/0 lock wait; thread dump không thấy request đang bị chặn. Đây chỉ là snapshot, không loại trừ lỗi gián đoạn.
+
+JAR hiện trên backend/target có0 BOOT-INF/classes entries, khác bản backend nghiệm thu123entries; tiến trình Java đã chạy trước đó nên không suy nguyên nhân timeout từ file trên đĩa. Chưa restart tiến trình người dùng hoặc sửa DB gốc.
+
+Đổi thông báo Axios timeout sang tiếng Việt: chưa xác nhận đã lưu, tải lại/readback trước retry; mật khẩu cần thử đăng nhập lại. Không tăng timeout, retry tự động, hoặc giả thành công. Frontend110/110, lint/demo/APIbuild và19assertions backend/MySQL-browser cô lập đạt, gồm điện thoại readback, GPLX HTTP/readback, đổi mật khẩu/sessionrevocation. GPLX ở lượt này được kiểm qua HTTP thật, không tuyên bố thêm UI submit GPLX.
+
+Nguyên nhân phiên người dùng NOT VERIFIED; chờ Request URL/Method/Status trong Network của request timeout, không thu thập token/password. Chỉ PASS phạm vi thông báo và fixture, toàn lỗi người dùng vẫn PARTIAL.
