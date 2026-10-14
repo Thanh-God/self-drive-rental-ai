@@ -6,6 +6,12 @@ from test_guards import ROOT,load
 class DocumentGuards(unittest.TestCase):
  def invoke(self,module,args):
   with patch.object(sys,'argv',['runner']+args),patch.object(module.subprocess,'run',side_effect=AssertionError('Native command reached')):module.main()
+ def test_browser_script_outside_coordination_refused_before_reads(self):
+  module=load('verify-documents')
+  with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+   root=Path(directory);output=root/'out'
+   with self.assertRaises(AssertionError):self.invoke(module,['--backend-root',directory,'--backend-evidence',directory,'--linked-evidence',directory,'--evidence',str(output),'--browser-script',str(ROOT/'frontend/src/routes/AppRoutes.jsx')])
+   self.assertFalse(output.exists());self.assertEqual(list(root.iterdir()),[])
  def test_existing_output_is_not_modified(self):
   module=load('verify-documents')
   with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:

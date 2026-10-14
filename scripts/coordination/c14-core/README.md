@@ -46,3 +46,16 @@ The refusal probe supplies deliberately invalid credentials and expects a specif
 guard exception before JDBC startup. Maven exits nonzero for these deliberate
 negative cases; the probe verifies the exact exception and does not count an
 unrelated connection failure as success. Run Maven-based probes sequentially.
+
+For read-only document permissions and catalog navigation, reuse the completed
+browser dataset with a new output directory:
+
+```powershell
+python scripts/coordination/c14-core/verify-documents.py --backend-root .runtime/<run>/evidence/backend-copy --backend-evidence .runtime/<run>/evidence/native-a --linked-evidence .runtime/<run>/evidence/browser-a --evidence .runtime/<run>/evidence/documents --browser-script scripts/coordination/c14-core/verify-catalog.cjs
+```
+
+This checks the same contract/invoice IDs for Guest, owner, another User, Admin
+and Staff at each branch, then verifies brand/search filtering, vehicle details
+and the correct booking-form target. It creates no additional bookings and
+compares business records before and after the reads. Omit `--browser-script`
+to check document permissions without starting Vite.
