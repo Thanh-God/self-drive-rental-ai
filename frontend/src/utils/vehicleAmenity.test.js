@@ -698,7 +698,7 @@ test("Desktop catalog: six homepage cards, all twenty list rows and readable sta
     await act(async () => { select.value = status; select.dispatchEvent(new dom.window.Event("change", { bubbles: true })); });
     assert.equal(list.container.querySelectorAll("article.vehicle-card").length, count);
   }
-  assert.match(list.container.textContent, /Lịch trống được kiểm tra/);
+  assert.match(list.container.textContent, /Giá và lịch được kiểm tra lại khi báo giá/);
   await list.unmount();
 });
 

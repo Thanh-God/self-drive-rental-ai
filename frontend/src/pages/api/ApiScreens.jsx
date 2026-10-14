@@ -1,5 +1,7 @@
 import VehicleGallery from "../../components/vehicle/VehicleGallery";
 import BrandBar from "../../components/vehicle/BrandBar";
+import TripSearchForm from "../../components/vehicle/TripSearchForm";
+import { searchParams, searchSuffix, tripSearch } from "../../utils/vehicleSearch";
 import PasswordField from "../../components/common/PasswordField";
 import { passwordError, passwordHint } from "../../utils/passwordPolicy";
 import {
@@ -625,21 +627,26 @@ export function ApiHomePage() {
 }
 
 export function ApiVehicleListPage() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const brand = params.get("brand") || "";
   const vehiclesRequest = useApiData("/vehicles");
   const catalogRequest = useApiData("/vehicles/catalog");
-  const [query, setQuery] = useState("");
-  const [status, setStatus] = useState("");
-  const [category, setCategory] = useState("");
-  const [seats, setSeats] = useState("");
-  const [transmission, setTransmission] = useState("");
-  const [sort, setSort] = useState("");
+  const branchesRequest = useApiData("/branches");
+  const trip = tripSearch(params);
+  const tripRequest = useApiData(trip.path, trip.active && !trip.error);
+  const update = changes => setParams(searchParams(params, changes));
+  const query = params.get("q") || "", setQuery = q => update({ q });
+  const status = params.get("status") || "", setStatus = status => update({ status });
+  const category = params.get("category") || "", setCategory = category => update({ category });
+  const seats = params.get("seats") || "", setSeats = seats => update({ seats });
+  const transmission = params.get("transmission") || "", setTransmission = transmission => update({ transmission });
+  const sort = params.get("sort") || "", setSort = sort => update({ sort });
+  const source = trip.active ? (tripRequest.data?.items || []).map(item => ({ ...item.vehicle, tripTotal: item.total, tripDays: item.rentalDays })) : vehiclesRequest.data;
   const vehicles = useMemo(() => {
     const rows = (
-      Array.isArray(vehiclesRequest.data) ? vehiclesRequest.data : []
+      Array.isArray(source) ? source : []
     )
-      .map((vehicle) => normalizeVehicle(vehicle, catalogRequest.data))
+      .map((vehicle) => ({ ...normalizeVehicle(vehicle, catalogRequest.data), tripTotal: vehicle.tripTotal, tripDays: vehicle.tripDays }))
       .filter(
         (vehicle) =>
           (!query ||
@@ -654,13 +661,13 @@ export function ApiVehicleListPage() {
       );
     return rows.sort((a, b) =>
       sort === "price-asc"
-        ? a.price - b.price
+        ? (a.tripTotal ?? a.price) - (b.tripTotal ?? b.price)
         : sort === "price-desc"
-          ? b.price - a.price
+          ? (b.tripTotal ?? b.price) - (a.tripTotal ?? a.price)
           : a.name.localeCompare(b.name, "vi"),
     );
   }, [
-    vehiclesRequest.data,
+    source,
     catalogRequest.data,
     brand,
     query,
@@ -670,17 +677,18 @@ export function ApiVehicleListPage() {
     transmission,
     sort,
   ]);
-  const loading = vehiclesRequest.loading || catalogRequest.loading;
-  const error = vehiclesRequest.error || catalogRequest.error;
+  const loading = (trip.active && !trip.error ? tripRequest.loading : vehiclesRequest.loading) || catalogRequest.loading;
+  const error = trip.error || (trip.active ? tripRequest.error : vehiclesRequest.error) || catalogRequest.error;
   const retry = () => {
     vehiclesRequest.reload();
     catalogRequest.reload();
+    tripRequest.reload();
   };
   return (
-    <><BrandBar vehicles={vehiclesRequest.data} catalog={catalogRequest.data} loading={loading} error={error} />
+    <><BrandBar vehicles={vehiclesRequest.data} catalog={catalogRequest.data} loading={vehiclesRequest.loading || catalogRequest.loading} error={vehiclesRequest.error || catalogRequest.error} />
     <Page
       title="Danh sách xe"
-      description="Tìm xe theo tên, hãng, loại xe và trạng thái. Lịch trống được kiểm tra khi bạn yêu cầu báo giá."
+      description="Chọn xe theo nhu cầu hoặc tìm lịch trống cho thời gian và tuyến nhận/trả của bạn."
     >
       <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Field label="Tìm xe">
@@ -747,11 +755,22 @@ export function ApiVehicleListPage() {
           </select>
         </Field>
       </div>
+      <div className="mb-5 flex flex-wrap items-center gap-2" aria-label="Gợi ý nhu cầu">
+        <span className="text-sm text-slate-600">Chọn nhanh:</span>
+        <button className="btn-secondary" onClick={() => update({seats: "2", category: (catalogRequest.data?.categories || []).find(c => c.name.toLowerCase() === "hatchback")?.id || ""})}>Đi phố · xe gọn</button>
+        <button className="btn-secondary" onClick={() => update({seats: "5", category: ""})}>Gia đình · từ 5 chỗ</button>
+        <button className="btn-secondary" onClick={() => update({seats: "7", category: ""})}>Đi nhóm · từ 7 chỗ</button>
+      </div>
+      <TripSearchForm key={["start","end","pickupBranchId","returnBranchId","budget"].map(key => params.get(key) || "").join("|")}
+        params={params} branches={(Array.isArray(branchesRequest.data) ? branchesRequest.data : []).filter(branch => branch.status === "ACTIVE")}
+        loading={branchesRequest.loading} error={branchesRequest.error} onRetry={branchesRequest.reload}
+        onSubmit={update} onClear={() => update({start:"",end:"",pickupBranchId:"",returnBranchId:"",budget:""})} />
+      {trip.active && !error && !loading ? <p className="mb-4 text-sm text-teal-800">{vehicles.length} xe phù hợp lịch chuyến · Sắp xếp giá theo tổng chuyến.</p> : null}
       <RequestState loading={loading} error={error} onRetry={retry}>
         {vehicles.length ? (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {vehicles.map((vehicle) => (
-              <VehicleCard key={vehicle.id} vehicle={vehicle} />
+              <VehicleCard key={vehicle.id} vehicle={vehicle} search={searchSuffix(params)} />
             ))}
           </div>
         ) : (
@@ -762,12 +781,7 @@ export function ApiVehicleListPage() {
               <button
                 className="btn-secondary"
                 onClick={() => {
-                  setQuery("");
-                  setStatus("");
-                  setCategory("");
-                  setSeats("");
-                  setTransmission("");
-                  setSort("");
+                  setParams({});
                 }}
               >
                 Xóa bộ lọc
@@ -786,6 +800,7 @@ export function ApiVehicleListPage() {
 
 export function ApiVehicleDetailPage() {
   const { vehicleId } = useParams();
+  const [params] = useSearchParams();
   const vehicleRequest = useApiData(
     `/vehicles/${encodeURIComponent(vehicleId)}`,
   );
@@ -800,6 +815,7 @@ export function ApiVehicleDetailPage() {
   const error = vehicleRequest.error || catalogRequest.error;
   return (
     <Page title={vehicle?.name || "Chi tiết xe"}>
+      <Link className="btn-secondary mb-5 inline-flex" to={`/vehicles${searchSuffix(params)}`}>Về danh sách xe</Link>
       <RequestState
         loading={loading}
         error={error}
@@ -859,7 +875,7 @@ export function ApiVehicleDetailPage() {
               {vehicle.status === "ACTIVE" ? (
                 <Link
                   className="btn mt-5 w-full"
-                  to={`/user/bookings/new?vehicleId=${encodeURIComponent(vehicle.id)}`}
+                  to={`/user/bookings/new?vehicleId=${encodeURIComponent(vehicle.id)}${searchSuffix(params).replace(/^\?/, "&")}`}
                 >
                   Kiểm tra giá & lịch
                 </Link>
@@ -924,8 +940,8 @@ export function ApiNewBookingPage() {
     () => params.get("start") || toVietnamInput(3),
   );
   const [end, setEnd] = useState(() => params.get("end") || toVietnamInput(4));
-  const [pickup, setPickup] = useState("");
-  const [dropoff, setDropoff] = useState("");
+  const [pickup, setPickup] = useState(() => params.get("pickupBranchId") || "");
+  const [dropoff, setDropoff] = useState(() => params.get("returnBranchId") || "");
   const [quoteValue, setQuote] = useState(null);
   const [quoteInput, setQuoteInput] = useState(null);
   const [error, setError] = useState("");
@@ -954,6 +970,7 @@ export function ApiNewBookingPage() {
   useEffect(() => {
     if (
       dropoffInitialized.current ||
+      dropoff ||
       !routes.length ||
       routes.some((route) => route.returnBranchId === dropoff)
     )
@@ -1078,7 +1095,7 @@ export function ApiNewBookingPage() {
       title="Tạo yêu cầu thuê"
       description="Chọn thời gian và tuyến nhận/trả. Báo giá cuối cùng do máy chủ xác nhận."
       actions={
-        <Link className="btn-secondary" to="/vehicles">
+        <Link className="btn-secondary" to={`/vehicles${searchSuffix(params)}`}>
           Quay lại danh sách xe
         </Link>
       }

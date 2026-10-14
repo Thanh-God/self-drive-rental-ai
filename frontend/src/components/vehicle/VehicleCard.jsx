@@ -132,7 +132,9 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0 }) {
             </strong>
             <span className="text-xs text-slate-500">/ 24 giờ</span>
           </div>
-          {rentalDays > 0 ? (
+          {vehicle.tripTotal != null ? (
+            <p className="text-sm font-semibold text-teal-700">Tổng chuyến: {money(vehicle.tripTotal)} ({vehicle.tripDays} ngày)</p>
+          ) : rentalDays > 0 ? (
             <p className="text-[11px] font-medium text-teal-700">
               Ước tính: {money(totalPrice)} ({rentalDays} ngày)
             </p>

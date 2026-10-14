@@ -1,6 +1,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { vehicleBrandOptions } from "../../utils/vehicleBrands";
+import { searchParams, searchSuffix } from "../../utils/vehicleSearch";
 
 export default function BrandBar({ vehicles, catalog, loading = false, error = false }) {
   const [params] = useSearchParams();
@@ -15,11 +16,11 @@ export default function BrandBar({ vehicles, catalog, loading = false, error = f
     document.addEventListener("pointerdown",close);
     return () => document.removeEventListener("pointerdown",close);
   },[open]);
-  const item = brand => <Link key={brand.id} to={`/vehicles?brand=${encodeURIComponent(brand.id)}`} aria-current={selected===brand.id?"true":undefined} onClick={()=>setOpen(false)}>{brand.name}</Link>;
+  const item = brand => <Link key={brand.id} to={`/vehicles${searchSuffix(searchParams(params, {brand: brand.id}))}`} aria-current={selected===brand.id?"true":undefined} onClick={()=>setOpen(false)}>{brand.name}</Link>;
   return <nav className="brand-bar" aria-label="Lọc theo hãng xe" aria-busy={loading} ref={root} onKeyDown={event=>{if(event.key==="Escape"){setOpen(false);trigger.current?.focus();}}}>
     <div className="brand-bar-inner">
       <div className="brand-bar-scroll">
-        <Link to="/vehicles" aria-current={!selected?"true":undefined} onClick={()=>setOpen(false)}>Tất cả xe</Link>
+        <Link to={`/vehicles${searchSuffix(searchParams(params, {brand: ""}))}`} aria-current={!selected?"true":undefined} onClick={()=>setOpen(false)}>Tất cả xe</Link>
         {primary.map(item)}
         {rest.length ? <button type="button" ref={trigger} aria-expanded={open} aria-controls={id} aria-current={rest.some(b=>b.id===selected)?"true":undefined} onClick={()=>setOpen(value=>!value)}>Khác ▾</button> : null}
       </div>

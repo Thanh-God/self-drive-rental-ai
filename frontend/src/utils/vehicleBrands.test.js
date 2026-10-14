@@ -41,8 +41,8 @@ test("missing brand data or API error keeps only All and no fabricated brand lin
  const c=await mount(h(BrandBar,{vehicles, catalog,error:true}));assert.equal(c.querySelectorAll('nav a').length,1);assert.equal(c.querySelector('nav a').textContent,"Tất cả xe");
 });
 test("query brand filters actual list; All clears brand; browser back/forward recomputes without duplicate fetches",async()=>{
- const c=await mount(h(Routes,null,h(Route,{path:"/vehicles",element:h("div",null,h(List),h(HistoryButtons))})),"/vehicles?brand=alpha");assert.deepEqual(titles(c),["Alpha Sedan"]);assert.equal(requests.length,2);
- await act(async()=>[...c.querySelectorAll('nav a')].find(e=>e.textContent==="Beta").click());assert.deepEqual(titles(c),["Beta Van"]);assert.equal(requests.length,2);
+ const c=await mount(h(Routes,null,h(Route,{path:"/vehicles",element:h("div",null,h(List),h(HistoryButtons))})),"/vehicles?brand=alpha");assert.deepEqual(titles(c),["Alpha Sedan"]);assert.equal(requests.length,3);
+ await act(async()=>[...c.querySelectorAll('nav a')].find(e=>e.textContent==="Beta").click());assert.deepEqual(titles(c),["Beta Van"]);assert.equal(requests.length,3);
  await act(async()=>[...c.querySelectorAll('button')].find(e=>e.textContent==="Back").click());assert.deepEqual(titles(c),["Alpha Sedan"]);
  await act(async()=>[...c.querySelectorAll('button')].find(e=>e.textContent==="Forward").click());assert.deepEqual(titles(c),["Beta Van"]);
  await act(async()=>[...c.querySelectorAll('nav a')].find(e=>e.textContent==="Tất cả xe").click());assert.deepEqual(titles(c),["Alpha Sedan","Beta Van"]);
