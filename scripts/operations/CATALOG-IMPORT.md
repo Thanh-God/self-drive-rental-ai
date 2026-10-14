@@ -43,3 +43,16 @@ Các amendment được kiểm trước write; ảnh kiểm hash local, không o
 `python -X utf8 scripts/operations/rehearse_catalog.py --batch <runtime-batch> --backend-root <runtime-backend-copy> --evidence <runtime-evidence-moi>` yêu cầu batch `catalog-create-proposal.json` và `catalog-configure-proposal.json`. Runner chỉ tạo một fixture riêng port33681, backend8381/frontend5381; không nhận DB_URL đích từ manifest. Xác minh source copy và class bytes trong JAR; giữ volume stopped và đóng đúng process được tạo. Có schema riêng cho ca batch lỗi một phần; không dọn dữ liệu để giả rollback. Cần Docker/MySQL8.4, JDK21 và Playwright/Chromium đã cài theo cấu hình runner. Chạy tuần tự khi các cổng trống.
 
 Runner tạo bản manifest approved chỉ bên trong fixture evidence để kiểm thử, không đổi cờ approved của đề xuất dành cho DB vận hành. Nó gọi actual CLI/API, kiểm repeat/conflict/partial failure, bảo toàn dữ liệu và contract đại diện, giá/quyền Staff cùng browser thật không interception. Source runner cần phù hợp inventory/identity của batch; không dùng cho project/DB khác. Cấu hình cổng/JDK/runtime hiện là môi trường phát triển local, không phải production.
+
+## Áp dụng batch đã được duyệt vào database local
+
+`deploy_catalog_batch.py` chỉ dành cho batch OTO1 cụ thể đã được người dùng duyệt, với hash proposal cố định trong source. Không phải công cụ deploy tổng quát. Chạy guard tests trước:
+
+```powershell
+python -X utf8 scripts/operations/test_deploy_catalog_batch.py
+python -X utf8 scripts/operations/deploy_catalog_batch.py --batch <runtime-batch-da-duyet> --backend-root <runtime-backend-copy> --evidence <runtime-evidence-moi> --apply-approved-oto1
+```
+
+Không có cờ apply thì chỉ preflight. Khi apply, runner kiểm exact identity/volume/schema gốc, toàn bộ catalog/version/history, hash ảnh và source/JAR. Nó tạo backup SQL nén riêng tư, kiểm gzip/hash và restore trên schema riêng trong đúng fixture OTO1 đã nghiệm thu; so checksum cả26bảng trước ghi. Không restore đè hoặc mount volume DB gốc.
+
+Chỉ khi các bước trên đạt mới chạy backend riêng với `SEED_ENABLED=false`, đăng nhập Admin hiện có bằng thông tin local được giữ riêng và gọi CLI create/configure. Không tạo/reset tài khoản. Source yêu cầu DB_URL local33385/kdrive chính xác; không fallback3306. Kiểm protected-table content SHA trước/sau, counts/history và browser thật GET-only. Giữ backup/journal/evidence local; dừng owned backend/frontend/probe, giữ MySQL gốc chạy. Lỗi sau khi bắt đầu ghi phải kiểm journal/readback để xử lý phần đã commit, không tự rollback hoặc chạy lại cùng batch mù.
