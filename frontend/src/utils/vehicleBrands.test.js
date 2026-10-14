@@ -47,9 +47,9 @@ test("query brand filters actual list; All clears brand; browser back/forward re
  await act(async()=>[...c.querySelectorAll('button')].find(e=>e.textContent==="Forward").click());assert.deepEqual(titles(c),["Beta Van"]);
  await act(async()=>[...c.querySelectorAll('nav a')].find(e=>e.textContent==="Tất cả xe").click());assert.deepEqual(titles(c),["Alpha Sedan","Beta Van"]);
 });
-test("brand composes with existing text and operational filters",async()=>{
+test("brand composes with instant text and seat filters",async()=>{
  const c=await mount(h(List),"/vehicles?brand=alpha");assert.deepEqual(titles(c),["Alpha Sedan"]);
- const status=c.querySelectorAll('select')[0];await change(status,"MAINTENANCE");assert.deepEqual(titles(c),[]);await change(status,"");assert.deepEqual(titles(c),["Alpha Sedan"]);
- await change(c.querySelector('input'),"Beta");assert.deepEqual(titles(c),[]);assert.equal(c.querySelectorAll('nav a').length,3,"bar counts not derived from filtered cars");
+ const seats=c.querySelector('select[id$="-seats"]');await change(seats,"7");assert.deepEqual(titles(c),[]);await change(seats,"");assert.deepEqual(titles(c),["Alpha Sedan"]);
+ await change(c.querySelector('input[placeholder="Tên xe, mẫu xe..."]'),"Beta");assert.deepEqual(titles(c),[]);assert.equal(c.querySelectorAll('nav a').length,3,"bar counts not derived from filtered cars");
 });
 test("unknown query never silently returns all vehicles",async()=>{const c=await mount(h(List),"/vehicles?brand=unknown");assert.deepEqual(titles(c),[]);assert.equal(c.querySelector('nav a[aria-current="true"]'),null);});

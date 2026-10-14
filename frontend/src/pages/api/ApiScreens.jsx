@@ -635,11 +635,11 @@ export function ApiVehicleListPage() {
   const trip = tripSearch(params);
   const tripRequest = useApiData(trip.path, trip.active && !trip.error);
   const update = changes => setParams(searchParams(params, changes));
-  const query = params.get("q") || "", setQuery = q => update({ q });
-  const status = params.get("status") || "", setStatus = status => update({ status });
-  const category = params.get("category") || "", setCategory = category => update({ category });
-  const seats = params.get("seats") || "", setSeats = seats => update({ seats });
-  const transmission = params.get("transmission") || "", setTransmission = transmission => update({ transmission });
+  const query = params.get("q") || "";
+
+  const category = params.get("category") || "";
+  const seats = params.get("seats") || "";
+  const transmission = params.get("transmission") || "";
   const sort = params.get("sort") || "", setSort = sort => update({ sort });
   const source = trip.active ? (tripRequest.data?.items || []).map(item => ({ ...item.vehicle, tripTotal: item.total, tripDays: item.rentalDays })) : vehiclesRequest.data;
   const vehicles = useMemo(() => {
@@ -654,7 +654,6 @@ export function ApiVehicleListPage() {
               .toLocaleLowerCase("vi")
               .includes(query.toLocaleLowerCase("vi"))) &&
           (!brand || String(vehicle.brandId) === brand) &&
-          (!status || vehicle.status === status) &&
           (!category || vehicle.categoryId === category) &&
           (!seats || vehicle.seats >= Number(seats)) &&
           (!transmission || vehicle.transmission === transmission),
@@ -671,7 +670,6 @@ export function ApiVehicleListPage() {
     catalogRequest.data,
     brand,
     query,
-    status,
     category,
     seats,
     transmission,
@@ -690,82 +688,17 @@ export function ApiVehicleListPage() {
       title="Danh sách xe"
       description="Chọn xe theo nhu cầu hoặc tìm lịch trống cho thời gian và tuyến nhận/trả của bạn."
     >
-      <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        <Field label="Tìm xe">
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </Field>
-        <Field label="Trạng thái xe">
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="ACTIVE">Sẵn sàng thuê</option>
-            <option value="MAINTENANCE">Đang bảo trì</option>
-            <option value="INACTIVE">Tạm ngưng</option>
-          </select>
-        </Field>
-        <Field label="Loại xe">
-          <select
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-          >
-            <option value="">Tất cả loại xe</option>
-            {(catalogRequest.data?.categories || []).map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.name}
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Số chỗ tối thiểu">
-          <select
-            value={seats}
-            onChange={(event) => setSeats(event.target.value)}
-          >
-            <option value="">Không giới hạn</option>
-            {[2, 4, 5, 7, 9].map((count) => (
-              <option key={count} value={count}>
-                {count} chỗ
-              </option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Hộp số">
-          <select
-            value={transmission}
-            onChange={(event) => setTransmission(event.target.value)}
-          >
-            <option value="">Tất cả</option>
-            <option value="Tự động">Tự động</option>
-            <option value="Số sàn">Số sàn</option>
-          </select>
-        </Field>
-        <Field label="Sắp xếp">
-          <select
-            value={sort}
-            onChange={(event) => setSort(event.target.value)}
-          >
-            <option value="">Tên xe</option>
-            <option value="price-asc">Giá thấp trước</option>
-            <option value="price-desc">Giá cao trước</option>
-          </select>
-        </Field>
-      </div>
-      <div className="mb-5 flex flex-wrap items-center gap-2" aria-label="Gợi ý nhu cầu">
-        <span className="text-sm text-slate-600">Chọn nhanh:</span>
-        <button className="btn-secondary" onClick={() => update({seats: "2", category: (catalogRequest.data?.categories || []).find(c => c.name.toLowerCase() === "hatchback")?.id || ""})}>Đi phố · xe gọn</button>
-        <button className="btn-secondary" onClick={() => update({seats: "5", category: ""})}>Gia đình · từ 5 chỗ</button>
-        <button className="btn-secondary" onClick={() => update({seats: "7", category: ""})}>Đi nhóm · từ 7 chỗ</button>
-      </div>
       <TripSearchForm key={["start","end","pickupBranchId","returnBranchId","budget"].map(key => params.get(key) || "").join("|")}
-        params={params} branches={(Array.isArray(branchesRequest.data) ? branchesRequest.data : []).filter(branch => branch.status === "ACTIVE")}
+        params={params} catalog={catalogRequest.data}
+        branches={(Array.isArray(branchesRequest.data) ? branchesRequest.data : []).filter(branch => branch.status === "ACTIVE")}
         loading={branchesRequest.loading} error={branchesRequest.error} onRetry={branchesRequest.reload}
-        onSubmit={update} onClear={() => update({start:"",end:"",pickupBranchId:"",returnBranchId:"",budget:""})} />
-      {trip.active && !error && !loading ? <p className="mb-4 text-sm text-teal-800">{vehicles.length} xe phù hợp lịch chuyến · Sắp xếp giá theo tổng chuyến.</p> : null}
+        onSubmit={update} onUpdate={update} onClear={() => setParams(brand ? {brand} : {})} />
+      <div className="search-results-heading">
+        <p aria-live="polite">{loading ? "Đang tìm xe…" : error ? "Chưa thể hiển thị kết quả" : `${vehicles.length} xe phù hợp`}</p>
+        <div className="search-result-sort"><label htmlFor="vehicle-result-sort">Sắp xếp</label><select id="vehicle-result-sort" value={sort} onChange={event => setSort(event.target.value)}>
+          <option value="">Tên xe</option><option value="price-asc">Giá thấp trước</option><option value="price-desc">Giá cao trước</option>
+        </select></div>
+      </div>
       <RequestState loading={loading} error={error} onRetry={retry}>
         {vehicles.length ? (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
@@ -776,24 +709,11 @@ export function ApiVehicleListPage() {
         ) : (
           <EmptyState
             title="Không tìm thấy xe"
-            description="Thử đổi từ khóa hoặc bỏ bộ lọc trạng thái."
-            action={
-              <button
-                className="btn-secondary"
-                onClick={() => {
-                  setParams({});
-                }}
-              >
-                Xóa bộ lọc
-              </button>
-            }
+            description="Thử đổi điều kiện tìm kiếm hoặc xóa bộ lọc."
+
           />
         )}
       </RequestState>
-      <p className="mt-5 text-xs text-slate-500">
-        Lịch còn trống được xác nhận qua báo giá trên máy chủ; trạng thái xe
-        không thay thế kiểm tra thời gian và tuyến nhận/trả.
-      </p>
     </Page></>
   );
 }

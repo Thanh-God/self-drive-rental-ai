@@ -667,7 +667,7 @@ test("Shared vehicle card retains demo label separately from API state", async (
   await mounted.unmount();
 });
 
-test("Desktop catalog: six homepage cards, all twenty list rows and readable status filters", async () => {
+test("Desktop catalog: six homepage cards, all twenty list rows and unified search without status filter", async () => {
   const { ApiHomePage, ApiVehicleListPage } = await viteServer.ssrLoadModule("/src/pages/api/ApiScreens.jsx");
   const { MemoryRouter } = await viteServer.ssrLoadModule("react-router-dom");
   const rows = Array.from({ length: 20 }, (_, index) => ({
@@ -692,12 +692,8 @@ test("Desktop catalog: six homepage cards, all twenty list rows and readable sta
   const list = await render(ApiVehicleListPage);
   assert.equal(list.container.querySelectorAll("article.vehicle-card").length, 20);
   const statusLabel = Array.from(list.container.querySelectorAll("label")).find(label => label.textContent.includes("Trạng thái xe"));
-  const select = statusLabel.querySelector("select");
-  assert.deepEqual(Array.from(select.options, o => o.textContent), ["Tất cả", "Sẵn sàng thuê", "Đang bảo trì", "Tạm ngưng"]);
-  for (const [status, count] of [["MAINTENANCE", 1], ["INACTIVE", 1], ["ACTIVE", 18], ["", 20]]) {
-    await act(async () => { select.value = status; select.dispatchEvent(new dom.window.Event("change", { bubbles: true })); });
-    assert.equal(list.container.querySelectorAll("article.vehicle-card").length, count);
-  }
+  assert.equal(statusLabel, undefined);
+  assert.equal(list.container.querySelectorAll('form[aria-label="Tìm xe theo chuyến"]').length,1);
   assert.match(list.container.textContent, /Giá và lịch được kiểm tra lại khi báo giá/);
   await list.unmount();
 });

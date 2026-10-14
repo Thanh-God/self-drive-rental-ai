@@ -1,10 +1,11 @@
-const keys = ["brand", "q", "status", "category", "seats", "transmission", "sort", "start", "end", "pickupBranchId", "returnBranchId", "budget"];
+const keys = ["brand", "q", "category", "seats", "transmission", "sort", "preset", "start", "end", "pickupBranchId", "returnBranchId", "budget"];
 export function searchParams(source, changes = {}) {
   const result = new URLSearchParams();
   for (const key of keys) {
     const value = Object.hasOwn(changes, key) ? changes[key] : source.get(key);
     if (value !== null && value !== undefined && value !== "") result.set(key, value);
   }
+  if (result.get("start") && result.get("end") && result.get("pickupBranchId") && !result.get("returnBranchId")) result.set("returnBranchId",result.get("pickupBranchId"));
   return result;
 }
 export function searchSuffix(params) {
@@ -13,9 +14,10 @@ export function searchSuffix(params) {
 }
 export function tripSearch(params) {
   const fields = ["start", "end", "pickupBranchId", "returnBranchId"];
-  const active = fields.some(key => params.has(key)) || params.has("budget");
+  const active = params.has("start") || params.has("end");
   if (!active) return { active: false, path: "", error: "" };
   const invalid = { active: true, path: "", error: "Hãy chọn đủ thời gian và điểm nhận/trả hợp lệ để tìm xe." };
+  if (!params.get("returnBranchId") && params.get("pickupBranchId")) params = searchParams(params, {returnBranchId: params.get("pickupBranchId")});
   if (fields.some(key => !params.get(key))) return invalid;
   const dates = [params.get("start"), params.get("end")];
   if (dates.some(value => !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))) return invalid;
@@ -27,4 +29,24 @@ export function tripSearch(params) {
   const api = new URLSearchParams({ startAt: start.toISOString(), endAt: end.toISOString(), pickupBranchId: params.get("pickupBranchId"), returnBranchId: params.get("returnBranchId") });
   if (budget !== null) api.set("budget", budget);
   return { active: true, path: `/vehicles/search?${api}`, error: "" };
+}
+
+export function formatBudget(value) {
+  return value ? value.replace(/\B(?=(\d{3})+(?!\d))/g, ".") : "";
+}
+
+export function tripErrors(draft, now = Date.now()) {
+  const errors = {};
+  if (!(draft.start || draft.end || draft.pickupBranchId || draft.budget)) return errors;
+  const parse = value => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value || "") ? new Date(`${value}:00+07:00`).getTime() : NaN;
+  const start = parse(draft.start), end = parse(draft.end);
+  if (!draft.pickupBranchId) errors.pickupBranchId = "Chọn điểm nhận xe.";
+  if (!Number.isFinite(start)) errors.start = "Chọn thời gian nhận xe.";
+  else if (start <= now) errors.start = "Thời gian nhận phải ở tương lai.";
+  if (!Number.isFinite(end)) errors.end = "Chọn thời gian trả xe.";
+  else if (Number.isFinite(start) && end <= start) errors.end = "Thời gian trả phải sau thời gian nhận.";
+  else if (end - start > 90 * 86400000) errors.end = "Thời gian thuê không quá 90 ngày.";
+  if (draft.differentReturn && !draft.returnBranchId) errors.returnBranchId = "Chọn điểm trả xe.";
+  if (draft.budget && (!/^\d+$/.test(draft.budget) || !Number.isSafeInteger(Number(draft.budget)))) errors.budget = "Nhập ngân sách bằng VND nguyên hợp lệ.";
+  return errors;
 }

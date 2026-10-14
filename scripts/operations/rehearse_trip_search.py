@@ -12,6 +12,7 @@ def main():
     parser.add_argument('--native-evidence',required=True,type=Path)
     parser.add_argument('--backend-root',required=True,type=Path)
     parser.add_argument('--evidence',required=True,type=Path)
+    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs'],default='verify-vehicle-search-form.cjs')
     args=parser.parse_args()
     native,backend,out=[p.resolve() for p in (args.native_evidence,args.backend_root,args.evidence)]
     if not all(p.is_relative_to(REPO/'.runtime') for p in (native,backend,out)) or out.exists(): raise ValueError('New runtime output required')
@@ -29,7 +30,7 @@ def main():
         with socket.socket() as sock:sock.bind(('127.0.0.1',port))
     def hashes():
         files=[p for root in ['backend/src','frontend/src'] for p in (REPO/root).rglob('*') if p.is_file()]
-        files.extend([Path(__file__),REPO/'scripts/operations/verify-oto2-browser.cjs',REPO/'frontend/vite.config.js'])
+        files.extend([Path(__file__),REPO/'scripts/operations'/args.browser_script,REPO/'frontend/vite.config.js'])
         return {p.relative_to(REPO).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in files}
     before=hashes()
     for p in (REPO/'backend/src').rglob('*'):
@@ -78,7 +79,7 @@ def main():
             except (URLError,TimeoutError,ConnectionError):time.sleep(1)
         else:raise RuntimeError('Frontend readiness timeout')
         env.update(OTO2_EVIDENCE=str(out),OTO2_SEED_PASSWORD=seed,KDRIVE_PLAYWRIGHT=str(REPO/'.runtime/phase5-rerun-20261004-1823/playwright/node_modules/playwright'))
-        result=subprocess.run(['node',str(REPO/'scripts/operations/verify-oto2-browser.cjs')],cwd=REPO,env=env,capture_output=True,creationflags=FLAGS,timeout=180)
+        result=subprocess.run(['node',str(REPO/'scripts/operations'/args.browser_script)],cwd=REPO,env=env,capture_output=True,creationflags=FLAGS,timeout=180)
         (out/'browser.log').write_bytes(result.stdout+result.stderr);(out/'browser.exit').write_text(str(result.returncode))
         if result.returncode:raise RuntimeError('Browser proof failed; see browser.log')
         if sql(f'SELECT count(*) FROM {schema}.bookings').strip()!=b'0':raise AssertionError('Search/quote flow created a booking')
