@@ -6,7 +6,7 @@ import zipfile
 
 REPO = Path(__file__).resolve().parents[3]
 FLAGS = subprocess.CREATE_NO_WINDOW
-SUITES = ['ConcurrencyAndRaceTest','BranchClosureBookingTest','BranchStatusHttpServerTest',
+SUITES = ['VehicleSearchTest','ConcurrencyAndRaceTest','BranchClosureBookingTest','BranchStatusHttpServerTest',
           'OperationalReportIntegrationTest','OperationalReportMySqlTest','RentalIntegrationTest',
           'CancelBoundaryTest','MySqlMigrationTest','LocationCategoryIntegrationTest','LocationIntegrationTest',
           'VehicleCatalogHttpServerTest','VehicleAmenityHttpServerTest','VehicleImageHttpServerTest',

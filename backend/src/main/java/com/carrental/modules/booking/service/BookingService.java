@@ -49,16 +49,16 @@ import java.util.*;
  }
  private Booking prepare(Actor a,Input i,Vehicle v){
   a.require("USER");Instant now=clock.instant();
-  if(i.startAt()==null||i.endAt()==null||!i.startAt().isAfter(now)||!i.endAt().isAfter(i.startAt())||Duration.between(i.startAt(),i.endAt()).compareTo(Duration.ofDays(90))>0)throw DomainException.bad("Khoảng thuê phải ở tương lai, thời lượng dương và không quá 90 ngày.");
+  int rentalDays=RentalTerms.days(i.startAt(),i.endAt(),now);
   if(!"ACTIVE".equals(v.status))throw DomainException.conflict("Xe không hoạt động.");
   licenses.eligible(a.id(),v.transmission,v.seats,i.endAt());
   Booking b=new Booking();b.userId=a.id();b.vehicleId=v.id;b.pickupBranchId=i.pickupBranchId();b.returnBranchId=i.returnBranchId();
   var route=branches.bookingRoute(i.pickupBranchId(),i.returnBranchId());
   b.pickupName=route.pickupName();b.returnName=route.returnName();
   b.oneWayFee=route.fee();b.startAt=i.startAt();b.endAt=i.endAt();b.createdAt=now;
-  b.expiresAt=now.plus(Duration.ofHours(2)).isBefore(b.startAt)?now.plus(Duration.ofHours(2)):b.startAt;
-  b.rentalDays=(int)Math.ceil(Duration.between(b.startAt,b.endAt).toMillis()/86400000.0);b.dailyPrice=v.dailyPrice;
-  b.rentalTotal=Math.multiplyExact(b.dailyPrice,b.rentalDays);b.total=Math.addExact(b.rentalTotal,b.oneWayFee);
+  b.expiresAt=RentalTerms.holdUntil(b.startAt,now);
+  b.rentalDays=rentalDays;b.dailyPrice=v.dailyPrice;
+  b.rentalTotal=RentalTerms.rent(b.dailyPrice,b.rentalDays);b.total=RentalTerms.total(b.rentalTotal,b.oneWayFee);
   b.customerName=accounts.profile(a.id()).fullName();b.vehicleName=v.name;b.status="PENDING";b.policyVersion="rental-2026-09-28";
   schedule(v,b,null);return b;
  }
