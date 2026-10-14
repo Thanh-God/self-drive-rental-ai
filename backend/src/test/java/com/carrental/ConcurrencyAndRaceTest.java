@@ -46,6 +46,11 @@ class ConcurrencyAndRaceTest {
     @DynamicPropertySource
     static void database(DynamicPropertyRegistry r) {
         String url = System.getenv("KDRIVE_TEST_DB_URL");
+        if (url != null && !url.isBlank()) {
+            CancelBoundaryTest.verifySafeIsolatedDatabase(url,
+                System.getenv("KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX"), System.getenv("KDRIVE_TEST_FIXTURE_MARKER_TOKEN"),
+                System.getenv("KDRIVE_TEST_DB_USER"), System.getenv("KDRIVE_TEST_DB_PASSWORD"));
+        }
         r.add("spring.datasource.url", () -> url == null ? "jdbc:h2:mem:concurrency;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1" : url);
         r.add("spring.datasource.username", () -> url == null ? "sa" : System.getenv("KDRIVE_TEST_DB_USER"));
         r.add("spring.datasource.password", () -> url == null ? "" : System.getenv("KDRIVE_TEST_DB_PASSWORD"));
@@ -76,6 +81,7 @@ class ConcurrencyAndRaceTest {
 
     @BeforeEach
     void setupLicenseAndResetSpies() {
+        CancelBoundaryTest.verifySafeIsolatedDatabase(jdbc);
         Mockito.reset(contractService, invoiceService, incidentCaseRepo, jdbc);
 
         // Dọn dẹp dữ liệu của các ca test trước để tránh xung đột lịch xe / dữ liệu tồn đọng

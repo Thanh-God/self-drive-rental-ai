@@ -2,6 +2,7 @@ package com.carrental;
 
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
@@ -18,6 +19,19 @@ class MySqlMigrationTest {
  private final String base=System.getenv("KDRIVE_MIGRATION_MYSQL_URL");
  private final String user=System.getenv("KDRIVE_MIGRATION_MYSQL_USER");
  private final String password=System.getenv("KDRIVE_MIGRATION_MYSQL_PASSWORD");
+ @BeforeEach void verifyFixtureBeforeDdl() {
+  String fixture=System.getenv("KDRIVE_TEST_DB_URL");
+  verifyMigrationTarget(base,fixture,()->CancelBoundaryTest.verifySafeIsolatedDatabase(fixture,
+   System.getenv("KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX"),System.getenv("KDRIVE_TEST_FIXTURE_MARKER_TOKEN"),user,password));
+ }
+ static void verifyMigrationTarget(String adminUrl,String fixtureUrl,Runnable verifyMarker) {
+  if(adminUrl==null || fixtureUrl==null || !fixtureUrl.matches("jdbc:mysql://127\\.0\\.0\\.1:[0-9]+/[A-Za-z0-9_]+\\?.*"))
+   throw new IllegalStateException("[MIGRATION GUARD] Explicit isolated fixture required before DDL");
+  var uri=java.net.URI.create(fixtureUrl.substring(5));
+  if(uri.getPort()==3306 || uri.getPort()==33385 || !adminUrl.equals(fixtureUrl.replace(uri.getPath()+"?","/mysql?")))
+   throw new IllegalStateException("[MIGRATION GUARD] Admin connection must match isolated fixture endpoint");
+  verifyMarker.run();
+ }
  private JdbcTemplate jdbc(String schema){return new JdbcTemplate(new DriverManagerDataSource(base.replace("/mysql?","/"+schema+"?"),user,password));}
  private Flyway flyway(String schema,String target){var config=Flyway.configure().dataSource(jdbc(schema).getDataSource()).locations("classpath:db/migration").cleanDisabled(true).baselineOnMigrate(false);if(target!=null)config.target(target);return config.load();}
  private List<Map<String,Object>> data(JdbcTemplate j){var result=new ArrayList<Map<String,Object>>();for(String table:j.queryForList("select table_name from information_schema.tables where table_schema=database() and table_name <> 'flyway_schema_history' order by table_name",String.class)){for(var row:j.queryForList("select * from `"+table+"` order by 1")){var copy=new TreeMap<String,Object>(row);copy.put("_table",table);result.add(copy);}}return result;}
