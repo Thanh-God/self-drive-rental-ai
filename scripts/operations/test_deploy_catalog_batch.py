@@ -89,6 +89,16 @@ class DeploymentGuards(unittest.TestCase):
         self.assertEqual(sentinel.read_text(), 'retain')
         self.assertEqual(len(list(out.iterdir())), 1)
 
+    def test_full_backup_retains_restore_metadata_while_content_digest_is_compact(self):
+        full = deploy.dump_command()
+        digest = deploy.dump_command(deploy.PROTECTED)
+        self.assertNotIn('--compact', full)
+        self.assertIn('--compact', digest)
+        self.assertIn('--single-transaction', full)
+        self.assertIn('--set-gtid-purged=OFF', full)
+        self.assertTrue(full.endswith(' kdrive'))
+        self.assertIn(' bookings ', digest)
+
 
 if __name__ == '__main__':
     unittest.main()

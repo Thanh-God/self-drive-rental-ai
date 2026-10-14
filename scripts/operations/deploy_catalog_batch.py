@@ -25,6 +25,15 @@ CATALOG_KEYS = ['vehicles', 'brands', 'categories', 'branches', 'routes', 'staff
 PROTECTED = ['users', 'driver_licenses', 'bookings', 'booking_status_history', 'contracts', 'invoices', 'invoice_items', 'vehicle_handover_records', 'reviews', 'incident_cases', 'incident_events']
 
 
+def dump_command(tables=None):
+    # Full backups retain mysqldump's restore-session metadata and FK ordering guards.
+    # Compact is only for deterministic content digests, never for a full restore backup.
+    options = '--single-transaction --skip-comments --skip-add-locks --skip-lock-tables --order-by-primary --hex-blob --set-gtid-purged=OFF --column-statistics=0'
+    if tables is not None:
+        options += ' --compact'
+    return 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot ' + options + ' kdrive' + ('' if tables is None else ' ' + ' '.join(tables))
+
+
 def validate_batch(batch, current):
     result = {}
     for name, expected_hash in APPROVED_HASHES.items():
@@ -107,6 +116,8 @@ def main():
     def must(command, input=None):
         result = run(command, input)
         if result.returncode:
+            with (out / 'native-failure.private.stderr').open('ab') as handle:
+                handle.write(result.stderr)
             raise RuntimeError('Private native operation failed; stopped without exposing credentials/data')
         return result.stdout
     def check(name, actual, expected):
@@ -121,7 +132,7 @@ def main():
             command = ['docker', 'exec', '-i', '-e', 'MYSQL_PWD=' + fixture_password, container, 'mysql', '-uroot', '--default-character-set=utf8mb4', '--batch', '--raw', '-N']
         return must(command, query.encode()).decode().strip()
     def dump(tables=None):
-        command = ['docker', 'exec', ORIGINAL, 'sh', '-c', 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysqldump -uroot --single-transaction --skip-comments --skip-add-locks --skip-lock-tables --compact --order-by-primary --hex-blob --set-gtid-purged=OFF --column-statistics=0 kdrive' + ('' if tables is None else ' ' + ' '.join(tables))]
+        command = ['docker', 'exec', ORIGINAL, 'sh', '-c', dump_command(tables)]
         return must(command)
     def table_checksums(container, schema, tables):
         rows = sql(container, 'CHECKSUM TABLE ' + ','.join('`' + schema + '`.`' + table + '`' for table in tables) + ';').splitlines()
@@ -146,6 +157,7 @@ def main():
         initial_checksums = table_checksums(ORIGINAL, 'kdrive', tables)
         protected_before = hashlib.sha256(dump(PROTECTED)).hexdigest()
         raw_backup = dump()
+        check('Full backup retains restore FK metadata', b'FOREIGN_KEY_CHECKS' in raw_backup, True)
         backup = out / 'kdrive-before.private.sql.gz'
         backup.write_bytes(gzip.compress(raw_backup))
         check('Backup gzip roundtrip SHA', hashlib.sha256(gzip.decompress(backup.read_bytes())).hexdigest(), hashlib.sha256(raw_backup).hexdigest())
