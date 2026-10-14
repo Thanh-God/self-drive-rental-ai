@@ -42,3 +42,7 @@ application-secret.yml
 
 # Private coordination, audit history and review records
 .local/internal-docs/
+
+# Python runner bytecode
+__pycache__/
+*.pyc
