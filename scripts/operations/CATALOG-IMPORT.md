@@ -4,6 +4,8 @@
 
 Manifest gồm `approved` (boolean), `branches` (mảng `{name, address}`) và `vehicles` (mảng `{name, plate, brand, category, branch, seats, transmission, dailyPrice}`). `branch` tham chiếu tên chi nhánh trong manifest. Chỉ hỗ trợ ô tô con 2–9 chỗ, `AUTO`/`MANUAL`; giá nguyên đồng dương. Biển số phải là xe riêng biệt, không dùng tên model thay danh tính xe. Manifest đề xuất có thể để null những mục chưa chốt nhưng không thể apply.
 
+Xe có thể thêm `description` tối đa2000ký tự. Với cấu hình giả lập cho đồ án, mã nội bộ có thể dùng thay biển số nếu được người dùng duyệt và tài liệu xác định rõ đây không phải xe/địa điểm kinh doanh thực. Không tạo biển số giống thật rồi tuyên bố đó là xe vận hành của doanh nghiệp.
+
 ```powershell
 python -X utf8 scripts/operations/catalog_import.py .runtime/catalog-approved.json
 python scripts/operations/test_catalog_import.py
@@ -24,3 +26,20 @@ Sau nhập: đọc lại `/vehicles`, `/vehicles/catalog`, `/branches`, đối c
 ## Kiểm tra giao diện với dữ liệu HTTP kiểm soát
 
 Đặt `KDRIVE_PLAYWRIGHT` trỏ module Playwright đã cài cùng Chromium tương ứng; chạy `node scripts/operations/verify-catalog-ui.cjs <thu-muc-evidence-moi>`. Runner tự mở Vite cổng5315 ở127.0.0.1 với strictPort, tự đóng server/browser trong finally; không dừng dịch vụ khác. Nó cấp20xe qua HTTP interception để kiểm 6thẻ homepage, link Xem thêm, trạng thái, logo và desktop1280/1440. Đây là kiểm tra render/interaction, không chứng minh backend hoặc dữ liệu database đã được bổ sung.
+
+## Điều chỉnh dữ liệu cũ, ảnh và vận hành qua API
+
+`configure_catalog.py <plan>` mặc định preview offline. Apply có cùng các cờ `--apply`, `--approved-sha256`, `--base-url`, `--journal` và token env như công cụ tạo mới. Plan có `approved`, các mảng tùy chọn:
+
+- `vehicles`/`branches`: `{expected, changes}`; expected chứa ID/version và các thuộc tính cần bảo toàn. Chỉ sửa name/plate/description của xe và name/address của chi nhánh; không đổi giá, trạng thái hoặc vị trí xe bằng công cụ này.
+- `images`: `{plate, model, url, attribution, sha256}`; chỉ asset local `/media/vehicles/` khớp hash và đúng tên xe. Thêm ảnh qua revision API, giữ ảnh có sẵn và từ chối credit khác cho cùng URL.
+- `routes`: `{pickup, return, fee}` tham chiếu tên chi nhánh sau sửa. Chỉ tạo tuyến còn thiếu; từ chối tuyến hiện có khác cấu hình. Phí0 cũng phải được duyệt, không được suy là policy kinh doanh mặc định.
+- `assignments`: `{userId, branch}` chỉ mở rộng phân công của Staff đã có phân công. Không tạo tài khoản/reset mật khẩu.
+
+Các amendment được kiểm trước write; ảnh kiểm hash local, không overwrite. Hai công cụ vẫn gồm nhiều transaction: dừng khi lỗi, giữ journal và đọc lại trước thử tiếp. Trình tự batch: tạo mới → configure → đọc lại. Sau configure đổi tên chi nhánh, không chạy mù manifest create cũ vì nó tham chiếu tên trước đổi; cần kiểm inventory/reconcile. Cấu hình đã khớp được giữ nguyên khi replay configure.
+
+## Rehearsal MySQL thật
+
+`python -X utf8 scripts/operations/rehearse_catalog.py --batch <runtime-batch> --backend-root <runtime-backend-copy> --evidence <runtime-evidence-moi>` yêu cầu batch `catalog-create-proposal.json` và `catalog-configure-proposal.json`. Runner chỉ tạo một fixture riêng port33681, backend8381/frontend5381; không nhận DB_URL đích từ manifest. Xác minh source copy và class bytes trong JAR; giữ volume stopped và đóng đúng process được tạo. Có schema riêng cho ca batch lỗi một phần; không dọn dữ liệu để giả rollback. Cần Docker/MySQL8.4, JDK21 và Playwright/Chromium đã cài theo cấu hình runner. Chạy tuần tự khi các cổng trống.
+
+Runner tạo bản manifest approved chỉ bên trong fixture evidence để kiểm thử, không đổi cờ approved của đề xuất dành cho DB vận hành. Nó gọi actual CLI/API, kiểm repeat/conflict/partial failure, bảo toàn dữ liệu và contract đại diện, giá/quyền Staff cùng browser thật không interception. Source runner cần phù hợp inventory/identity của batch; không dùng cho project/DB khác. Cấu hình cổng/JDK/runtime hiện là môi trường phát triển local, không phải production.

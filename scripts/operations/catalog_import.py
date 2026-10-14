@@ -37,6 +37,8 @@ def validate(data):
         if type(v.get("seats")) is not int or not 2 <= v["seats"] <= 9 or v.get("transmission") not in ("AUTO", "MANUAL"):
             raise ValueError("Only supported passenger cars may be imported")
         plates.append(v["plate"].upper())
+        if v.get("description") is not None and (not isinstance(v["description"], str) or len(v["description"]) > 2000):
+            raise ValueError("Invalid description")
     if len(set(plates)) != len(plates):
         raise ValueError("Duplicate plates")
 
@@ -116,6 +118,8 @@ def apply(data, call, record):
         payload.update(plate=v["plate"].upper(), brandId=brand_map[v["brand"].casefold()]["id"],
                        categoryId=category_map[v["category"].casefold()]["id"],
                        homeBranchId=branch_map[v["branch"].casefold()]["id"], status="ACTIVE", version=0)
+        if v.get("description") is not None:
+            payload["description"] = v["description"]
         create("/admin/vehicles", payload)
 
 

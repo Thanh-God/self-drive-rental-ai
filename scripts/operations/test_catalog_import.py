@@ -43,13 +43,16 @@ class FakeAPI:
 class ImportTests(unittest.TestCase):
     def test_create_order_and_typed_payload(self):
         api, journal = FakeAPI(), []
-        module.apply(manifest(), api, journal.append)
+        data = manifest()
+        data["vehicles"][0]["description"] = "Reviewed vehicle description"
+        module.apply(data, api, journal.append)
         posts = [(path, body) for method, path, body in api.calls if method == "POST"]
         self.assertEqual([p for p, _ in posts], ["/admin/branches", "/admin/vehicle-brands", "/admin/vehicle-categories", "/admin/vehicles"])
         self.assertEqual(posts[-1][1]["homeBranchId"], journal[0]["id"])
         self.assertEqual(posts[-1][1]["brandId"], journal[1]["id"])
         self.assertEqual(posts[-1][1]["dailyPrice"], 650000)
         self.assertEqual(posts[-1][1]["status"], "ACTIVE")
+        self.assertEqual(posts[-1][1]["description"], "Reviewed vehicle description")
 
     def test_refuse_unapproved_or_incomplete_before_network(self):
         changes = [{"approved": False}, {"branches": [{"name": "Branch A", "address": None}]}]
@@ -61,7 +64,7 @@ class ImportTests(unittest.TestCase):
             self.assertEqual(api.calls, [])
 
     def test_invalid_vehicle_references_and_duplicate_plates(self):
-        for patch in [{"branch": "missing"}, {"dailyPrice": 0}, {"dailyPrice": True}, {"seats": 1}, {"transmission": "SCOOTER"}]:
+        for patch in [{"branch": "missing"}, {"dailyPrice": 0}, {"dailyPrice": True}, {"seats": 1}, {"transmission": "SCOOTER"}, {"description": "x" * 2001}]:
             data = manifest()
             data["vehicles"][0].update(patch)
             with self.assertRaises(ValueError):

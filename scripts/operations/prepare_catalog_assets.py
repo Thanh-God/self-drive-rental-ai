@@ -60,12 +60,12 @@ def prepare(models, out, resume=False):
             continue
         slug = re.sub(r"[^a-z0-9]+", "-", model.lower()).strip("-")
         params = {"action": "query", "format": "json", "generator": "search", "gsrnamespace": 6,
-                  "gsrsearch": '"' + model + '" filetype:bitmap' + (' -hatchback' if model == 'Honda City' else ''), "gsrlimit": 12,
+                  "gsrsearch": '"' + model + '" filetype:bitmap' + (' -hatchback' if model == 'Honda City' else '') + (' N18' if model == 'Nissan Almera' else '') + (' -screen -interior -dashboard' if model == 'VinFast VF 6' else ''), "gsrlimit": 12,
                   "prop": "imageinfo", "iiprop": "url|extmetadata|size", "iiurlwidth": 1200}
         raw = fetch("https://commons.wikimedia.org/w/api.php?" + urlencode(params))
         (out / (slug + ".metadata.json")).write_bytes(raw)
         pages = list(json.loads(raw).get("query", {}).get("pages", {}).values())
-        pages.sort(key=lambda p: (bool(re.search(r"rear|interior|engine|logo|wheel|dashboard|badge|concept", p.get("title", ""), re.I)),
+        pages.sort(key=lambda p: (bool(re.search(r"rear|interior|engine|logo|wheel|dashboard|badge|concept|screen|detail", p.get("title", ""), re.I)),
                                   not bool(re.search(r"front", p.get("title", ""), re.I)), p.get("index", 999)))
         for page in pages:
             try:
