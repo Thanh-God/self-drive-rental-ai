@@ -21,9 +21,9 @@ export default function WorkspaceTopbar({ areaLabel }) {
       ) : null}
       <Link
         to="/"
-        className="flex items-center gap-2 text-sm font-semibold text-teal-800"
+        className="flex items-center gap-3 text-xl font-bold text-teal-800"
       >
-        <Car className="h-5 w-5" />
+        <Car className="h-7 w-7" />
         KDrive
         <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
           {areaLabel}

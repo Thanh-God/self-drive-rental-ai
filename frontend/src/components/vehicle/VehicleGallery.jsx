@@ -12,7 +12,7 @@ function Gallery({ vehicle }) {
   return (
     <section className="vehicle-gallery" aria-label={`Thư viện ảnh ${vehicle.name}`}>
       <VehicleVisual vehicle={vehicle} large customSrc={selected?.url} />
-      {selected ? <p className="image-credit">Ảnh minh họa mẫu xe · {selected.attribution || "Chưa cung cấp thông tin nguồn ảnh"}</p> : null}
+      {selected ? <p className="image-credit">Ảnh minh họa · {selected.attribution || "Chưa cung cấp thông tin nguồn ảnh"}</p> : null}
       {images.length > 1 ? <div className="gallery-thumbnails" aria-label="Chọn ảnh xe">
         {images.map((image, index) => <button key={image.id} type="button" aria-label={`Xem ảnh ${index + 1}`} aria-pressed={selected?.id === image.id} onClick={() => setSelectedId(image.id)}>
           <img src={image.url} alt={`Ảnh ${index + 1} của ${vehicle.name}`} loading="lazy" />

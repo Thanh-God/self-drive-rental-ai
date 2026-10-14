@@ -10,7 +10,7 @@ export default function Footer() {
           <p className="mt-2 text-sm leading-6">
             {DEMO_MODE
               ? "Hệ thống cho thuê xe tự lái với bản xem trước gợi ý xe và lập kế hoạch hành trình AI."
-              : "Hệ thống cho thuê xe tự lái; giá, khả dụng và đơn thuê được xác nhận từ API."}
+              : "Thuê xe tự lái theo hành trình của bạn. Xem xe, kiểm tra giá và theo dõi đơn thuê tại KDrive."}
           </p>
         </div>
         <div>

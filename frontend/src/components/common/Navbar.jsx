@@ -53,10 +53,10 @@ export default function Navbar() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4">
         <Link
           to="/"
-          className="flex items-center gap-2 font-semibold text-teal-800"
+          className="flex items-center gap-3 text-2xl font-bold text-teal-800"
         >
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-700 text-white">
-            <Car className="h-5 w-5" />
+          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-teal-700 text-white">
+            <Car className="h-7 w-7" />
           </span>
           <span>
             KDrive

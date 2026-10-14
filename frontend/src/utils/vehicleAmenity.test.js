@@ -649,7 +649,7 @@ test("Homepage API uses real cards, one H1 and honest availability copy", async 
   assert.equal(mounted.container.querySelectorAll("h1").length, 1);
   const card = mounted.container.querySelector("article");
   assert.match(card.textContent, /Bluetooth/);
-  assert.match(card.textContent, /Đang khai thác/);
+  assert.match(card.textContent, /Sẵn sàng thuê/);
   assert.doesNotMatch(mounted.container.textContent, /Không tính phí ẩn|bảo đảm ngay/);
   assert.equal(mounted.container.querySelector(".animate-pulse"), null);
   const cta = Array.from(mounted.container.querySelectorAll("a")).find(link => link.textContent === "Xem toàn bộ xe ↗");
@@ -665,6 +665,60 @@ test("Shared vehicle card retains demo label separately from API state", async (
   assert.match(mounted.container.textContent, /Sẵn sàng/);
   assert.match(mounted.container.textContent, /Bluetooth/);
   await mounted.unmount();
+});
+
+test("Desktop catalog: six homepage cards, all twenty list rows and readable status filters", async () => {
+  const { ApiHomePage, ApiVehicleListPage } = await viteServer.ssrLoadModule("/src/pages/api/ApiScreens.jsx");
+  const { MemoryRouter } = await viteServer.ssrLoadModule("react-router-dom");
+  const rows = Array.from({ length: 20 }, (_, index) => ({
+    ...mockVehicles[0], id: `car-${index}`, name: `Xe ${String(index).padStart(2, "0")}`,
+    status: index === 18 ? "MAINTENANCE" : index === 19 ? "INACTIVE" : "ACTIVE",
+  }));
+  const render = async (Component) => {
+    const mounted = await mount(createElement(AuthProvider, null,
+      createElement(MemoryRouter, null, createElement(Component))));
+    await act(async () => {
+      fulfill(takeRequest("/vehicles"), rows);
+      fulfill(takeRequest("/vehicles/catalog"), mockCatalog);
+    });
+    return mounted;
+  };
+  const home = await render(ApiHomePage);
+  assert.equal(home.container.querySelectorAll("article.vehicle-card").length, 6);
+  const more = Array.from(home.container.querySelectorAll("a")).find(a => a.textContent.startsWith("Xem thêm"));
+  assert.equal(more.getAttribute("href"), "/vehicles");
+  assert.doesNotMatch(home.container.textContent, /Xem tất cả xe trong hệ thống|demo|dữ liệu mẫu/i);
+  await home.unmount();
+  const list = await render(ApiVehicleListPage);
+  assert.equal(list.container.querySelectorAll("article.vehicle-card").length, 20);
+  const statusLabel = Array.from(list.container.querySelectorAll("label")).find(label => label.textContent.includes("Trạng thái xe"));
+  const select = statusLabel.querySelector("select");
+  assert.deepEqual(Array.from(select.options, o => o.textContent), ["Tất cả", "Sẵn sàng thuê", "Đang bảo trì", "Tạm ngưng"]);
+  for (const [status, count] of [["MAINTENANCE", 1], ["INACTIVE", 1], ["ACTIVE", 18], ["", 20]]) {
+    await act(async () => { select.value = status; select.dispatchEvent(new dom.window.Event("change", { bubbles: true })); });
+    assert.equal(list.container.querySelectorAll("article.vehicle-card").length, count);
+  }
+  assert.match(list.container.textContent, /Lịch trống được kiểm tra/);
+  await list.unmount();
+});
+
+test("Homepage never invents cars for a sparse, empty or failed API response", async () => {
+  const { ApiHomePage } = await viteServer.ssrLoadModule("/src/pages/api/ApiScreens.jsx");
+  const { MemoryRouter } = await viteServer.ssrLoadModule("react-router-dom");
+  for (const count of [3, 0, -1]) {
+    const mounted = await mount(createElement(AuthProvider, null,
+      createElement(MemoryRouter, null, createElement(ApiHomePage))));
+    await act(async () => {
+      const request = takeRequest("/vehicles");
+      if (count < 0) rejectWithStatus(request, 503, { message: "Không tải được danh sách xe" });
+      else fulfill(request, Array.from({ length: count }, (_, i) => ({ ...mockVehicles[0], id: `sparse-${i}` })));
+      fulfill(takeRequest("/vehicles/catalog"), mockCatalog);
+    });
+    assert.equal(mounted.container.querySelectorAll("article.vehicle-card").length, Math.max(count, 0));
+    if (count === 0) assert.match(mounted.container.textContent, /Chưa có xe nào/);
+    if (count < 0) assert.match(mounted.container.textContent, /Thử tải lại/);
+    await mounted.unmount();
+  }
 });
 
 test("Late save of an old vehicle cannot claim success on the new editor", async () => {

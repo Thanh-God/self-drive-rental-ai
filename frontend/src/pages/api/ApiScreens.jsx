@@ -94,10 +94,10 @@ function VehicleOperationalStatus({ status }) {
   const available = status === "ACTIVE";
   const label =
     status === "ACTIVE"
-      ? "Đang khai thác"
+      ? "Sẵn sàng thuê"
       : status === "MAINTENANCE"
         ? "Đang bảo trì"
-        : "Ngừng khai thác";
+        : "Tạm ngưng";
   return (
     <span
       className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
@@ -539,7 +539,7 @@ export function ApiHomePage() {
         </div>
         <div className="urban-hero-photo">
           {!loading && !error && vehicles[0] ? <VehicleGallery vehicle={vehicles[0]} /> : <div className="urban-photo-empty">Hành trình của bạn bắt đầu tại đây.</div>}
-          <div className="urban-photo-caption"><span>ĐỒNG HÀNH CÙNG BẠN</span><strong>{!loading && !error ? vehicles[0]?.name || "Khám phá danh mục xe" : "Khám phá danh mục xe"}</strong>{vehicles[0]?.images?.length ? <small>Ảnh minh họa mẫu xe</small> : null}</div>
+          <div className="urban-photo-caption"><span>ĐỒNG HÀNH CÙNG BẠN</span><strong>{!loading && !error ? vehicles[0]?.name || "Khám phá danh mục xe" : "Khám phá danh mục xe"}</strong>{vehicles[0]?.images?.length ? <small>Ảnh minh họa</small> : null}</div>
         </div>
       </section>
       <section className="urban-promises" aria-label="Thông tin thuê xe">
@@ -584,7 +584,7 @@ export function ApiHomePage() {
                   className="btn-secondary inline-flex items-center gap-2 px-6 py-2.5 font-medium"
                   to="/vehicles"
                 >
-                  Xem tất cả xe trong hệ thống <span>→</span>
+                  Xem thêm <span aria-hidden="true">→</span>
                 </Link>
               </div>
             </div>
@@ -680,7 +680,7 @@ export function ApiVehicleListPage() {
     <><BrandBar vehicles={vehiclesRequest.data} catalog={catalogRequest.data} loading={loading} error={error} />
     <Page
       title="Danh sách xe"
-      description="Lọc xe theo tên, hãng hoặc trạng thái khai thác."
+      description="Tìm xe theo tên, hãng, loại xe và trạng thái. Lịch trống được kiểm tra khi bạn yêu cầu báo giá."
     >
       <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Field label="Tìm xe">
@@ -689,15 +689,15 @@ export function ApiVehicleListPage() {
             onChange={(event) => setQuery(event.target.value)}
           />
         </Field>
-        <Field label="Tình trạng khai thác">
+        <Field label="Trạng thái xe">
           <select
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
             <option value="">Tất cả</option>
-            <option value="ACTIVE">Đang khai thác</option>
-            <option value="MAINTENANCE">Bảo trì</option>
-            <option value="INACTIVE">Ngừng khai thác</option>
+            <option value="ACTIVE">Sẵn sàng thuê</option>
+            <option value="MAINTENANCE">Đang bảo trì</option>
+            <option value="INACTIVE">Tạm ngưng</option>
           </select>
         </Field>
         <Field label="Loại xe">

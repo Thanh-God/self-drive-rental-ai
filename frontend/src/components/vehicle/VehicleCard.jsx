@@ -37,7 +37,7 @@ export function VehicleVisual({
         </div>
         <div className="absolute bottom-2.5 right-3">
           <span className="rounded bg-black/60 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wider text-slate-200 backdrop-blur-sm">
-            {vehicle?.noLocalAsset ? "Ảnh minh họa mẫu xe" : vehicle?.plate || "DEMO"}
+            {vehicle?.noLocalAsset ? "Ảnh minh họa" : vehicle?.plate || "Minh họa"}
           </span>
         </div>
       </div>
@@ -80,12 +80,12 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0 }) {
               {vehicle.brand}
             </span>
             {isAvailable ? (
-              <Badge tone="success">{vehicle.noLocalAsset ? "Đang khai thác" : "Sẵn sàng"}</Badge>
+              <Badge tone="success">Sẵn sàng thuê</Badge>
             ) : (
               <Badge tone="warning">
                 {vehicle.status === "MAINTENANCE"
-                  ? "Bảo trì"
-                  : "Ngừng khai thác"}
+                  ? "Đang bảo trì"
+                  : "Tạm ngưng"}
               </Badge>
             )}
           </div>

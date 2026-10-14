@@ -112,8 +112,7 @@ export function DataGate({ children }) {
     return (
       <Page title="Chức năng đang chờ kết nối">
         <Notice>
-          Chế độ API đang bật. Màn hình nghiệp vụ này chưa có hợp đồng API được
-          xác nhận; dữ liệu demo không được sử dụng.
+          Tính năng này chưa được cung cấp. Vui lòng quay lại sau.
         </Notice>
       </Page>
     );
