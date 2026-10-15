@@ -16,6 +16,7 @@ export default function Footer() {
         <div>
           <p className="text-sm font-semibold text-white">Khám phá</p>
           <ul className="mt-3 space-y-2 text-sm">
+            <li><Link to="/rental-guide" className="hover:text-white">Hướng dẫn thuê xe</Link></li>
             <li>
               <Link to="/vehicles" className="hover:text-white">
                 Duyệt xe

@@ -1,3 +1,4 @@
+import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
 import VehicleGallery from "../../components/vehicle/VehicleGallery";
 import BrandBar from "../../components/vehicle/BrandBar";
@@ -1508,9 +1509,10 @@ export function ApiBookingDetailPage({ area = "user" }) {
       title={booking ? `Đơn ${booking.id}` : "Chi tiết đơn thuê"}
       description={booking?.vehicleName}
       actions={
+        <div className="flex flex-wrap gap-3"><button type="button" className="btn-secondary" onClick={request.reload} disabled={request.loading}>Tải lại đơn</button>
         <Link className="btn-secondary" to={`/${area}/bookings`}>
           Quay lại danh sách
-        </Link>
+        </Link></div>
       }
     >
       <RequestState
@@ -1557,7 +1559,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                         `${booking.rentalDays} ngày × ${money(booking.dailyPrice)}`,
                       ],
                       ["Phí tuyến", money(booking.oneWayFee)],
-                      ["Tổng tiền snapshot", money(booking.total)],
+                      ["Tổng tiền lúc đặt", money(booking.total)],
                     ].map(([label, value]) => (
                       <div key={label}>
                         <dt className="text-slate-500">{label}</dt>
@@ -1569,36 +1571,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     Tổng tiền không xác nhận đã thanh toán.
                   </p>
                 </section>
-                <section className="panel">
-                  <h2 className="mb-4 text-lg font-semibold">
-                    Lịch sử trạng thái
-                  </h2>
-                  {detail.history?.length ? (
-                    <ol className="space-y-3">
-                      {detail.history.map((event, index) => (
-                        <li
-                          className="border-l-2 border-teal-200 pl-4 text-sm"
-                          key={`${event.occurred_at}-${index}`}
-                        >
-                          <p className="font-semibold">
-                            {event.previous_status || "Mới"} →{" "}
-                            {event.next_status}
-                          </p>
-                          <p className="mt-1 text-slate-500">
-                            {dateTime(event.occurred_at)}
-                          </p>
-                          {event.reason ? (
-                            <p className="mt-1">{event.reason}</p>
-                          ) : null}
-                        </li>
-                      ))}
-                    </ol>
-                  ) : (
-                    <p className="text-sm text-slate-500">
-                      Chưa có lịch sử trạng thái.
-                    </p>
-                  )}
-                </section>
+                <BookingProgress booking={booking} history={detail.history} role={currentUser?.role} actions={availableActions} area={area} />
                 {detail.records?.length ? (
                   <section className="panel">
                     <h2 className="mb-4 text-lg font-semibold">
@@ -1631,23 +1604,6 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     </div>
                   </section>
                 ) : null}
-                <section className="panel">
-                  <h2 className="mb-4 text-lg font-semibold">Hồ sơ đơn</h2>
-                  <div className="flex flex-wrap gap-3">
-                    <Link
-                      className="btn-secondary"
-                      to={`/${area}/bookings/${booking.id}/contract`}
-                    >
-                      Hợp đồng
-                    </Link>
-                    <Link
-                      className="btn-secondary"
-                      to={`/${area}/bookings/${booking.id}/invoice`}
-                    >
-                      Hóa đơn
-                    </Link>
-                  </div>
-                </section>
                 <BookingReviewSection
                   booking={booking}
                   area={area}

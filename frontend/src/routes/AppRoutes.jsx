@@ -1,3 +1,4 @@
+import RentalGuidePage from "../pages/guest/RentalGuidePage";
 import ApiVehicleFavoritesPage from "../pages/api/ApiVehicleFavoritesPage";
 import ApiDashboardPage from "../pages/api/ApiDashboardPage";
 import ApiVehicleComparePage from "../pages/api/ApiVehicleComparePage";
@@ -70,6 +71,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route element={<GuestLayout />}>
+        <Route path="/rental-guide" element={<RentalGuidePage />} />
         <Route path="/vehicles/favorites" element={DEMO_MODE ? <Navigate to="/vehicles" replace /> : <ApiVehicleFavoritesPage />} />
         <Route path="/vehicles/compare" element={DEMO_MODE ? <Navigate to="/vehicles" replace /> : <ApiVehicleComparePage />} />
         <Route path="/" element={DEMO_MODE ? <HomePage /> : <ApiHomePage />} />
