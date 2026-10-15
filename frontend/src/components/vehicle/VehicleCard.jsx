@@ -64,12 +64,13 @@ export function VehicleVisual({
   );
 }
 
-export default function VehicleCard({ vehicle, search = "", rentalDays = 0 }) {
+export default function VehicleCard({ vehicle, search = "", rentalDays = 0, compareControl = null }) {
   const isAvailable = vehicle.status === "ACTIVE";
   const totalPrice = rentalDays > 0 ? vehicle.price * rentalDays : 0;
 
   return (
     <article className="vehicle-card group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-[transform,box-shadow,border-color] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md">
+      {compareControl}
       <div>
         <Link to={`/vehicles/${vehicle.id}${search}`} className="block">
           <VehicleVisual vehicle={vehicle} />

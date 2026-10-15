@@ -1,4 +1,5 @@
 import ApiDashboardPage from "../pages/api/ApiDashboardPage";
+import ApiVehicleComparePage from "../pages/api/ApiVehicleComparePage";
 import ApiVehicleCatalogPage from "../pages/api/ApiVehicleCatalogPage";
 import { Navigate, Route, Routes } from "react-router-dom";
 import AdminLayout from "../layouts/AdminLayout";
@@ -68,6 +69,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route element={<GuestLayout />}>
+        <Route path="/vehicles/compare" element={DEMO_MODE ? <Navigate to="/vehicles" replace /> : <ApiVehicleComparePage />} />
         <Route path="/" element={DEMO_MODE ? <HomePage /> : <ApiHomePage />} />
         <Route
           path="/vehicles"

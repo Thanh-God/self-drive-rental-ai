@@ -208,6 +208,14 @@ body {
   .urban-promises { grid-template-columns: 1fr; }
 }
 /* Unified vehicle search. Keep controls scoped away from booking/operations. */
+.compare-scroll { overflow-x: auto; padding: .25rem; }
+.compare-grid { display: grid; gap: 1rem; align-items: start; }
+.compare-count-1 { grid-template-columns: minmax(260px,1fr); max-width: 26rem; }
+.compare-count-2 { grid-template-columns: repeat(2,minmax(260px,1fr)); }
+.compare-count-3 { grid-template-columns: repeat(3,minmax(260px,1fr)); }
+.compare-column { min-width: 0; }
+.compare-specs dt { font-size: .8125rem; color: var(--color-ink-500); margin-top: 1rem; }
+.compare-specs dd { min-height: 1.5rem; margin-top: .25rem; overflow-wrap: anywhere; }
 .trip-search { margin-bottom: 1.5rem; }
 .search-subtitle { font-size: .75rem; color: var(--color-ink-500); margin: .375rem 0 1.25rem; }
 .search-trip-row, .search-vehicle-row { display: grid; grid-template-columns: repeat(12,minmax(0,1fr)); gap: 1rem; }

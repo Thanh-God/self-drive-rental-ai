@@ -1,6 +1,7 @@
 import VehicleGallery from "../../components/vehicle/VehicleGallery";
 import BrandBar from "../../components/vehicle/BrandBar";
 import TripSearchForm from "../../components/vehicle/TripSearchForm";
+import CompareTray, { CompareToggle } from "../../components/vehicle/CompareControls";
 import { searchParams, searchSuffix, tripSearch } from "../../utils/vehicleSearch";
 import PasswordField from "../../components/common/PasswordField";
 import { passwordError, passwordHint } from "../../utils/passwordPolicy";
@@ -692,7 +693,8 @@ export function ApiVehicleListPage() {
         params={params} catalog={catalogRequest.data}
         branches={(Array.isArray(branchesRequest.data) ? branchesRequest.data : []).filter(branch => branch.status === "ACTIVE")}
         loading={branchesRequest.loading} error={branchesRequest.error} onRetry={branchesRequest.reload}
-        onSubmit={update} onUpdate={update} onClear={() => setParams(brand ? {brand} : {})} />
+        onSubmit={update} onUpdate={update} onClear={() => setParams({...brand ? {brand} : {},...params.get("compare") ? {compare:params.get("compare")} : {}})} />
+      <CompareTray />
       <div className="search-results-heading">
         <p aria-live="polite">{loading ? "Đang tìm xe…" : error ? "Chưa thể hiển thị kết quả" : `${vehicles.length} xe phù hợp`}</p>
         <div className="search-result-sort"><label htmlFor="vehicle-result-sort">Sắp xếp</label><select id="vehicle-result-sort" value={sort} onChange={event => setSort(event.target.value)}>
@@ -703,7 +705,7 @@ export function ApiVehicleListPage() {
         {vehicles.length ? (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {vehicles.map((vehicle) => (
-              <VehicleCard key={vehicle.id} vehicle={vehicle} search={searchSuffix(params)} />
+              <VehicleCard key={vehicle.id} vehicle={vehicle} search={searchSuffix(params)} compareControl={<CompareToggle vehicleId={vehicle.id} name={vehicle.name} />} />
             ))}
           </div>
         ) : (
@@ -736,6 +738,7 @@ export function ApiVehicleDetailPage() {
   return (
     <Page title={vehicle?.name || "Chi tiết xe"}>
       <Link className="btn-secondary mb-5 inline-flex" to={`/vehicles${searchSuffix(params)}`}>Về danh sách xe</Link>
+      <CompareTray />
       <RequestState
         loading={loading}
         error={error}
@@ -784,6 +787,7 @@ export function ApiVehicleDetailPage() {
               )}
             </section>
             <aside className="panel h-fit">
+              <CompareToggle vehicleId={vehicle.id} name={vehicle.name} />
               <VehicleOperationalStatus status={vehicle.status} />
               <p className="mt-4 text-2xl font-bold text-teal-800">
                 {money(vehicle.price)}{" "}

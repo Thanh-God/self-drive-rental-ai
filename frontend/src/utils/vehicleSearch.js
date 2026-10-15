@@ -1,4 +1,4 @@
-const keys = ["brand", "q", "category", "seats", "transmission", "sort", "preset", "start", "end", "pickupBranchId", "returnBranchId", "budget"];
+const keys = ["brand", "q", "category", "seats", "transmission", "sort", "preset", "compare", "start", "end", "pickupBranchId", "returnBranchId", "budget"];
 export function searchParams(source, changes = {}) {
   const result = new URLSearchParams();
   for (const key of keys) {
