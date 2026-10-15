@@ -12,7 +12,8 @@ def main():
     parser.add_argument('--native-evidence',required=True,type=Path)
     parser.add_argument('--backend-root',required=True,type=Path)
     parser.add_argument('--evidence',required=True,type=Path)
-    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs'],default='verify-vehicle-search-form.cjs')
+    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs','verify-vehicle-compare.cjs'],default='verify-vehicle-search-form.cjs')
+    parser.add_argument('--expected-bookings',type=int,choices=[0,1],default=0)
     args=parser.parse_args()
     native,backend,out=[p.resolve() for p in (args.native_evidence,args.backend_root,args.evidence)]
     if not all(p.is_relative_to(REPO/'.runtime') for p in (native,backend,out)) or out.exists(): raise ValueError('New runtime output required')
@@ -82,10 +83,10 @@ def main():
         result=subprocess.run(['node',str(REPO/'scripts/operations'/args.browser_script)],cwd=REPO,env=env,capture_output=True,creationflags=FLAGS,timeout=180)
         (out/'browser.log').write_bytes(result.stdout+result.stderr);(out/'browser.exit').write_text(str(result.returncode))
         if result.returncode:raise RuntimeError('Browser proof failed; see browser.log')
-        if sql(f'SELECT count(*) FROM {schema}.bookings').strip()!=b'0':raise AssertionError('Search/quote flow created a booking')
+        if sql(f'SELECT count(*) FROM {schema}.bookings').strip()!=str(args.expected_bookings).encode():raise AssertionError('Unexpected fixture booking count')
         if before!=hashes():raise AssertionError('Source drift')
         (out/'inputs-after.json').write_text(json.dumps(hashes(),indent=2))
-        (out/'result.json').write_text(json.dumps({'status':'PASS scoped browser','originalDBWrites':False,'bookingCount':0},indent=2))
+        (out/'result.json').write_text(json.dumps({'status':'PASS scoped browser','originalDBWrites':False,'bookingCount':args.expected_bookings},indent=2))
         print('PASS native browser trip flow')
     finally:
         for process in reversed(processes):

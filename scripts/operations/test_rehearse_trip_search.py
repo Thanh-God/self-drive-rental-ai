@@ -3,11 +3,19 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import io
+from contextlib import redirect_stderr
 import unittest
 from unittest.mock import patch
 import rehearse_trip_search as runner
 
 class TripRunnerGuardTest(unittest.TestCase):
+    def test_unsupported_booking_count_refused_before_any_process(self):
+        argv=['runner','--native-evidence','missing','--backend-root','missing','--evidence','missing','--expected-bookings','2']
+        with patch.object(sys,'argv',argv),patch.object(runner.subprocess,'run') as process,redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as error:runner.main()
+            self.assertEqual(error.exception.code,2)
+            process.assert_not_called()
     def invoke(self, root, fixture, out=None, backend=None):
         native=root/'native';native.mkdir()
         (native/'fixture.json').write_text(json.dumps(fixture))

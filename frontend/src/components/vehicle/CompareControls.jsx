@@ -11,7 +11,7 @@ export function CompareToggle({ vehicleId, name }) {
   return <div className="my-2"><button type="button" className="btn-secondary text-xs" aria-pressed={selected} aria-label={`${selected ? "Bỏ so sánh" : "So sánh"} ${name}`} onClick={() => {
     const next=toggleCompare(ids,vehicleId);setIssue(next.issue);
     if (!next.issue) setParams(searchParams(params,{compare:next.ids.join(",")}));
-  }}>{selected ? "✓ Đã chọn so sánh" : "+ So sánh"}</button>{issue ? <p role="status" className="mt-2 text-xs text-red-700">{issue}</p> : null}</div>;
+  }}>{selected ? "✓ Đã chọn so sánh" : "+ So sánh"}</button>{issue && ids.length === 3 ? <p role="status" className="mt-2 text-xs text-red-700">{issue}</p> : null}</div>;
 }
 
 export default function CompareTray() {
