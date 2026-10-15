@@ -14,7 +14,7 @@ test("comparison accepts zero to three unique IDs; invalid, duplicate and fourth
  assert.ok(toggleCompare(["v1","v2","v3"],"v4").issue);
  assert.deepEqual(toggleCompare(["v1","v2"],"v1").ids,["v2"]);
 });
-let dom,vite,createRoot,List,Compare,Detail,Auth,Router,Routes,Route,Link,client;
+let dom,vite,createRoot,List,Compare,Detail,Auth,Router,Routes,Route,Link,client,Favorites,FavoriteToggle;
 const roots=[],originals=new Map(),oldMode=process.env.VITE_DATA_MODE;
 const cars=Array.from({length:4},(_,i)=>({id:"v"+(i+1),name:"Car "+(i+1),brandId:"b",categoryId:"sedan",currentBranchId:"dn",status:"ACTIVE",transmission:"AUTO",seats:5,dailyPrice:600000+i*100000,amenities:[{id:"a",name:"Bluetooth"}]}));
 const catalog={brands:[{id:"b",name:"Brand"}],categories:[{id:"sedan",name:"Sedan"}]};
@@ -26,7 +26,38 @@ before(async()=>{
  vite=await createServer({root:fileURLToPath(new URL("../..",import.meta.url)),server:{middlewareMode:true},appType:"custom",logLevel:"error"});
  ({ApiVehicleListPage:List,ApiVehicleDetailPage:Detail}=await vite.ssrLoadModule("/src/pages/api/ApiScreens.jsx"));({default:Compare}=await vite.ssrLoadModule("/src/pages/api/ApiVehicleComparePage.jsx"));({default:Auth}=await vite.ssrLoadModule("/src/context/AuthContext.jsx"));
  ({MemoryRouter:Router,Routes,Route,Link}=await vite.ssrLoadModule("react-router-dom"));({default:client}=await vite.ssrLoadModule("/src/api/client.js"));
+ ({default:Favorites}=await vite.ssrLoadModule("/src/pages/api/ApiVehicleFavoritesPage.jsx"));
+ ({FavoriteToggle}=await vite.ssrLoadModule("/src/components/vehicle/FavoriteControls.jsx"));
  client.defaults.adapter=async config=>({config,data:await handler(config),status:200,statusText:"OK",headers:{}});
+});
+test("favorite controls isolate accounts, hide during hydration, restore guest and same-account selection",async()=>{
+ const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);
+ const render=async value=>act(async()=>root.render(h(Auth.Provider,{value},h(FavoriteToggle,{vehicleId:'v1',name:'Car 1'}))));
+ await render({user:null});await act(async()=>btn(c,'Yêu thích Car 1').click());assert.ok(btn(c,'Bỏ yêu thích Car 1'));
+ await render({user:{id:'account-a'}});assert.ok(btn(c,'Yêu thích Car 1'));await act(async()=>btn(c,'Yêu thích Car 1').click());
+ await render({loading:true,user:{id:'account-a'}});assert.equal(btn(c,'Yêu thích Car 1').disabled,true);
+ await render({user:{id:'account-b'}});assert.equal(btn(c,'Yêu thích Car 1').getAttribute('aria-pressed'),'false');
+ await render({user:{id:'account-a'}});assert.ok(btn(c,'Bỏ yêu thích Car 1'));
+ await render({user:null});assert.ok(btn(c,'Bỏ yêu thích Car 1'));
+});
+test("favorites use current API records, retain URL, expose missing IDs and hide stale values on reload failure",async()=>{
+ handler=defaults;
+ const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);
+ const value={user:{id:'favorites-page'}};
+ await act(async()=>root.render(h(Auth.Provider,{value},h(FavoriteToggle,{vehicleId:'v1',name:'Car 1'}))));
+ await act(async()=>btn(c,'Yêu thích Car 1').click());
+ await act(async()=>root.render(h(Auth.Provider,{value},h(FavoriteToggle,{vehicleId:'removed',name:'Removed'}))));
+ await act(async()=>btn(c,'Yêu thích Removed').click());
+ await act(async()=>root.render(h(Router,{initialEntries:['/vehicles/favorites?brand=b&seats=7']},h(Auth.Provider,{value},h(Favorites)))));
+ assert.equal(c.querySelectorAll('.vehicle-card').length,1);assert.match(c.textContent,/không còn trong danh mục/);
+ assert.equal(new URL(c.querySelector('a').href).searchParams.get('brand'),'b');
+ handler=config=>config.url==='/vehicles'?[{...cars[0],name:'Updated API car',dailyPrice:930000,status:'MAINTENANCE'}]:defaults(config);
+ await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());
+ assert.match(c.querySelector('.vehicle-card').textContent,/Updated API car/);assert.match(c.querySelector('.vehicle-card').textContent,/930.000/);assert.doesNotMatch(c.querySelector('.vehicle-card').textContent,/600.000/);
+ handler=config=>{if(config.url==='/vehicles')throw new Error('Favorites API offline');return defaults(config);};
+ await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());
+ assert.match(c.textContent,/Favorites API offline/);assert.equal(c.querySelectorAll('.vehicle-card').length,0);
+ handler=defaults;
 });
 function defaults(config){return config.url==="/vehicles"?cars:config.url==="/vehicles/catalog"?catalog:config.url==="/branches"?[{id:"dn",name:"Đà Nẵng",status:"ACTIVE"}]:config.url.endsWith("/reviews")?[]:cars.find(car=>config.url==="/vehicles/"+car.id);}
 afterEach(async()=>{for(const root of roots.splice(0))await act(async()=>root.unmount());document.body.replaceChildren();});
