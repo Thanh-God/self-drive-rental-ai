@@ -18,6 +18,9 @@ async function main(){
   check('Default queue all',await queue.inputValue(),'all');
   await queue.selectOption('today');await p.locator('article').filter({hasText:today.id}).waitFor();check('Today creation excludes yesterday',await count(1),1);
   await queue.selectOption('all');await p.locator('article').nth(1).waitFor();check('All includes historical rows',await count(2),2);
+  const vietnamDay=value=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
+  await queue.selectOption('date');const calendar=p.getByLabel('Ngày trong hàng đợi',{exact:true});check('Calendar defaults Vietnam today',await calendar.inputValue(),vietnamDay(Date.now()));await calendar.fill(vietnamDay(old.createdAt));await p.locator('article').filter({hasText:old.id}).waitFor();check('Calendar finds historical creation day',await count(1),1);
+  await p.getByRole('button',{name:'Tải lại danh sách',exact:true}).click();await p.locator('article').filter({hasText:old.id}).waitFor();check('Calendar preserved by refresh',await calendar.inputValue(),vietnamDay(old.createdAt));await calendar.fill('');await p.getByText('Vui lòng chọn ngày để xem đơn trong hàng đợi.',{exact:true}).waitFor();check('Empty date does not show all records',await count(0),0);await queue.selectOption('all');await p.locator('article').nth(1).waitFor();check('All hides calendar',await calendar.count(),0);
   const start=new Date(Date.now()+12*86400000),input={vehicleId:'v3',pickupBranchId:'dn',returnBranchId:'dn',startAt:start.toISOString(),endAt:new Date(start.getTime()+86400000).toISOString()};
   const quote=await http('POST','/bookings/quote',input,user.token),fresh=await http('POST','/bookings',{...input,expectedTotal:quote.total},user.token);
   check('CreatedAt is actual server field',Number.isFinite(Date.parse(fresh.createdAt)));

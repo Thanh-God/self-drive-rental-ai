@@ -1,5 +1,5 @@
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
-import { visibleBookings, queueDateField, workStatusLabels } from "../../utils/bookingQueue";
+import { visibleBookings, queueDateField, workStatusLabels, vietnamDay } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
@@ -1216,8 +1216,9 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
     mode === "handover" ? (params.get("group") === "delivered" ? "IN_PROGRESS" : "CONFIRMED") : mode === "return" ? "IN_PROGRESS" : "",
   );
   const [queue, setQueue] = useState("all");
+  const [queueDate, setQueueDate] = useState(() => vietnamDay(Date.now()));
   const now = useNow();
-  const rows = visibleBookings(request.data, { query, status, queue, mode, now });
+  const rows = visibleBookings(request.data, { query, status, queue, date: queueDate, mode, now });
   const statusLabels = workStatusLabels[mode] || bookingStatusLabels;
   const dayLabel = queueDateField(mode) === "startAt" ? "ngày nhận xe" : queueDateField(mode) === "endAt" ? "ngày trả xe" : "ngày tạo đơn";
   const title =
@@ -1256,12 +1257,20 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
             ))}
           </select>
         </Field>
-        <Field label="Hàng đợi" hint={`Hôm nay theo ${dayLabel}, giờ Việt Nam. Tất cả không giới hạn ngày.`}>
+        <div className="space-y-3">
+        <Field label="Hàng đợi" hint={`Lọc theo ${dayLabel}, giờ Việt Nam. Tất cả không giới hạn ngày.`}>
           <select value={queue} onChange={event => setQueue(event.target.value)}>
-            <option value="all">Tất cả</option><option value="today">Hôm nay</option>
+            <option value="all">Tất cả</option><option value="today">Hôm nay</option><option value="date">Chọn ngày</option>
           </select>
         </Field>
+        {queue === "date" ? (
+          <Field label="Ngày trong hàng đợi" hint={`Chọn ${dayLabel}. Đây là bộ lọc danh sách, không thay đổi lịch thuê.`}>
+            <input type="date" value={queueDate} onChange={event => setQueueDate(event.target.value)} />
+          </Field>
+        ) : null}
+        </div>
       </div>
+      {queue === "date" && !queueDate ? <p className="mb-4 text-sm text-muted" role="status">Vui lòng chọn ngày để xem đơn trong hàng đợi.</p> : null}
       <p className="mb-4 text-sm text-muted" aria-live="polite">{request.loading ? "Đang tải đơn…" : request.error ? "Chưa tải được danh sách" : `${rows.length} đơn phù hợp · Mới tạo trước`}</p>
       <RequestState
         loading={request.loading}

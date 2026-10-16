@@ -29,6 +29,12 @@ test('Today uses creation, pickup or return by work mode and composes status/sea
  assert.deepEqual(ids(visibleBookings(rows,{queue:'today',mode:'handover',query:'Khách B',now})),[]);
  assert.deepEqual(visibleBookings(null,{queue:'today',now}),[]);
 });
+test('Selected date respects Vietnam midnight and work date; invalid dates fail closed and All ignores date',()=>{
+ assert.deepEqual(ids(visibleBookings(rows,{queue:'date',date:'2026-10-15'})),['old']);assert.deepEqual(ids(visibleBookings(rows,{queue:'date',date:'2026-10-16'})),['latest','new']);
+ assert.deepEqual(ids(visibleBookings(rows,{queue:'date',date:'2026-10-17',mode:'handover',status:'CONFIRMED',query:'Khách B'})),['new']);assert.deepEqual(ids(visibleBookings(rows,{queue:'date',date:'2026-10-16',mode:'return'})),['return']);
+ for(const date of ['', 'bad', '2026-02-30', '2026-10-16T00:00:00Z'])assert.deepEqual(visibleBookings(rows,{queue:'date',date}),[]);
+ assert.deepEqual(ids(visibleBookings([...rows,{id:'invalid',createdAt:'bad'}],{queue:'date',date:'2026-10-16'})),['latest','new']);assert.deepEqual(ids(visibleBookings(rows,{queue:'all',date:'bad'})),['latest','new','old','return']);
+});
 let dom,vite,createRoot,List,Topbar,Auth,Router,client,originalNow;const originals=new Map(),roots=[],oldMode=process.env.VITE_DATA_MODE;
 before(async()=>{
  dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost'});
@@ -41,6 +47,14 @@ after(async()=>{Date.now=originalNow;await vite.close();dom.window.close();for(c
 async function mount(mode='all',entry='/'){const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);await act(async()=>root.render(h(Router,{initialEntries:[entry]},h(Auth.Provider,{value:{user:{id:'staff',role:'STAFF',fullName:'Nhân viên kiểm thử'}}},h(Topbar,{areaLabel:'Nhân viên'}),h(List,{area:'staff',mode})))));return c;}
 async function select(el,value){await act(async()=>{el.value=value;el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
 const names=c=>[...c.querySelectorAll('article h2')].map(el=>el.textContent);
+test('Calendar on queue/handover/return defaults Vietnam today, supports selection, empty, refresh and All',async()=>{
+ for(const mode of ['all','handover','return']){
+  const c=await mount(mode),queue=c.querySelectorAll('select')[1];assert.equal(c.querySelector('input[type="date"]'),null);await select(queue,'date');let calendar=c.querySelector('input[type="date"]');assert.equal(calendar.value,'2026-10-16');assert.deepEqual(names(c),mode==='all'?['Xe vừa tạo','Xe mới']:mode==='handover'?['Xe cũ']:['Xe trả']);
+  async function date(value){await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(calendar,value);calendar.dispatchEvent(new dom.window.Event('input',{bubbles:true}));calendar.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
+  await date('2026-10-17');assert.deepEqual(names(c),mode==='handover'?['Xe mới']:[]);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(queue.value,'date');assert.equal(calendar.value,'2026-10-17');
+  await date('');assert.deepEqual(names(c),[]);assert.match(c.textContent,/Vui lòng chọn ngày/);await date('2026-10-17');await select(queue,'all');assert.equal(c.querySelector('input[type="date"]'),null);assert.deepEqual(names(c),mode==='all'?['Xe vừa tạo','Xe mới','Xe cũ','Xe trả']:mode==='handover'?['Xe mới','Xe cũ']:['Xe trả']);await select(queue,'date');calendar=c.querySelector('input[type="date"]');assert.equal(calendar.value,'2026-10-17');await select(queue,'today');assert.deepEqual(names(c),mode==='all'?['Xe vừa tạo','Xe mới']:mode==='handover'?['Xe cũ']:['Xe trả']);
+ }
+});
 test('Handover status list replaces buttons, scopes All and retains date/search/refresh/deep link',async()=>{
  const c=await mount('handover'),[status,queue]=c.querySelectorAll('select');
  assert.equal(c.querySelector('section[aria-label="Nhóm bàn giao xe"]'),null);assert.deepEqual([...status.options].map(o=>o.textContent),['Tất cả đơn bàn giao','Chờ bàn giao','Đã bàn giao · Đang thuê']);assert.equal(status.value,'CONFIRMED');assert.deepEqual(names(c),['Xe mới','Xe cũ']);
