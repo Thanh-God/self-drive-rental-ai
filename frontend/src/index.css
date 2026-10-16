@@ -292,3 +292,18 @@ body {
 .vehicle-card-actions [aria-pressed="true"] { background: var(--color-action-soft); color: var(--color-action-text); }
 .compare-selection-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
 .urban-shell .compare-selection-chips .btn-secondary { padding: .5rem .875rem; font-size: .8125rem; }
+
+/* Rental detail and request hierarchy; existing responsive columns remain. */
+.vehicle-detail-tools { display: flex; flex-wrap: wrap; gap: .75rem; margin-bottom: 1.25rem; }
+.vehicle-trip-summary { display: grid; gap: 1rem; margin-top: 1.25rem; font-size: .875rem; }
+.vehicle-trip-summary dt { color: var(--color-readable-muted); }
+.vehicle-trip-summary dd { margin-top: .375rem; font-weight: 600; }
+.rental-step { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; margin-right: .625rem; border-radius: 50%; background: var(--color-action-soft); color: #8c3d12; font-size: .875rem; }
+.rental-send-heading { border-top: 1px solid var(--color-surface-border); padding-top: 1.25rem; }
+.booking-quote-warning { border-left: 3px solid #b45309; padding: .875rem 1rem; background: #fffbeb; color: #78350f; font-size: .875rem; line-height: 1.7; }
+.booking-identity { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: 1.25rem; font-size: .8125rem; color: var(--color-readable-muted); }
+.booking-identity code { font: inherit; overflow-wrap: anywhere; user-select: all; }
+.booking-identity p { flex-basis: 100%; }
+.booking-identity p:empty { display: none; }
+.urban-shell .booking-identity .btn-secondary { padding: .5rem .875rem; font-size: .8125rem; }
+.booking-history summary { cursor: pointer; min-height: 44px; display: list-item; padding: .625rem 0; font-weight: 600; }

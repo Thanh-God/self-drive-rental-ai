@@ -20,6 +20,7 @@ test("all main and terminal statuses explain actual state without inventing hist
   for (const [status, expected] of Object.entries({ PENDING: "Chờ xác nhận", CONFIRMED: "Đã xác nhận", IN_PROGRESS: "Đang thuê", RETURNED: "Đã trả xe", COMPLETED: "Hoàn tất", CANCELLED: "Đã hủy", REJECTED: "Đã từ chối", EXPIRED: "Hết hạn giữ lịch" })) {
     const html = render(status, { role: "USER" });
     assert.match(html, new RegExp(`Hiện tại: ${expected}`));
+    assert.match(html, /<details class="booking-history/);assert.doesNotMatch(html, /<details[^>]* open/);assert.match(html, /<summary>Lịch sử trạng thái<\/summary>/);
     assert.match(html, /Chưa có lịch sử trạng thái từ hệ thống/);assert.doesNotMatch(html, /<li/);
   }
   assert.match(render("NEW_UNKNOWN"), /Trạng thái chưa xác định/);

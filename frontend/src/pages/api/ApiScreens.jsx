@@ -1,3 +1,4 @@
+import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
 import VehicleGallery from "../../components/vehicle/VehicleGallery";
@@ -96,17 +97,17 @@ export function normalizeVehicle(vehicle, catalog) {
 }
 
 function VehicleOperationalStatus({ status }) {
-  const available = status === "ACTIVE";
+  const operating = status === "ACTIVE";
   const label =
     status === "ACTIVE"
-      ? "Sẵn sàng thuê"
+      ? "Đang khai thác"
       : status === "MAINTENANCE"
         ? "Đang bảo trì"
         : "Tạm ngưng";
   return (
     <span
       className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${
-        available
+        operating
           ? "bg-emerald-50 text-emerald-800"
           : "bg-amber-50 text-amber-800"
       }`}
@@ -728,6 +729,9 @@ export function ApiVehicleListPage() {
 export function ApiVehicleDetailPage() {
   const { vehicleId } = useParams();
   const [params] = useSearchParams();
+  const branchesRequest = useApiData("/branches");
+  const selectedTrip = tripSearch(params);
+  const branchName = id => (Array.isArray(branchesRequest.data) ? branchesRequest.data : []).find(branch => branch.id === id)?.name || "Chưa xác định";
   const vehicleRequest = useApiData(
     `/vehicles/${encodeURIComponent(vehicleId)}`,
   );
@@ -742,8 +746,8 @@ export function ApiVehicleDetailPage() {
   const error = vehicleRequest.error || catalogRequest.error;
   return (
     <Page title={vehicle?.name || "Chi tiết xe"}>
-      <Link className="btn-secondary mb-5 inline-flex" to={`/vehicles${searchSuffix(params)}`}>Về danh sách xe</Link>
-      <FavoritesLink /><CompareTray />
+      <div className="vehicle-detail-tools"><Link className="btn-secondary" to={`/vehicles${searchSuffix(params)}`}>Về danh sách xe</Link>
+      <FavoritesLink compact /><CompareLink /></div>
       <RequestState
         loading={loading}
         error={error}
@@ -767,8 +771,9 @@ export function ApiVehicleDetailPage() {
                 {vehicle.description || "Chưa có mô tả cho xe này."}
               </p>
               <p className="mt-4 text-sm text-slate-600">
-                Chi nhánh hiện tại: {vehicle.currentBranchId || "Chưa xác định"}
+                Chi nhánh hiện tại: {branchesRequest.loading ? "Đang tải tên chi nhánh…" : branchesRequest.error ? "Chưa tải được tên chi nhánh" : branchName(vehicle.currentBranchId)}
               </p>
+              {branchesRequest.error ? <button type="button" className="btn-secondary mt-3" onClick={branchesRequest.reload}>Tải lại tên chi nhánh</button> : null}
               {vehicle.amenities && vehicle.amenities.length > 0 ? (
                 <div className="mt-5 border-t border-slate-100 pt-5">
                   <h3 className="mb-3 text-sm font-semibold text-slate-700">
@@ -792,7 +797,6 @@ export function ApiVehicleDetailPage() {
               )}
             </section>
             <aside className="panel h-fit">
-              <FavoriteToggle vehicleId={vehicle.id} name={vehicle.name} /><CompareToggle vehicleId={vehicle.id} name={vehicle.name} />
               <VehicleOperationalStatus status={vehicle.status} />
               <p className="mt-4 text-2xl font-bold text-teal-800">
                 {money(vehicle.price)}{" "}
@@ -801,6 +805,12 @@ export function ApiVehicleDetailPage() {
               <p className="mt-3 text-sm text-slate-600">
                 Báo giá sẽ kiểm tra lịch xe, tuyến chi nhánh và giá hiện tại.
               </p>
+              {selectedTrip.error ? <Notice error>{selectedTrip.error}</Notice> : selectedTrip.active ? (
+                <dl className="vehicle-trip-summary">
+                  <div><dt>Nhận xe · Giờ Việt Nam</dt><dd>{dateTime(toUTC(params.get("start")))} · {branchName(params.get("pickupBranchId"))}</dd></div>
+                  <div><dt>Trả xe · Giờ Việt Nam</dt><dd>{dateTime(toUTC(params.get("end")))} · {branchName(params.get("returnBranchId") || params.get("pickupBranchId"))}</dd></div>
+                </dl>
+              ) : <p className="mt-4 text-sm text-muted">Chọn thời gian và điểm nhận/trả ở bước kiểm tra báo giá.</p>}
               {vehicle.status === "ACTIVE" ? (
                 <Link
                   className="btn mt-5 w-full"
@@ -809,6 +819,7 @@ export function ApiVehicleDetailPage() {
                   Kiểm tra giá & lịch
                 </Link>
               ) : null}
+              <div className="vehicle-card-actions mt-4"><FavoriteToggle vehicleId={vehicle.id} name={vehicle.name} /><CompareToggle vehicleId={vehicle.id} name={vehicle.name} /></div>
             </aside>
             <section className="panel lg:col-span-2">
               <h2 className="mb-4 text-lg font-semibold">
@@ -1021,8 +1032,8 @@ export function ApiNewBookingPage() {
     vehicleRequest.error || branchesRequest.error || routesRequest.error;
   return (
     <Page
-      title="Tạo yêu cầu thuê"
-      description="Chọn thời gian và tuyến nhận/trả. Báo giá cuối cùng do máy chủ xác nhận."
+      title="Chuyến đi của bạn"
+      description="Chọn thời gian và nơi nhận/trả, kiểm tra báo giá rồi gửi yêu cầu thuê."
       actions={
         <Link className="btn-secondary" to={`/vehicles${searchSuffix(params)}`}>
           Quay lại danh sách xe
@@ -1043,7 +1054,8 @@ export function ApiNewBookingPage() {
         ) : (
           <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
             <div className="space-y-5">
-              <form className="panel space-y-5" onSubmit={checkQuote}>
+              <form className="panel space-y-5" aria-label="Chuyến đi thuê xe" onSubmit={checkQuote}>
+                <h2 className="text-lg font-semibold"><span className="rental-step">1</span>Chuyến đi</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <Field label="Thời gian nhận (giờ Việt Nam)">
                     <input
@@ -1115,6 +1127,7 @@ export function ApiNewBookingPage() {
                     </select>
                   </Field>
                 </div>
+                <p className="text-sm text-muted">Cần giấy phép lái xe phù hợp và còn hạn đến hết chuyến. <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p>
                 {!routes.length ? (
                   <Notice error>
                     Không có tuyến trả xe đang mở từ chi nhánh nhận đã chọn.
@@ -1132,8 +1145,8 @@ export function ApiNewBookingPage() {
                 </button>
               </form>
               {quote ? (
-                <section className="panel space-y-4">
-                  <h2 className="text-lg font-semibold">Báo giá xác nhận</h2>
+                <section className="panel space-y-4" aria-label="Báo giá chuyến đi">
+                  <h2 className="text-lg font-semibold"><span className="rental-step">2</span>Báo giá chuyến đi</h2>
                   <dl className="space-y-2 text-sm">
                     <div className="flex justify-between gap-4">
                       <dt>
@@ -1155,10 +1168,11 @@ export function ApiNewBookingPage() {
                     được kiểm tra lại khi gửi; yêu cầu chỉ được tạo nếu báo giá
                     còn khớp.
                   </p>
-                  <p className="text-xs text-slate-500">
-                    Tiền cọc hoặc khoản chưa được cấu hình không nằm trong báo
+                  <p className="booking-quote-warning">
+                    Báo giá không giữ chỗ. Tiền cọc hoặc khoản chưa được cấu hình không nằm trong báo
                     giá này. Tổng báo giá không xác nhận thanh toán.
                   </p>
+                  <h2 className="rental-send-heading text-lg font-semibold"><span className="rental-step">3</span>Gửi yêu cầu</h2>
                   <label className="flex items-start gap-3 text-sm">
                     <input
                       type="checkbox"
@@ -1167,6 +1181,7 @@ export function ApiNewBookingPage() {
                     />
                     Tôi xác nhận thời gian, chi nhánh và tổng báo giá.
                   </label>
+                  <p className="text-sm text-muted">Xác nhận báo giá không phải ký hợp đồng. Hợp đồng được phát hành khi yêu cầu được xác nhận.</p>
                   <button
                     className="btn"
                     disabled={!accepted || busy}
@@ -1175,7 +1190,7 @@ export function ApiNewBookingPage() {
                     {busy ? "Đang gửi..." : "Gửi yêu cầu thuê"}
                   </button>
                 </section>
-              ) : null}
+              ) : <p role="status" className="text-sm text-muted">Báo giá sẽ hiển thị sau khi kiểm tra lịch và tuyến nhận/trả.</p>}
             </div>
             <aside className="panel h-fit">
               <VehicleVisual vehicle={normalized} />
@@ -1509,7 +1524,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
 
   return (
     <Page
-      title={booking ? `Đơn ${booking.id}` : "Chi tiết đơn thuê"}
+      title={booking ? `Đơn thuê · ${booking.id.slice(0, 8)}` : "Chi tiết đơn thuê"}
       description={booking?.vehicleName}
       actions={
         <div className="flex flex-wrap gap-3"><button type="button" className="btn-secondary" onClick={request.reload} disabled={request.loading}>Tải lại đơn</button>
@@ -1527,12 +1542,11 @@ export function ApiBookingDetailPage({ area = "user" }) {
           <Missing title="Không tìm thấy đơn" back={`/${area}/bookings`} />
         ) : (
           <>
+            <BookingIdentity key={booking.id} id={booking.id} />
             {notice ? <Notice>{notice}</Notice> : null}
             <div className="mb-5 flex items-center gap-3">
               <Status status={booking.status} />
-              <span className="text-sm text-slate-500">
-                Phiên bản {booking.version}
-              </span>
+              {area !== "user" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}
             </div>
             {booking.status === "PENDING" && booking.expiresAt ? (
               <p className="mb-5 text-sm text-amber-800">
@@ -1698,8 +1712,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     className="panel h-fit space-y-4"
                     onSubmit={submitAction}
                   >
-                  <h2 className="text-lg font-semibold">Thao tác được phép</h2>
-                  <Field label="Chuyển trạng thái">
+                  <h2 className="text-lg font-semibold">{area === "user" ? "Thay đổi yêu cầu" : "Thao tác được phép"}</h2>
+                  <Field label={area === "user" ? "Yêu cầu xử lý" : "Chuyển trạng thái"}>
                     <select
                       required
                       value={next}

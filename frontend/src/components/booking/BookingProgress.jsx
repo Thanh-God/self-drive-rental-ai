@@ -29,12 +29,14 @@ export default function BookingProgress({ booking, history = [], role, actions =
     {role === "ADMIN" ? <p className="mt-2 text-sm">Admin không thực hiện giao hoặc nhận trả xe. Theo dõi đơn và các thao tác được phép bên dưới.</p> : null}
     {role === "USER" && ["PENDING", "CONFIRMED"].includes(booking.status) ? <p className="mt-2 text-sm">{actions.includes("CANCELLED") ? "Có thể yêu cầu hủy tại phần thao tác bên dưới, kèm lý do." : "Nếu cần hủy sát giờ nhận, hãy liên hệ nhân viên chi nhánh nhận."} <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p> : null}
     <p className="mt-3 text-xs text-muted">Giờ Việt Nam · Dùng nút Tải lại đơn để kiểm tra cập nhật mới nhất.</p>
-    <h3 className="mt-5 font-semibold">Lịch sử trạng thái</h3>
+    <details className="booking-history mt-5">
+    <summary>Lịch sử trạng thái</summary>
     {events.length ? <ol className="mt-3 space-y-3">{events.map((event, index) => <li className="border-l-2 border-teal-200 pl-4 text-sm" key={`${event.occurred_at}-${index}`}>
       <p className="font-semibold">{event.previous_status ? label(event.previous_status) : "Tạo yêu cầu"} → {label(event.next_status)}</p>
       <p className="mt-1 text-muted">{dateTime(event.occurred_at)}</p>
       {event.reason ? <p className="mt-1 whitespace-pre-wrap break-words">{event.reason}</p> : null}
     </li>)}</ol> : <p className="mt-3 text-sm text-muted">Chưa có lịch sử trạng thái từ hệ thống.</p>}
+    </details>
     <h3 className="mt-5 font-semibold">Hồ sơ đơn</h3>
     <p className="mt-2 text-sm">Hợp đồng phát hành khi xác nhận; hóa đơn khi hoàn tất. Chứng từ không xác nhận đã thanh toán.</p>
     <div className="mt-3 flex flex-wrap gap-3">
