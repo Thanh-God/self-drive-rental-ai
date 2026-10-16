@@ -277,3 +277,18 @@ body {
     transition: none !important;
   }
 }
+
+/* Vehicle list: secondary actions stay below the vehicle information. */
+.vehicle-list-toolbar, .vehicle-list-tools { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; }
+.vehicle-list-toolbar { margin-bottom: .5rem; }
+.vehicle-list-tools { margin-left: auto; }
+.urban-shell .vehicle-list-tools .btn-secondary { padding: .5rem .875rem; font-size: .8125rem; }
+.favorites-privacy { color: var(--color-ink-500); font-size: .75rem; margin-bottom: 1.25rem; }
+.favorites-privacy summary { cursor: pointer; width: fit-content; padding: .5rem 0; }
+.favorites-privacy p { margin-top: .375rem; }
+.vehicle-card-actions { display: flex; flex-wrap: wrap; gap: .5rem; border-top: 1px solid var(--color-secondary-border); padding: .5rem 0; }
+.vehicle-card-actions > div { flex: 1 1 120px; min-width: 0; margin: 0; }
+.urban-shell .vehicle-card-actions .btn-secondary { width: 100%; padding: .5rem; font-size: .75rem; }
+.vehicle-card-actions [aria-pressed="true"] { background: var(--color-action-soft); color: var(--color-action-text); }
+.compare-selection-chips { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .75rem; }
+.urban-shell .compare-selection-chips .btn-secondary { padding: .5rem .875rem; font-size: .8125rem; }

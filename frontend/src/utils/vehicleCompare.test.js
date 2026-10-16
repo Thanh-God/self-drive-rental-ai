@@ -68,6 +68,34 @@ async function mount(entry,next=null){handler ||= defaults;const c=document.crea
  await act(async()=>root.render(h(Router,{initialEntries:[entry]},h(Auth.Provider,{value:{user:null}},routes))));return c;
 }
 function btn(c,label){return c.querySelector(`button[aria-label="${label}"]`);}
+test("R3a compact list preserves entries, truthful cards, filters and removal focus",async()=>{
+ handler=defaults;const c=await mount('/vehicles?brand=b&q=Car&sort=price-desc');
+ assert.equal(c.querySelector('aside[aria-label="Lựa chọn so sánh"]'),null);
+ assert.match(c.querySelector('.vehicle-list-toolbar').textContent,/So sánh xe \(0\)/);
+ assert.match(c.querySelector('.vehicle-list-toolbar').textContent,/Xe yêu thích/);
+ assert.equal(c.querySelector('.favorites-privacy').open,false);
+ for(const card of c.querySelectorAll('.vehicle-card')){
+  assert.ok(card.firstElementChild.querySelector('h2'));
+  assert.ok(card.querySelector('.vehicle-card-actions button[aria-pressed="false"]'));
+  assert.match(card.textContent,/Đang khai thác/);assert.doesNotMatch(card.textContent,/Sẵn sàng thuê|Chưa cập nhật/);
+  assert.match(card.querySelector('a.btn').textContent,/Xem chi tiết/);
+  assert.equal(new URL(card.querySelector('a.btn').href).searchParams.get('sort'),'price-desc');
+ }
+ await act(async()=>btn(c,'So sánh Car 1').click());
+ const chip=btn(c,'Bỏ Car 1 khỏi lựa chọn so sánh');assert.ok(chip);
+ await act(async()=>chip.click());
+ assert.equal(c.querySelector('aside[aria-label="Lựa chọn so sánh"]'),null);
+ assert.equal(document.activeElement.textContent,'So sánh xe (0)');
+ assert.equal(new URL(document.activeElement.href).searchParams.get('brand'),'b');
+ assert.equal(new URL(document.activeElement.href).searchParams.get('q'),'Car');
+ await act(async()=>btn(c,'So sánh Car 2').click());
+ await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Bỏ tất cả xe').click());
+ assert.equal(document.activeElement.textContent,'So sánh xe (0)');
+});
+test("R3a invalid empty selection retains explicit feedback",async()=>{
+ handler=defaults;const c=await mount('/vehicles?compare=..%2Fbad');
+ const tray=c.querySelector('aside[aria-label="Lựa chọn so sánh"]');assert.ok(tray);assert.ok(tray.querySelector('[role="status"]'));
+});
 test("actual list selection blocks fourth, survives detail and comparison, removal keeps filters",async()=>{
  handler=defaults;const c=await mount("/vehicles?brand=b&q=Car");
  for(const i of [1,2,3]) await act(async()=>btn(c,"So sánh Car "+i).click());

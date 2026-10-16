@@ -14,7 +14,7 @@ async function main(){
   check('Actual card secondary text contrast',contrast(textColor,'rgb(255,255,255)')>=4.5,true);
   const input=p.getByPlaceholder('Tên xe, mẫu xe...');const border=await input.evaluate(e=>getComputedStyle(e).borderColor);
   check('Actual input border contrast',contrast(border,'rgb(255,255,255)')>=3,true);
-  const secondary=p.locator('.vehicle-card a.btn-secondary').first();check('Secondary action white surface',await secondary.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
+  const secondary=p.locator('.vehicle-list-tools a.btn-secondary').first();check('Secondary action white surface',await secondary.evaluate(e=>getComputedStyle(e).backgroundColor),'rgb(255, 255, 255)');
   await input.focus();check('Keyboard focus visible',await input.evaluate(e=>parseFloat(getComputedStyle(e).outlineWidth)>0),true);
   const primary=p.getByRole('button',{name:'Tìm xe',exact:true});const colors=await primary.evaluate(e=>({text:getComputedStyle(e).color,bg:getComputedStyle(e).backgroundColor}));
   check('Actual primary label contrast',contrast(colors.text,colors.bg)>=4.5,true);

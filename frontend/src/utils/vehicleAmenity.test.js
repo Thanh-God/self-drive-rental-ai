@@ -649,7 +649,8 @@ test("Homepage API uses real cards, one H1 and honest availability copy", async 
   assert.equal(mounted.container.querySelectorAll("h1").length, 1);
   const card = mounted.container.querySelector("article");
   assert.match(card.textContent, /Bluetooth/);
-  assert.match(card.textContent, /Sẵn sàng thuê/);
+  assert.match(card.textContent, /Đang khai thác/);
+  assert.doesNotMatch(card.textContent, /Sẵn sàng thuê/);
   assert.doesNotMatch(mounted.container.textContent, /Không tính phí ẩn|bảo đảm ngay/);
   assert.equal(mounted.container.querySelector(".animate-pulse"), null);
   const cta = Array.from(mounted.container.querySelectorAll("a")).find(link => link.textContent === "Xem toàn bộ xe ↗");
@@ -662,7 +663,8 @@ test("Shared vehicle card retains demo label separately from API state", async (
   const { MemoryRouter } = await viteServer.ssrLoadModule("react-router-dom");
   const mounted = await mount(createElement(MemoryRouter, null,
     createElement(VehicleCard, { vehicle: { ...mockVehicles[0], status: "ACTIVE", noLocalAsset: false, price: 100, amenities: ["Bluetooth"] } })));
-  assert.match(mounted.container.textContent, /Sẵn sàng/);
+  assert.match(mounted.container.textContent, /Đang khai thác/);
+  assert.match(mounted.container.textContent, /Minh họa · Demo/);
   assert.match(mounted.container.textContent, /Bluetooth/);
   await mounted.unmount();
 });

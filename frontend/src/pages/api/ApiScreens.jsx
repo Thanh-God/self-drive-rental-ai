@@ -3,7 +3,7 @@ import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/Favorite
 import VehicleGallery from "../../components/vehicle/VehicleGallery";
 import BrandBar from "../../components/vehicle/BrandBar";
 import TripSearchForm from "../../components/vehicle/TripSearchForm";
-import CompareTray, { CompareToggle } from "../../components/vehicle/CompareControls";
+import CompareTray, { CompareToggle, CompareLink } from "../../components/vehicle/CompareControls";
 import { searchParams, searchSuffix, tripSearch } from "../../utils/vehicleSearch";
 import PasswordField from "../../components/common/PasswordField";
 import { passwordError, passwordHint } from "../../utils/passwordPolicy";
@@ -630,6 +630,7 @@ export function ApiHomePage() {
 }
 
 export function ApiVehicleListPage() {
+  const compareEntry = useRef(null);
   const [params, setParams] = useSearchParams();
   const brand = params.get("brand") || "";
   const vehiclesRequest = useApiData("/vehicles");
@@ -696,13 +697,15 @@ export function ApiVehicleListPage() {
         branches={(Array.isArray(branchesRequest.data) ? branchesRequest.data : []).filter(branch => branch.status === "ACTIVE")}
         loading={branchesRequest.loading} error={branchesRequest.error} onRetry={branchesRequest.reload}
         onSubmit={update} onUpdate={update} onClear={() => setParams({...brand ? {brand} : {},...params.get("compare") ? {compare:params.get("compare")} : {}})} />
-      <FavoritesLink /><CompareTray />
-      <div className="search-results-heading">
+      <div className="search-results-heading vehicle-list-toolbar">
         <p aria-live="polite">{loading ? "Đang tìm xe…" : error ? "Chưa thể hiển thị kết quả" : `${vehicles.length} xe phù hợp`}</p>
+        <div className="vehicle-list-tools"><FavoritesLink compact /><CompareLink linkRef={compareEntry} />
         <div className="search-result-sort"><label htmlFor="vehicle-result-sort">Sắp xếp</label><select id="vehicle-result-sort" value={sort} onChange={event => setSort(event.target.value)}>
           <option value="">Tên xe</option><option value="price-asc">Giá thấp trước</option><option value="price-desc">Giá cao trước</option>
-        </select></div>
+        </select></div></div>
       </div>
+      <details className="favorites-privacy"><summary>Về lưu xe yêu thích</summary><p>Chỉ lưu trên trình duyệt này, tách riêng khách và từng tài khoản. Không đồng bộ thiết bị.</p></details>
+      <CompareTray compact vehicles={vehicles} onRemove={() => compareEntry.current?.focus()} />
       <RequestState loading={loading} error={error} onRetry={retry}>
         {vehicles.length ? (
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">

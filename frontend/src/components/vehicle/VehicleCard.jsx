@@ -65,12 +65,11 @@ export function VehicleVisual({
 }
 
 export default function VehicleCard({ vehicle, search = "", rentalDays = 0, compareControl = null }) {
-  const isAvailable = vehicle.status === "ACTIVE";
+  const isOperating = vehicle.status === "ACTIVE";
   const totalPrice = rentalDays > 0 ? vehicle.price * rentalDays : 0;
 
   return (
     <article className="vehicle-card group flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-[transform,box-shadow,border-color] duration-200 motion-reduce:transition-none motion-reduce:hover:translate-y-0 hover:-translate-y-0.5 hover:border-teal-300 hover:shadow-md">
-      {compareControl}
       <div>
         <Link to={`/vehicles/${vehicle.id}${search}`} className="block">
           <VehicleVisual vehicle={vehicle} />
@@ -80,8 +79,8 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0, comp
             <span className="text-xs font-medium text-slate-500">
               {vehicle.brand}
             </span>
-            {isAvailable ? (
-              <Badge tone="success">Sẵn sàng thuê</Badge>
+            {isOperating ? (
+              <Badge tone="success">Đang khai thác</Badge>
             ) : (
               <Badge tone="warning">
                 {vehicle.status === "MAINTENANCE"
@@ -94,7 +93,7 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0, comp
             <Link to={`/vehicles/${vehicle.id}${search}`}>{vehicle.name}</Link>
           </h2>
 
-          <div className="my-3.5 grid grid-cols-3 gap-2 rounded-xl bg-slate-50 p-2 text-xs font-medium text-slate-600">
+          <div className={`my-3.5 grid ${vehicle.fuel && vehicle.fuel !== "Chưa cập nhật" ? "grid-cols-3" : "grid-cols-2"} gap-2 rounded-xl bg-slate-50 p-2 text-xs font-medium text-slate-600`}>
             <div className="flex items-center gap-1.5 justify-center">
               <Users size={14} className="text-teal-700" />
               <span>{vehicle.seats} chỗ</span>
@@ -103,10 +102,10 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0, comp
               <Gauge size={14} className="text-teal-700" />
               <span className="truncate">{vehicle.transmission}</span>
             </div>
-            <div className="flex items-center gap-1.5 justify-center">
+            {vehicle.fuel && vehicle.fuel !== "Chưa cập nhật" ? <div className="flex items-center gap-1.5 justify-center">
               <Fuel size={14} className="text-teal-700" />
               <span>{vehicle.fuel}</span>
-            </div>
+            </div> : null}
           </div>
 
           {vehicle.amenities && vehicle.amenities.length > 0 ? (
@@ -125,6 +124,7 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0, comp
         </div>
       </div>
 
+      {compareControl ? <div className="vehicle-card-actions">{compareControl}</div> : null}
       <div className="flex flex-wrap items-end justify-between gap-3 border-t border-slate-100 p-2 pt-3.5">
         <div>
           <div className="flex items-baseline gap-1">
@@ -146,7 +146,7 @@ export default function VehicleCard({ vehicle, search = "", rentalDays = 0, comp
           )}
         </div>
         <Link
-          className="btn-secondary text-xs font-semibold hover:border-teal-600 hover:text-teal-800"
+          className="btn text-xs font-semibold"
           to={`/vehicles/${vehicle.id}${search}`}
         >
           Xem chi tiết ↗
