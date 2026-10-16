@@ -22,10 +22,15 @@ export function createFavoritesStore(storage) {
   return {
     getSnapshot: () => snapshot,
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
-    refresh() { volatile = false; publish(readFavorites(storage, storage.key)); },
+    refresh() {
+      const next = readFavorites(storage, storage.key);
+      volatile = Boolean(next.issue);
+      publish(next.issue ? { ...snapshot, issue: next.issue } : next);
+    },
     toggle(id) {
       if (!/^[a-zA-Z0-9_-]+$/.test(id)) return;
-      const current = volatile ? snapshot : readFavorites(storage, storage.key);
+      const stored = volatile ? snapshot : readFavorites(storage, storage.key);
+      const current = stored.issue ? snapshot : stored;
       const ids = current.ids.includes(id) ? current.ids.filter(value => value !== id) : [...current.ids, id];
       try { storage.setItem(storage.key, JSON.stringify(ids)); volatile = false; publish({ ids, issue: "" }); }
       catch { volatile = true; publish({ ids, issue: "Không lưu được trên thiết bị; lựa chọn chỉ giữ trong phiên hiện tại." }); }

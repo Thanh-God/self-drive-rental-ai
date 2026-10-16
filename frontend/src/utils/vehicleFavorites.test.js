@@ -38,3 +38,76 @@ test("corrupt/object/invalid entries are rejected without deleting storage, dupl
   storage.setItem(storage.key, '["v1","v1"]');
   assert.deepEqual(readFavorites(storage, storage.key).ids, ["v1"]);
 });
+
+test("blocked refresh preserves volatile IDs and later toggles keep the same RAM selection", () => {
+  const store = createFavoritesStore({ key: "blocked", getItem() { throw new Error("blocked"); }, setItem() { throw new Error("quota"); } });
+  let notifications = 0;
+  store.subscribe(() => notifications++);
+  store.toggle("v1"); store.refresh(); store.refresh();
+  assert.deepEqual(store.getSnapshot().ids, ["v1"]);
+  assert.match(store.getSnapshot().issue, /Không đọc được/);
+  store.toggle("v2");
+  assert.deepEqual(store.getSnapshot().ids, ["v1", "v2"]);
+  assert.equal(notifications, 4);
+});
+
+test("new read failure during toggle preserves previously persisted cached IDs", () => {
+  const storage = memory();
+  const store = createFavoritesStore(storage);
+  store.toggle("v1");
+  storage.getItem = () => { throw new Error("blocked"); };
+  storage.setItem = () => { throw new Error("quota"); };
+  store.toggle("v2");
+  assert.deepEqual(store.getSnapshot().ids, ["v1", "v2"]);
+  store.refresh();
+  assert.deepEqual(store.getSnapshot().ids, ["v1", "v2"]);
+  assert.ok(store.getSnapshot().issue);
+});
+
+test("corrupt external data cannot erase cached IDs and is not overwritten by refresh", () => {
+  const storage = memory();
+  const store = createFavoritesStore(storage);
+  store.toggle("v1");
+  for (const raw of ["broken", "{}", '["../bad"]']) {
+    storage.values.set(storage.key, raw);
+    store.refresh();
+    assert.deepEqual(store.getSnapshot().ids, ["v1"]);
+    assert.ok(store.getSnapshot().issue);
+    assert.equal(storage.values.get(storage.key), raw);
+  }
+});
+
+test("recovery honors readable external replacement and clear, without writing RAM automatically", () => {
+  const storage = memory(), get = storage.getItem, set = storage.setItem;
+  const store = createFavoritesStore(storage);
+  storage.getItem = () => { throw new Error("blocked"); };
+  storage.setItem = () => { throw new Error("quota"); };
+  store.toggle("v1"); store.refresh();
+  assert.deepEqual(store.getSnapshot().ids, ["v1"]);
+  storage.getItem = get; storage.setItem = set;
+  storage.values.set(storage.key, '["v3"]');
+  store.refresh();
+  assert.deepEqual(store.getSnapshot(), { ids: ["v3"], issue: "" });
+  assert.equal(storage.values.get(storage.key), '["v3"]');
+  storage.values.delete(storage.key); store.refresh();
+  assert.deepEqual(store.getSnapshot(), { ids: [], issue: "" });
+  store.toggle("v2");
+  assert.equal(storage.values.get(storage.key), '["v2"]');
+  storage.values.set(storage.key, '[]'); store.refresh();
+  assert.deepEqual(store.getSnapshot(), { ids: [], issue: "" });
+});
+
+test("successful clear replaces volatile RAM, while failure in one scope cannot affect another", () => {
+  const a = memory(), b = memory();
+  const first = createFavoritesStore(a), second = createFavoritesStore(b);
+  second.toggle("v2");
+  a.setItem = () => { throw new Error("quota"); };
+  first.toggle("v1");
+  a.getItem = () => { throw new Error("blocked"); };
+  first.refresh();
+  assert.deepEqual(first.getSnapshot().ids, ["v1"]);
+  assert.deepEqual(second.getSnapshot(), { ids: ["v2"], issue: "" });
+  a.getItem = () => null; first.refresh();
+  assert.deepEqual(first.getSnapshot(), { ids: [], issue: "" });
+  assert.deepEqual(second.getSnapshot().ids, ["v2"]);
+});
