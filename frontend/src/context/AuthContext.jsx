@@ -18,7 +18,9 @@ import { demoActors } from "../demo/seed";
 import {
   clearSession,
   getStoredToken,
-  setStoredToken,
+  readStoredSession,
+  storeSession,
+  STORAGE_ERROR,
   setStoredUser,
 } from "../utils/storage";
 import { createRequestGeneration } from "../utils/requestGeneration";
@@ -26,9 +28,11 @@ import { createRequestGeneration } from "../utils/requestGeneration";
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [token, setToken] = useState(() =>
-    DEMO_MODE ? null : getStoredToken(),
+  const [initialSession] = useState(() =>
+    DEMO_MODE ? { token: null, issue: "" } : readStoredSession(),
   );
+  const [token, setToken] = useState(initialSession.token);
+  const activeToken = useRef(token);
   const [user, setUser] = useState(() => {
     if (!DEMO_MODE) return null;
     try {
@@ -38,9 +42,9 @@ export function AuthProvider({ children }) {
     }
   });
   const [loading, setLoading] = useState(
-    () => !DEMO_MODE && Boolean(getStoredToken()),
+    () => !DEMO_MODE && Boolean(initialSession.token),
   );
-  const [sessionError, setSessionError] = useState("");
+  const [sessionError, setSessionError] = useState(initialSession.issue);
   const [logoutWarning, setLogoutWarning] = useState("");
   const [retry, setRetry] = useState(0);
   const [sessionGeneration] = useState(createRequestGeneration);
@@ -56,8 +60,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const persistSession = useCallback((nextToken, nextUser) => {
-    setStoredToken(nextToken);
-    setStoredUser(nextUser);
+    const { issue } = storeSession(nextToken, nextUser);
+    if (issue) {
+      activeToken.current = null;
+      setToken(null);
+      setUser(null);
+      setSessionError(issue);
+      throw new Error(issue);
+    }
+    activeToken.current = nextToken;
     setToken(nextToken);
     setUser(nextUser);
   }, []);
@@ -69,7 +80,15 @@ export function AuthProvider({ children }) {
       email: nextUser.email,
       role: nextUser.role,
     };
-    setStoredUser(normalizedUser);
+    const { issue } = setStoredUser(normalizedUser);
+    if (issue) {
+      clearSession();
+      activeToken.current = null;
+      setToken(null);
+      setUser(null);
+      setSessionError(issue);
+      return;
+    }
     setUser(normalizedUser);
   }, [token, user?.id]);
 
@@ -80,12 +99,13 @@ export function AuthProvider({ children }) {
         return;
       }
       const generation = sessionGeneration.begin();
-      const tokenToRevoke = getStoredToken();
-      clearSession();
+      const tokenToRevoke = activeToken.current;
+      const { issue } = clearSession();
+      activeToken.current = null;
       setToken(null);
       setUser(null);
       setSessionError("");
-      setLogoutWarning("");
+      setLogoutWarning(issue);
       setLoading(false);
       if (callApi && tokenToRevoke) {
         const request = logoutRequest(tokenToRevoke);
@@ -95,7 +115,7 @@ export function AuthProvider({ children }) {
         } catch {
           if (sessionGeneration.isCurrent(generation)) {
             setLogoutWarning(
-              "Đã đăng xuất trên thiết bị này. Chưa xác nhận được thu hồi phiên ở máy chủ do lỗi kết nối; phiên trên thiết bị khác có thể còn hiệu lực.",
+              [issue || "Đã đăng xuất trên thiết bị này.", "Chưa xác nhận được thu hồi phiên ở máy chủ do lỗi kết nối; phiên trên thiết bị khác có thể còn hiệu lực."].join(" "),
             );
           }
         } finally {
@@ -113,13 +133,22 @@ export function AuthProvider({ children }) {
 
     async function hydrate() {
       setSessionError("");
-      const storedToken = getStoredToken();
+      const { token: storedToken, issue } = readStoredSession();
+      if (issue) {
+        activeToken.current = null;
+        setToken(null);
+        setUser(null);
+        setSessionError(issue);
+        setLoading(false);
+        return;
+      }
       if (!storedToken) {
         setLoading(false);
         return;
       }
       try {
         const profile = await fetchCurrentUser();
+        if (readStoredSession().issue) throw new Error(STORAGE_ERROR);
         if (
           !cancelled &&
           sessionGeneration.isCurrent(generation) &&
@@ -134,6 +163,12 @@ export function AuthProvider({ children }) {
           });
         }
       } catch (error) {
+        if (!cancelled && sessionGeneration.isCurrent(generation) && readStoredSession().issue) {
+          activeToken.current = null;
+          setToken(null);
+          setUser(null);
+          setSessionError(STORAGE_ERROR);
+        }
         if (
           !cancelled &&
           sessionGeneration.isCurrent(generation) &&

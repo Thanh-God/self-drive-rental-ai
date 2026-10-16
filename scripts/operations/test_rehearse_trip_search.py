@@ -10,6 +10,12 @@ from unittest.mock import patch
 import rehearse_trip_search as runner
 
 class TripRunnerGuardTest(unittest.TestCase):
+    def test_unknown_browser_script_refused_before_any_process(self):
+        argv=['runner','--native-evidence','missing','--backend-root','missing','--evidence','missing','--browser-script','arbitrary.cjs']
+        with patch.object(sys,'argv',argv),patch.object(runner.subprocess,'run') as process,redirect_stderr(io.StringIO()):
+            with self.assertRaises(SystemExit) as error:runner.main()
+            self.assertEqual(error.exception.code,2)
+            process.assert_not_called()
     def test_unsupported_booking_count_refused_before_any_process(self):
         argv=['runner','--native-evidence','missing','--backend-root','missing','--evidence','missing','--expected-bookings','2']
         with patch.object(sys,'argv',argv),patch.object(runner.subprocess,'run') as process,redirect_stderr(io.StringIO()):

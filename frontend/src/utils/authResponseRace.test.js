@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, test } from "node:test";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
-import { createElement, act } from "react";
+import { createElement, act, useEffect } from "react";
 import { AxiosError } from "axios";
 import { JSDOM } from "jsdom";
 import { createServer } from "vite";
@@ -21,6 +21,7 @@ let useApiData;
 let createRoot;
 let viteServer;
 let originalAdapter;
+let storageUtils;
 
 function deferred() {
   let resolve;
@@ -225,6 +226,7 @@ before(async () => {
   ({ default: apiClient, setAuthInterceptors } =
     await viteServer.ssrLoadModule("/src/api/client.js"));
   originalAdapter = apiClient.defaults.adapter;
+  storageUtils = await viteServer.ssrLoadModule("/src/utils/storage.js");
 });
 
 beforeEach(() => {
@@ -249,6 +251,8 @@ afterEach(async () => {
     });
   }
   mountedRoots.clear();
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, writable: true, value: dom.window.localStorage });
+  storageUtils.clearSession();
   document.body.replaceChildren();
   apiClient.defaults.adapter = originalAdapter;
   setAuthInterceptors();
@@ -490,3 +494,88 @@ for (const status of [403, 500]) {
     assert.equal(callbacks, 1, "current-session error still reaches global handler");
   });
 }
+
+let currentAuth;
+function SessionProbe() {
+  const auth = useAuth();
+  useEffect(() => { currentAuth = auth; }, [auth]);
+  return createElement("output", null, JSON.stringify({ user: auth.user, token: auth.token, loading: auth.loading, error: auth.sessionError, warning: auth.logoutWarning }));
+}
+function failStorage(method, key = null, name = "SecurityError") {
+  const actual = dom.window.localStorage;
+  globalThis.localStorage = {
+    getItem(item) { if (method === "getItem" && (!key || key === item)) throw Object.assign(new Error("blocked"), { name }); return actual.getItem(item); },
+    setItem(item, value) { if (method === "setItem" && (!key || key === item)) throw Object.assign(new Error("full"), { name }); actual.setItem(item, value); },
+    removeItem(item) { if (method === "removeItem" && (!key || key === item)) throw Object.assign(new Error("blocked"), { name }); actual.removeItem(item); },
+  };
+}
+const fixtureProfile = { id: "storage-user", fullName: "Storage", email: "storage@example.test", role: "USER" };
+for (const getter of [false, true]) test(`blocked bootstrap is mounted, anonymous and reports error: getter=${getter}`, async () => {
+  if (getter) Object.defineProperty(globalThis, "localStorage", { configurable: true, get() { throw new Error("blocked property"); } });
+  else failStorage("getItem");
+  const view = await mount(createElement(SessionProbe), true);
+  assert.equal(currentAuth.isAuthenticated, false);
+  assert.equal(currentAuth.token, null);
+  assert.equal(currentAuth.loading, false);
+  assert.match(currentAuth.sessionError, /lưu phiên/);
+  assert.equal(requests.length, 0, "unknown credential must not hydrate");
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, writable: true, value: dom.window.localStorage });
+  await view.unmount();
+});
+for (const action of ["login", "register"]) for (const key of ["kdrive.user", "kdrive.jwt"]) test(`${action} cannot establish session on quota failure at ${key}`, async () => {
+  await mount(createElement(SessionProbe), true);
+  failStorage("setItem", key, "QuotaExceededError");
+  let outcome;
+  await act(async () => { outcome = currentAuth[action]({ email: "storage@example.test", password: "Fixture1!" }).catch(error => error); });
+  await act(async () => {
+    fulfill(takeRequest(`/auth/${action}`), { token: "quota-token", user: fixtureProfile });
+    assert.match((await outcome).message, /lưu phiên/);
+  });
+  assert.equal(currentAuth.isAuthenticated, false);
+  assert.equal(currentAuth.user, null);
+  assert.equal(currentAuth.token, null);
+  assert.equal(currentAuth.loading, false);
+  assert.ok(currentAuth.sessionError);
+  assert.equal(dom.window.localStorage.getItem("kdrive.jwt"), null);
+  assert.equal(dom.window.localStorage.getItem("kdrive.user"), null);
+  await assert.rejects(apiClient.get("/protected/storage"), /lưu phiên/);
+  assert.equal(requests.some(request => request.config.url === "/protected/storage"), false);
+  // Explicit successful login, rather than merely reading leftovers, recovers.
+  Object.defineProperty(globalThis, "localStorage", { configurable: true, writable: true, value: dom.window.localStorage });
+  await act(async () => { outcome = currentAuth.login({ email: "storage@example.test", password: "Fixture1!" }); });
+  await act(async () => { fulfill(takeRequest("/auth/login"), { token: "recovered", user: fixtureProfile }); await outcome; });
+  assert.equal(currentAuth.isAuthenticated, true);
+  assert.equal(currentAuth.sessionError, "");
+});
+for (const serverFails of [false, true]) test(`logout clears mounted state despite removal failure; server failure=${serverFails}`, async () => {
+  localStorage.setItem("kdrive.jwt", "retained-token");
+  await mount(createElement(SessionProbe), true);
+  await act(async () => fulfill(takeRequest("/auth/me"), fixtureProfile));
+  assert.equal(currentAuth.isAuthenticated, true);
+  failStorage("removeItem", "kdrive.jwt");
+  let logout;
+  await act(async () => { logout = currentAuth.logout(); });
+  assert.equal(currentAuth.user, null);
+  assert.equal(currentAuth.token, null);
+  assert.equal(currentAuth.isAuthenticated, false);
+  assert.match(currentAuth.logoutWarning, /không xóa được/);
+  assert.equal(storageUtils.getStoredToken(), null);
+  assert.equal(dom.window.localStorage.getItem("kdrive.jwt"), "retained-token");
+  const request = takeRequest("/auth/logout");
+  assert.equal(request.config.headers.get("Authorization"), "Bearer retained-token");
+  await act(async () => { if (serverFails) request.reject(new Error("network")); else fulfill(request, null); await logout; });
+  assert.match(currentAuth.logoutWarning, /không xóa được/);
+  if (serverFails) assert.match(currentAuth.logoutWarning, /Chưa xác nhận/);
+  await assert.rejects(apiClient.get("/protected/after-logout"), /lưu phiên/);
+});
+test("storage read failure while hydration is pending leaves no authenticated session", async () => {
+  localStorage.setItem("kdrive.jwt", "pending-token");
+  await mount(createElement(SessionProbe), true);
+  const request = takeRequest("/auth/me");
+  failStorage("getItem");
+  await act(async () => fulfill(request, fixtureProfile));
+  assert.equal(currentAuth.isAuthenticated, false);
+  assert.equal(currentAuth.token, null);
+  assert.equal(currentAuth.loading, false);
+  assert.ok(currentAuth.sessionError);
+});

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { clearSession, getStoredToken } from "../utils/storage";
+import { clearSession, getStoredToken, readStoredSession } from "../utils/storage";
 import { shouldClearUnauthorizedSession } from "../utils/requestGeneration";
 
 const API_BASE_URL =
@@ -35,7 +35,8 @@ apiClient.interceptors.request.use((config) => {
     config.url?.includes(path),
   );
   if (!isAuthCall) {
-    const token = getStoredToken();
+    const { token, issue } = readStoredSession();
+    if (issue && !config.headers.Authorization) throw new Error(issue);
     if (token && !config.headers.Authorization) {
       config.headers.Authorization = `Bearer ${token}`;
     }
