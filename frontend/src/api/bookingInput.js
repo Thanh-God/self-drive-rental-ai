@@ -4,6 +4,8 @@ const BOOKING_INPUT_FIELDS = [
   "returnBranchId",
   "startAt",
   "endAt",
+  "pickupDate",
+  "returnDate",
 ];
 
 export function sameBookingInput(left, right) {

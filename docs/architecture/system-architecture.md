@@ -34,7 +34,9 @@ Liên hệ: FR-05–FR-10, UC-U02, UC-S01–UC-S04.
 
 Hướng chống đặt trùng: khóa bản ghi xe để tuần tự hóa các yêu cầu cùng xe, sau đó kiểm tra overlap bằng truy vấn đọc trạng thái hiện hành trong transaction. Kiểm tra lại trạng thái đơn khi cập nhật để chống hai Staff xử lý cùng lúc. Mọi thao tác làm chiếm/thay đổi lịch phải theo cùng giao thức khóa; cần quy định thứ tự khóa nhất quán và kiểm thử đồng thời trên MySQL thật. Không chỉ khóa các đơn tìm được vì khi chưa có đơn sẽ không có gì để khóa.
 
-Khoảng thuê dùng điều kiện `newStart < existingEnd AND newEnd > existingStart`. PENDING giữ tối đa 2 giờ, không vượt giờ nhận; khoảng đệm/no-show/gia hạn chưa có. Kết quả tìm xe/báo giá không bảo đảm đặt thành công về sau.
+Khoảng thuê dùng điều kiện `newStart < existingEnd AND newEnd > existingStart`. Đơn theo ngày giữ xe từ đầu ngày nhận đến hết ngày trả tại Việt Nam; kể cả đã trả/hoàn tất sớm, lịch mới bắt đầu từ ngày kế tiếp. Số ngày tính phí là chênh lệch hai ngày, không phải số block của khoảng giữ xe. PENDING giữ tối đa 2 giờ: đơn theo ngày không vượt hết ngày nhận, đơn cũ không vượt giờ nhận; khoảng đệm/no-show/gia hạn chưa có. Kết quả tìm xe/báo giá không bảo đảm đặt thành công về sau.
+
+Web đặt xe mới gửi `pickupDate`/`returnDate` theo ngày Việt Nam; backend tính tiền theo chênh lệch ngày và gắn `calendar-2026-10-17`. API còn nhận cặp `startAt`/`endAt` cho client dùng hợp đồng thời gian cũ, với chính sách riêng; không nhận trộn hai dạng trong cùng request. Bản ghi cũ và snapshot chứng từ không được chuyển đổi hoặc tính lại tự động.
 
 ## 4. Hai luồng AI
 

@@ -1,3 +1,4 @@
+import { vietnamDay } from '../utils/bookingQueue.js';
 export function getBookingActions(
   booking,
   { role, assignedBranchIds = new Set(), assignmentsReady = true, now },
@@ -21,6 +22,7 @@ export function getBookingActions(
       assignedPickup &&
       now >= startAt &&
       now < new Date(booking.endAt).getTime()
+      && (booking.policyVersion !== 'calendar-2026-10-17' || vietnamDay(now) === vietnamDay(booking.startAt))
     ) {
       return ["IN_PROGRESS", "CANCELLED"];
     }

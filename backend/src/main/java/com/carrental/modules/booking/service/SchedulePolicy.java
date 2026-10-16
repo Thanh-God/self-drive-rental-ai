@@ -3,8 +3,10 @@ import com.carrental.exception.DomainException;
 import java.time.Instant;
 import java.util.*;
 public final class SchedulePolicy {
- public record Slot(String id,String pickup,String destination,Instant start,Instant end,String status,Instant expires){}
- public static boolean occupies(Slot s,Instant now){return Set.of("CONFIRMED","IN_PROGRESS").contains(s.status())||("PENDING".equals(s.status())&&s.expires().isAfter(now));}
+ public record Slot(String id,String pickup,String destination,Instant start,Instant end,String status,Instant expires,boolean calendar){
+  public Slot(String id,String pickup,String destination,Instant start,Instant end,String status,Instant expires){this(id,pickup,destination,start,end,status,expires,false);}
+ }
+ public static boolean occupies(Slot s,Instant now){return Set.of("CONFIRMED","IN_PROGRESS").contains(s.status())||("PENDING".equals(s.status())&&s.expires().isAfter(now))||(s.calendar()&&Set.of("RETURNED","COMPLETED").contains(s.status())&&s.end().isAfter(now));}
  public static void validate(String currentBranch,List<Slot> rows,Instant now){
   var slots=rows.stream().filter(s->occupies(s,now)).sorted(Comparator.comparing(Slot::start)).toList();
   String position=currentBranch;Slot previous=null;

@@ -125,7 +125,7 @@ FR-14/16/19 dùng Gemini theo phương án gốc; ranh giới chức năng giữ
 - Xe `MAINTENANCE` hoặc `INACTIVE` không thể đặt.
 - `startAt < endAt`.
 - Hai đơn chiếm lịch của cùng xe không được overlap. Điều kiện overlap: `newStart < existingEnd AND newEnd > existingStart`.
-- Trạng thái chiếm lịch: PENDING còn hạn, CONFIRMED và IN_PROGRESS. Giữ lịch tối đa 2 giờ, không vượt giờ nhận; xe đang thuê quá hạn không tự được trả.
+- Trạng thái chiếm lịch: PENDING còn hạn, CONFIRMED và IN_PROGRESS; đơn theo ngày đã RETURNED/COMPLETED vẫn giữ lịch đến hết ngày trả đã đặt. Giữ lịch PENDING tối đa 2 giờ, đơn theo ngày không vượt hết ngày nhận, đơn cũ không vượt giờ nhận; xe đang thuê quá hạn không tự được trả.
 - Backend kiểm tra availability lại khi tạo đơn và có biện pháp chống hai yêu cầu đồng thời giữ cùng xe.
 - Giá và tổng tiền do backend tính; giá tại thời điểm đặt được lưu thành snapshot.
 - Không xóa cứng xe/tài khoản có dữ liệu giao dịch; dùng trạng thái ngừng hoạt động.
@@ -152,7 +152,7 @@ Các mục sau phân biệt phần đã chốt và phần còn mở; không dùn
 
 1. **Quyền dùng AI của Guest:** đề xuất cho Guest xem kết quả gợi ý/hành trình nhưng chỉ User mới lưu lịch sử.
 2. **Giấy phép lái xe:** ghi nhận thông tin, tương thích xe, Staff xác minh thủ công; không ảnh, không tra cứu quốc gia. Lịch sử xác minh đầy đủ còn thiếu.
-3. **Cách tính ngày thuê:** đã duyệt block 24 giờ làm tròn lên, VND nguyên đồng.
+3. **Cách tính ngày thuê:** đơn mới tính chênh lệch ngày nhận/trả tại Việt Nam, tối thiểu 1 và tối đa 90 ngày. Nhận 17/10, trả 21/10 tính 4 ngày; giữ xe hết ngày 21/10 và lịch tiếp theo từ 22/10, kể cả trả sớm. VND nguyên đồng. Đơn cũ giữ giá và chính sách block 24 giờ đã lưu.
 4. **Giữ xe khi chờ xác nhận:** PENDING chiếm lịch đến min(createdAt + 2 giờ, startAt).
 5. **Hợp đồng/hóa đơn:** phát hành lúc xác nhận/hoàn tất, giữ snapshot. Sửa/phát hành lại và phụ phí còn mở; hóa đơn không xác nhận thanh toán.
 6. **Chi nhánh và điểm tham quan:** `branch` riêng với `location`; cho phép nhận/trả khác chi nhánh trên tuyến mở, kiểm tra lịch lẫn vị trí. Chưa tự điều chuyển/gia hạn/no-show.

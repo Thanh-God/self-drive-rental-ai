@@ -9,6 +9,7 @@ export default function TripSearchForm({ params, catalog, branches, loading, err
   const [draft, setDraft] = useState(() => ({
     ...Object.fromEntries(["start", "end", "pickupBranchId", "returnBranchId", "budget"].map(key => [key, params.get(key) || ""])),
     differentReturn: Boolean(params.get("returnBranchId") && params.get("returnBranchId") !== params.get("pickupBranchId")),
+    start: (params.get('start') || '').slice(0,10), end: (params.get('end') || '').slice(0,10),
   }));
   const [advanced, setAdvanced] = useState(() => params.has("budget"));
   const errors = tripErrors(draft, now);
@@ -31,15 +32,15 @@ export default function TripSearchForm({ params, catalog, branches, loading, err
     onSubmit({start:draft.start,end:draft.end,pickupBranchId:draft.pickupBranchId,returnBranchId:draft.differentReturn ? draft.returnBranchId : draft.pickupBranchId,budget:draft.budget});
   }}>
     <h2 className="text-lg font-bold">Tìm xe cho chuyến đi</h2>
-    <p className="search-subtitle">Giờ Việt Nam · Số chỗ gồm người lái · Giá theo block 24 giờ</p>
+    <p className="search-subtitle">Ngày Việt Nam · Giá theo số ngày giữa ngày nhận và ngày trả · Giữ xe đến hết ngày trả</p>
     <div className="search-trip-row">
       <div className="search-pickup">
         {field("pickupBranchId","Điểm nhận",branchSelect("pickupBranchId"))}
         <div className="search-return"><label className="search-return-toggle" htmlFor={`${id}-different`}><input id={`${id}-different`} type="checkbox" checked={draft.differentReturn} onChange={event => setDraft(old => ({...old,differentReturn:event.target.checked}))} />Trả xe ở điểm khác</label>
           {draft.differentReturn ? field("returnBranchId","Điểm trả",branchSelect("returnBranchId")) : null}</div>
       </div>
-      {field("start","Thời gian nhận",(inputId,description) => <input id={inputId} type="datetime-local" value={draft.start} onChange={change("start")} aria-describedby={description} aria-invalid={Boolean(errors.start)} />)}
-      {field("end","Thời gian trả",(inputId,description) => <input id={inputId} type="datetime-local" value={draft.end} onChange={change("end")} aria-describedby={description} aria-invalid={Boolean(errors.end)} />)}
+      {field("start","Ngày nhận",(inputId,description) => <input id={inputId} type="date" value={draft.start} onChange={change("start")} aria-describedby={description} aria-invalid={Boolean(errors.start)} />)}
+      {field("end","Ngày trả",(inputId,description) => <input id={inputId} type="date" value={draft.end} onChange={change("end")} aria-describedby={description} aria-invalid={Boolean(errors.end)} />)}
       <div className="search-submit"><button className="btn" disabled={Object.keys(errors).length > 0 || Boolean(draft.start && (loading || error))}>Tìm xe</button>
         <small>Chưa giữ chỗ khi tìm kiếm. Giá và lịch được kiểm tra lại khi báo giá.</small></div>
     </div>

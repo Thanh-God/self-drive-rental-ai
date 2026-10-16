@@ -60,6 +60,25 @@ class VehicleSearchTest {
         return result.items().stream().filter(i -> i.vehicle().id().equals("v1")).findFirst().orElseThrow();
     }
     boolean available() { return search.search(input(86400,null)).items().stream().anyMatch(i -> i.vehicle().id().equals("v1")); }
+    @Test void calendarQuoteSearchCreateAndCompletedReservationAgree(){
+        LocalDate pickup=LocalDate.of(2026,10,20),returned=LocalDate.of(2026,10,24);
+        var request=new BookingService.Input("v1","dn","dn",null,null,null,pickup,returned);
+        var quote=bookings.quote(user,request);assertEquals(4,quote.rentalDays());assertEquals(2600000,quote.total());assertEquals("calendar-2026-10-17",quote.policyVersion());
+        var found=search.search(new VehicleSearchService.Input(null,null,"dn","dn",null,null,null,null,null,null,pickup,returned));assertEquals(2600000,v1(found).total());
+        var b=bookings.create(user,new BookingService.Input("v1","dn","dn",null,null,quote.total(),pickup,returned));
+        assertEquals("calendar-2026-10-17",jdbc.queryForObject("select policy_version from bookings where id=?",String.class,b.id()));
+        assertThrows(RuntimeException.class,()->bookings.quote(user,new BookingService.Input("v1","dn","dn",null,null,null,returned,returned.plusDays(1))));
+        assertDoesNotThrow(()->bookings.quote(user,new BookingService.Input("v1","dn","dn",null,null,null,returned.plusDays(1),returned.plusDays(2))));
+        jdbc.update("update bookings set status='COMPLETED' where id=?",b.id());
+        assertTrue(search.search(new VehicleSearchService.Input(null,null,"dn","dn",null,null,null,null,null,null,returned,returned.plusDays(1))).items().stream().noneMatch(i->i.vehicle().id().equals("v1")));
+        assertThrows(RuntimeException.class,()->bookings.quote(user,new BookingService.Input("v1","dn","dn",null,null,null,returned,returned.plusDays(1))));
+        assertEquals(4,jdbc.queryForObject("select rental_days from bookings where id=?",Integer.class,b.id()));
+    }
+    @Test void calendarRejectsMixedOrIncompleteInput(){
+        LocalDate pickup=LocalDate.of(2026,10,20);
+        assertThrows(RuntimeException.class,()->bookings.quote(user,new BookingService.Input("v1","dn","dn",start,start.plusSeconds(86400),null,pickup,pickup.plusDays(1))));
+        assertThrows(RuntimeException.class,()->search.search(new VehicleSearchService.Input(null,null,"dn","dn",null,null,null,null,null,null,pickup,null)));
+    }
     BookingService.Input booking() { return new BookingService.Input("v1","dn","hn",start,start.plusSeconds(86400),null); }
     String pending() {
         var i=booking(); long total=bookings.quote(user,i).total();

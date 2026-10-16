@@ -13,6 +13,10 @@ const input = {
   startAt: "2026-10-10T03:00:00Z",
   endAt: "2026-10-11T03:00:00Z",
 };
+test('Calendar quote identity includes both selected dates',()=>{
+ const dates={vehicleId:'v1',pickupBranchId:'dn',returnBranchId:'dn',pickupDate:'2026-10-17',returnDate:'2026-10-21'};
+ assert.equal(sameBookingInput(dates,{...dates}),true);assert.equal(sameBookingInput(dates,{...dates,pickupDate:'2026-10-18'}),false);assert.equal(sameBookingInput(dates,{...dates,returnDate:'2026-10-22'}),false);
+});
 
 test("a quote matches only the exact vehicle, route, and time inputs", () => {
   assert.equal(sameBookingInput(input, { ...input }), true);

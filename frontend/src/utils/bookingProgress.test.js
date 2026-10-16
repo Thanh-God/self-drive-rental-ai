@@ -50,7 +50,7 @@ test("staff wrong branch and admin get no handover action; user links remain rol
 });
 test("guide covers actual rental contract, FAQ and valid public entry points", () => {
   const html = renderToStaticMarkup(h(Router, null, h(Guide)));
-  for (const text of ["block 24 giờ", "ít nhất 24 giờ", "tối đa 2 giờ", "GPLX bản gốc", "không xác nhận đã thanh toán", "hệ bằng cũ hoặc mới"]) assert.ok(html.includes(text), text);
+  for (const text of ["4 ngày thuê", "ngày tiếp theo", "Đơn cũ", "block 24 giờ", "ít nhất 24 giờ", "tối đa 2 giờ", "GPLX bản gốc", "không xác nhận đã thanh toán", "hệ bằng cũ hoặc mới"]) assert.ok(html.includes(text), text);
   assert.match(html, /href="\/vehicles"/);assert.match(html, /href="\/media\/vehicles\/licenses.html"/);
   assert.equal((html.match(/<details /g) || []).length, 7);
   assert.doesNotMatch(html, /href="\/staff|href="\/admin/);

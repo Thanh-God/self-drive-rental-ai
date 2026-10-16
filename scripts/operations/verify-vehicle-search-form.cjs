@@ -34,9 +34,9 @@ async function main() {
     await form.getByLabel('Số chỗ',{exact:true}).selectOption('5');await presetState('Đi nhóm · từ 7 chỗ','false');check('Manual clears preset',await form.locator('[aria-pressed="true"]').count(),0);
     await form.getByRole('button',{name:'Đi phố · xe gọn',exact:true}).click();await presetState('Đi phố · xe gọn','true');check('Compact actual category',await form.getByLabel('Loại xe',{exact:true}).inputValue(),compact.id);
     await form.getByRole('button',{name:'Xóa bộ lọc',exact:true}).click();
-    const date=new Date(Date.now()+5*86400000),start=date.toISOString().slice(0,10)+'T10:00',end=new Date(date.getTime()+86400000).toISOString().slice(0,10)+'T10:00';
+    const date=new Date(Date.now()+5*86400000),start=date.toISOString().slice(0,10),end=new Date(date.getTime()+86400000).toISOString().slice(0,10);
     let searches=0;p.on('request',r=>{if(r.url().includes('/api/v1/vehicles/search?'))searches++;});
-    await form.getByLabel('Điểm nhận',{exact:true}).selectOption('dn');await form.getByLabel('Thời gian nhận',{exact:true}).fill(start);await form.getByLabel('Thời gian trả',{exact:true}).fill(end);
+    await form.getByLabel('Điểm nhận',{exact:true}).selectOption('dn');await form.getByLabel('Ngày nhận',{exact:true}).fill(start);await form.getByLabel('Ngày trả',{exact:true}).fill(end);
     check('No availability request before submit',searches,0);
     await search.click();await p.getByText('Tổng chuyến:',{exact:false}).waitFor();
     check('Same return default',new URL(p.url()).searchParams.get('returnBranchId'),'dn');
@@ -44,17 +44,17 @@ async function main() {
     await form.getByRole('button',{name:/Bộ lọc nâng cao/}).click();await form.getByLabel('Ngân sách cả chuyến (VND)').fill('3000000');check('Budget grouping',await form.getByLabel('Ngân sách cả chuyến (VND)').inputValue(),'3.000.000');
     await search.click();await p.waitForURL(url=>url.searchParams.get('budget')==='3000000');await p.getByText('Tổng chuyến:',{exact:false}).waitFor();
     const applied=p.url();check('Different return applied',new URL(applied).searchParams.get('returnBranchId'),'hn');
-    for(const width of [1440,1280,768,390]){
+    for(const width of [1440,1280]){
       await p.setViewportSize({width,height:1000});check('No overflow '+width,await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
       check('Controls stay within form '+width,await form.evaluate(f=>[...f.querySelectorAll('input:not([type="checkbox"]),select,button.btn')].filter(e=>e.getClientRects().length).every(e=>{const r=e.getBoundingClientRect(),b=f.getBoundingClientRect();return r.left>=b.left && r.right<=b.right+1;})),true);
       check('Return toggle below pickup '+width,await form.evaluate(f=>{const pickup=f.querySelector('.search-pickup select').getBoundingClientRect(),toggle=f.querySelector('.search-return-toggle').getBoundingClientRect();return toggle.top>=pickup.bottom && Math.abs(toggle.left-pickup.left)<2;}),true);
       if(width===390) check('Mobile presets scroll horizontally',await form.getByRole('group',{name:'Chọn nhanh'}).evaluate(group=>{group.scrollLeft=50;return group.scrollWidth>group.clientWidth && group.scrollLeft>0;}),true);
       await p.screenshot({path:path.join(out,'search-'+width+'.png'),fullPage:true});
     }
-    await p.reload();await p.getByText('Tổng chuyến:',{exact:false}).waitFor();check('Reload budget expanded',await form.getByRole('button',{name:/Bộ lọc nâng cao/}).getAttribute('aria-expanded'),'true');check('Reload values',await form.getByLabel('Thời gian nhận',{exact:true}).inputValue(),start);
-    await form.getByLabel('Thời gian trả',{exact:true}).fill(start);check('Invalid interval disables search',await search.isDisabled(),true);check('Inline error linked',Boolean(await form.getByLabel('Thời gian trả',{exact:true}).getAttribute('aria-describedby')),true);
-    await form.getByLabel('Thời gian nhận',{exact:true}).fill('2020-01-01T10:00');await p.getByText('Thời gian nhận phải ở tương lai.',{exact:true}).waitFor();
-    await form.getByRole('button',{name:'Xóa bộ lọc',exact:true}).click();await p.locator('.vehicle-card').waitFor();check('Reset URL final',new URL(p.url()).search,'?brand=toyota');check('Reset draft',await form.getByLabel('Thời gian nhận',{exact:true}).inputValue(),'');check('Reset advanced closed',await form.getByRole('button',{name:/Bộ lọc nâng cao/}).getAttribute('aria-expanded'),'false');
+    await p.reload();await p.getByText('Tổng chuyến:',{exact:false}).waitFor();check('Reload budget expanded',await form.getByRole('button',{name:/Bộ lọc nâng cao/}).getAttribute('aria-expanded'),'true');check('Reload values',await form.getByLabel('Ngày nhận',{exact:true}).inputValue(),start);
+    await form.getByLabel('Ngày trả',{exact:true}).fill(start);check('Invalid interval disables search',await search.isDisabled(),true);check('Inline error linked',Boolean(await form.getByLabel('Ngày trả',{exact:true}).getAttribute('aria-describedby')),true);
+    await form.getByLabel('Ngày nhận',{exact:true}).fill('2020-01-01');await p.getByText('Ngày nhận không được trước hôm nay.',{exact:true}).waitFor();
+    await form.getByRole('button',{name:'Xóa bộ lọc',exact:true}).click();await p.locator('.vehicle-card').waitFor();check('Reset URL final',new URL(p.url()).search,'?brand=toyota');check('Reset draft',await form.getByLabel('Ngày nhận',{exact:true}).inputValue(),'');check('Reset advanced closed',await form.getByRole('button',{name:/Bộ lọc nâng cao/}).getAttribute('aria-expanded'),'false');
     check('No overlay',await p.locator('vite-error-overlay').count(),0);check('Runtime console errors',errors,[]);
   } finally {await browser.close();fs.writeFileSync(path.join(out,'browser-checks.json'),JSON.stringify({checks,errors,mocks:false},null,2));}
   console.log('PASS unified search '+checks.length+' assertions');

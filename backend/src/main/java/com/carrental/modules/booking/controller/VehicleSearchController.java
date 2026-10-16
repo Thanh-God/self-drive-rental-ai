@@ -2,6 +2,7 @@ package com.carrental.modules.booking.controller;
 
 import com.carrental.modules.booking.service.VehicleSearchService;
 import java.time.Instant;
+import java.time.LocalDate;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.*;
 
@@ -20,12 +21,14 @@ public class VehicleSearchController {
 
     @GetMapping
     public VehicleSearchService.Result search(
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startAt,
-            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endAt,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant startAt,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant endAt,
             @RequestParam String pickupBranchId, @RequestParam String returnBranchId,
             @RequestParam(required = false) Long budget, @RequestParam(required = false) Integer seats,
             @RequestParam(required = false) String transmission, @RequestParam(required = false) String brand,
-            @RequestParam(required = false) String category, @RequestParam(required = false) String q) {
-        return service.search(new VehicleSearchService.Input(startAt, endAt, pickupBranchId, returnBranchId, budget, seats, transmission, brand, category, q));
+            @RequestParam(required = false) String category, @RequestParam(required = false) String q,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate pickupDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate returnDate) {
+        return service.search(new VehicleSearchService.Input(startAt, endAt, pickupBranchId, returnBranchId, budget, seats, transmission, brand, category, q,pickupDate,returnDate));
     }
 }

@@ -7,6 +7,13 @@ import { fileURLToPath, URL, URLSearchParams } from "node:url";
 import process from "node:process";
 import { searchParams, searchSuffix, tripSearch, tripErrors, formatBudget } from "./vehicleSearch.js";
 const query="start=2026-11-20T10%3A00&end=2026-11-21T10%3A00&pickupBranchId=dn&returnBranchId=hn&budget=2200000";
+test('Date-only trip sends dates without hidden hours; today is valid and return must be later',()=>{
+ const p=new URLSearchParams({start:'2026-10-17',end:'2026-10-21',pickupBranchId:'dn',returnBranchId:'dn'}),result=tripSearch(p),url=new URL(result.path,'http://localhost');
+ assert.equal(url.searchParams.get('pickupDate'),'2026-10-17');assert.equal(url.searchParams.get('returnDate'),'2026-10-21');assert.equal(url.searchParams.has('startAt'),false);assert.equal(url.searchParams.has('endAt'),false);
+ assert.deepEqual(tripErrors({start:'2026-10-17',end:'2026-10-21',pickupBranchId:'dn'},Date.parse('2026-10-17T15:00:00Z')),{});
+ for(const bad of ['2026-02-30','2026-99-01','bad'])assert.ok(tripSearch(new URLSearchParams({...Object.fromEntries(p),start:bad})).error);
+ assert.ok(tripErrors({start:'2026-10-16',end:'2026-10-21',pickupBranchId:'dn'},Date.parse('2026-10-17T15:00:00Z')).start);
+});
 test("trip URL converts Vietnam time, preserves only supported keys, clears brand independently",()=>{
  const p=new URLSearchParams(query+"&brand=a&token=private");
  const result=tripSearch(p); assert.equal(result.error,"");
@@ -48,7 +55,7 @@ test("server total is displayed and trip survives brand, detail, back link and b
  await act(async()=>c.querySelector(".vehicle-card h2 a").click());
  const back=[...c.querySelectorAll("a")].find(a=>a.textContent==="Về danh sách xe");assert.equal(new URL(back.href).searchParams.get("pickupBranchId"),"dn");
  const booking=[...c.querySelectorAll("a")].find(a=>a.getAttribute("href").startsWith("/user/bookings/new"));await act(async()=>booking.click());
- assert.deepEqual([...c.querySelectorAll('input[type="datetime-local"]')].map(i=>i.value),["2026-11-20T10:00","2026-11-21T10:00"]);
+ assert.deepEqual([...c.querySelectorAll('input[type="date"]')].map(i=>i.value),["2026-11-20","2026-11-21"]);
  assert.deepEqual([...c.querySelectorAll("select")].slice(0,2).map(i=>i.value),["dn","hn"]);
  const listBack=[...c.querySelectorAll("a")].find(a=>a.textContent==="Quay lại danh sách xe");assert.equal(new URL(listBack.href).searchParams.get("budget"),"2200000");
 });
@@ -84,7 +91,7 @@ test("one form defaults empty regardless of storage; reset clears unsubmitted dr
  assert.equal(c.textContent.includes("Trạng thái xe"),false);assert.equal(c.querySelector("form").contains(c.querySelector("#vehicle-result-sort")),false);
  assert.equal(button(c,"Bộ lọc nâng cao ▾").getAttribute("aria-expanded"),"false");
  await act(async()=>button(c,"Bộ lọc nâng cao ▾").click());await change(input(c,"budget"),"3000000");assert.equal(input(c,"budget").value,"3.000.000");
- await change(input(c,"start"),"2026-11-20T10:00");await act(async()=>button(c,"Xóa bộ lọc").click());
+ await change(input(c,"start"),"2026-11-20");await act(async()=>button(c,"Xóa bộ lọc").click());
  assert.equal(input(c,"start").value,"");assert.equal(input(c,"budget").value,"");assert.equal(input(c,"seats").value,"");assert.ok(button(c,"Bộ lọc nâng cao ▾"));
  assert.equal([...c.querySelectorAll("nav a")].find(a=>a.textContent==="Alpha").getAttribute("aria-current"),"true");
  localStorage.clear();
@@ -101,10 +108,10 @@ test("presets toggle and manual changes clear explicit selected state; restored 
 });
 test("draft trip is submitted only on search; same-branch default, different return and field errors",async()=>{
  const requests=[];searchHandler=async config=>{requests.push(new URL(config.url,"http://localhost"));return{items:[{vehicle:car,total:650000,rentalDays:1}]};};
- const c=await mount("/vehicles");await change(input(c,"pickupBranchId"),"dn");await change(input(c,"start"),"2026-11-20T10:00");await change(input(c,"end"),"2026-11-21T10:00");assert.equal(requests.length,0);
+ const c=await mount("/vehicles");await change(input(c,"pickupBranchId"),"dn");await change(input(c,"start"),"2026-11-20");await change(input(c,"end"),"2026-11-21");assert.equal(requests.length,0);
  await change(input(c,"q"),"Search");assert.equal(requests.length,0);
  await act(async()=>button(c,"Tìm xe").click());assert.equal(requests.length,1);assert.equal(requests[0].searchParams.get("returnBranchId"),"dn");
  await act(async()=>input(c,"different").click());assert.ok(input(c,"returnBranchId"));await change(input(c,"returnBranchId"),"hn");await act(async()=>button(c,"Tìm xe").click());assert.equal(requests.at(-1).searchParams.get("returnBranchId"),"hn");
- await change(input(c,"end"),"2026-11-19T10:00");assert.equal(button(c,"Tìm xe").disabled,true);assert.match(c.textContent,/Thời gian trả phải sau/);assert.ok(input(c,"end").getAttribute("aria-describedby"));
- await change(input(c,"start"),"2020-01-01T10:00");assert.match(c.textContent,/Thời gian nhận phải ở tương lai/);
+ await change(input(c,"end"),"2026-11-19");assert.equal(button(c,"Tìm xe").disabled,true);assert.match(c.textContent,/Thời gian trả phải sau/);assert.ok(input(c,"end").getAttribute("aria-describedby"));
+ await change(input(c,"start"),"2020-01-01");assert.match(c.textContent,/Ngày nhận không được trước hôm nay/);
 });

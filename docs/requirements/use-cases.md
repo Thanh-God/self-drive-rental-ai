@@ -52,7 +52,7 @@
 
 1. User chọn xe, thời gian và chi nhánh nhận/trả trong tuyến được phép.
 2. Backend validate ngày giờ, trạng thái xe và chuỗi chi nhánh.
-3. Backend tính số ngày (block 24 giờ), phí tuyến và tổng tiền dự kiến.
+3. Backend tính số ngày (đơn mới lấy chênh lệch ngày nhận/trả tại Việt Nam; đơn cũ giữ block 24 giờ), phí tuyến và tổng tiền dự kiến.
 4. Hệ thống trả báo giá và thông tin khả dụng cho User xem xét.
 5. User có thể thay đổi điều kiện và xem báo giá lại nhiều lần.
 
@@ -251,7 +251,7 @@ Admin không được xem mật khẩu dạng rõ. Hệ thống chỉ lưu hash 
 - Backend là nguồn sự thật cho availability, giá và state transition.
 - AI và map là tích hợp bên ngoài qua backend adapter.
 - Tách chi nhánh giao nhận (`branch`) và điểm tham quan (`location`); baseline hiện hỗ trợ nhận/trả khác chi nhánh, nhân viên được phân công.
-- Guest AI, mô hình/provider, Map provider, cọc, phụ phí, gia hạn/no-show vẫn còn mở; GPLX, block 24 giờ, hold 2 giờ và thời điểm phát hành đã chốt tại [sổ quyết định](../architecture/decisions.md).
+- Guest AI, mô hình/provider, Map provider, cọc, phụ phí, gia hạn/no-show vẫn còn mở; GPLX, tính thuê theo ngày cho đơn mới/giữ chính sách cũ, hold tối đa 2 giờ và thời điểm phát hành đã chốt tại [sổ quyết định](../architecture/decisions.md).
 - Backend tổ chức theo nghiệp vụ, không có module dữ liệu riêng `staff`/`admin`; các quyền và use case của hai actor vẫn được giữ. Xem [ranh giới module](../architecture/module-boundaries.md).
 
 ## 12. Sự cố và trách nhiệm

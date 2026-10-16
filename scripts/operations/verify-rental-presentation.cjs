@@ -8,7 +8,7 @@ async function main(){
  const admin=await http('POST','/auth/login',{email:'admin@example.test',password:process.env.OTO2_SEED_PASSWORD});
  const staff=await http('POST','/auth/login',{email:'staff.dn@example.test',password:process.env.OTO2_SEED_PASSWORD});
  const vehicle=await http('GET','/vehicles/v1');
- const day=new Date(Date.now()+5*86400000),start=day.toISOString().slice(0,10)+'T10:00',end=new Date(day.getTime()+2*86400000).toISOString().slice(0,10)+'T10:00';
+ const day=new Date(Date.now()+5*86400000),start=day.toISOString().slice(0,10),end=new Date(day.getTime()+2*86400000).toISOString().slice(0,10);
  const query=new URLSearchParams({start,end,pickupBranchId:'dn',returnBranchId:'dn',brand:'toyota'});
  const browser=await chromium.launch({headless:true});
  try{
@@ -22,14 +22,14 @@ async function main(){
   await p.evaluate(()=>scrollTo(0,0));await p.screenshot({path:path.join(out,'detail-1280.png'),fullPage:true});
   await next.click();await p.waitForURL('**/login');await p.getByLabel('Email',{exact:true}).fill('user@example.test');await p.getByLabel('Mật khẩu',{exact:true}).fill(process.env.OTO2_SEED_PASSWORD);await p.getByRole('button',{name:'Đăng nhập',exact:true}).click();await p.waitForURL(url=>url.pathname==='/user/bookings/new');
   const form=p.getByRole('form',{name:'Chuyến đi thuê xe',exact:true});await form.getByRole('button',{name:'Kiểm tra lịch & báo giá',exact:true}).waitFor();
-  check('Dates restored after login',await form.getByLabel('Thời gian nhận (giờ Việt Nam)',{exact:true}).inputValue(),start);
+  check('Dates restored after login',await form.getByLabel('Ngày nhận (giờ Việt Nam)',{exact:true}).inputValue(),start);
   await form.getByRole('link',{name:'Kiểm tra GPLX',exact:true}).waitFor();
   const quoteResponse=p.waitForResponse(r=>r.url().endsWith('/api/v1/bookings/quote')&&r.request().method()==='POST');await form.getByRole('button',{name:'Kiểm tra lịch & báo giá',exact:true}).click();const quoted=await (await quoteResponse).json();
   let section=p.getByRole('region',{name:'Báo giá chuyến đi',exact:true});await section.waitFor();check('Real server total shown',(await section.textContent()).includes(Number(quoted.total).toLocaleString('vi-VN')));
   const consent=p.getByLabel('Tôi xác nhận thời gian, chi nhánh và tổng báo giá.',{exact:true}),send=p.getByRole('button',{name:'Gửi yêu cầu thuê',exact:true});
   check('Consent initially unchecked',await consent.isChecked(),false);check('Send disabled without consent',await send.isDisabled());
-  await consent.check();await form.getByLabel('Thời gian trả (giờ Việt Nam)',{exact:true}).fill(end.replace('10:00','11:00'));await section.waitFor({state:'detached'});check('Date edit hides quote',await section.count(),0);
-  await form.getByLabel('Thời gian trả (giờ Việt Nam)',{exact:true}).fill(end);await form.getByRole('button',{name:'Kiểm tra lịch & báo giá',exact:true}).click();await section.waitFor();check('Fresh quote needs new consent',await consent.isChecked(),false);
+  await consent.check();await form.getByLabel('Ngày trả (giờ Việt Nam)',{exact:true}).fill(new Date(Date.parse(end+'T00:00:00Z')+86400000).toISOString().slice(0,10));await section.waitFor({state:'detached'});check('Date edit hides quote',await section.count(),0);
+  await form.getByLabel('Ngày trả (giờ Việt Nam)',{exact:true}).fill(end);await form.getByRole('button',{name:'Kiểm tra lịch & báo giá',exact:true}).click();await section.waitFor();check('Fresh quote needs new consent',await consent.isChecked(),false);
   await http('PUT','/admin/vehicles/v1',{...vehicle,dailyPrice:vehicle.dailyPrice+100000},admin.token);
   await consent.check();const stale=p.waitForResponse(r=>r.url().endsWith('/api/v1/bookings')&&r.request().method()==='POST');await send.click();check('Stale price rejected by actual backend',(await stale).status(),409);await section.waitFor({state:'detached'});await p.getByText('Giá đã thay đổi',{exact:false}).waitFor();check('Stale quote not left actionable',await send.count(),0);
   await form.getByRole('button',{name:'Kiểm tra lịch & báo giá',exact:true}).click();await section.waitFor();check('Requote still unchecked',await consent.isChecked(),false);

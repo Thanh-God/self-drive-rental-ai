@@ -16,9 +16,11 @@ import java.util.*;
  private final BookingRepository repo;private final VehicleService vehicles;private final BranchService branches;
  private final LicenseService licenses;private final AccountService accounts;private final JdbcTemplate jdbc;private final Clock clock;
  public BookingService(BookingRepository r,VehicleService v,BranchService b,LicenseService l,AccountService a,JdbcTemplate j,Clock c){repo=r;vehicles=v;branches=b;licenses=l;accounts=a;jdbc=j;clock=c;}
- public record Input(String vehicleId,String pickupBranchId,String returnBranchId,Instant startAt,Instant endAt,Long expectedTotal){}
- public record View(String id,String userId,String vehicleId,String customerName,String vehicleName,String pickupBranchId,String returnBranchId,String pickupName,String returnName,String actualReturnBranchId,Instant startAt,Instant endAt,Instant expiresAt,String status,long dailyPrice,int rentalDays,long rentalTotal,long oneWayFee,long total,long version,Instant createdAt){}
- public View view(Booking b){return new View(b.id,b.userId,b.vehicleId,b.customerName,b.vehicleName,b.pickupBranchId,b.returnBranchId,b.pickupName,b.returnName,b.actualReturnBranchId,b.startAt,b.endAt,b.expiresAt,effective(b),b.dailyPrice,b.rentalDays,b.rentalTotal,b.oneWayFee,b.total,b.version,b.createdAt);}
+ public record Input(String vehicleId,String pickupBranchId,String returnBranchId,Instant startAt,Instant endAt,Long expectedTotal,LocalDate pickupDate,LocalDate returnDate){
+  public Input(String vehicleId,String pickupBranchId,String returnBranchId,Instant startAt,Instant endAt,Long expectedTotal){this(vehicleId,pickupBranchId,returnBranchId,startAt,endAt,expectedTotal,null,null);}
+ }
+ public record View(String id,String userId,String vehicleId,String customerName,String vehicleName,String pickupBranchId,String returnBranchId,String pickupName,String returnName,String actualReturnBranchId,Instant startAt,Instant endAt,Instant expiresAt,String status,long dailyPrice,int rentalDays,long rentalTotal,long oneWayFee,long total,long version,Instant createdAt,String policyVersion){}
+ public View view(Booking b){return new View(b.id,b.userId,b.vehicleId,b.customerName,b.vehicleName,b.pickupBranchId,b.returnBranchId,b.pickupName,b.returnName,b.actualReturnBranchId,b.startAt,b.endAt,b.expiresAt,effective(b),b.dailyPrice,b.rentalDays,b.rentalTotal,b.oneWayFee,b.total,b.version,b.createdAt,b.policyVersion);}
  public String effective(Booking b){return "PENDING".equals(b.status)&&!b.expiresAt.isAfter(clock.instant())?"EXPIRED":b.status;}
  public record Report(long total,Map<String,Long> byStatus,long completed){}
  public Report report(Instant from,Instant to,Instant asOf){
@@ -41,7 +43,7 @@ import java.util.*;
   if(a.is("STAFF"))result.put("license",licenses.forBooking(b.userId));
   return result;
  }
- private SchedulePolicy.Slot slot(Booking b){return new SchedulePolicy.Slot(b.id,b.pickupBranchId,b.returnBranchId,b.startAt,b.endAt,b.status,b.expiresAt);}
+ private SchedulePolicy.Slot slot(Booking b){boolean calendar=RentalTerms.CALENDAR_POLICY.equals(b.policyVersion);boolean received=calendar&&Set.of("RETURNED","COMPLETED").contains(b.status);return new SchedulePolicy.Slot(b.id,received?b.returnBranchId:b.pickupBranchId,b.returnBranchId,b.startAt,b.endAt,b.status,b.expiresAt,calendar);}
  private void schedule(Vehicle v,Booking added,String excluded){
   var existing=repo.lockScheduleByVehicleId(v.id);
   var rows=new ArrayList<>(existing.stream().filter(b->!b.id.equals(excluded)).map(this::slot).toList());
@@ -49,17 +51,21 @@ import java.util.*;
  }
  private Booking prepare(Actor a,Input i,Vehicle v){
   a.require("USER");Instant now=clock.instant();
-  int rentalDays=RentalTerms.days(i.startAt(),i.endAt(),now);
+  boolean calendar=i.pickupDate()!=null||i.returnDate()!=null;
+  if(calendar&&(i.startAt()!=null||i.endAt()!=null))throw DomainException.bad("Không trộn ngày thuê với thời gian thuê cũ.");
+  var period=calendar?RentalTerms.calendar(i.pickupDate(),i.returnDate(),now):null;
+  Instant start=calendar?period.start():i.startAt(),end=calendar?period.end():i.endAt();
+  int rentalDays=calendar?period.days():RentalTerms.days(start,end,now);
   if(!"ACTIVE".equals(v.status))throw DomainException.conflict("Xe không hoạt động.");
-  licenses.eligible(a.id(),v.transmission,v.seats,i.endAt());
+  licenses.eligible(a.id(),v.transmission,v.seats,end);
   Booking b=new Booking();b.userId=a.id();b.vehicleId=v.id;b.pickupBranchId=i.pickupBranchId();b.returnBranchId=i.returnBranchId();
   var route=branches.bookingRoute(i.pickupBranchId(),i.returnBranchId());
   b.pickupName=route.pickupName();b.returnName=route.returnName();
-  b.oneWayFee=route.fee();b.startAt=i.startAt();b.endAt=i.endAt();b.createdAt=now;
-  b.expiresAt=RentalTerms.holdUntil(b.startAt,now);
+  b.oneWayFee=route.fee();b.startAt=start;b.endAt=end;b.createdAt=now;
+  b.expiresAt=calendar?period.holdUntil():RentalTerms.holdUntil(b.startAt,now);
   b.rentalDays=rentalDays;b.dailyPrice=v.dailyPrice;
   b.rentalTotal=RentalTerms.rent(b.dailyPrice,b.rentalDays);b.total=RentalTerms.total(b.rentalTotal,b.oneWayFee);
-  b.customerName=accounts.profile(a.id()).fullName();b.vehicleName=v.name;b.status="PENDING";b.policyVersion="rental-2026-09-28";
+  b.customerName=accounts.profile(a.id()).fullName();b.vehicleName=v.name;b.status="PENDING";b.policyVersion=calendar?RentalTerms.CALENDAR_POLICY:"rental-2026-09-28";
   schedule(v,b,null);return b;
  }
  @Transactional public View quote(Actor a,Input i){return view(prepare(a,i,vehicles.lock(i.vehicleId())));}
@@ -92,6 +98,7 @@ import java.util.*;
    case "IN_PROGRESS" -> {
     branches.requireStaff(a,b.pickupBranchId);
     if(!"CONFIRMED".equals(old)||clock.instant().isBefore(b.startAt)||!clock.instant().isBefore(b.endAt))throw DomainException.conflict("Chỉ giao đơn đã xác nhận trong khoảng thuê; chưa hỗ trợ giao sớm/no-show.");
+    if(RentalTerms.CALENDAR_POLICY.equals(b.policyVersion)&&!clock.instant().atZone(RentalTerms.VIETNAM).toLocalDate().equals(b.startAt.atZone(RentalTerms.VIETNAM).toLocalDate()))throw DomainException.conflict("Chỉ xác nhận giao xe trong ngày nhận đã đặt.");
     if(!"ACTIVE".equals(vehicle.status)||!vehicle.currentBranchId.equals(b.pickupBranchId))throw DomainException.conflict("Xe không sẵn sàng tại chi nhánh nhận.");
     if(repo.lockScheduleByVehicleId(vehicle.id).stream().anyMatch(x->!x.id.equals(b.id)&&"IN_PROGRESS".equals(x.status)))throw DomainException.conflict("Xe còn đang được thuê.");
     if(!action.licenseChecked())throw DomainException.bad("Staff phải kiểm tra GPLX thực tế trước giao.");

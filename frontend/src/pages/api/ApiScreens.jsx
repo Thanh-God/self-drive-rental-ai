@@ -31,6 +31,8 @@ import {
   Page,
   Status,
   dateTime,
+  dateOnly,
+  bookingDate,
   toUTC,
 } from "../../components/common/PageKit";
 import EmptyState from "../../components/common/EmptyState";
@@ -543,7 +545,7 @@ export function ApiHomePage() {
             {isUser ? <Link className="btn-secondary" to="/user/bookings">Đơn thuê của tôi</Link> : !currentUser ? <Link className="btn-secondary" to="/register">Đăng ký tài khoản</Link> : null}
             {isUser ? <Link className="btn-secondary" to="/user/profile">Hồ sơ &amp; GPLX</Link> : null}
           </div>
-          <p className="urban-smallprint">Giá theo block 24 giờ · Nhận / trả theo tuyến chi nhánh</p>
+          <p className="urban-smallprint">Giá theo ngày · Giữ xe đến hết ngày trả · Nhận / trả theo tuyến chi nhánh</p>
         </div>
         <div className="urban-hero-photo">
           {!loading && !error && vehicles[0] ? <VehicleGallery vehicle={vehicles[0]} /> : <div className="urban-photo-empty">Hành trình của bạn bắt đầu tại đây.</div>}
@@ -802,15 +804,15 @@ export function ApiVehicleDetailPage() {
               <VehicleOperationalStatus status={vehicle.status} />
               <p className="mt-4 text-2xl font-bold text-teal-800">
                 {money(vehicle.price)}{" "}
-                <span className="text-sm font-normal">/ 24 giờ</span>
+                <span className="text-sm font-normal">/ ngày</span>
               </p>
               <p className="mt-3 text-sm text-slate-600">
                 Báo giá sẽ kiểm tra lịch xe, tuyến chi nhánh và giá hiện tại.
               </p>
               {selectedTrip.error ? <Notice error>{selectedTrip.error}</Notice> : selectedTrip.active ? (
                 <dl className="vehicle-trip-summary">
-                  <div><dt>Nhận xe · Giờ Việt Nam</dt><dd>{dateTime(toUTC(params.get("start")))} · {branchName(params.get("pickupBranchId"))}</dd></div>
-                  <div><dt>Trả xe · Giờ Việt Nam</dt><dd>{dateTime(toUTC(params.get("end")))} · {branchName(params.get("returnBranchId") || params.get("pickupBranchId"))}</dd></div>
+                  <div><dt>Nhận xe · Giờ Việt Nam</dt><dd>{(params.get("start").length === 10 ? dateOnly : dateTime)(toUTC(params.get("start")))} · {branchName(params.get("pickupBranchId"))}</dd></div>
+                  <div><dt>Trả xe · Giờ Việt Nam</dt><dd>{(params.get("end").length === 10 ? dateOnly : dateTime)(toUTC(params.get("end")))} · {branchName(params.get("returnBranchId") || params.get("pickupBranchId"))}</dd></div>
                 </dl>
               ) : <p className="mt-4 text-sm text-muted">Chọn thời gian và điểm nhận/trả ở bước kiểm tra báo giá.</p>}
               {vehicle.status === "ACTIVE" ? (
@@ -879,9 +881,9 @@ export function ApiNewBookingPage() {
   const branchesRequest = useApiData("/branches");
   const routesRequest = useApiData("/branch-routes");
   const [start, setStart] = useState(
-    () => params.get("start") || toVietnamInput(3),
+    () => (params.get("start") || toVietnamInput(3)).slice(0,10),
   );
-  const [end, setEnd] = useState(() => params.get("end") || toVietnamInput(4));
+  const [end, setEnd] = useState(() => (params.get("end") || toVietnamInput(4)).slice(0,10));
   const [pickup, setPickup] = useState(() => params.get("pickupBranchId") || "");
   const [dropoff, setDropoff] = useState(() => params.get("returnBranchId") || "");
   const [quoteValue, setQuote] = useState(null);
@@ -929,8 +931,8 @@ export function ApiNewBookingPage() {
       vehicleId,
       pickupBranchId: pickup,
       returnBranchId: dropoff,
-      startAt: toUTC(start),
-      endAt: toUTC(end),
+      pickupDate: start,
+      returnDate: end,
     };
   }
 
@@ -1059,21 +1061,21 @@ export function ApiNewBookingPage() {
               <form className="panel space-y-5" aria-label="Chuyến đi thuê xe" onSubmit={checkQuote}>
                 <h2 className="text-lg font-semibold"><span className="rental-step">1</span>Chuyến đi</h2>
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Thời gian nhận (giờ Việt Nam)">
+                  <Field label="Ngày nhận (giờ Việt Nam)">
                     <input
-                      type="datetime-local"
+                      type="date"
                       required
                       disabled={submitting}
-                      min={toVietnamInput(0)}
+                      min={toVietnamInput(0).slice(0,10)}
                       value={start}
                       onChange={(event) => {
                         updateQuoteField("start", setStart, event.target.value);
                       }}
                     />
                   </Field>
-                  <Field label="Thời gian trả (giờ Việt Nam)">
+                  <Field label="Ngày trả (giờ Việt Nam)">
                     <input
-                      type="datetime-local"
+                      type="date"
                       required
                       disabled={submitting}
                       min={start}
@@ -1293,7 +1295,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                   </div>
                   <h2 className="font-semibold">{booking.vehicleName}</h2>
                   <p className="mt-1 text-sm text-slate-600">
-                    {dateTime(booking.startAt)} → {dateTime(booking.endAt)}
+                    {bookingDate(booking, booking.startAt)} → {bookingDate(booking, booking.endAt)}
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
                     {booking.pickupName} → {booking.returnName}
@@ -1570,8 +1572,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     {[
                       ["Khách hàng", booking.customerName],
                       ["Xe", booking.vehicleName],
-                      ["Thời gian nhận", dateTime(booking.startAt)],
-                      ["Thời gian trả", dateTime(booking.endAt)],
+                      [booking.policyVersion === 'calendar-2026-10-17' ? "Ngày nhận" : "Thời gian nhận", bookingDate(booking, booking.startAt)],
+                      [booking.policyVersion === 'calendar-2026-10-17' ? "Ngày trả" : "Thời gian trả", bookingDate(booking, booking.endAt)],
                       ["Chi nhánh nhận", booking.pickupName],
                       [
                         "Chi nhánh trả",
@@ -1871,7 +1873,7 @@ export function ApiDocumentPage({ kind, area }) {
   const formatValue = (key, value) => {
     if (value == null) return "—";
     if (typeof value === "object") return JSON.stringify(value);
-    if (["startAt", "endAt"].includes(key)) return dateTime(value);
+    if (["startAt", "endAt"].includes(key)) return bookingDate(doc, value);
     if (["rentalTotal", "oneWayFee", "total"].includes(key))
       return money(value);
     return String(value);

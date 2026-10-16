@@ -24,13 +24,13 @@ function CompareColumn({ id, catalog, branches, search, trip, pricing, budget, o
         <dt>Hộp số</dt><dd>{vehicle.transmission}</dd>
         <dt>Tiện nghi</dt><dd>{vehicle.amenities?.length ? vehicle.amenities.map(a=>a.name).join(", ") : "Chưa có thông tin tiện nghi"}</dd>
         <dt>Chi nhánh hiện tại</dt><dd>{branches?.find(b=>b.id===vehicle.currentBranchId)?.name || "Chưa tải được chi nhánh"}</dd>
-        <dt>Giá / block 24 giờ</dt><dd>{money(vehicle.price)}</dd>
+        <dt>Giá / ngày</dt><dd>{money(vehicle.price)}</dd>
       </dl>
       {trip.active ? <section className="mt-4 border-t border-slate-200 pt-4" aria-label={`Giá chuyến ${vehicle.name}`}>
         <h3 className="font-semibold">Tổng giá chuyến</h3>
         {trip.error ? <Notice error>{trip.error}</Notice> : pricing.loading ? <p role="status">Đang kiểm tra giá và lịch…</p> : pricing.error ? <p>Chưa lấy được tổng giá và lịch.</p> : !price ? <p role="status">Không còn phù hợp lịch/tuyến đã chọn. Hãy đổi chuyến hoặc kiểm tra lại.</p> : <>
           <p className="my-2 text-xl font-bold" data-trip-total={price.total}>{money(price.total)}</p>
-          <p className="text-sm">{price.rentalDays} block 24 giờ · Tiền thuê {money(price.rentalTotal)} · Phí tuyến {money(price.oneWayFee)}</p>
+          <p className="text-sm">{price.rentalDays} ngày thuê · Tiền thuê {money(price.rentalTotal)} · Phí tuyến {money(price.oneWayFee)}</p>
           {budget != null && price.total > budget ? <p className="mt-2 text-sm text-red-700">Vượt ngân sách đã chọn</p> : null}
         </>}
       </section> : <p className="mt-4 text-sm">Chọn thời gian và điểm nhận/trả để so sánh tổng giá chuyến.</p>}

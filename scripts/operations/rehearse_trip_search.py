@@ -14,11 +14,12 @@ def main():
     parser.add_argument('--native-evidence',required=True,type=Path)
     parser.add_argument('--backend-root',required=True,type=Path)
     parser.add_argument('--evidence',required=True,type=Path)
-    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs','verify-vehicle-compare.cjs','verify-vehicle-favorites.cjs','verify-rental-guide.cjs','verify-ui-readability.cjs','verify-auth-storage.cjs','verify-auth-tabs.cjs','verify-vehicle-list-layout.cjs','verify-rental-presentation.cjs','verify-staff-queue.cjs','verify-handover-groups.cjs'],default='verify-vehicle-search-form.cjs')
+    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs','verify-vehicle-compare.cjs','verify-vehicle-favorites.cjs','verify-rental-guide.cjs','verify-ui-readability.cjs','verify-auth-storage.cjs','verify-auth-tabs.cjs','verify-vehicle-list-layout.cjs','verify-rental-presentation.cjs','verify-staff-queue.cjs','verify-handover-groups.cjs','verify-calendar-rental.cjs'],default='verify-vehicle-search-form.cjs')
     parser.add_argument('--expected-bookings',type=int,choices=[0,1,3],default=0)
     args=parser.parse_args()
     if args.browser_script=='verify-staff-queue.cjs' and args.expected_bookings!=3:raise ValueError('Queue proof requires exactly three fixture bookings')
     if args.browser_script=='verify-handover-groups.cjs' and args.expected_bookings!=1:raise ValueError('Handover proof requires exactly one fixture booking')
+    if args.browser_script=='verify-calendar-rental.cjs' and args.expected_bookings!=3:raise ValueError('Calendar proof requires exactly three fixture bookings')
     native,backend,out=[p.resolve() for p in (args.native_evidence,args.backend_root,args.evidence)]
     if not all(p.is_relative_to(REPO/'.runtime') for p in (native,backend,out)) or out.exists(): raise ValueError('New runtime output required')
     fixture=json.loads((native/'fixture.json').read_text())

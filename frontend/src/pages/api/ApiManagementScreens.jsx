@@ -710,7 +710,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                     {vehicle.transmission === "AUTO" ? "Tự động" : "Số sàn"}
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
-                    {money(vehicle.dailyPrice)} / 24 giờ · Chi nhánh hiện tại:{" "}
+                    {money(vehicle.dailyPrice)} / ngày · Chi nhánh hiện tại:{" "}
                     {vehicle.currentBranchId}
                   </p>
                 </div>

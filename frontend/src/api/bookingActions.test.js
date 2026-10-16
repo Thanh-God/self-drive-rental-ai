@@ -10,6 +10,12 @@ const booking = {
   pickupBranchId: "branch-pickup",
   returnBranchId: "branch-return",
 };
+test('Calendar handover is permitted throughout pickup day only, while legacy time rules remain',()=>{
+ const calendar={...booking,status:'CONFIRMED',policyVersion:'calendar-2026-10-17',startAt:'2026-10-16T17:00:00Z',endAt:'2026-10-21T16:59:59.999999Z'};
+ const options={role:'STAFF',assignedBranchIds:new Set(['branch-pickup'])};
+ assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-17T16:59:59Z')}),['IN_PROGRESS','CANCELLED']);
+ assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-17T17:00:00Z')}),[]);assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-16T16:59:59Z')}),[]);
+});
 
 test("Staff actions require API-backed assignment to the operational branch", () => {
   assert.deepEqual(

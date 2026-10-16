@@ -38,10 +38,10 @@ async function main(){
   for(const width of [1440,1280]){await p.setViewportSize({width,height:1000});check('No overflow '+width,await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.evaluate(()=>scrollTo(0,0));await p.screenshot({path:path.join(out,'list-'+width+'.png'),fullPage:true});}
   await p.getByRole('link',{name:'Xe yêu thích (1)',exact:true}).click();await p.getByRole('heading',{name:'Xe yêu thích',exact:true}).waitFor();await p.locator('.vehicle-card').waitFor();check('Favorite API record survives navigation',await p.locator('.vehicle-card h2').textContent(),names[0]);
   await p.goto('http://127.0.0.1:5382/vehicles?compare=..%2Fbad');await p.getByRole('complementary',{name:'Lựa chọn so sánh'}).getByRole('status').waitFor();check('Invalid selection reported',true);
-  const day=new Date(Date.now()+5*86400000),start=day.toISOString().slice(0,10)+'T10:00',end=new Date(day.getTime()+2*86400000).toISOString().slice(0,10)+'T10:00';
+  const day=new Date(Date.now()+5*86400000),start=day.toISOString().slice(0,10),end=new Date(day.getTime()+2*86400000).toISOString().slice(0,10);
   const query=new URLSearchParams({start,end,pickupBranchId:'dn',returnBranchId:'dn',sort:'price-asc'});
   await p.goto('http://127.0.0.1:5382/vehicles?'+query);await p.getByText('Tổng chuyến:',{exact:false}).first().waitFor();
-  const apiQuery=new URLSearchParams({startAt:new Date(start+':00+07:00').toISOString(),endAt:new Date(end+':00+07:00').toISOString(),pickupBranchId:'dn',returnBranchId:'dn'});
+  const apiQuery=new URLSearchParams({pickupDate:start,returnDate:end,pickupBranchId:'dn',returnBranchId:'dn'});
   const response=await context.request.get('http://127.0.0.1:8382/api/v1/vehicles/search?'+apiQuery);assert.ok(response.ok());const result=await response.json();assert.ok(result.items.length);
   for(const item of result.items){const card=p.locator('.vehicle-card').filter({has:p.getByRole('heading',{name:item.vehicle.name,exact:true})});check('Server trip total '+item.vehicle.id,(await card.textContent()).includes(Number(item.total).toLocaleString('vi-VN')));const href=await card.locator('a.btn').getAttribute('href');check('Trip preserved '+item.vehicle.id,new URL(href,'http://localhost').searchParams.get('start'),start);}
   await p.evaluate(()=>scrollTo(0,0));await p.screenshot({path:path.join(out,'list-trip-1280.png'),fullPage:true});
