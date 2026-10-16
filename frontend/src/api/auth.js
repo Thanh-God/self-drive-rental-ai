@@ -17,8 +17,8 @@ export async function registerRequest(payload) {
   return normalizeAuthPayload(data);
 }
 
-export async function fetchCurrentUser() {
-  const { data } = await apiClient.get("/auth/me");
+export async function fetchCurrentUser(token) {
+  const { data } = await apiClient.get("/auth/me", token ? { headers: { Authorization: `Bearer ${token}` } } : undefined);
   return data?.user ?? data;
 }
 

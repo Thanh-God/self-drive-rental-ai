@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { after, afterEach, before, beforeEach, test } from "node:test";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
-import { createElement, act, useEffect } from "react";
+import { createElement, act, useEffect, useState } from "react";
 import { AxiosError } from "axios";
 import { JSDOM } from "jsdom";
 import { createServer } from "vite";
@@ -22,6 +22,7 @@ let createRoot;
 let viteServer;
 let originalAdapter;
 let storageUtils;
+let useVehicleFavorites;
 
 function deferred() {
   let resolve;
@@ -227,6 +228,7 @@ before(async () => {
     await viteServer.ssrLoadModule("/src/api/client.js"));
   originalAdapter = apiClient.defaults.adapter;
   storageUtils = await viteServer.ssrLoadModule("/src/utils/storage.js");
+  ({ useVehicleFavorites } = await viteServer.ssrLoadModule("/src/hooks/useVehicleFavorites.js"));
 });
 
 beforeEach(() => {
@@ -578,4 +580,205 @@ test("storage read failure while hydration is pending leaves no authenticated se
   assert.equal(currentAuth.token, null);
   assert.equal(currentAuth.loading, false);
   assert.ok(currentAuth.sessionError);
+});
+
+function TabProbe() {
+  const auth = useAuth(), favorites = useVehicleFavorites();
+  const [draft, setDraft] = useState("clean");
+  useEffect(() => { currentAuth = auth; }, [auth]);
+  return createElement("section", null,
+    createElement("output", { "data-testid": "identity" }, auth.user?.id ?? "guest"),
+    createElement("output", { "data-testid": "favorites" }, favorites.ready ? JSON.stringify(favorites.ids) : "unverified"),
+    createElement("output", { "data-testid": "draft" }, draft),
+    createElement("button", { "data-testid": "draft-edit", onClick: () => setDraft("private-A-draft") }, "Edit"),
+    auth.user ? createElement(DataProbe, { path: "/private/tab" }) : null,
+  );
+}
+let tabFixtureId = 0;
+async function mountTab() {
+  const id = `tab-a-${++tabFixtureId}`;
+  localStorage.setItem("kdrive.jwt", "tab-token-a");
+  localStorage.setItem(`kdrive.favorites.v1.user.${id}`, '["v1"]');
+  const view = await mount(createElement(TabProbe), true);
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id }));
+  return { ...view, id };
+}
+async function changeTabToken(token, { event = true, clear = false } = {}) {
+  await act(async () => {
+    const oldValue = localStorage.getItem("kdrive.jwt");
+    if (clear) localStorage.clear();
+    else if (token === null) localStorage.removeItem("kdrive.jwt");
+    else localStorage.setItem("kdrive.jwt", token);
+    if (event) window.dispatchEvent(new window.StorageEvent("storage", { key: clear ? null : "kdrive.jwt", oldValue, newValue: token, storageArea: dom.window.localStorage }));
+  });
+}
+
+test("external A to B hides old data/draft/favorites until me verifies B, then resets child state", async () => {
+  const view = await mountTab();
+  await act(async () => fulfill(takeRequest("/private/tab"), { owner: view.id }));
+  await act(async () => view.container.querySelector('[data-testid="draft-edit"]').click());
+  assert.equal(text(view.container, "favorites"), '["v1"]');
+  assert.ok(view.container.textContent.includes(view.id));
+  const oldLogout = currentAuth.logout;
+  localStorage.setItem("kdrive.favorites.v1.user.tab-b", '["v2"]');
+  await changeTabToken("tab-token-b");
+  assert.match(view.container.textContent, /Đang xác định phiên/);
+  assert.ok(!view.container.textContent.includes(view.id));
+  assert.ok(!view.container.textContent.includes("private-A-draft"));
+  assert.equal(localStorage.getItem("kdrive.jwt"), "tab-token-b");
+  const hydration = takeRequest("/auth/me");
+  assert.equal(hydration.config.headers.get("Authorization"), "Bearer tab-token-b");
+  await act(async () => fulfill(hydration, { ...fixtureProfile, id: "tab-b" }));
+  assert.equal(text(view.container, "identity"), "tab-b");
+  assert.equal(text(view.container, "favorites"), '["v2"]');
+  assert.equal(text(view.container, "draft"), "clean");
+  const fresh = takeRequest("/private/tab");
+  assert.equal(fresh.config.headers.get("Authorization"), "Bearer tab-token-b");
+  await act(async () => fulfill(fresh, { owner: "tab-b" }));
+  await act(async () => oldLogout());
+  assert.equal(localStorage.getItem("kdrive.jwt"), "tab-token-b", "stale logout must not clear shared B");
+  assert.equal(text(view.container, "identity"), "tab-b");
+  assert.equal(requests.filter(r => r.config.url === "/auth/logout").length, 0);
+});
+
+for (const outcome of ["success", 401, 403, 500]) test(`late old-account data cannot replace B or trigger callbacks: ${outcome}`, async () => {
+  const view = await mountTab(), old = takeRequest("/private/tab");
+  let callbacks = 0;
+  setAuthInterceptors({ unauthorized: () => callbacks++, forbidden: () => callbacks++, serverError: () => callbacks++ });
+  await changeTabToken("tab-token-b");
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: "late-b" }));
+  await act(async () => fulfill(takeRequest("/private/tab"), { owner: "B" }));
+  await act(async () => { if (outcome === "success") fulfill(old, { owner: "PRIVATE-A" }); else rejectWithStatus(old, outcome); });
+  assert.equal(text(view.container, "identity"), "late-b");
+  assert.equal(text(view.container, "request-data"), '{"owner":"B"}');
+  assert.equal(callbacks, 0);
+  assert.equal(localStorage.getItem("kdrive.jwt"), "tab-token-b");
+});
+
+for (const clear of [false, true]) test(`external logout/clear becomes guest without server revoke: clear=${clear}`, async () => {
+  const view = await mountTab();
+  await changeTabToken(null, { clear });
+  assert.equal(text(view.container, "identity"), "guest");
+  assert.equal(text(view.container, "favorites"), "[]");
+  assert.equal(requests.filter(r => r.config.url === "/auth/logout").length, 0);
+  await changeTabToken("relogin-token");
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: "relogged" }));
+  assert.equal(text(view.container, "identity"), "relogged");
+});
+
+test("request before native storage event is refused and cannot send B credential from A UI", async () => {
+  const view = await mountTab();
+  await changeTabToken("tab-token-b", { event: false });
+  await act(async () => {
+    await assert.rejects(apiClient.post("/private/action", { oldOwner: view.id }), /Phiên truy cập đã thay đổi/);
+  });
+  assert.equal(requests.some(r => r.config.url === "/private/action"), false);
+  assert.ok(!view.container.textContent.includes(view.id));
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: "pre-event-b" }));
+  assert.equal(text(view.container, "identity"), "pre-event-b");
+});
+
+test("logout before storage event never removes or revokes newly shared B session", async () => {
+  const view = await mountTab(), logout = currentAuth.logout;
+  await changeTabToken("tab-token-b", { event: false });
+  await act(async () => logout());
+  assert.equal(localStorage.getItem("kdrive.jwt"), "tab-token-b");
+  assert.equal(requests.some(r => r.config.url === "/auth/logout"), false);
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: "logout-safe-b" }));
+  assert.equal(text(view.container, "identity"), "logout-safe-b");
+});
+
+for (const action of ["login", "register"]) test(`pending ${action} cannot overwrite external B before its storage event`, async () => {
+  const view = await mountTab();
+  let pending;
+  await act(async () => { pending = currentAuth[action]({ email: "fixture@example.test", password: "Fixture1!" }).catch(error => error); });
+  const request = takeRequest(`/auth/${action}`);
+  await changeTabToken("tab-token-b", { event: false });
+  await act(async () => {
+    fulfill(request, { token: "obsolete-login", user: fixtureProfile });
+    assert.match((await pending).message, /đã bị thay thế/);
+  });
+  assert.equal(localStorage.getItem("kdrive.jwt"), "tab-token-b");
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: "pending-b" }));
+  assert.equal(text(view.container, "identity"), "pending-b");
+});
+
+test("rapid A to B to C ignores intermediate hydration and verifies only final identity", async () => {
+  const view = await mountTab();
+  await changeTabToken("tab-token-b");
+  const b = takeRequest("/auth/me");
+  await changeTabToken("tab-token-c");
+  const c = takeRequest("/auth/me");
+  await act(async () => fulfill(c, { ...fixtureProfile, id: "final-c" }));
+  await act(async () => fulfill(b, { ...fixtureProfile, id: "obsolete-b" }));
+  assert.equal(text(view.container, "identity"), "final-c");
+  assert.equal(localStorage.getItem("kdrive.jwt"), "tab-token-c");
+});
+
+test("focus detects missed storage event; unrelated/user/sessionStorage events do not reset identity", async () => {
+  const view = await mountTab(), before = requests.length;
+  await act(async () => {
+    for (const [key, storageArea] of [["other", localStorage], ["kdrive.user", localStorage], ["kdrive.jwt", dom.window.sessionStorage]]) {
+      window.dispatchEvent(new window.StorageEvent("storage", { key, storageArea }));
+    }
+  });
+  assert.equal(text(view.container, "identity"), view.id);
+  assert.equal(requests.length, before);
+  await changeTabToken("focus-b", { event: false });
+  await act(async () => window.dispatchEvent(new window.Event("focus")));
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: "focus-b" }));
+  assert.equal(text(view.container, "identity"), "focus-b");
+});
+
+test("queued logout/relogin event with same final token invalidates data, logout and profile callbacks", async () => {
+  const view = await mountTab(), old = takeRequest("/private/tab");
+  const oldLogout = currentAuth.logout, oldRefresh = currentAuth.refreshUser;
+  await act(async () => window.dispatchEvent(new window.StorageEvent("storage", {
+    key: "kdrive.jwt", oldValue: "tab-token-a", newValue: null, storageArea: localStorage,
+  })));
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: view.id }));
+  await act(async () => fulfill(takeRequest("/private/tab"), { owner: "new-session" }));
+  await act(async () => {
+    fulfill(old, { owner: "obsolete-session" });
+    await oldLogout();
+    oldRefresh({ ...fixtureProfile, id: view.id, fullName: "obsolete-profile" });
+  });
+  assert.equal(text(view.container, "request-data"), '{"owner":"new-session"}');
+  assert.equal(currentAuth.user.fullName, fixtureProfile.fullName);
+  assert.equal(currentAuth.isAuthenticated, true);
+  assert.equal(localStorage.getItem("kdrive.jwt"), "tab-token-a");
+  assert.equal(requests.some(r => r.config.url === "/auth/logout"), false);
+});
+
+for (const status of [401, 403, 500]) test(`external identity hydration failure cannot restore A or remain in synchronization loop: ${status}`, async () => {
+  const view = await mountTab();
+  await changeTabToken("invalid-or-offline-b");
+  await act(async () => rejectWithStatus(takeRequest("/auth/me"), status));
+  assert.ok(!view.container.textContent.includes(view.id));
+  assert.ok(!view.container.textContent.includes("Đang xác định phiên truy cập…"));
+  assert.equal(currentAuth.isAuthenticated, false);
+  assert.equal(currentAuth.loading, false);
+  assert.equal(currentAuth.user, null);
+  if (status === 500) assert.ok(currentAuth.sessionError);
+  else assert.equal(localStorage.getItem("kdrive.jwt"), null);
+  assert.equal(requests.filter(r => r.config.url === "/auth/me").length, 2, "no repeated hydration loop");
+});
+
+for (const action of ["login", "register"]) test(`late obsolete ${action} leaves verified B and its new draft untouched`, async () => {
+  const view = await mountTab();
+  let pending;
+  await act(async () => { pending = currentAuth[action]({ email: "fixture@example.test", password: "Fixture1!" }).catch(error => error); });
+  const request = takeRequest(`/auth/${action}`);
+  await changeTabToken("verified-b");
+  await act(async () => fulfill(takeRequest("/auth/me"), { ...fixtureProfile, id: "verified-b" }));
+  await act(async () => view.container.querySelector('[data-testid="draft-edit"]').click());
+  const count = requests.length;
+  await act(async () => {
+    fulfill(request, { token: "obsolete", user: fixtureProfile });
+    assert.match((await pending).message, /đã bị thay thế/);
+  });
+  assert.equal(text(view.container, "identity"), "verified-b");
+  assert.equal(text(view.container, "draft"), "private-A-draft");
+  assert.equal(requests.length, count, "obsolete auth response must not restart B hydration");
+  assert.equal(localStorage.getItem("kdrive.jwt"), "verified-b");
 });

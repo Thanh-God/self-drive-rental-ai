@@ -1,5 +1,6 @@
 import {
   createContext,
+  Fragment,
   useCallback,
   useContext,
   useEffect,
@@ -24,6 +25,7 @@ import {
   setStoredUser,
 } from "../utils/storage";
 import { createRequestGeneration } from "../utils/requestGeneration";
+import { invalidateSessionRequests, setSessionGuard } from "../api/client";
 
 const AuthContext = createContext(null);
 
@@ -47,6 +49,10 @@ export function AuthProvider({ children }) {
   const [sessionError, setSessionError] = useState(initialSession.issue);
   const [logoutWarning, setLogoutWarning] = useState("");
   const [retry, setRetry] = useState(0);
+  const [sessionRevision, setSessionRevision] = useState(0);
+  const [synchronizing, setSynchronizing] = useState(false);
+  const identityRevision = useRef(0);
+  const observedToken = useRef(initialSession.token);
   const [sessionGeneration] = useState(createRequestGeneration);
   const pendingLogout = useRef(null);
   const selectDemoRole = useCallback((role) => {
@@ -69,11 +75,12 @@ export function AuthProvider({ children }) {
       throw new Error(issue);
     }
     activeToken.current = nextToken;
+    observedToken.current = nextToken;
     setToken(nextToken);
     setUser(nextUser);
   }, []);
   const refreshUser = useCallback((nextUser) => {
-    if (!token || getStoredToken() !== token || nextUser.id !== user?.id) return;
+    if (sessionRevision !== identityRevision.current || !token || getStoredToken() !== token || nextUser.id !== user?.id) return;
     const normalizedUser = {
       id: nextUser.id,
       fullName: nextUser.fullName,
@@ -90,23 +97,75 @@ export function AuthProvider({ children }) {
       return;
     }
     setUser(normalizedUser);
-  }, [token, user?.id]);
+  }, [token, user?.id, sessionRevision]);
 
-  const logout = useCallback(
-    async ({ callApi = true } = {}) => {
+  const synchronizeSession = useCallback(() => {
+    sessionGeneration.invalidate();
+    invalidateSessionRequests();
+    observedToken.current = getStoredToken();
+    activeToken.current = null;
+    setToken(null);
+    setUser(null);
+    setSessionError("");
+    setLogoutWarning("");
+    setLoading(true);
+    setSynchronizing(true);
+    identityRevision.current += 1;
+    setSessionRevision(identityRevision.current);
+  }, [sessionGeneration]);
+
+  useEffect(() => {
+    if (DEMO_MODE) return undefined;
+    const guard = (storedToken, issue) => {
+      if (storedToken !== observedToken.current) synchronizeSession();
+      return !issue && storedToken === activeToken.current;
+    };
+    const onStorage = event => {
+      if (event.key !== null && event.key !== "kdrive.jwt") return;
+      try {
+        if (event.storageArea && event.storageArea !== window.localStorage) return;
+      } catch {
+        synchronizeSession();
+        return;
+      }
+      synchronizeSession();
+    };
+    const onFocus = () => guard(getStoredToken(), readStoredSession().issue);
+    setSessionGuard(guard);
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      setSessionGuard(null);
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [synchronizeSession]);
+
+  const endSession = useCallback(
+    async ({ callApi = true, expectedToken = activeToken.current, expectedRevision = identityRevision.current } = {}) => {
       if (DEMO_MODE) {
         selectDemoRole("GUEST");
         return;
       }
+      if (expectedRevision !== identityRevision.current) return;
+      if (expectedToken !== activeToken.current && !(activeToken.current === null && expectedToken === observedToken.current)) return;
+      const stored = readStoredSession();
+      if (!stored.issue && stored.token !== expectedToken) {
+        synchronizeSession();
+        return;
+      }
       const generation = sessionGeneration.begin();
+      invalidateSessionRequests();
       const tokenToRevoke = activeToken.current;
       const { issue } = clearSession();
       activeToken.current = null;
+      observedToken.current = null;
       setToken(null);
       setUser(null);
       setSessionError("");
       setLogoutWarning(issue);
       setLoading(false);
+      setSynchronizing(false);
       if (callApi && tokenToRevoke) {
         const request = logoutRequest(tokenToRevoke);
         pendingLogout.current = request;
@@ -123,8 +182,9 @@ export function AuthProvider({ children }) {
         }
       }
     },
-    [selectDemoRole, sessionGeneration],
+    [selectDemoRole, sessionGeneration, synchronizeSession],
   );
+  const logout = useCallback(options => endSession({ ...options, expectedToken: token, expectedRevision: sessionRevision }), [endSession, token, sessionRevision]);
 
   useEffect(() => {
     if (DEMO_MODE) return undefined;
@@ -140,14 +200,16 @@ export function AuthProvider({ children }) {
         setUser(null);
         setSessionError(issue);
         setLoading(false);
+        setSynchronizing(false);
         return;
       }
       if (!storedToken) {
         setLoading(false);
+        setSynchronizing(false);
         return;
       }
       try {
-        const profile = await fetchCurrentUser();
+        const profile = await fetchCurrentUser(storedToken);
         if (readStoredSession().issue) throw new Error(STORAGE_ERROR);
         if (
           !cancelled &&
@@ -163,6 +225,9 @@ export function AuthProvider({ children }) {
           });
         }
       } catch (error) {
+        if (!cancelled && sessionGeneration.isCurrent(generation) && !readStoredSession().issue && getStoredToken() !== storedToken) {
+          synchronizeSession();
+        }
         if (!cancelled && sessionGeneration.isCurrent(generation) && readStoredSession().issue) {
           activeToken.current = null;
           setToken(null);
@@ -175,7 +240,7 @@ export function AuthProvider({ children }) {
           getStoredToken() === storedToken
         ) {
           if ([401, 403].includes(error.response?.status))
-            await logout({ callApi: false });
+            await endSession({ callApi: false, expectedToken: storedToken });
           else {
             setUser(null);
             setSessionError(
@@ -189,6 +254,7 @@ export function AuthProvider({ children }) {
           sessionGeneration.isCurrent(generation)
         ) {
           setLoading(false);
+          setSynchronizing(false);
         }
       }
     }
@@ -198,13 +264,14 @@ export function AuthProvider({ children }) {
       cancelled = true;
       sessionGeneration.invalidate(generation);
     };
-  }, [persistSession, logout, retry, sessionGeneration]);
+  }, [persistSession, endSession, retry, sessionGeneration, sessionRevision, synchronizeSession]);
 
   const login = useCallback(
     async ({ email, password }) => {
       if (DEMO_MODE)
         throw new Error("Bản demo không nhận mật khẩu. Hãy chọn vai trò mẫu.");
       const generation = sessionGeneration.begin();
+      invalidateSessionRequests();
       setLoading(true);
       setSessionError("");
       try {
@@ -213,6 +280,7 @@ export function AuthProvider({ children }) {
         if (!sessionGeneration.isCurrent(generation)) {
           throw new Error("Yêu cầu đăng nhập đã bị thay thế.");
         }
+        const startingToken = getStoredToken();
         const { token: nextToken, user: nextUser } = await loginRequest({
           email,
           password,
@@ -220,6 +288,7 @@ export function AuthProvider({ children }) {
         if (!nextToken || !nextUser) {
           throw new Error("Phản hồi đăng nhập không hợp lệ.");
         }
+        if (sessionGeneration.isCurrent(generation) && getStoredToken() !== startingToken) synchronizeSession();
         if (!sessionGeneration.isCurrent(generation)) {
           throw new Error("Yêu cầu đăng nhập đã bị thay thế.");
         }
@@ -236,7 +305,7 @@ export function AuthProvider({ children }) {
         }
       }
     },
-    [persistSession, sessionGeneration],
+    [persistSession, sessionGeneration, synchronizeSession],
   );
 
   const register = useCallback(
@@ -246,6 +315,7 @@ export function AuthProvider({ children }) {
           "Bản demo không tạo tài khoản thật. Hãy dùng vai trò User mẫu.",
         );
       const generation = sessionGeneration.begin();
+      invalidateSessionRequests();
       setLoading(true);
       setSessionError("");
       try {
@@ -254,7 +324,9 @@ export function AuthProvider({ children }) {
         if (!sessionGeneration.isCurrent(generation)) {
           throw new Error("Yêu cầu đăng ký đã bị thay thế.");
         }
+        const startingToken = getStoredToken();
         const result = await registerRequest(payload);
+        if (sessionGeneration.isCurrent(generation) && getStoredToken() !== startingToken) synchronizeSession();
         if (!sessionGeneration.isCurrent(generation)) {
           throw new Error("Yêu cầu đăng ký đã bị thay thế.");
         }
@@ -273,7 +345,7 @@ export function AuthProvider({ children }) {
         }
       }
     },
-    [persistSession, sessionGeneration],
+    [persistSession, sessionGeneration, synchronizeSession],
   );
 
   const value = useMemo(
@@ -308,7 +380,9 @@ export function AuthProvider({ children }) {
     ],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={value}>
+    {synchronizing ? <p role="status" className="page-shell">Đang xác định phiên truy cập…</p> : <Fragment key={sessionRevision}>{children}</Fragment>}
+  </AuthContext.Provider>;
 }
 
 export function useAuth() {

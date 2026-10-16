@@ -12,7 +12,7 @@ def main():
     parser.add_argument('--native-evidence',required=True,type=Path)
     parser.add_argument('--backend-root',required=True,type=Path)
     parser.add_argument('--evidence',required=True,type=Path)
-    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs','verify-vehicle-compare.cjs','verify-vehicle-favorites.cjs','verify-rental-guide.cjs','verify-ui-readability.cjs','verify-auth-storage.cjs'],default='verify-vehicle-search-form.cjs')
+    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs','verify-vehicle-compare.cjs','verify-vehicle-favorites.cjs','verify-rental-guide.cjs','verify-ui-readability.cjs','verify-auth-storage.cjs','verify-auth-tabs.cjs'],default='verify-vehicle-search-form.cjs')
     parser.add_argument('--expected-bookings',type=int,choices=[0,1],default=0)
     args=parser.parse_args()
     native,backend,out=[p.resolve() for p in (args.native_evidence,args.backend_root,args.evidence)]
