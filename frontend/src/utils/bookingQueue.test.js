@@ -41,16 +41,26 @@ after(async()=>{Date.now=originalNow;await vite.close();dom.window.close();for(c
 async function mount(mode='all',entry='/'){const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);await act(async()=>root.render(h(Router,{initialEntries:[entry]},h(Auth.Provider,{value:{user:{id:'staff',role:'STAFF',fullName:'Nhân viên kiểm thử'}}},h(Topbar,{areaLabel:'Nhân viên'}),h(List,{area:'staff',mode})))));return c;}
 async function select(el,value){await act(async()=>{el.value=value;el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
 const names=c=>[...c.querySelectorAll('article h2')].map(el=>el.textContent);
-test('Handover groups show only waiting or delivered, retain filters and refresh, support deep link',async()=>{
- const c=await mount('handover'),group=c.querySelector('section[aria-label="Nhóm bàn giao xe"]'),[status,queue]=c.querySelectorAll('select'),[waiting,delivered]=group.querySelectorAll('button');
- assert.equal(waiting.getAttribute('aria-pressed'),'true');assert.deepEqual(names(c),['Xe mới','Xe cũ']);
- await act(async()=>delivered.click());assert.equal(status.value,'IN_PROGRESS');assert.equal(delivered.getAttribute('aria-pressed'),'true');assert.deepEqual(names(c),['Xe trả']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/bookings\/return$/);
- await select(queue,'today');assert.deepEqual(names(c),[]);assert.match(c.textContent,/Không có đơn phù hợp/);await act(async()=>waiting.click());assert.deepEqual(names(c),['Xe cũ']);assert.equal(queue.value,'today');
- const search=c.querySelector('input');await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(search,'không khớp');search.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await act(async()=>delivered.click());assert.deepEqual(names(c),[]);assert.equal(search.value,'không khớp');
- await select(queue,'all');await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(status.value,'IN_PROGRESS');assert.equal(delivered.getAttribute('aria-pressed'),'true');
- await select(status,'COMPLETED');assert.equal(waiting.getAttribute('aria-pressed'),'false');assert.equal(delivered.getAttribute('aria-pressed'),'false');
+test('Handover status list replaces buttons, scopes All and retains date/search/refresh/deep link',async()=>{
+ const c=await mount('handover'),[status,queue]=c.querySelectorAll('select');
+ assert.equal(c.querySelector('section[aria-label="Nhóm bàn giao xe"]'),null);assert.deepEqual([...status.options].map(o=>o.textContent),['Tất cả đơn bàn giao','Chờ bàn giao','Đã bàn giao · Đang thuê']);assert.equal(status.value,'CONFIRMED');assert.deepEqual(names(c),['Xe mới','Xe cũ']);
+ await select(status,'IN_PROGRESS');assert.deepEqual(names(c),['Xe trả']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/bookings\/return$/);
+ await select(queue,'today');assert.deepEqual(names(c),[]);assert.match(c.textContent,/Không có đơn phù hợp/);await select(status,'CONFIRMED');assert.deepEqual(names(c),['Xe cũ']);assert.equal(queue.value,'today');
+ await select(queue,'all');await select(status,'');assert.deepEqual(names(c),['Xe mới','Xe cũ','Xe trả']);
+ const search=c.querySelector('input');await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(search,'không khớp');search.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});await select(status,'IN_PROGRESS');assert.deepEqual(names(c),[]);assert.equal(search.value,'không khớp');
+ await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(status.value,'IN_PROGRESS');assert.equal(search.value,'không khớp');
  const d=await mount('handover','/staff/handover?group=delivered');assert.deepEqual(names(d),['Xe trả']);assert.equal(d.querySelector('select').value,'IN_PROGRESS');
- const e=await mount('return');assert.equal(e.querySelector('section[aria-label="Nhóm bàn giao xe"]'),null);
+ const e=await mount('handover','/staff/handover?group=unknown');assert.equal(e.querySelector('select').value,'CONFIRMED');
+});
+test('Operational All excludes unrelated statuses and return includes received and completed with dates/search',()=>{
+ const fixtures=['PENDING','CONFIRMED','IN_PROGRESS','RETURNED','COMPLETED','CANCELLED','REJECTED','EXPIRED'].map((status,index)=>({...rows[0],id:status,status,createdAt:new Date(now+index*1000).toISOString(),endAt:rows[0].startAt}));
+ assert.deepEqual(ids(visibleBookings(fixtures,{mode:'handover'})),['IN_PROGRESS','CONFIRMED']);assert.deepEqual(ids(visibleBookings(fixtures,{mode:'return'})),['COMPLETED','RETURNED','IN_PROGRESS']);assert.deepEqual(visibleBookings(fixtures,{mode:'handover',status:'COMPLETED'}),[]);
+ assert.deepEqual(ids(visibleBookings(fixtures,{mode:'return',status:'RETURNED',queue:'today',query:'Khách A',now})),['RETURNED']);assert.deepEqual(visibleBookings(fixtures,{mode:'return',queue:'today',now:now+86400000}),[]);assert.equal(visibleBookings(fixtures).length,8);
+});
+test('Return offers only work statuses and scoped All; date, routes and refresh stay usable',async()=>{
+ const c=await mount('return'),[status,queue]=c.querySelectorAll('select');assert.deepEqual([...status.options].map(o=>o.textContent),['Tất cả đơn nhận trả','Chờ nhận trả · Đang thuê','Đã nhận xe · Chờ hoàn tất','Đã hoàn tất']);assert.equal(status.value,'IN_PROGRESS');assert.deepEqual(names(c),['Xe trả']);
+ for(const value of ['RETURNED','COMPLETED']){await select(status,value);assert.deepEqual(names(c),[]);assert.match(c.textContent,/Không có đơn phù hợp/);}
+ await select(status,'');assert.deepEqual(names(c),['Xe trả']);await select(queue,'today');assert.deepEqual(names(c),['Xe trả']);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(status.value,'');assert.equal(queue.value,'today');
 });
 test('Actual staff page renders Vietnamese enum labels, newest first, Today and refresh without losing filters',async()=>{
  const c=await mount();assert.deepEqual(names(c),['Xe vừa tạo','Xe mới','Xe cũ','Xe trả']);assert.match(c.querySelector('header').textContent,/Nhân viên/);assert.doesNotMatch(c.querySelector('header').textContent,/STAFF/);

@@ -4,9 +4,14 @@ export function vietnamDay(value) {
   return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Ho_Chi_Minh', year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
 }
 export const queueDateField = mode => mode === 'handover' ? 'startAt' : mode === 'return' ? 'endAt' : 'createdAt';
+export const workStatusLabels = {
+  handover: { CONFIRMED: 'Chờ bàn giao', IN_PROGRESS: 'Đã bàn giao · Đang thuê' },
+  return: { IN_PROGRESS: 'Chờ nhận trả · Đang thuê', RETURNED: 'Đã nhận xe · Chờ hoàn tất', COMPLETED: 'Đã hoàn tất' },
+};
 export function visibleBookings(bookings, { query = '', status = '', queue = 'all', mode = 'all', now = Date.now() } = {}) {
   const today = vietnamDay(now), field = queueDateField(mode);
   return (Array.isArray(bookings) ? bookings : []).filter(booking =>
+    (!workStatusLabels[mode] || Object.hasOwn(workStatusLabels[mode], booking.status)) &&
     (!status || booking.status === status) &&
     (queue !== 'today' || vietnamDay(booking[field]) === today) &&
     `${booking.id} ${booking.vehicleName} ${booking.customerName || ''}`.toLocaleLowerCase('vi').includes(query.toLocaleLowerCase('vi'))

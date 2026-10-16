@@ -1,5 +1,5 @@
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
-import { visibleBookings, queueDateField } from "../../utils/bookingQueue";
+import { visibleBookings, queueDateField, workStatusLabels } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
@@ -1218,6 +1218,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   const [queue, setQueue] = useState("all");
   const now = useNow();
   const rows = visibleBookings(request.data, { query, status, queue, mode, now });
+  const statusLabels = workStatusLabels[mode] || bookingStatusLabels;
   const dayLabel = queueDateField(mode) === "startAt" ? "ngày nhận xe" : queueDateField(mode) === "endAt" ? "ngày trả xe" : "ngày tạo đơn";
   const title =
     area === "user"
@@ -1235,15 +1236,6 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
       description="Đơn mới tạo được hiển thị trước. Dùng nút Tải lại danh sách để xem cập nhật mới nhất."
       actions={<button type="button" className="btn-secondary" disabled={request.loading} onClick={request.reload}>Tải lại danh sách</button>}
     >
-      {mode === "handover" ? (
-        <section className="mb-6 space-y-3" aria-label="Nhóm bàn giao xe">
-          <div className="flex flex-wrap gap-3">
-            <button type="button" className={status === "CONFIRMED" ? "btn" : "btn-secondary"} aria-pressed={status === "CONFIRMED"} onClick={() => setStatus("CONFIRMED")}>Chờ bàn giao</button>
-            <button type="button" className={status === "IN_PROGRESS" ? "btn" : "btn-secondary"} aria-pressed={status === "IN_PROGRESS"} onClick={() => setStatus("IN_PROGRESS")}>Đã bàn giao</button>
-          </div>
-          <p className="text-sm text-muted">Chờ bàn giao: đơn đã xác nhận, chưa giao xe. Đã bàn giao: xe đã giao thành công và đang thuê. Dùng bộ lọc trạng thái để tra cứu các đơn khác.</p>
-        </section>
-      ) : null}
       <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Tìm mã đơn, xe hoặc khách hàng">
           <input
@@ -1256,19 +1248,10 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
             value={status}
             onChange={(event) => setStatus(event.target.value)}
           >
-            <option value="">Tất cả</option>
-            {[
-              "PENDING",
-              "CONFIRMED",
-              "IN_PROGRESS",
-              "RETURNED",
-              "COMPLETED",
-              "CANCELLED",
-              "REJECTED",
-              "EXPIRED",
-            ].map((value) => (
+            <option value="">{mode === "handover" ? "Tất cả đơn bàn giao" : mode === "return" ? "Tất cả đơn nhận trả" : "Tất cả"}</option>
+            {Object.keys(statusLabels).map((value) => (
               <option key={value} value={value}>
-                {bookingStatusLabels[value]}
+                {statusLabels[value]}
               </option>
             ))}
           </select>

@@ -29,8 +29,8 @@ async function main(){
   await p.getByLabel('Tìm mã đơn, xe hoặc khách hàng',{exact:true}).fill('');await status.selectOption('');await queue.selectOption('all');await p.locator('article').nth(2).waitFor();await p.evaluate(()=>scrollTo(0,0));await p.screenshot({path:path.join(out,'queue-1440.png'),fullPage:true});
   for(const route of ['handover','return']){
    await p.goto(origin+'/staff/'+route);await p.getByLabel('Trạng thái',{exact:true}).waitFor();check('Operational status default '+route,await p.getByLabel('Trạng thái',{exact:true}).inputValue(),route==='handover'?'CONFIRMED':'IN_PROGRESS');
-   await p.getByLabel('Trạng thái',{exact:true}).selectOption('');await p.getByLabel('Hàng đợi',{exact:true}).selectOption('today');await p.locator('article').filter({hasText:old.id}).waitFor();check('Today by '+route+' date',await count(1),1);check('Work date ignores creation day '+route,(await p.locator('article').textContent()).includes(old.id));
-   await p.getByLabel('Hàng đợi',{exact:true}).selectOption('all');await p.locator('article').nth(2).waitFor();check('All removes only day '+route,await count(3),3);
+   await p.getByLabel('Trạng thái',{exact:true}).selectOption('');await p.getByLabel('Hàng đợi',{exact:true}).selectOption('today');await p.getByText('Không có đơn phù hợp',{exact:true}).waitFor();check('Today excludes expired/pending outside work scope '+route,await count(0),0);
+   await p.getByLabel('Hàng đợi',{exact:true}).selectOption('all');await p.getByText('Không có đơn phù hợp',{exact:true}).waitFor();check('All retains work status scope '+route,await count(0),0);
   }
   await p.goto(origin+'/staff/queue');await p.locator('article').nth(2).waitFor();await p.setViewportSize({width:1280,height:1000});check('Desktop no overflow',await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth));await p.screenshot({path:path.join(out,'queue-1280.png'),fullPage:true});
   const other=await http('POST','/auth/login',{email:'staff.hn@example.test',password:process.env.OTO2_SEED_PASSWORD});check('Wrong branch cannot read queue records',await http('GET','/bookings',null,other.token),[]);
