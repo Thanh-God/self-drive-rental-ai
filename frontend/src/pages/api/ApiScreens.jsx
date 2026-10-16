@@ -1210,9 +1210,10 @@ export function ApiNewBookingPage() {
 
 export function ApiBookingListPage({ area = "user", mode = "all" }) {
   const request = useApiData("/bookings");
+  const [params] = useSearchParams();
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState(
-    mode === "handover" ? "CONFIRMED" : mode === "return" ? "IN_PROGRESS" : "",
+    mode === "handover" ? (params.get("group") === "delivered" ? "IN_PROGRESS" : "CONFIRMED") : mode === "return" ? "IN_PROGRESS" : "",
   );
   const [queue, setQueue] = useState("all");
   const now = useNow();
@@ -1234,6 +1235,15 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
       description="Đơn mới tạo được hiển thị trước. Dùng nút Tải lại danh sách để xem cập nhật mới nhất."
       actions={<button type="button" className="btn-secondary" disabled={request.loading} onClick={request.reload}>Tải lại danh sách</button>}
     >
+      {mode === "handover" ? (
+        <section className="mb-6 space-y-3" aria-label="Nhóm bàn giao xe">
+          <div className="flex flex-wrap gap-3">
+            <button type="button" className={status === "CONFIRMED" ? "btn" : "btn-secondary"} aria-pressed={status === "CONFIRMED"} onClick={() => setStatus("CONFIRMED")}>Chờ bàn giao</button>
+            <button type="button" className={status === "IN_PROGRESS" ? "btn" : "btn-secondary"} aria-pressed={status === "IN_PROGRESS"} onClick={() => setStatus("IN_PROGRESS")}>Đã bàn giao</button>
+          </div>
+          <p className="text-sm text-muted">Chờ bàn giao: đơn đã xác nhận, chưa giao xe. Đã bàn giao: xe đã giao thành công và đang thuê. Dùng bộ lọc trạng thái để tra cứu các đơn khác.</p>
+        </section>
+      ) : null}
       <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Tìm mã đơn, xe hoặc khách hàng">
           <input
@@ -1451,6 +1461,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
   const prevBookingId = useRef(booking?.id);
 
   useEffect(() => {
+    if (!booking?.id) return;
     if (prevBookingId.current === booking?.id) return;
     prevBookingId.current = booking?.id;
     setNext("");
@@ -1484,7 +1495,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
         licenseChecked,
         maintenance,
       });
-      setNotice("Đã cập nhật trạng thái đơn.");
+      setNotice(next === "IN_PROGRESS" ? "Đã bàn giao xe thành công — đơn chuyển sang Đang thuê." : "Đã cập nhật trạng thái đơn.");
       setNext("");
       setReason("");
       setCondition("");
@@ -1546,6 +1557,9 @@ export function ApiBookingDetailPage({ area = "user" }) {
           <>
             <BookingIdentity key={booking.id} id={booking.id} />
             {notice ? <Notice>{notice}</Notice> : null}
+            {isStaff && booking.status === "IN_PROGRESS" ? (
+              <p className="mb-4"><Link className="btn-secondary" to="/staff/handover?group=delivered">Xem danh sách Đã bàn giao</Link></p>
+            ) : null}
             <div className="mb-5 flex items-center gap-3">
               <Status status={booking.status} />
               {area !== "user" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}

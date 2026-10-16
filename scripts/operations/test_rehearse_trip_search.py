@@ -10,6 +10,11 @@ from unittest.mock import patch
 import rehearse_trip_search as runner
 
 class TripRunnerGuardTest(unittest.TestCase):
+    def test_handover_proof_requires_exact_count_before_any_process(self):
+        argv=['runner','--native-evidence','missing','--backend-root','missing','--evidence','missing','--browser-script','verify-handover-groups.cjs']
+        with patch.object(sys,'argv',argv),patch.object(runner.subprocess,'run') as process:
+            with self.assertRaisesRegex(ValueError,'exactly one'):runner.main()
+            process.assert_not_called()
     def test_unknown_browser_script_refused_before_any_process(self):
         argv=['runner','--native-evidence','missing','--backend-root','missing','--evidence','missing','--browser-script','arbitrary.cjs']
         with patch.object(sys,'argv',argv),patch.object(runner.subprocess,'run') as process,redirect_stderr(io.StringIO()):
