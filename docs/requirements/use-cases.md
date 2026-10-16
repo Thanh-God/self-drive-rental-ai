@@ -277,4 +277,4 @@ Tên rút gọn không bỏ nghiệp vụ đã có: U04 vẫn có chi tiết đ�
 | U08 | Khai báo GPLX theo scheme đã duyệt; đọc lại dữ liệu; kiểm tra phù hợp xe và hiệu lực đến hết thuê | Sai scheme/hạng/dữ liệu/hạn; khai báo không thay xác minh trực tiếp của Staff |
 | U09 | Báo sự cố thuộc thời gian giữ xe thực tế; xem tiến trình, phản hồi yêu cầu bồi thường theo vòng đời đã duyệt | Sai chủ sở hữu/thời điểm/trạng thái; không tự kết luận trách nhiệm hoặc trừ cọc |
 
-Các UC cần User có phiên hợp lệ; backend kiểm tra quyền và sở hữu ở mọi thao tác. Hết phiên/đăng xuất phải chặn response cũ tái lập phiên. Đặc tả này không duyệt thêm cọc, phụ phí, no-show, retention hoặc provider. Kế hoạch triển khai và bằng chứng nghiệm thu xem mục “Hoàn thiện toàn bộ chức năng User” trong [bàn giao UI](../ui/phase-4-handoff.md).
+Các UC cần User có phiên hợp lệ; backend kiểm tra quyền và sở hữu ở mọi thao tác. Hết phiên/đăng xuất phải chặn response cũ tái lập phiên. Đặc tả này không duyệt thêm cọc, phụ phí, no-show, retention hoặc provider. Quy tắc giao diện hiện hành xem [giao diện khách hàng](../ui/customer-experience.md). Kế hoạch và bằng chứng nghiệm thu được giữ riêng trong tài liệu nội bộ.

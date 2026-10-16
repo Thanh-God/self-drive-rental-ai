@@ -17,7 +17,7 @@
 - `docs/architecture/system-architecture.md`: kiến trúc hiện hành; audit lịch sử được lưu trong .local/internal-docs/.
 - `docs/architecture/module-boundaries.md`, `project-structure.md`, `development-workflow.md`: ranh giới, cấu trúc, vận hành.
 - `docs/database/database-design.md`, `database/README.md`: thiết kế DB và hướng dẫn migration.
-- `frontend/README.md`, `docs/ui/phase-4-handoff.md`: frontend và QA demo/API.
+- `frontend/README.md`, `docs/ui/customer-experience.md`: frontend và QA demo/API.
 - Nếu có, đọc `AG_PHASE5_RESULT.md`, `COPILOT_PHASE5_RESULT.md`, `OPENCODE_PHASE5_RESULT.md` khi tiếp nối. Đối chiếu source/hash/artifact; báo cáo agent không tự chứng minh PASS. Tài liệu cũ có thể chưa phản ánh source mới.
 
 ## Kiến trúc và cấu trúc

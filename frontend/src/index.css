@@ -18,7 +18,8 @@
   --color-page-background: #f3efe8;
   --color-surface: #ffffff;
   --color-surface-border: #e3dcd0;
-  --color-secondary-border: #bfb3a3;
+  --color-secondary-border: #847768;
+  --color-readable-muted: #59534c;
   --color-action-primary: #ff7e33;
   --color-action-primary-hover: #e86b23;
   --color-action-soft: #fff0e5;
@@ -140,7 +141,9 @@ body {
 .urban-shell .panel, .urban-shell .vehicle-card { background: var(--color-surface); border-color: var(--color-surface-border); box-shadow: var(--shadow-surface); border-radius: 24px; }
 .urban-shell .btn { background: var(--color-action-primary); color: #1a1a1a; border-radius: 999px; padding: 14px 24px; }
 .urban-shell .btn:hover { background: var(--color-action-primary-hover); }
-.urban-shell .btn-secondary { background: transparent; color: #1a1a1a; border-color: #b6aea2; border-radius: 999px; padding: 12px 22px; }
+.urban-shell .btn-secondary { background: transparent; color: #1a1a1a; border-color: var(--color-secondary-border); border-radius: 999px; padding: 12px 22px; }
+.urban-shell .page-shell .btn-secondary { background: var(--color-surface); }
+.urban-shell .page-shell :is(.text-muted, .text-slate-400, .text-slate-500) { color: var(--color-readable-muted); }
 .urban-shell .btn-secondary:hover { background: #d8d1c6; }
 .urban-shell :focus-visible { outline: 2px solid #007b73; outline-offset: 2px; }
 .urban-navbar nav { margin-left: 24px; margin-right: auto; }
@@ -151,7 +154,7 @@ body {
 .password-input { position: relative; }
 .password-input input { width: 100%; padding-right: 48px !important; }
 .password-input button { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); padding: 8px; color: #005b55; border-radius: 6px; }
-.urban-shell .field input:not([type="checkbox"]), .urban-shell .field select, .urban-shell .field textarea { background: #eeebe4; border-color: #b6aea2; }
+.urban-shell .field input:not([type="checkbox"]), .urban-shell .field select, .urban-shell .field textarea { background: var(--color-surface); border-color: var(--color-secondary-border); }
 .urban-shell .text-teal-800, .urban-shell .text-teal-700, .urban-shell .text-teal-600 { color: #874019; }
 .urban-shell .bg-teal-50, .urban-shell .bg-teal-50\/70 { background: #e6dbcc; }
 .urban-shell .vehicle-card { padding: 14px; }
