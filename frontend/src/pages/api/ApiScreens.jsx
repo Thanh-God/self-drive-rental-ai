@@ -1,4 +1,4 @@
-import { bookingStatusLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
+import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, queueDateField } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
@@ -1714,7 +1714,10 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     className="panel h-fit space-y-4"
                     onSubmit={submitAction}
                   >
-                  <h2 className="text-lg font-semibold">{area === "user" ? "Thay đổi yêu cầu" : "Thao tác được phép"}</h2>
+                  <h2 className="text-lg font-semibold">{area === "user" ? "Hủy đơn thuê" : "Thao tác được phép"}</h2>
+                  {area === "user" ? (
+                    <p className="text-sm text-slate-600">Chọn hủy đơn và nhập lý do. Đơn chỉ bị hủy sau khi bạn bấm xác nhận và hệ thống xử lý thành công.</p>
+                  ) : null}
                   <Field label={area === "user" ? "Yêu cầu xử lý" : "Chuyển trạng thái"}>
                     <select
                       required
@@ -1724,7 +1727,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       <option value="">Chọn thao tác</option>
                       {availableActions.map((action) => (
                         <option key={action} value={action}>
-                          {action}
+                          {bookingActionLabels[action] || bookingStatusLabels[action] || "Thao tác chưa xác định"}
                         </option>
                       ))}
                     </select>
@@ -1776,7 +1779,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                   ) : null}
                   {error ? <Notice error>{error}</Notice> : null}
                   <button className="btn" disabled={busy || !next}>
-                    {busy ? "Đang lưu..." : "Cập nhật đơn"}
+                    {busy ? "Đang xử lý..." : next === "CANCELLED" ? "Xác nhận hủy đơn" : bookingActionLabels[next] || "Chọn thao tác"}
                   </button>
                   </form>
                 ) : null}
