@@ -43,7 +43,7 @@ test("staff wrong branch and admin get no handover action; user links remain rol
   const actions = getBookingActions(current, { role: "STAFF", assignedBranchIds: new Set(["hn"]), now });
   assert.deepEqual(actions, []);assert.match(render("CONFIRMED", { role: "STAFF", actions }), /Hiện không có thao tác khả dụng/);
   const adminActions = getBookingActions(current, { role: "ADMIN", now });
-  assert.deepEqual(adminActions, ["CANCELLED"]);assert.match(render("CONFIRMED", { role: "ADMIN", actions: adminActions }), /Admin không thực hiện giao hoặc nhận trả xe/);
+  assert.deepEqual(adminActions, ["CANCELLED"]);assert.match(render("CONFIRMED", { role: "ADMIN", actions: adminActions }), /Quản trị viên không thực hiện giao hoặc nhận trả xe/);
   assert.doesNotMatch(render("CONFIRMED", { role: "STAFF" }), /href="\/user\/profile"/);
   assert.match(render("CONFIRMED", { role: "USER", actions: [] }), /liên hệ nhân viên chi nhánh nhận/);
   assert.match(render("PENDING", { role: "USER", actions: ["CANCELLED"] }), /Có thể yêu cầu hủy/);

@@ -1,5 +1,7 @@
 """Real browser proof on a stopped, owned native-test fixture; never the original DB."""
 import argparse, hashlib, json, os, socket, subprocess, time, uuid, zipfile
+from datetime import datetime, timezone, timedelta
+import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.error import HTTPError, URLError
@@ -12,9 +14,10 @@ def main():
     parser.add_argument('--native-evidence',required=True,type=Path)
     parser.add_argument('--backend-root',required=True,type=Path)
     parser.add_argument('--evidence',required=True,type=Path)
-    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs','verify-vehicle-compare.cjs','verify-vehicle-favorites.cjs','verify-rental-guide.cjs','verify-ui-readability.cjs','verify-auth-storage.cjs','verify-auth-tabs.cjs','verify-vehicle-list-layout.cjs','verify-rental-presentation.cjs'],default='verify-vehicle-search-form.cjs')
-    parser.add_argument('--expected-bookings',type=int,choices=[0,1],default=0)
+    parser.add_argument('--browser-script',choices=['verify-oto2-browser.cjs','verify-vehicle-search-form.cjs','verify-vehicle-compare.cjs','verify-vehicle-favorites.cjs','verify-rental-guide.cjs','verify-ui-readability.cjs','verify-auth-storage.cjs','verify-auth-tabs.cjs','verify-vehicle-list-layout.cjs','verify-rental-presentation.cjs','verify-staff-queue.cjs'],default='verify-vehicle-search-form.cjs')
+    parser.add_argument('--expected-bookings',type=int,choices=[0,1,3],default=0)
     args=parser.parse_args()
+    if args.browser_script=='verify-staff-queue.cjs' and args.expected_bookings!=3:raise ValueError('Queue proof requires exactly three fixture bookings')
     native,backend,out=[p.resolve() for p in (args.native_evidence,args.backend_root,args.evidence)]
     if not all(p.is_relative_to(REPO/'.runtime') for p in (native,backend,out)) or out.exists(): raise ValueError('New runtime output required')
     fixture=json.loads((native/'fixture.json').read_text())
@@ -71,7 +74,28 @@ def main():
             except (HTTPError,URLError,TimeoutError,ConnectionError):time.sleep(1)
         else:raise RuntimeError('Backend readiness timeout')
         http('PUT','/me/license',{'licenseNumber':'OTO2-FIXTURE','scheme':'VN_2025','licenseClass':'B','expiresOn':'2035-12-31','automaticOnly':False,'version':0},login['token'])
-        (out/'fixture-readback.json').write_text(json.dumps({'fixture':fixture,'schema':schema,'vehicles':http('GET','/vehicles'),'jarSHA256':hashlib.sha256(jar.read_bytes()).hexdigest()},indent=2))
+        queue_fixture=None
+        if args.browser_script=='verify-staff-queue.cjs':
+            # List-only historical fixtures on this freshly created guarded schema.
+            # Not proof of lifecycle transitions; live booking creation is tested in browser.
+            current=datetime.now(timezone.utc)
+            day=(current+timedelta(hours=7)).date()
+            midnight=datetime.combine(day,datetime.min.time(),timezone.utc)-timedelta(hours=7)
+            seeded=[]
+            for index in range(2):
+                start=current+timedelta(days=5+index*2)
+                data={'vehicleId':'v1','pickupBranchId':'dn','returnBranchId':'dn','startAt':start.isoformat(),'endAt':(start+timedelta(days=1)).isoformat()}
+                quote=http('POST','/bookings/quote',data,login['token'])
+                booking=http('POST','/bookings',{**data,'expectedTotal':quote['total']},login['token'])
+                if not re.fullmatch(r'[0-9a-f-]{36}',booking['id']):raise ValueError('Unexpected fixture booking ID')
+                created=midnight-timedelta(hours=1) if index==0 else midnight
+                pickup=midnight+timedelta(days=index,hours=9)
+                dropoff=pickup+timedelta(hours=2)
+                stamp=lambda value:value.strftime('%Y-%m-%d %H:%M:%S')
+                sql(f"UPDATE {schema}.bookings SET created_at='{stamp(created)}',start_at='{stamp(pickup)}',end_at='{stamp(dropoff)}',status='EXPIRED',expires_at='{stamp(midnight-timedelta(seconds=1))}' WHERE id='{booking['id']}'")
+                seeded.append({'id':booking['id'],'createdAt':created.isoformat(),'startAt':pickup.isoformat(),'endAt':dropoff.isoformat(),'status':'EXPIRED'})
+            queue_fixture={'vietnamDay':str(day),'historicalListOnly':True,'rows':seeded}
+        (out/'fixture-readback.json').write_text(json.dumps({'fixture':fixture,'schema':schema,'vehicles':http('GET','/vehicles'),'queueFixture':queue_fixture,'jarSHA256':hashlib.sha256(jar.read_bytes()).hexdigest()},indent=2))
         spawn(['node','node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','5382','--strictPort'],'frontend',REPO/'frontend')
         deadline=time.monotonic()+30
         while time.monotonic()<deadline:

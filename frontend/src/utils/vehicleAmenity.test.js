@@ -664,7 +664,7 @@ test("Shared vehicle card retains demo label separately from API state", async (
   const mounted = await mount(createElement(MemoryRouter, null,
     createElement(VehicleCard, { vehicle: { ...mockVehicles[0], status: "ACTIVE", noLocalAsset: false, price: 100, amenities: ["Bluetooth"] } })));
   assert.match(mounted.container.textContent, /Đang khai thác/);
-  assert.match(mounted.container.textContent, /Minh họa · Demo/);
+  assert.match(mounted.container.textContent, /Minh họa · Dữ liệu mẫu/);
   assert.match(mounted.container.textContent, /Bluetooth/);
   await mounted.unmount();
 });

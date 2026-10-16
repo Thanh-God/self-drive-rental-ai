@@ -1,3 +1,4 @@
+import { vehicleStatusLabels } from "../../utils/uiLabels";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useDemo } from "../../context/DemoContext";
@@ -404,7 +405,7 @@ export function FleetScreen() {
     if (!reason.trim()) return;
     update((state) => {
       if (user.role !== "STAFF")
-        throw new Error("Chỉ Staff cập nhật vận hành.");
+        throw new Error("Chỉ nhân viên cập nhật vận hành.");
       return {
         ...state,
         vehicles: state.vehicles.map((v) =>
@@ -429,7 +430,7 @@ export function FleetScreen() {
             <div className="flex flex-wrap justify-between gap-3">
               <h2 className="font-bold">{v.name}</h2>
               <Badge tone={v.status === "ACTIVE" ? "brand" : "warning"}>
-                {v.status}
+                {vehicleStatusLabels[v.status] || "Chưa xác định"}
               </Badge>
             </div>
             <p className="mt-2 text-sm text-slate-500">{v.plate}</p>

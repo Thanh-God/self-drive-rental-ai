@@ -16,7 +16,7 @@ export default function DemoToolbar() {
     >
       <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-2">
         <p>
-          <strong>DEMO UI</strong> · Dữ liệu mẫu, thao tác chỉ lưu trong phiên
+          <strong>GIAO DIỆN MẪU</strong> · Dữ liệu mẫu, thao tác chỉ lưu trong phiên
           trình duyệt. AI và giá là mô phỏng.
         </p>
         <div className="flex flex-wrap items-center gap-2">
@@ -33,10 +33,10 @@ export default function DemoToolbar() {
                 navigate(role === "GUEST" ? "/" : homePathForRole(role));
               }}
             >
-              <option value="GUEST">Guest</option>
-              <option value="USER">User</option>
-              <option value="STAFF">Staff</option>
-              <option value="ADMIN">Admin</option>
+              <option value="GUEST">Khách</option>
+              <option value="USER">Khách hàng</option>
+              <option value="STAFF">Nhân viên</option>
+              <option value="ADMIN">Quản trị viên</option>
             </select>
           </label>
           <label>
@@ -48,9 +48,9 @@ export default function DemoToolbar() {
               onChange={(e) => setScenario(e.target.value)}
             >
               <option value="ready">Có dữ liệu</option>
-              <option value="loading">Loading</option>
-              <option value="empty">Empty</option>
-              <option value="error">Error</option>
+              <option value="loading">Đang tải</option>
+              <option value="empty">Không có dữ liệu</option>
+              <option value="error">Có lỗi</option>
             </select>
           </label>
           <button

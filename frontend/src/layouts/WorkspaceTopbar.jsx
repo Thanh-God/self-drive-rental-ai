@@ -1,3 +1,4 @@
+import { roleLabels } from "../utils/uiLabels";
 import { Link, useNavigate } from "react-router-dom";
 import { Car, LogOut } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -32,7 +33,7 @@ export default function WorkspaceTopbar({ areaLabel }) {
       <div className="flex items-center gap-3">
         <div className="hidden text-right text-sm sm:block">
           <p className="font-medium text-slate-800">{user?.fullName}</p>
-          <p className="text-xs text-slate-500">{user?.role}</p>
+          <p className="text-xs text-slate-500">{roleLabels[user?.role] || "Chưa xác định"}</p>
         </div>
         <button
           type="button"

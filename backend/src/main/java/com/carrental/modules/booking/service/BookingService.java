@@ -17,8 +17,8 @@ import java.util.*;
  private final LicenseService licenses;private final AccountService accounts;private final JdbcTemplate jdbc;private final Clock clock;
  public BookingService(BookingRepository r,VehicleService v,BranchService b,LicenseService l,AccountService a,JdbcTemplate j,Clock c){repo=r;vehicles=v;branches=b;licenses=l;accounts=a;jdbc=j;clock=c;}
  public record Input(String vehicleId,String pickupBranchId,String returnBranchId,Instant startAt,Instant endAt,Long expectedTotal){}
- public record View(String id,String userId,String vehicleId,String customerName,String vehicleName,String pickupBranchId,String returnBranchId,String pickupName,String returnName,String actualReturnBranchId,Instant startAt,Instant endAt,Instant expiresAt,String status,long dailyPrice,int rentalDays,long rentalTotal,long oneWayFee,long total,long version){}
- public View view(Booking b){return new View(b.id,b.userId,b.vehicleId,b.customerName,b.vehicleName,b.pickupBranchId,b.returnBranchId,b.pickupName,b.returnName,b.actualReturnBranchId,b.startAt,b.endAt,b.expiresAt,effective(b),b.dailyPrice,b.rentalDays,b.rentalTotal,b.oneWayFee,b.total,b.version);}
+ public record View(String id,String userId,String vehicleId,String customerName,String vehicleName,String pickupBranchId,String returnBranchId,String pickupName,String returnName,String actualReturnBranchId,Instant startAt,Instant endAt,Instant expiresAt,String status,long dailyPrice,int rentalDays,long rentalTotal,long oneWayFee,long total,long version,Instant createdAt){}
+ public View view(Booking b){return new View(b.id,b.userId,b.vehicleId,b.customerName,b.vehicleName,b.pickupBranchId,b.returnBranchId,b.pickupName,b.returnName,b.actualReturnBranchId,b.startAt,b.endAt,b.expiresAt,effective(b),b.dailyPrice,b.rentalDays,b.rentalTotal,b.oneWayFee,b.total,b.version,b.createdAt);}
  public String effective(Booking b){return "PENDING".equals(b.status)&&!b.expiresAt.isAfter(clock.instant())?"EXPIRED":b.status;}
  public record Report(long total,Map<String,Long> byStatus,long completed){}
  public Report report(Instant from,Instant to,Instant asOf){
@@ -31,7 +31,7 @@ import java.util.*;
  }
  public boolean canRead(Actor a,Booking b){return a.is("ADMIN")||(a.is("USER")&&b.userId.equals(a.id()))||(a.is("STAFF")&&(branches.assigned(a,b.pickupBranchId)||branches.assigned(a,b.returnBranchId)));}
  public Booking require(Actor a,String id){Booking b=repo.findById(id).orElseThrow(DomainException::missing);if(!canRead(a,b))throw DomainException.missing();return b;}
- public List<View> list(Actor a){return (a.is("USER")?repo.findByUserIdOrderByCreatedAtDesc(a.id()):repo.findAll()).stream().filter(b->canRead(a,b)).map(this::view).toList();}
+ public List<View> list(Actor a){return (a.is("USER")?repo.findByUserIdOrderByCreatedAtDescIdAsc(a.id()):repo.findAllByOrderByCreatedAtDescIdAsc()).stream().filter(b->canRead(a,b)).map(this::view).toList();}
  public List<String> bookingIdsForVehicle(String vehicleId){return repo.findByVehicleIdOrderByStartAtAsc(vehicleId).stream().map(b->b.id).toList();}
  public Object detail(Actor a,String id){
   Booking b=require(a,id);

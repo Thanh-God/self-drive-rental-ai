@@ -1,15 +1,6 @@
 // UI-only simulation. These rules are not a replacement for server authorization,
 // transactions, pricing, availability, or validated AI output.
-export const statusLabels = {
-  PENDING: "Chờ xác nhận",
-  CONFIRMED: "Đã xác nhận",
-  IN_PROGRESS: "Đang thuê",
-  RETURNED: "Đã trả xe",
-  COMPLETED: "Hoàn tất",
-  CANCELLED: "Đã hủy",
-  REJECTED: "Từ chối",
-  EXPIRED: "Hết hạn",
-};
+export { bookingStatusLabels as statusLabels } from "../utils/uiLabels.js";
 export const mainSteps = [
   "PENDING",
   "CONFIRMED",

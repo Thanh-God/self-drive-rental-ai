@@ -1,11 +1,8 @@
 import { Link } from "react-router-dom";
 import { dateTime } from "../common/PageKit";
 
-export const bookingStageLabels = {
-  PENDING: "Chờ xác nhận", CONFIRMED: "Đã xác nhận", IN_PROGRESS: "Đang thuê",
-  RETURNED: "Đã trả xe", COMPLETED: "Hoàn tất", CANCELLED: "Đã hủy",
-  REJECTED: "Đã từ chối", EXPIRED: "Hết hạn giữ lịch",
-};
+import { bookingStatusLabels as bookingStageLabels } from "../../utils/uiLabels";
+export { bookingStageLabels };
 const explanations = {
   PENDING: "Đang chờ nhân viên chi nhánh nhận xử lý yêu cầu. Kiểm tra thời hạn giữ lịch trên đơn.",
   CONFIRMED: "Chuẩn bị GPLX bản gốc và đến chi nhánh nhận đúng thời gian. Nhân viên đối chiếu trước khi giao xe.",
@@ -26,7 +23,7 @@ export default function BookingProgress({ booking, history = [], role, actions =
     <p className="mt-3 font-semibold" aria-live="polite">Hiện tại: {label(booking.status)}</p>
     <p className="mt-2 text-sm leading-6">{explanations[booking.status] || "Tải lại đơn để kiểm tra trạng thái hiện tại."}</p>
     {role === "STAFF" ? <p className="mt-2 text-sm">Nhận/xác nhận và giao xe thuộc chi nhánh nhận; nhận trả và hoàn tất thuộc chi nhánh trả. {actions.length ? "Chỉ sử dụng các thao tác được phép bên dưới." : "Hiện không có thao tác khả dụng theo phân công, trạng thái hoặc thời gian thuê."}</p> : null}
-    {role === "ADMIN" ? <p className="mt-2 text-sm">Admin không thực hiện giao hoặc nhận trả xe. Theo dõi đơn và các thao tác được phép bên dưới.</p> : null}
+    {role === "ADMIN" ? <p className="mt-2 text-sm">Quản trị viên không thực hiện giao hoặc nhận trả xe. Theo dõi đơn và các thao tác được phép bên dưới.</p> : null}
     {role === "USER" && ["PENDING", "CONFIRMED"].includes(booking.status) ? <p className="mt-2 text-sm">{actions.includes("CANCELLED") ? "Có thể yêu cầu hủy tại phần thao tác bên dưới, kèm lý do." : "Nếu cần hủy sát giờ nhận, hãy liên hệ nhân viên chi nhánh nhận."} <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p> : null}
     <p className="mt-3 text-xs text-muted">Giờ Việt Nam · Dùng nút Tải lại đơn để kiểm tra cập nhật mới nhất.</p>
     <details className="booking-history mt-5">

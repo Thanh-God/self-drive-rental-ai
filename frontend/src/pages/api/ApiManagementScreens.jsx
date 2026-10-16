@@ -1,3 +1,4 @@
+import { roleLabels, accountStatusLabels, vehicleStatusLabels } from "../../utils/uiLabels";
 import VehicleImageEditor from "../../components/vehicle/VehicleImageEditor";
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
 import apiClient from "../../api/client";
@@ -70,10 +71,10 @@ export function ApiAccountsPage() {
         password: String(form.get("password") || ""),
       });
       target.reset();
-      setNotice("Đã tạo tài khoản Staff.");
+      setNotice("Đã tạo tài khoản nhân viên.");
       accountsRequest.reload();
     } catch (requestError) {
-      setError(getErrorMessage(requestError, "Không thể tạo tài khoản Staff."));
+      setError(getErrorMessage(requestError, "Không thể tạo tài khoản nhân viên."));
     } finally {
       inFlightRef.current.delete("create");
       setBusyIds((prev) => {
@@ -173,7 +174,7 @@ export function ApiAccountsPage() {
   return (
     <Page
       title="Quản lý tài khoản"
-      description="Quản lý trạng thái User/Staff và phân công phạm vi chi nhánh."
+      description="Quản lý trạng thái khách hàng/nhân viên và phân công phạm vi chi nhánh."
     >
       {notice ? <Notice>{notice}</Notice> : null}
       {error ? <Notice error>{error}</Notice> : null}
@@ -206,9 +207,9 @@ export function ApiAccountsPage() {
                             account.status === "ACTIVE" ? "success" : "danger"
                           }
                         >
-                          {account.status}
+                          {accountStatusLabels[account.status] || "Chưa xác định"}
                         </Badge>
-                        <Badge>{account.role}</Badge>
+                        <Badge>{roleLabels[account.role] || "Chưa xác định"}</Badge>
                       </div>
                     </div>
                     <div className="mt-4 flex flex-wrap items-center gap-3">
@@ -332,11 +333,11 @@ export function ApiAccountsPage() {
                 />
               </Field>
               <p className="text-xs text-slate-500">
-                Tài khoản tạo mới có role Staff; mật khẩu không được hiển thị hoặc
+                Tài khoản tạo mới có vai trò nhân viên; mật khẩu không được hiển thị hoặc
                 lưu ở giao diện.
               </p>
               <button type="submit" className="btn" disabled={isBusy("create")}>
-                {isBusy("create") ? "Đang tạo..." : "Tạo Staff"}
+                {isBusy("create") ? "Đang tạo..." : "Tạo nhân viên"}
               </button>
             </form>
           </>
@@ -675,7 +676,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
       title={sectionTitle}
       description={
         fleet
-          ? "Staff cập nhật tình trạng khai thác trong phạm vi quyền vận hành."
+          ? "Nhân viên cập nhật tình trạng khai thác trong phạm vi quyền vận hành."
           : "Quản lý xe, giá niêm yết và chi nhánh quản lý. Giá đặt xe được máy chủ kiểm tra lại."
       }
     >
@@ -714,12 +715,12 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge>{vehicle.status}</Badge>
+                  <Badge>{vehicleStatusLabels[vehicle.status] || "Chưa xác định"}</Badge>
                   {fleet ? (
                     <>
                       {vehicle.status === "INACTIVE" ? (
                         <span className="text-xs text-slate-500">
-                          Chỉ Admin được quản lý xe ngừng khai thác.
+                          Chỉ quản trị viên được quản lý xe ngừng khai thác.
                         </span>
                       ) : (
                         <>
@@ -762,7 +763,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                 }
                 description={
                   fleet && !assignedBranchIds.size
-                    ? "Liên hệ Admin để được phân công chi nhánh vận hành."
+                    ? "Liên hệ quản trị viên để được phân công chi nhánh vận hành."
                     : undefined
                 }
               />

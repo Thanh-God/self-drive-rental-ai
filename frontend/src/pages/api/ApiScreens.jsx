@@ -1,3 +1,5 @@
+import { bookingStatusLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
+import { visibleBookings, queueDateField } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
@@ -206,7 +208,7 @@ function IncidentSection({ booking, records = [], area }) {
           note: String(form.get("note") || ""),
         },
       );
-      setNotice(`Đã cập nhật hồ sơ sự cố: ${next}.`);
+      setNotice(`Đã cập nhật hồ sơ sự cố: ${incidentStatusLabels[next] || "Đã cập nhật"}.`);
       request.reload();
       setSelectedId("");
     } catch (error) {
@@ -271,7 +273,7 @@ function IncidentSection({ booking, records = [], area }) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <h3 className="font-semibold">
-                      {incident.kind} · {incident.status}
+                      {incidentKindLabels[incident.kind] || "Sự cố"} · {incidentStatusLabels[incident.status] || "Chưa xác định"}
                     </h3>
                     <p className="mt-1 text-sm text-slate-600">
                       {incident.description}
@@ -318,9 +320,9 @@ function IncidentSection({ booking, records = [], area }) {
                       selectedEvents.map((item, index) => (
                         <li key={`${item.occurred_at}-${index}`}>
                           <p>
-                            {item.action} · {dateTime(item.occurred_at)}
+                            {incidentStatusLabels[item.action] || "Cập nhật hồ sơ"} · {dateTime(item.occurred_at)}
                             {item.previous_status || item.next_status
-                              ? ` · ${item.previous_status || "Mới"} → ${item.next_status || item.action}`
+                              ? ` · ${incidentStatusLabels[item.previous_status] || "Mới"} → ${incidentStatusLabels[item.next_status] || "Cập nhật hồ sơ"}`
                               : ""}
                           </p>
                           <p>{item.note}</p>
@@ -399,7 +401,7 @@ function IncidentSection({ booking, records = [], area }) {
                     </Field>
                     <button className="btn" disabled={busy}>
                       {incident.status === "ASSESSED"
-                        ? "Gửi yêu cầu (Admin)"
+                        ? "Gửi yêu cầu (quản trị viên)"
                         : "Lưu đánh giá"}
                     </button>
                   </form>
@@ -465,7 +467,7 @@ function IncidentSection({ booking, records = [], area }) {
           </Field>
           <p className="text-xs text-slate-500 sm:col-span-2">
             {custodyStart
-              ? `Thời điểm phải thuộc thời gian giữ xe thực tế: từ ${dateTime(handoverRecord.occurred_at)} đến ${returnRecord ? dateTime(returnRecord.occurred_at) : "hiện tại"}. Backend vẫn kiểm tra lại theo biên bản.`
+              ? `Thời điểm phải thuộc thời gian giữ xe thực tế: từ ${dateTime(handoverRecord.occurred_at)} đến ${returnRecord ? dateTime(returnRecord.occurred_at) : "hiện tại"}. Hệ thống vẫn kiểm tra lại theo biên bản.`
               : "Cần có biên bản giao xe thực tế để xác định thời gian sự cố hợp lệ."}
           </p>
           <Field label="Mô tả có căn cứ">
@@ -1212,18 +1214,10 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   const [status, setStatus] = useState(
     mode === "handover" ? "CONFIRMED" : mode === "return" ? "IN_PROGRESS" : "",
   );
-  const rows = (Array.isArray(request.data) ? request.data : []).filter(
-    (booking) => {
-      const text =
-        `${booking.id} ${booking.vehicleName} ${booking.customerName || ""}`.toLocaleLowerCase(
-          "vi",
-        );
-      return (
-        (!status || booking.status === status) &&
-        text.includes(query.toLocaleLowerCase("vi"))
-      );
-    },
-  );
+  const [queue, setQueue] = useState("all");
+  const now = useNow();
+  const rows = visibleBookings(request.data, { query, status, queue, mode, now });
+  const dayLabel = queueDateField(mode) === "startAt" ? "ngày nhận xe" : queueDateField(mode) === "endAt" ? "ngày trả xe" : "ngày tạo đơn";
   const title =
     area === "user"
       ? "Đơn thuê của tôi"
@@ -1237,9 +1231,10 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   return (
     <Page
       title={title}
-      description="Thông tin và trạng thái được tải trực tiếp từ hệ thống."
+      description="Đơn mới tạo được hiển thị trước. Dùng nút Tải lại danh sách để xem cập nhật mới nhất."
+      actions={<button type="button" className="btn-secondary" disabled={request.loading} onClick={request.reload}>Tải lại danh sách</button>}
     >
-      <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2">
+      <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Field label="Tìm mã đơn, xe hoặc khách hàng">
           <input
             value={query}
@@ -1263,12 +1258,18 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
               "EXPIRED",
             ].map((value) => (
               <option key={value} value={value}>
-                {value}
+                {bookingStatusLabels[value]}
               </option>
             ))}
           </select>
         </Field>
+        <Field label="Hàng đợi" hint={`Hôm nay theo ${dayLabel}, giờ Việt Nam. Tất cả không giới hạn ngày.`}>
+          <select value={queue} onChange={event => setQueue(event.target.value)}>
+            <option value="all">Tất cả</option><option value="today">Hôm nay</option>
+          </select>
+        </Field>
       </div>
+      <p className="mb-4 text-sm text-muted" aria-live="polite">{request.loading ? "Đang tải đơn…" : request.error ? "Chưa tải được danh sách" : `${rows.length} đơn phù hợp · Mới tạo trước`}</p>
       <RequestState
         loading={request.loading}
         error={request.error}
@@ -1295,6 +1296,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                   <p className="mt-1 text-sm text-slate-500">
                     {booking.pickupName} → {booking.returnName}
                   </p>
+                  {booking.createdAt ? <p className="mt-1 text-sm text-muted">Tạo lúc {dateTime(booking.createdAt)}</p> : null}
                   {area !== "user" ? (
                     <p className="mt-1 text-sm text-slate-500">
                       {booking.customerName}
@@ -1322,7 +1324,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
         ) : (
           <EmptyState
             title="Không có đơn phù hợp"
-            description="Thử thay đổi từ khóa hoặc trạng thái."
+            description="Thử thay đổi từ khóa, trạng thái hoặc chọn hàng đợi Tất cả."
           />
         )}
       </RequestState>
@@ -1660,7 +1662,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                 !branchAssignmentsRequest.error &&
                 !assignedBranchIds.size ? (
                   <Notice error>
-                    Tài khoản Staff chưa được phân công chi nhánh; không có
+                    Tài khoản nhân viên chưa được phân công chi nhánh; không có
                     thao tác vận hành khả dụng.
                   </Notice>
                 ) : null}
@@ -1679,7 +1681,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       <div>
                         <dt className="text-slate-500">Hệ / Hạng</dt>
                         <dd className="mt-1 font-semibold">
-                          {license.scheme} / {license.licenseClass}
+                          {licenseSchemeLabels[license.scheme] || "Chưa xác định"} / {license.licenseClass}
                         </dd>
                       </div>
                       <div>
@@ -1697,7 +1699,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       <div>
                         <dt className="text-slate-500">Trạng thái xác minh</dt>
                         <dd className="mt-1 font-semibold">
-                          {license.status}
+                          {licenseStatusLabels[license.status] || "Chưa xác định"}
                         </dd>
                       </div>
                     </dl>
@@ -2203,7 +2205,7 @@ export function ApiProfilePage() {
             </label>
             {license ? (
               <p className="text-sm text-slate-600">
-                Trạng thái xác minh: {license.status}
+                Trạng thái xác minh: {licenseStatusLabels[license.status] || "Chưa xác định"}
               </p>
             ) : null}
             <button className="btn" disabled={busy}>

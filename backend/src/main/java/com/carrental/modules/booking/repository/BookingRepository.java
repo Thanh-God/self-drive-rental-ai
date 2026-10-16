@@ -9,7 +9,8 @@ public interface BookingRepository extends JpaRepository<Booking, String> {
     @Query("select e from Booking e where e.vehicleId in :vehicleIds and (e.status in ('CONFIRMED','IN_PROGRESS') or (e.status = 'PENDING' and e.expiresAt > :now)) order by e.vehicleId, e.startAt")
     java.util.List<Booking> searchSchedule(@Param("vehicleIds") java.util.List<String> vehicleIds, @Param("now") java.time.Instant now);
     java.util.List<Booking> findByVehicleIdOrderByStartAtAsc(String vehicleId);
-    java.util.List<Booking> findByUserIdOrderByCreatedAtDesc(String userId);
+    java.util.List<Booking> findByUserIdOrderByCreatedAtDescIdAsc(String userId);
+    java.util.List<Booking> findAllByOrderByCreatedAtDescIdAsc();
 
     @Query("select e.vehicleId from Booking e where e.id = :id")
     java.util.Optional<String> findVehicleIdById(@Param("id") String id);

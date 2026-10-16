@@ -212,7 +212,7 @@ test("mounted incident report locks duplicate submit, maps Vietnam time, and rea
     occurredAt: "2026-10-10T04:00:00Z", reportedAt: "2026-10-11T04:00:00Z",
     description: "Vết xước phát hiện khi trả xe", version: 0,
   }]));
-  assert.match(container.textContent, /DAMAGE · OPEN/);
+  assert.match(container.textContent, /Hư hỏng · Đã tiếp nhận/);
   assert.match(container.textContent, /Chưa có kết luận trách nhiệm hoặc khấu trừ/);
   assert.doesNotMatch(container.textContent, /Đã thanh toán|Đã khấu trừ/);
 
@@ -302,5 +302,5 @@ test("mounted incident assessment permits one pending POST and releases its guar
   await act(async () => response(take("/incidents?bookingId=c7-report-ui", "get"), [{
     id: "assessment-case", kind: "DAMAGE", status: "ASSESSED", description: "Assessment fixture", version: 1,
   }]));
-  assert.match(container.textContent, /DAMAGE · ASSESSED/);
+  assert.match(container.textContent, /Hư hỏng · Đã đánh giá/);
 });

@@ -58,7 +58,7 @@ export function VehicleVisual({
         className={large ? "h-40 w-64" : "h-28 w-44"}
       />
       <span className="absolute bottom-3 right-3 text-[10px] uppercase tracking-widest text-slate-500">
-        {vehicle?.noLocalAsset ? "Ảnh chưa cập nhật" : "Minh họa · Demo"}
+        {vehicle?.noLocalAsset ? "Ảnh chưa cập nhật" : "Minh họa · Dữ liệu mẫu"}
       </span>
     </div>
   );

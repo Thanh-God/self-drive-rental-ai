@@ -22,6 +22,11 @@ class TripRunnerGuardTest(unittest.TestCase):
             with self.assertRaises(SystemExit) as error:runner.main()
             self.assertEqual(error.exception.code,2)
             process.assert_not_called()
+    def test_queue_proof_requires_exact_count_before_any_process(self):
+        argv=['runner','--native-evidence','missing','--backend-root','missing','--evidence','missing','--browser-script','verify-staff-queue.cjs']
+        with patch.object(sys,'argv',argv),patch.object(runner.subprocess,'run') as process:
+            with self.assertRaisesRegex(ValueError,'exactly three'):runner.main()
+            process.assert_not_called()
     def invoke(self, root, fixture, out=None, backend=None):
         native=root/'native';native.mkdir()
         (native/'fixture.json').write_text(json.dumps(fixture))

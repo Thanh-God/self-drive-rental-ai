@@ -342,12 +342,12 @@ test("DOM: ApiAccountsPage displays accounts with status, role, and assigned bra
   // Check accounts rendered
   assert.ok(container.textContent.includes("Staff One"), "Staff name must be visible");
   assert.ok(container.textContent.includes("staff1@test"), "Staff email must be visible");
-  assert.ok(container.textContent.includes("STAFF"), "STAFF role badge must be visible");
-  assert.ok(container.textContent.includes("ACTIVE"), "ACTIVE status badge must be visible");
+  assert.ok(container.textContent.includes("Nhân viên"), "STAFF role badge must be visible");
+  assert.ok(container.textContent.includes("Đang hoạt động"), "ACTIVE status badge must be visible");
   assert.ok(container.textContent.includes("User One"), "User name must be visible");
-  assert.ok(container.textContent.includes("USER"), "USER role badge must be visible");
+  assert.ok(container.textContent.includes("Khách hàng"), "USER role badge must be visible");
   assert.ok(container.textContent.includes("Locked Staff"), "Locked staff name must be visible");
-  assert.ok(container.textContent.includes("LOCKED"), "LOCKED status badge must be visible");
+  assert.ok(container.textContent.includes("Đã khóa"), "LOCKED status badge must be visible");
 
   // Check assigned branches including inactive
   assert.ok(container.textContent.includes("Chi nhánh Hà Nội"), "Active assigned branch must be visible");
@@ -484,7 +484,7 @@ test("DOM: ApiAccountsPage create staff submits POST and shows success", async (
     fulfill(accountsReq2, []);
   });
 
-  assert.ok(container.textContent.includes("Đã tạo tài khoản Staff."), "Success notice must be visible");
+  assert.ok(container.textContent.includes("Đã tạo tài khoản nhân viên."), "Success notice must be visible");
 
   await unmount();
 });
@@ -930,7 +930,7 @@ test("DOM: ApiAccountsPage addStaff synchronous pending guard holds double dispa
     fulfill(accountsReloadReq, [{ id: "new-staff", fullName: "Guard Staff", email: "guard@test", role: "STAFF", status: "ACTIVE", version: 0 }]);
   });
 
-  assert.ok(container.textContent.includes("Đã tạo tài khoản Staff."), "Success notice on retry submission");
+  assert.ok(container.textContent.includes("Đã tạo tài khoản nhân viên."), "Success notice on retry submission");
 
   await unmount();
 });

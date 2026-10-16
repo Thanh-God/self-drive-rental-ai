@@ -25,3 +25,9 @@ Trang chủ/danh sách API có thanh hãng lấy từ xe thật và catalog, ch�
 Token màu/shadow nằm tại `frontend/src/index.css`. Nền trang `--color-page-background`, thẻ trắng `--color-surface`, nút chính cam/chữ tối, nút phụ trắng/viền rõ trong nội dung khách hàng. Chữ phụ dùng `--color-readable-muted`, viền điều khiển dùng `--color-secondary-border`; không thêm màu cứng trong component. Footer nền tối giữ màu chữ riêng.
 
 Form có label/focus rõ, thao tác bàn phím và thông báo dễ hiểu. Chữ thông thường đặt mục tiêu tương phản tối thiểu 4.5:1, biên điều khiển 3:1 so với nền liền kề; đây là tiêu chí từng cặp màu, không tự chứng nhận toàn site đạt WCAG. Responsive web, không phát triển app mobile riêng. Kiểm tra bằng npm test/lint, build API/demo và browser với DB test cô lập; không test ghi trên dữ liệu vận hành.
+
+## Hàng đợi đơn thuê trên website
+
+Danh sách đơn sắp theo thời điểm tạo mới nhất trước; API trả `createdAt` theo UTC, giao diện hiển thị giờ Việt Nam. Bộ lọc trạng thái dùng nhãn tiếng Việt và giữ nguyên mã gửi/nhận qua API.
+
+Bộ lọc **Hàng đợi** mặc định **Tất cả** để không bỏ sót đơn cũ chưa xử lý. **Hôm nay** tính theo ngày tạo đơn ở hàng chờ duyệt, ngày nhận xe ở trang bàn giao và ngày trả xe ở trang nhận trả, trong múi giờ `Asia/Ho_Chi_Minh`. **Tất cả** chỉ bỏ giới hạn ngày; trạng thái và từ khóa vẫn được áp dụng. Dùng **Tải lại danh sách** để lấy dữ liệu mới, không cam kết cập nhật thời gian thực. Bộ lọc không thay đổi quyền xem hoặc thao tác theo chi nhánh.

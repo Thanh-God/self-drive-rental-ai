@@ -86,7 +86,7 @@ export function Status({ status }) {
               : "brand"
       }
     >
-      {statusLabels[status] || status}
+      {statusLabels[status] || "Chưa xác định"}
     </Badge>
   );
 }

@@ -1,3 +1,4 @@
+import { roleLabels } from "../../utils/uiLabels";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useState, useMemo } from "react";
 import {
@@ -768,8 +769,8 @@ function VehicleDetailContent({ vehicle, vehicleId, params, data, user }) {
             </Notice>
           ) : user && user.role !== "USER" ? (
             <Notice>
-              Tài khoản hiện tại có vai trò <strong>{user.role}</strong>. Hãy
-              đổi sang vai trò <strong>User</strong> trong thanh công cụ Demo để
+              Tài khoản hiện tại có vai trò <strong>{roleLabels[user.role] || "Chưa xác định"}</strong>. Hãy
+              đổi sang vai trò <strong>Khách hàng</strong> trong thanh công cụ dữ liệu mẫu để
               tạo đơn thuê xe.
             </Notice>
           ) : (

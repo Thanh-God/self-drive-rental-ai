@@ -13,7 +13,7 @@ import { DEMO_MODE } from "../demo/config";
 
 const adminNav = [
   { to: "/admin/bookings", label: "Tra cứu đơn thuê", icon: Car },
-  { to: "/admin", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/admin", label: "Tổng quan", icon: LayoutDashboard, end: true },
   { to: "/admin/accounts", label: "Quản lý tài khoản", icon: Users },
   { to: "/admin/vehicles", label: "Quản lý xe", icon: Car },
   { to: "/admin/catalog", label: "Danh mục xe", icon: Building2 },
