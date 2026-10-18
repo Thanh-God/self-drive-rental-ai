@@ -1121,6 +1121,23 @@ export function ApiBranchesPage() {
     routesRequest.reload();
   }
 
+  async function deleteBranch(branch) {
+    if (!isAdmin || mutationPending.current || conflict || !window.confirm(`Xóa chi nhánh “${branch.name}”? Chi nhánh còn xe, đơn thuê, tuyến hoặc nhân viên sẽ không được xóa. Thao tác không thể hoàn tác.`)) return;
+    mutationPending.current = true;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await apiClient.delete(`/admin/branches/${encodeURIComponent(branch.id)}`, { params: { expectedVersion: branch.version } });
+      if (selected?.id === branch.id) setSelected(null);
+      if ([routeForm.pickupBranchId, routeForm.returnBranchId].includes(branch.id)) {
+        routeInitialized.current = false;
+        setRouteForm({ pickupBranchId: "", returnBranchId: "", fee: "", enabled: false });
+      }
+      setNotice(`Đã xóa chi nhánh “${branch.name}”.`);
+      branchesRequest.reload(); routesRequest.reload();
+    } catch (failure) { setError(getErrorMessage(failure, "Không thể xóa chi nhánh.")); }
+    finally { mutationPending.current = false; setBusy(false); }
+  }
+
   function changeRoute(key, value) {
     const next = { ...routeForm, [key]: value };
     const savedRoute = routes.find(
@@ -1169,7 +1186,7 @@ export function ApiBranchesPage() {
               {!branches.length ? <p>Chưa có chi nhánh.</p> : null}
               {branches.map((branch) => (
                 <article
-                  className="panel flex flex-wrap items-center justify-between gap-3"
+                  className="panel space-y-4"
                   key={branch.id}
                 >
                   <div>
@@ -1181,14 +1198,15 @@ export function ApiBranchesPage() {
                       {branch.status === "ACTIVE" ? "Đang nhận đơn mới" : "Ngừng nhận đơn mới"} · Phiên bản {branch.version}
                     </p>
                   </div>
-                  <div className="flex gap-2"><button
+                  <div className="flex flex-wrap gap-2"><button
                     className="btn-secondary"
                     disabled={busy || conflict}
                     onClick={() => setSelected(branch)}
                   >
                     Chỉnh sửa
                   </button>
-                  <button type="button" className="btn-secondary" disabled={busy || conflict} onClick={() => toggleBranch(branch)} aria-label={`${branch.status === "ACTIVE" ? "Ngừng" : "Mở"} nhận đơn mới: ${branch.name}`}>{busy ? "Đang xử lý..." : branch.status === "ACTIVE" ? "Ngừng nhận đơn mới" : "Mở nhận đơn mới"}</button></div>
+                  <button type="button" className="btn-secondary" disabled={busy || conflict} onClick={() => toggleBranch(branch)} aria-label={`${branch.status === "ACTIVE" ? "Ngừng" : "Mở"} nhận đơn mới: ${branch.name}`}>{busy ? "Đang xử lý..." : branch.status === "ACTIVE" ? "Ngừng nhận đơn mới" : "Mở nhận đơn mới"}</button>
+                  <button type="button" className="btn-secondary text-red-700" disabled={busy || conflict} onClick={() => deleteBranch(branch)} aria-label={`Xóa chi nhánh ${branch.name}`}>Xóa chi nhánh</button></div>
                 </article>
               ))}
             </div>

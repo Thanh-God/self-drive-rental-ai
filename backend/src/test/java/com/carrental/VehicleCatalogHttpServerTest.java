@@ -158,7 +158,7 @@ public class VehicleCatalogHttpServerTest {
             Map other=createItem(kind);
             assertEquals(HttpStatus.CONFLICT,call(kind,HttpMethod.PUT,"/"+id,Map.of("name",other.get("name"),"expectedRevision",edited.getBody().get("revision")),adminToken).getStatusCode());
             assertEquals(newName,jdbc.queryForObject("select name from "+table+" where id=?",String.class,id));
-            assertEquals(HttpStatus.METHOD_NOT_ALLOWED,restTemplate.exchange("/api/v1/admin/"+kind+"/"+id,HttpMethod.DELETE,new HttpEntity<>(authHeaders(adminToken)),String.class).getStatusCode());
+            assertEquals(HttpStatus.BAD_REQUEST,restTemplate.exchange("/api/v1/admin/"+kind+"/"+id,HttpMethod.DELETE,new HttpEntity<>(authHeaders(adminToken)),String.class).getStatusCode());
         }
         assertEquals(HttpStatus.OK,restTemplate.getForEntity("/api/v1/vehicles/catalog",Map.class).getStatusCode());
     }
@@ -190,6 +190,53 @@ public class VehicleCatalogHttpServerTest {
                 for(int i=0;i<2;i++)jobs.add(workers.submit(()->{createStart.await();return call(kind,HttpMethod.POST,"",Map.of("name",duplicate),adminToken).getStatusCode();}));
                 createStart.countDown();statuses.clear();for(Future<HttpStatusCode> job:jobs)statuses.add(job.get(30,TimeUnit.SECONDS).value());Collections.sort(statuses);assertEquals(List.of(201,409),statuses);String table=kind.equals("vehicle-brands")?"vehicle_brands":kind.equals("amenities")?"amenities":"vehicle_categories";assertEquals(1L,jdbc.queryForObject("select count(*) from "+table+" where name=?",Long.class,duplicate));
             } finally {workers.shutdownNow();}
+        }
+    }
+    @Test void deleteUnusedCatalogRequiresAdminAndCurrentRevision() {
+        for(String kind:List.of("vehicle-brands","vehicle-categories","amenities")) {
+            Map item=createItem(kind);String path="/"+item.get("id"),query="?expectedRevision="+item.get("revision");
+            assertEquals(401,call(kind,HttpMethod.DELETE,path+query,null,null).getStatusCode().value());
+            for(String actor:List.of(userToken,staffToken))assertEquals(403,call(kind,HttpMethod.DELETE,path+query,null,actor).getStatusCode().value());
+            assertEquals(400,call(kind,HttpMethod.DELETE,path,null,adminToken).getStatusCode().value());
+            assertEquals(400,call(kind,HttpMethod.DELETE,path+"?expectedRevision=invalid",null,adminToken).getStatusCode().value());
+            assertEquals(409,call(kind,HttpMethod.DELETE,path+"?expectedRevision="+"0".repeat(64),null,adminToken).getStatusCode().value());
+            assertEquals(204,call(kind,HttpMethod.DELETE,path+query,null,adminToken).getStatusCode().value());
+            assertEquals(404,call(kind,HttpMethod.DELETE,path+query,null,adminToken).getStatusCode().value());
+            Map catalog=restTemplate.getForObject("/api/v1/vehicles/catalog",Map.class);
+            String key=kind.equals("vehicle-brands")?"brands":kind.equals("vehicle-categories")?"categories":"amenities";
+            assertFalse(((List<Map>)catalog.get(key)).stream().anyMatch(row->row.get("id").equals(item.get("id"))));
+        }
+    }
+    @Test void referencedCatalogDeletionNeverReclassifiesVehiclesOrRemovesLinks() {
+        for(String kind:List.of("vehicle-brands","vehicle-categories","amenities")) {
+            Map item=createItem(kind);String id=(String)item.get("id"),column=kind.equals("vehicle-brands")?"brand_id":"category_id";
+            String old=kind.equals("amenities")?null:jdbc.queryForObject("select "+column+" from vehicles where id='v1'",String.class);
+            try {
+                if(kind.equals("amenities"))jdbc.update("insert into vehicle_amenities(vehicle_id,amenity_id) values('v1',?)",id);
+                else jdbc.update("update vehicles set "+column+"=? where id='v1'",id);
+                var vehicles=jdbc.queryForList("select * from vehicles order by id");var links=jdbc.queryForList("select * from vehicle_amenities order by vehicle_id,amenity_id");
+                var result=call(kind,HttpMethod.DELETE,"/"+id+"?expectedRevision="+item.get("revision"),null,adminToken);
+                assertEquals(409,result.getStatusCode().value());assertTrue(result.getBody().get("message").toString().contains("1 xe"));
+                assertEquals(vehicles,jdbc.queryForList("select * from vehicles order by id"));assertEquals(links,jdbc.queryForList("select * from vehicle_amenities order by vehicle_id,amenity_id"));
+            } finally {
+                if(kind.equals("amenities"))jdbc.update("delete from vehicle_amenities where vehicle_id='v1' and amenity_id=?",id);
+                else jdbc.update("update vehicles set "+column+"=? where id='v1'",old);
+            }
+        }
+    }
+    @Autowired com.carrental.modules.vehicle.repository.VehicleCatalogRepository catalogRepository;
+    @Autowired org.springframework.transaction.support.TransactionTemplate transactions;
+    @Test void deleteWaitsForCatalogRenameAndRejectsStaleRevision()throws Exception {
+        for(String kind:List.of("vehicle-brands","vehicle-categories","amenities")) {
+            Map item=createItem(kind);String id=(String)item.get("id"),table=kind.equals("vehicle-brands")?"vehicle_brands":kind.equals("vehicle-categories")?"vehicle_categories":"amenities";
+            var worker=Executors.newSingleThreadExecutor();var future=new java.util.concurrent.atomic.AtomicReference<Future<Integer>>();
+            try {
+                transactions.executeWithoutResult(ignored->{catalogRepository.lock(kind,id).orElseThrow();catalogRepository.update(kind,id,"Updated "+id);
+                    future.set(worker.submit(()->call(kind,HttpMethod.DELETE,"/"+id+"?expectedRevision="+item.get("revision"),null,adminToken).getStatusCode().value()));
+                    if(System.getenv("KDRIVE_TEST_DB_URL")!=null){long end=System.nanoTime()+TimeUnit.SECONDS.toNanos(5);int waits=0;while(System.nanoTime()<end){waits=jdbc.queryForObject("select count(*) from performance_schema.data_lock_waits w join performance_schema.data_locks l on w.requesting_engine_lock_id=l.engine_lock_id where l.object_schema=database() and l.object_name=?",Integer.class,table);if(waits>0)break;try{Thread.sleep(20);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new RuntimeException(e);}}assertTrue(waits>0,"Actual MySQL lock wait required");}
+                });
+                assertEquals(409,future.get().get(10,TimeUnit.SECONDS));assertEquals("Updated "+id,jdbc.queryForObject("select name from "+table+" where id=?",String.class,id));
+            } finally {worker.shutdownNow();assertTrue(worker.awaitTermination(10,TimeUnit.SECONDS));}
         }
     }
 }

@@ -195,11 +195,11 @@ after(async () => {
 // Kiểm tra loading (skeleton), error (notice + nút retry), empty state
 // =============================================================================
 
-async function renderCatalog() {
+async function renderCatalog(brands=[{id:"brand",name:"Existing Brand",revision:"a".repeat(64)}], categories=[]) {
   const mounted=await mount(createElement(AuthProvider,null,createElement(ApiVehicleCatalogPage)));
   await act(async()=>{
-    fulfill(takeRequest("/admin/vehicle-brands"),[{id:"brand",name:"Existing Brand",revision:"a".repeat(64)}]);
-    fulfill(takeRequest("/admin/vehicle-categories"),[]);fulfill(takeRequest("/admin/amenities"),[]);
+    fulfill(takeRequest("/admin/vehicle-brands"),brands);
+    fulfill(takeRequest("/admin/vehicle-categories"),categories);fulfill(takeRequest("/admin/amenities"),[]);
   });
   return mounted;
 }
@@ -238,4 +238,17 @@ test("amenity validation error keeps input, releases guard and does not claim su
  await act(async()=>changeValue(form.querySelector("input"),"   "));await act(async()=>form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true})));
  const request=takeRequest("/admin/amenities");assert.equal(request.config.method,"post");await act(async()=>rejectWithStatus(request,400,{message:"Invalid amenity"}));
  assert.match(section.textContent,/Invalid amenity/);assert.equal(form.querySelector("input").value,"   ");assert.equal(form.querySelector("button").disabled,false);assert.doesNotMatch(section.textContent,/Đã lưu danh mục/);await unmount();
+});
+
+test("catalog delete confirmation, revision, pending guard and successful reload",async()=>{
+ const {container,unmount}=await renderCatalog([{id:"brand",name:"Unused",revision:"a".repeat(64)}]);const section=container.querySelector('section[aria-label="Hãng xe"]');
+ const remove=()=>section.querySelector('button[aria-label="Xóa Unused"]');window.confirm=()=>false;await act(async()=>remove().click());assert.equal(requests.filter(r=>r.config.method==="delete").length,0);
+ window.confirm=()=>true;await act(async()=>{remove().click();remove().click();});const request=takeRequest("/admin/vehicle-brands/brand");assert.deepEqual(request.config.params,{expectedRevision:"a".repeat(64)});assert.equal(requests.filter(r=>r.config.method==="delete").length,1);assert.equal(remove().disabled,true);assert.doesNotMatch(section.textContent,/Đã xóa/);
+ await act(async()=>fulfill(request,null,204));await act(async()=>fulfill(takeRequest("/admin/vehicle-brands"),[]));assert.match(section.textContent,/Đã xóa hãng xe/);assert.equal(section.querySelectorAll("li").length,0);await unmount();
+});
+
+test("catalog reference409 keeps item and never claims delete success",async()=>{
+ const {container,unmount}=await renderCatalog(undefined,[{id:"category",name:"Used",revision:"b".repeat(64)}]);const section=container.querySelector('section[aria-label="Loại xe"]');window.confirm=()=>true;
+ await act(async()=>section.querySelector('button[aria-label="Xóa Used"]').click());await act(async()=>rejectWithStatus(takeRequest("/admin/vehicle-categories/category"),409,{message:"Danh mục đang được 2 xe sử dụng."}));
+ assert.match(section.textContent,/2 xe sử dụng/);assert.equal(section.querySelectorAll("li").length,1);assert.doesNotMatch(section.textContent,/Đã xóa/);await unmount();
 });

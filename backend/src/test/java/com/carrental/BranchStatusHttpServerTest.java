@@ -196,4 +196,44 @@ class BranchStatusHttpServerTest {
             : table.equals("flyway_schema_history") ? "installed_rank" : "id";
         return jdbc.queryForList("select * from " + table + " order by " + order);
     }
+    @Test void deleteUnusedBranchValidatesPermissionVersionAndKeepsOtherRows(){
+        String id=create(),path="/api/v1/admin/branches/"+id;
+        var before=row(id);assertEquals(401,request(HttpMethod.DELETE,path+"?expectedVersion=0",null,null).getStatusCode().value());
+        for(String actor:List.of(user,staff))assertEquals(403,request(HttpMethod.DELETE,path+"?expectedVersion=0",null,actor).getStatusCode().value());
+        for(String suffix:List.of("","?expectedVersion=-1","?expectedVersion=abc"))assertEquals(400,request(HttpMethod.DELETE,path+suffix,null,admin).getStatusCode().value());
+        assertEquals(409,request(HttpMethod.DELETE,path+"?expectedVersion=10",null,admin).getStatusCode().value());assertEquals(before,row(id));
+        var unrelated=row("dn");assertEquals(204,request(HttpMethod.DELETE,path+"?expectedVersion=0",null,admin).getStatusCode().value());assertTrue(row(id).isEmpty());assertEquals(unrelated,row("dn"));
+        assertEquals(404,request(HttpMethod.DELETE,path+"?expectedVersion=0",null,admin).getStatusCode().value());
+        List<Map> list=http.getForObject("/api/v1/branches",List.class);assertFalse(list.stream().anyMatch(b->id.equals(b.get("id"))));
+    }
+    @Test void branchReferencesIncludingHistoryAndDisabledRoutesPreventDeletion(){
+        for(String reference:List.of("home","current","route","staff","booking","handover")){
+            String id=create(),booking=UUID.randomUUID().toString();
+            if(reference.equals("home"))jdbc.update("update vehicles set home_branch_id=? where id='v1'",id);
+            if(reference.equals("current"))jdbc.update("update vehicles set current_branch_id=? where id='v1'",id);
+            if(reference.equals("route"))jdbc.update("insert into branch_routes(id,pickup_branch_id,return_branch_id,fee,enabled,version) values(?,?,?,0,false,0)",UUID.randomUUID().toString(),id,id);
+            if(reference.equals("staff"))jdbc.update("insert into staff_branches(user_id,branch_id) values('demo-staff-dn',?)",id);
+            if(reference.equals("booking")||reference.equals("handover")){
+                String bookedBranch=reference.equals("booking")?id:"dn";
+                jdbc.update("insert into bookings(id,user_id,vehicle_id,pickup_branch_id,return_branch_id,start_at,end_at,created_at,expires_at,status,daily_price,rental_days,rental_total,one_way_fee,total,customer_name,vehicle_name,pickup_name,return_name,policy_version) values (?,'demo-user','v1',?,?,'2026-10-01 08:00:00','2026-10-02 08:00:00','2026-09-30 08:00:00','2026-09-30 10:00:00','COMPLETED',100,1,100,0,100,'History','Car','Pickup','Return','delete-test')",booking,bookedBranch,bookedBranch);
+                if(reference.equals("handover"))jdbc.update("insert into vehicle_handover_records(id,booking_id,kind,actor_id,branch_id,occurred_at,condition_note,maintenance) values(?,?,'RETURN','demo-staff-dn',?,'2026-10-02 08:00:00','Fixture',false)",UUID.randomUUID().toString(),booking,id);
+            }
+            assertEquals(200,status(id,"INACTIVE",0).getStatusCode().value());
+            Map<String,List<Map<String,Object>>> before=new LinkedHashMap<>();for(String table:List.of("vehicles","branch_routes","staff_branches","bookings","vehicle_handover_records"))before.put(table,businessRows(table));var branchBefore=row(id);
+            var result=request(HttpMethod.DELETE,"/api/v1/admin/branches/"+id+"?expectedVersion="+version(id),null,admin);assertEquals(409,result.getStatusCode().value());assertTrue(result.getBody().get("message").toString().contains("ngừng nhận đơn mới"));
+            assertEquals(branchBefore,row(id));for(var entry:before.entrySet())assertEquals(entry.getValue(),businessRows(entry.getKey()));
+            if(reference.equals("home"))jdbc.update("update vehicles set home_branch_id='dn' where id='v1'");if(reference.equals("current"))jdbc.update("update vehicles set current_branch_id='dn' where id='v1'");
+        }
+    }
+    @Autowired com.carrental.modules.branch.repository.BranchRepository branchRepository;
+    @Autowired org.springframework.transaction.support.TransactionTemplate transactions;
+    @Test void deleteAfterConcurrentEditRejectsOldVersion()throws Exception{
+        String id=create();var worker=java.util.concurrent.Executors.newSingleThreadExecutor();var future=new java.util.concurrent.atomic.AtomicReference<java.util.concurrent.Future<Integer>>();
+        try{
+            transactions.executeWithoutResult(ignored->{branchRepository.lock(id).orElseThrow().address="Committed address";
+                future.set(worker.submit(()->request(HttpMethod.DELETE,"/api/v1/admin/branches/"+id+"?expectedVersion=0",null,admin).getStatusCode().value()));
+                if(System.getenv("KDRIVE_TEST_DB_URL")!=null){long end=System.nanoTime()+java.util.concurrent.TimeUnit.SECONDS.toNanos(5);int waits=0;while(System.nanoTime()<end){waits=jdbc.queryForObject("select count(*) from performance_schema.data_lock_waits w join performance_schema.data_locks l on w.requesting_engine_lock_id=l.engine_lock_id where l.object_schema=database() and l.object_name='branches'",Integer.class);if(waits>0)break;try{Thread.sleep(20);}catch(InterruptedException e){Thread.currentThread().interrupt();throw new RuntimeException(e);}}assertTrue(waits>0,"Actual MySQL lock wait required");}
+            });assertEquals(409,future.get().get(10,java.util.concurrent.TimeUnit.SECONDS));assertEquals("Committed address",row(id).getFirst().get("address"));
+        }finally{worker.shutdownNow();assertTrue(worker.awaitTermination(10,java.util.concurrent.TimeUnit.SECONDS));}
+    }
 }

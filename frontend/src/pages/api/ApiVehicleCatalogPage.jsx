@@ -14,6 +14,17 @@ function CatalogGroup({ kind, title }) {
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const pending = useRef(false);
+  async function remove(item) {
+    if (pending.current || !window.confirm(`Xóa ${title.toLowerCase()} “${item.name}”? Chỉ xóa được danh mục chưa được xe sử dụng. Thao tác không thể hoàn tác.`)) return;
+    pending.current = true;
+    setBusy(true); setError(""); setNotice("");
+    try {
+      await apiClient.delete(`/admin/${kind}/${encodeURIComponent(item.id)}`, { params: { expectedRevision: item.revision } });
+      if (editing?.id === item.id) { setEditing(null); setName(""); }
+      setNotice(`Đã xóa ${title.toLowerCase()} “${item.name}”.`); request.reload();
+    } catch (failure) { setError(getErrorMessage(failure, "Không thể xóa danh mục.")); }
+    finally { pending.current = false; setBusy(false); }
+  }
   async function save(event) {
     event.preventDefault();
     if (pending.current) return;
@@ -30,7 +41,7 @@ function CatalogGroup({ kind, title }) {
     <h2 className="text-xl font-semibold">{title}</h2>
     {error && <Notice error>{error}</Notice>}{notice && <Notice>{notice}</Notice>}
     {request.loading ? <p role="status">Đang tải danh mục...</p> : request.error ? <><Notice error>{request.error}</Notice><button className="btn-secondary" onClick={request.reload}>Thử tải lại</button></> : <>
-      {request.data?.length ? <ul className="space-y-2">{request.data.map(item => <li key={item.id} className="flex items-center justify-between gap-3"><span className="min-w-0 break-words">{item.name}</span><button aria-label={`Sửa ${item.name}`} className="btn-secondary shrink-0 whitespace-nowrap" disabled={busy} onClick={() => { setEditing(item); setName(item.name); setError(""); setNotice(""); }}>Sửa</button></li>)}</ul> : <p>Chưa có danh mục</p>}
+      {request.data?.length ? <ul className="space-y-2">{request.data.map(item => <li key={item.id} className="flex items-center justify-between gap-3"><span className="min-w-0 break-words">{item.name}</span><div className="flex shrink-0 gap-2"><button aria-label={`Sửa ${item.name}`} className="btn-secondary whitespace-nowrap" disabled={busy} onClick={() => { setEditing(item); setName(item.name); setError(""); setNotice(""); }}>Sửa</button><button type="button" aria-label={`Xóa ${item.name}`} className="btn-secondary text-red-700" disabled={busy} onClick={() => remove(item)}>Xóa</button></div></li>)}</ul> : <p>Chưa có danh mục</p>}
       <form onSubmit={save} className="space-y-3">
         <Field label={editing ? "Tên mới" : "Tên danh mục"}><input name="name" value={name} onChange={event => setName(event.target.value)} required maxLength={100} disabled={busy} /></Field>
         <button className="btn" disabled={busy}>{busy ? "Đang lưu..." : editing ? "Lưu thay đổi" : "Tạo mới"}</button>
@@ -41,5 +52,5 @@ function CatalogGroup({ kind, title }) {
   </section>;
 }
 export default function ApiVehicleCatalogPage() {
-  return <Page title="Danh mục xe" description="Quản lý hãng, loại xe và tiện nghi."><div className="grid gap-6 lg:grid-cols-2">{groups.map(([kind, title]) => <CatalogGroup key={kind} kind={kind} title={title} />)}</div></Page>;
+  return <Page title="Danh mục xe" description="Quản lý hãng, loại xe và tiện nghi. Chỉ xóa danh mục chưa được xe sử dụng; thao tác này không xóa xe."><div className="grid gap-6 lg:grid-cols-2">{groups.map(([kind, title]) => <CatalogGroup key={kind} kind={kind} title={title} />)}</div></Page>;
 }

@@ -48,6 +48,16 @@ import java.util.*;
   if(b.version!=expectedVersion)throw DomainException.conflict("Chi nhánh đã thay đổi. Vui lòng tải lại trước khi lưu.");
   b.status=status;branches.saveAndFlush(b);return new BranchView(b.id,b.name,b.address,b.status,b.version);
  }
+ @Transactional public void delete(Actor actor,String id,long expectedVersion){
+  actor.require("ADMIN");
+  if(expectedVersion<0)throw DomainException.bad("Phiên bản chi nhánh phải là số không âm.");
+  var branch=branches.lock(id).orElseThrow(DomainException::missing);
+  if(branch.version!=expectedVersion)throw DomainException.conflict("Chi nhánh đã thay đổi. Vui lòng tải lại trước khi xóa.");
+  try{branches.delete(branch);branches.flush();}
+  catch(org.springframework.dao.DataIntegrityViolationException failure){
+   throw DomainException.conflict("Chi nhánh còn được xe, đơn thuê, tuyến hoặc phân công nhân viên sử dụng nên không thể xóa. Hãy ngừng nhận đơn mới.");
+  }
+ }
 @Transactional public void route(Actor actor,String pickup,String destination,long fee,boolean enabled,long expectedVersion){
   actor.require("ADMIN");
   if(expectedVersion<0)throw DomainException.bad("expectedVersion phải là số không âm; dùng 0 để tạo tuyến mới.");

@@ -26,4 +26,9 @@ public class VehicleCatalogController {
     public VehicleCatalogService.Item update(@AuthenticationPrincipal Actor actor, @PathVariable String kind, @PathVariable String id, @RequestBody Update input) {
         return service.update(actor, kind, id, input.name(), input.expectedRevision());
     }
+    @DeleteMapping("/{id}") @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void delete(@AuthenticationPrincipal Actor actor, @PathVariable String kind, @PathVariable String id,
+                       @RequestParam(required=false) String expectedRevision) {
+        service.delete(actor, kind, id, expectedRevision);
+    }
 }

@@ -10,6 +10,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -62,5 +63,20 @@ public class VehicleCatalogService {
         try { repository.update(kind, id, name); }
         catch (DuplicateKeyException e) { throw DomainException.conflict("Tên danh mục đã tồn tại."); }
         return view(kind, id, name);
+    }
+    @Transactional
+    public void delete(Actor actor, String kind, String id, String expectedRevision) {
+        actor.require("ADMIN");
+        if (expectedRevision == null || !expectedRevision.matches("[a-f0-9]{64}"))
+            throw DomainException.bad("Cần phiên bản danh mục hợp lệ để xóa.");
+        var row = repository.lock(kind, id).orElseThrow(DomainException::missing);
+        if (!view(kind, row.id(), row.name()).revision().equals(expectedRevision))
+            throw DomainException.conflict("Danh mục đã thay đổi. Vui lòng tải lại trước khi xóa.");
+        long usage = repository.usage(kind, id);
+        if (usage > 0) throw DomainException.conflict("Danh mục đang được " + usage + " xe sử dụng nên không thể xóa. Hãy chỉnh lại liên kết của xe trước.");
+        try { repository.delete(kind, id); }
+        catch (DataIntegrityViolationException failure) {
+            throw DomainException.conflict("Danh mục đang được dữ liệu khác sử dụng nên không thể xóa. Vui lòng tải lại.");
+        }
     }
 }

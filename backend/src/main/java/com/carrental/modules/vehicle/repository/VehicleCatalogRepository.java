@@ -33,4 +33,16 @@ public class VehicleCatalogRepository {
     public void update(String kind, String id, String name) {
         jdbc.update("update " + table(kind) + " set name=? where id=?", name, id);
     }
+    public long usage(String kind, String id) {
+        String query = switch (kind) {
+            case "vehicle-brands" -> "select count(*) from vehicles where brand_id=?";
+            case "vehicle-categories" -> "select count(*) from vehicles where category_id=?";
+            case "amenities" -> "select count(*) from vehicle_amenities where amenity_id=?";
+            default -> throw DomainException.bad("Danh mục không hợp lệ.");
+        };
+        return jdbc.queryForObject(query, Long.class, id);
+    }
+    public void delete(String kind, String id) {
+        jdbc.update("delete from " + table(kind) + " where id=?", id);
+    }
 }
