@@ -28,3 +28,4 @@ app:
   seed-enabled: ${SEED_ENABLED:false}
   seed-password: ${SEED_PASSWORD:}
   ai-recommendation-enabled: ${AI_RECOMMENDATION_ENABLED:false}
+  gemini-parser-enabled: ${GEMINI_PARSER_ENABLED:false}
