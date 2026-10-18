@@ -27,3 +27,4 @@ app:
   cors-origin: ${FRONTEND_ORIGIN:http://127.0.0.1:5173}
   seed-enabled: ${SEED_ENABLED:false}
   seed-password: ${SEED_PASSWORD:}
+  ai-recommendation-enabled: ${AI_RECOMMENDATION_ENABLED:false}

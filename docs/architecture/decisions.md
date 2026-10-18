@@ -31,7 +31,7 @@ Các quy tắc dưới đây định hướng triển khai và vận hành. Ph�
 
 | ID | Nội dung | Phương án và giới hạn | Chốt trước |
 |---|---|---|---|
-| OP-01 | Guest dùng AI | Đang xem xét preview hoặc chỉ User để giảm quota. Chưa chọn giữa hai phương án | API/UX AI |
+| OP-01 | Quyền dùng AI | AI1 gợi ý xe theo quy tắc chỉ USER; Guest chưa được truy cập. Quyền Guest cho AI parser/hành trình tiếp tục mở | API/UX AI |
 | OP-02 | Giấy phép lái xe — chốt một phần | Tương thích xe, hệ cũ/mới, còn hiệu lực đến hết thuê, Staff đối chiếu trước giao, không ảnh. Source đã lưu số/hạng/hạn, người/thời điểm kiểm tra và snapshot giao xe; chưa có lịch sử xác minh riêng hoặc tra cứu cơ sở dữ liệu quốc gia | Hoàn thiện GPLX/giao nhận |
 | OP-03 | Ngày thuê/giá/cọc — chốt một phần | Đơn mới chọn ngày nhận/trả, tính chênh lệch ngày Việt Nam (17/10 → 21/10 = 4 ngày); được trả hết ngày trả, lịch tiếp theo từ ngày kế tiếp kể cả trả sớm. Đơn cũ giữ giá/quy tắc block 24 giờ đã lưu. VND nguyên đồng, UTC lưu; cọc còn mở | Schema snapshot và booking |
 | OP-04 | PENDING/state machine — chốt một phần | Giữ lịch tối đa 2 giờ; đơn theo ngày không vượt hết ngày nhận, đơn cũ không vượt giờ nhận. Đơn theo ngày chỉ bàn giao trong ngày nhận. Luồng PENDING → CONFIRMED → IN_PROGRESS → RETURNED → COMPLETED; còn quy tắc đệm, no-show, gia hạn, trả muộn/đơn kế tiếp | ERD và transaction booking |
@@ -81,3 +81,7 @@ Admin xem đơn tạo trong khoảng với trạng thái hiện tại, đơn ho�
 ## Dữ liệu và xác thực
 
 Tài khoản có ACTIVE/LOCKED; không mở rộng thu thập CCCD. Token ngắn hạn có token_version và thu hồi khi đăng xuất/đổi mật khẩu. Snapshot hợp đồng/hóa đơn là dữ liệu nội bộ tại thời điểm phát hành, không tự khẳng định giá trị pháp lý của chữ ký điện tử. Migration dùng Flyway và Hibernate validate; backup không cấp quyền clean/repair. Phụ phí thông thường không tự chuyển thành hồ sơ sự cố. AI/Map/provider/quota còn phụ thuộc quyết định, không coi mock là tính năng thật.
+
+## Gợi ý xe theo quy tắc AI1
+
+Phạm vi đầu tiên chỉ USER, không gọi nhà cung cấp AI hoặc Map. Ngày thuê, tuyến, đủ chỗ và tổng ngân sách gồm phí tuyến là điều kiện bắt buộc. Điểm ngân sách 40%, số chỗ 25%, sở thích 35%; hộp số và tiện nghi là ưu tiên mềm. Công thức có phiên bản và quyền truy cập được mô tả tại [hợp đồng gợi ý xe](../modules/ai-recommendation.md). Recommendation không giữ chỗ; quote/create kiểm tra lại. Parser ngôn ngữ tự nhiên, provider và hành trình thuộc các giai đoạn sau.
