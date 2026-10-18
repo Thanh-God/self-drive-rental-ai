@@ -562,6 +562,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const deletePending = useRef(false);
   const vehicles = Array.isArray(vehiclesRequest.data)
     ? vehiclesRequest.data
     : [];
@@ -610,6 +611,38 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
     setNotice("");
   }
 
+  function resetVehicleForm() {
+    setForm({
+      ...initialVehicleForm,
+      brandId: brands[0]?.id || "",
+      categoryId: categories[0]?.id || "",
+      homeBranchId: branches[0]?.id || "",
+    });
+  }
+
+  async function deleteVehicle(vehicle) {
+    if (busy || deletePending.current || !window.confirm(
+      `Xóa xe ${vehicle.name} (${vehicle.plate}) khỏi hệ thống? Thao tác không thể hoàn tác. Xe đã có đơn thuê sẽ không được xóa; hãy dùng Ngừng khai thác.`,
+    )) return;
+    deletePending.current = true;
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      await apiClient.delete(`/admin/vehicles/${encodeURIComponent(vehicle.id)}`, {
+        params: { version: vehicle.version },
+      });
+      if (form.id === vehicle.id) resetVehicleForm();
+      setNotice(`Đã xóa xe ${vehicle.name}.`);
+      vehiclesRequest.reload();
+    } catch (requestError) {
+      setError(getErrorMessage(requestError, "Không thể xóa xe."));
+    } finally {
+      deletePending.current = false;
+      setBusy(false);
+    }
+  }
+
   async function saveVehicle(event) {
     event.preventDefault();
     setError("");
@@ -632,7 +665,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
         await apiClient.post("/admin/vehicles", payload);
         setNotice("Đã tạo xe.");
       }
-      setForm(initialVehicleForm);
+      resetVehicleForm();
       vehiclesRequest.reload();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể lưu thông tin xe."));
@@ -700,10 +733,10 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
           <div className="space-y-3">
             {visibleVehicles.map((vehicle) => (
               <article
-                className="panel flex flex-wrap items-center justify-between gap-4"
+                className="panel space-y-4"
                 key={vehicle.id}
               >
-                <div>
+                <div className="min-w-0 break-words">
                   <h2 className="font-semibold">{vehicle.name}</h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {vehicle.plate} · {vehicle.seats} chỗ ·{" "}
@@ -711,10 +744,10 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                   </p>
                   <p className="mt-1 text-sm text-slate-600">
                     {money(vehicle.dailyPrice)} / ngày · Chi nhánh hiện tại:{" "}
-                    {vehicle.currentBranchId}
+                    {(branchesRequest.data || []).find((branch) => branch.id === vehicle.currentBranchId)?.name || vehicle.currentBranchId}
                   </p>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-4" aria-label={`Thao tác xe ${vehicle.name}`}>
                   <Badge>{vehicleStatusLabels[vehicle.status] || "Chưa xác định"}</Badge>
                   {fleet ? (
                     <>
@@ -744,12 +777,16 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                       )}
                     </>
                   ) : (
-                    <button
+                    <><button
                       className="btn-secondary"
+                      disabled={busy}
                       onClick={() => editVehicle(vehicle)}
                     >
                       Chỉnh sửa
                     </button>
+                    <button className="btn-secondary text-red-700" disabled={busy} onClick={() => deleteVehicle(vehicle)}>
+                      Xóa xe
+                    </button></>
                   )}
                 </div>
               </article>
@@ -909,7 +946,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                   <button
                     type="button"
                     className="btn-secondary"
-                    onClick={() => setForm(initialVehicleForm)}
+                    onClick={resetVehicleForm}
                   >
                     Hủy
                   </button>

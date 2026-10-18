@@ -9,6 +9,15 @@ def load(name):
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
 class RunnerGuards(unittest.TestCase):
+    def test_browser_proof_accepts_repository_script_and_refuses_external_or_missing(self):
+        module=load('run-browser')
+        proof=ROOT/'scripts/operations/verify-vehicle-admin.cjs'
+        self.assertEqual(module.resolve_proof(str(proof)),proof.resolve())
+        self.assertEqual(module.resolve_proof(None),Path(__file__).with_name('verify-browser.cjs').resolve())
+        for path in [ROOT/'scripts/missing-proof.cjs',ROOT/'frontend/package.json']:
+            with self.assertRaisesRegex(AssertionError,'Repository browser proof required'):
+                module.resolve_proof(str(path))
+
     def invoke(self,module,arguments):
         with patch.object(sys,'argv',['runner']+arguments),patch.object(module.subprocess,'run',side_effect=AssertionError('Native command reached')):
             module.main()

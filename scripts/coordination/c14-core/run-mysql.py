@@ -11,7 +11,7 @@ SUITES = ['VehicleSearchTest','ConcurrencyAndRaceTest','BranchClosureBookingTest
           'CancelBoundaryTest','MySqlMigrationTest','LocationCategoryIntegrationTest','LocationIntegrationTest',
           'VehicleCatalogHttpServerTest','VehicleAmenityHttpServerTest','VehicleImageHttpServerTest',
           'AccountAssignmentHttpServerTest','IncidentReportIntegrationTest','IncidentReportHttpServerTest',
-          'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest']
+          'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest']
 
 def inputs():
     files = list((REPO/'backend/src').rglob('*')) + list((REPO/'backend/.mvn').rglob('*'))
@@ -95,7 +95,7 @@ def main():
             counts=[int(report.get(k,'0')) for k in ['tests','failures','errors','skipped']]
             assert counts[0]>0 and counts[1:]==[0,0,0],(suite,counts)
             if suite=='ConcurrencyAndRaceTest':assert counts[0]==8
-            if suite=='MySqlMigrationTest':assert counts[0]==2
+            if suite=='MySqlMigrationTest':assert counts[0]==3
             shutil.copy2(xml,out/xml.name)
             reports.append({'suite':suite,'counts':counts,'schema':schema,'methods':[c.get('name') for c in report.findall('testcase')]})
             (out/'progress.json').write_text(json.dumps(reports,indent=2));print(suite+': PASS '+str(counts[0]),flush=True)

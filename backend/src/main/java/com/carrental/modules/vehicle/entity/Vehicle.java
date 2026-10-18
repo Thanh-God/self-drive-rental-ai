@@ -20,4 +20,5 @@ public class Vehicle {
     public long dailyPrice;
     public String status;
     public String description;
+    @Column(updatable = false) public Instant createdAt;
 }

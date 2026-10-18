@@ -7,6 +7,15 @@ schemas for individual suites. The browser uses backend 8300 and frontend 5300.
 All three ports must be free. Containers are stopped afterwards and their volumes
 are retained for inspection; there is no automatic deletion.
 
+For vehicle administration, select `--suites VehicleAdminHttpServerTest MySqlMigrationTest`
+in `run-mysql.py`. The migration suite covers fresh, V1 upgrade, V2 upgrade and
+the historical partial-migration refusal (three test methods). With that native
+evidence and the matching JAR, run `run-browser.py` with
+`--browser-script scripts/operations/verify-vehicle-admin.cjs`. This proof uses
+native desktop controls for create/edit/delete/cancel/history conflict and action
+placement at 1280/1440 pixels. Alternative browser scripts must exist under the
+repository's `scripts/` directory; their hashes join the provenance manifest.
+
 Prerequisites: Docker, JDK 21, Maven Wrapper cache, Node/npm dependencies,
 Python 3.12 and Playwright Chromium. Configure runtime executable paths in the
 runner for the machine being used. Run from the repository root.

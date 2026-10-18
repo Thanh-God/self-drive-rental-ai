@@ -592,6 +592,7 @@ test("DOM: ApiVehiclesAdminPage fleet mode (Staff) không hiển thị amenity e
 
   const amenityForm = mounted.container.querySelector('form[aria-label="Tiện nghi xe"]');
   assert.equal(amenityForm, null, "Staff fleet mode tuyệt đối không có amenity editor");
+  assert.equal([...mounted.container.querySelectorAll("button")].some((button) => button.textContent.trim() === "Xóa xe"), false, "Staff không có thao tác xóa xe");
 
   await mounted.unmount();
 });
@@ -722,7 +723,8 @@ test("Homepage never invents cars for a sparse, empty or failed API response", a
 test("Late save of an old vehicle cannot claim success on the new editor", async () => {
   const second = { ...mockVehicles[0], id: "veh-202", name: "Second car", plate: "51A-20202" };
   const mounted = await renderAdminVehicles([mockVehicles[0], second]);
-  const editButtons = mounted.container.querySelectorAll("article button");
+  const editButtons = [...mounted.container.querySelectorAll("article button")]
+    .filter((button) => button.textContent.trim() === "Chỉnh sửa");
   await act(async () => editButtons[0].click());
   await act(async () => fulfill(takeRequest("/admin/vehicles/veh-101/amenities"), {
     amenities: [{ id: "am1", name: "Bluetooth" }], revision: "first-revision",

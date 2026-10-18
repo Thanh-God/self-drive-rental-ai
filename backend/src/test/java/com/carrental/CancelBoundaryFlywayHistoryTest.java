@@ -41,9 +41,10 @@ class CancelBoundaryFlywayHistoryTest {
                 Function.identity()
             ));
 
-        assertEquals(Set.of("1", "2"), applied.keySet(), "Expected only final V1 and V2 migration records.");
+        assertEquals(Set.of("1", "2", "3"), applied.keySet(), "Expected final V1, V2 and V3 migration records.");
         assertMigration(applied.get("1"), "rental schema");
         assertMigration(applied.get("2"), "incident audit and review vehicle");
+        assertMigration(applied.get("3"), "vehicle creation time");
     }
 
     private static void assertMigration(MigrationInfo migration, String expectedDescription) {

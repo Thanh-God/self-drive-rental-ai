@@ -3,8 +3,13 @@ import argparse, hashlib, json, os, socket, subprocess, time, urllib.request, uu
 from pathlib import Path
 REPO=Path(__file__).resolve().parents[3];FLAGS=subprocess.CREATE_NO_WINDOW
 
+def resolve_proof(value):
+ proof=Path(value).resolve() if value else Path(__file__).with_name('verify-browser.cjs').resolve()
+ assert proof.is_relative_to(REPO/'scripts') and proof.is_file(),'Repository browser proof required'
+ return proof
+
 def main():
- p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);p.add_argument('--browser-script');a=p.parse_args()
  native=Path(a.backend_evidence).resolve();build=Path(a.backend_root).resolve();out=Path(a.evidence).resolve()
  assert all(x.is_relative_to(REPO/'.runtime') for x in [native,build,out]) and not out.exists()
  f=json.loads((native/'fixture.json').read_text());assert f['name'].startswith('kltn-c14-core-') and f['port']==33676
@@ -14,6 +19,8 @@ def main():
  for rel,sha in json.loads((native/'inputs-before.json').read_text()).items():assert hashlib.sha256((REPO/rel).read_bytes()).hexdigest()==sha,rel
  files=[x for root in ['backend/src','frontend/src','scripts/coordination/c14-core'] for x in (REPO/root).rglob('*') if x.is_file() and '__pycache__' not in x.parts]
  files += [REPO/'frontend'/n for n in ['package.json','package-lock.json','vite.config.js']]
+ proof=resolve_proof(a.browser_script)
+ files.append(proof)
  before={x.relative_to(REPO).as_posix():hashlib.sha256(x.read_bytes()).hexdigest() for x in files}
  for port in [33676,8300,5300]:
   with socket.socket() as s:s.bind(('127.0.0.1',port))
@@ -52,10 +59,10 @@ def main():
     urllib.request.urlopen(request,timeout=2).close();break
    except OSError:time.sleep(1)
   else:raise RuntimeError('Services readiness deadline')
-  r=subprocess.run(['node',str(Path(__file__).with_name('verify-browser.cjs'))],cwd=REPO,env=env,capture_output=True,creationflags=FLAGS,timeout=600)
+  r=subprocess.run(['node',str(proof)],cwd=REPO,env=env,capture_output=True,creationflags=FLAGS,timeout=600)
   (out/'browser.log').write_bytes(r.stdout+r.stderr);(out/'browser-exit.txt').write_text(str(r.returncode));assert r.returncode==0,'Browser failure; see browser.log'
   for rel,sha in before.items():assert hashlib.sha256((REPO/rel).read_bytes()).hexdigest()==sha,rel
-  result={'status':'PASS C14 linked browser scoped','assertions':len(json.loads((out/'browser-assertions.json').read_text())),'sourceMatch':True}
+  result={'status':'PASS browser scoped' if a.browser_script else 'PASS C14 linked browser scoped','proofScript':str(proof.relative_to(REPO)),'assertions':len(json.loads((out/'browser-assertions.json').read_text())),'sourceMatch':True}
  finally:
   for process in reversed(procs):
    if process.poll() is None:process.terminate();process.wait(timeout=20)

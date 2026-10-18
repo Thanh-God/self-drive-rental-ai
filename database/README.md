@@ -4,7 +4,7 @@
 
 Migration Flyway chỉ đặt tại [backend/src/main/resources/db/migration](../backend/src/main/resources/db/migration/). Khi khởi tạo Spring Boot, cấu hình Flyway dùng nguồn này; Hibernate kiểm tra schema (`validate`), không dùng cơ chế tự tạo/cập nhật schema thay migration.
 
-V1__rental_schema.sql tạo 25 bảng nghiệp vụ; V2__incident_audit_and_review_vehicle.sql bổ sung dữ liệu audit cho sự cố. Cấu hình application.yml bật Flyway, Hibernate validate và clean-disabled. Khi triển khai, kiểm tra lịch sử/checksum migration trên đúng MySQL được cấu hình; test H2 không thay thế kiểm tra MySQL.
+V1__rental_schema.sql tạo 25 bảng nghiệp vụ; V2__incident_audit_and_review_vehicle.sql bổ sung dữ liệu audit cho sự cố; V3__vehicle_creation_time.sql thêm ngày tạo xe và index sắp xếp. Xe có sẵn giữ ngày tạo NULL vì không có dữ liệu lịch sử đáng tin cậy. Cấu hình application.yml bật Flyway, Hibernate validate và clean-disabled. Khi triển khai, kiểm tra lịch sử/checksum migration trên đúng MySQL được cấu hình; test H2 không thay thế kiểm tra MySQL.
 
 Quy ước V<version>__<description>.sql, phiên bản tăng và không trùng. V1 thực tế tên V1__rental_schema.sql. Không sửa migration đã áp dụng vào môi trường dùng chung; tạo migration tiếp theo. Không bật clean/xóa database trong quy trình khởi động bình thường.
 
