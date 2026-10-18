@@ -44,7 +44,7 @@ before(async()=>{
 });
 afterEach(async()=>{for(const root of roots.splice(0))await act(async()=>root.unmount());document.body.replaceChildren();});
 after(async()=>{Date.now=originalNow;await vite.close();dom.window.close();for(const[k,v]of originals){if(v)Object.defineProperty(globalThis,k,v);else delete globalThis[k];}if(oldMode===undefined)delete process.env.VITE_DATA_MODE;else process.env.VITE_DATA_MODE=oldMode;});
-async function mount(mode='all',entry='/'){const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);await act(async()=>root.render(h(Router,{initialEntries:[entry]},h(Auth.Provider,{value:{user:{id:'staff',role:'STAFF',fullName:'Nhân viên kiểm thử'}}},h(Topbar,{areaLabel:'Nhân viên'}),h(List,{area:'staff',mode})))));return c;}
+async function mount(mode='all',entry='/',area='staff'){const c=document.createElement('div');document.body.append(c);const root=createRoot(c);roots.push(root);await act(async()=>root.render(h(Router,{initialEntries:[entry]},h(Auth.Provider,{value:{user:{id:'staff',role:'STAFF',fullName:'Nhân viên kiểm thử'}}},h(Topbar,{areaLabel:'Nhân viên'}),h(List,{area,mode})))));return c;}
 async function select(el,value){await act(async()=>{el.value=value;el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
 const names=c=>[...c.querySelectorAll('article h2')].map(el=>el.textContent);
 test('Calendar on queue/handover/return defaults Vietnam today, supports selection, empty, refresh and All',async()=>{
@@ -79,10 +79,21 @@ test('Return offers only work statuses and scoped All; date, routes and refresh 
 test('Actual staff page renders Vietnamese enum labels, newest first, Today and refresh without losing filters',async()=>{
  const c=await mount();assert.deepEqual(names(c),['Xe vừa tạo','Xe mới','Xe cũ','Xe trả']);assert.match(c.querySelector('header').textContent,/Nhân viên/);assert.doesNotMatch(c.querySelector('header').textContent,/STAFF/);
  const [status,queue]=c.querySelectorAll('select');assert.deepEqual([...status.options].slice(1).map(o=>o.textContent),Object.values(bookingStatusLabels));assert.equal(status.options[1].value,'PENDING');assert.equal(queue.value,'all');
- await select(queue,'today');assert.deepEqual(names(c),['Xe vừa tạo','Xe mới']);await select(status,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(queue.value,'today');assert.equal(status.value,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await select(queue,'all');assert.deepEqual(names(c),['Xe mới','Xe cũ']);assert.match(c.textContent,/ngày tạo đơn/);
+ await select(queue,'today');assert.deepEqual(names(c),['Xe vừa tạo','Xe mới']);await select(status,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách').click());assert.equal(queue.value,'today');assert.equal(status.value,'CONFIRMED');assert.deepEqual(names(c),['Xe mới']);await select(queue,'all');assert.deepEqual(names(c),['Xe mới','Xe cũ']);assert.doesNotMatch(c.textContent,/Lọc theo ngày tạo đơn/);
  assert.equal(roleLabels.ADMIN,'Quản trị viên');
 });
 test('Actual handover/return pages apply work dates and retain operation route IDs',async()=>{
- const c=await mount('handover'),[status,queue]=c.querySelectorAll('select');assert.equal(status.value,'CONFIRMED');await select(queue,'today');assert.deepEqual(names(c),['Xe cũ']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/handover\/old$/);assert.match(c.textContent,/ngày nhận xe/);
- const d=await mount('return'),fields=d.querySelectorAll('select');assert.equal(fields[0].value,'IN_PROGRESS');await select(fields[1],'today');assert.deepEqual(names(d),['Xe trả']);assert.match(d.querySelector('article a').getAttribute('href'),/\/staff\/return\/return$/);assert.match(d.textContent,/ngày trả xe/);
+ const c=await mount('handover'),[status,queue]=c.querySelectorAll('select');assert.equal(status.value,'CONFIRMED');await select(queue,'today');assert.deepEqual(names(c),['Xe cũ']);assert.match(c.querySelector('article a').getAttribute('href'),/\/staff\/handover\/old$/);assert.doesNotMatch(c.textContent,/Lọc theo ngày nhận xe/);
+ const d=await mount('return'),fields=d.querySelectorAll('select');assert.equal(fields[0].value,'IN_PROGRESS');await select(fields[1],'today');assert.deepEqual(names(d),['Xe trả']);assert.match(d.querySelector('article a').getAttribute('href'),/\/staff\/return\/return$/);assert.doesNotMatch(d.textContent,/Lọc theo ngày trả xe/);
+});
+
+test('Booking lists omit explanatory hints for every account and retain calendar controls',async()=>{
+ for(const [area,mode] of [['user','all'],['admin','all'],['staff','all'],['staff','handover'],['staff','return']]){
+  const c=await mount(mode,'/',area);
+  assert.doesNotMatch(c.textContent,/Đơn mới tạo được hiển thị trước|Lọc theo|Tất cả không giới hạn ngày/);
+  assert.ok([...c.querySelectorAll('button')].find(b=>b.textContent==='Tải lại danh sách'));
+  await select(c.querySelectorAll('select')[1],'date');
+  assert.ok(c.querySelector('input[type="date"]'));
+  assert.doesNotMatch(c.textContent,/Đây là bộ lọc danh sách/);
+ }
 });
