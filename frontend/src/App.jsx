@@ -1,3 +1,4 @@
+import AssistantWidget from "./components/ai/AssistantWidget";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import ApiErrorBridge from "./routes/ApiErrorBridge";
@@ -17,6 +18,7 @@ export default function App() {
           <ApiErrorBridge />
           <AppRoutes />
           <NavigationEffects />
+          <AssistantWidget />
         </BrowserRouter>
       </DemoProvider>
     </AuthProvider>

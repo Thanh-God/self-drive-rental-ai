@@ -99,6 +99,22 @@
       },
       "updatedAt": "2026-10-13T13:00:00+07:00",
       "implementationEvidence": "docs/ui/c10b-ui-acceptance.md"
+    },
+    "assistant-widget": {
+      "targetKind": "new-ui",
+      "projectId": "2a8ac76a-2f37-4542-b2c1-bfefb9c1ca0d",
+      "activeDraftId": "b17caa18-85b0-4c59-8319-6b9bbfbf6450",
+      "designSystemPath": ".superdesign/design-system.md",
+      "contextFiles": [
+        ".superdesign/design-system.md",
+        "frontend/src/layouts/UserLayout.jsx"
+      ],
+      "fingerprints": {
+        ".superdesign/design-system.md": "c1c625e44ebf106b64873783ead7eeddba647b9e55e76908747b577571b3fad2",
+        "frontend/src/layouts/UserLayout.jsx": "ba565f4d33332aa082a59bd57c47816578b65e9f1d96c2829634535c1d1c3bc9"
+      },
+      "device": "desktop",
+      "implementation": "frontend/src/components/ai/AssistantWidget.jsx"
     }
   }
 }
