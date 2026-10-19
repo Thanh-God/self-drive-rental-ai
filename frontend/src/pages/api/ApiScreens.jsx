@@ -1,5 +1,5 @@
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
-import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels } from "../../utils/bookingQueue";
+import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
@@ -1222,6 +1222,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   const [sort, setSort] = useState("createdAt_desc");
   const [page, setPage] = useState(1);
   const [copyFeedback, setCopyFeedback] = useState({});
+  const [manualCopyId, setManualCopyId] = useState(null);
   const now = useNow();
 
   const isFilterActive = area === "admin";
@@ -1270,11 +1271,13 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
       }
       await navigator.clipboard.writeText(id);
       setCopyFeedback((prev) => ({ ...prev, [id]: "Đã sao chép mã đầy đủ" }));
+      setManualCopyId(null);
     } catch {
       setCopyFeedback((prev) => ({
         ...prev,
-        [id]: "Không thể sao chép tự động",
+        [id]: "Không thể sao chép tự động, vui lòng chọn mã bên dưới",
       }));
+      setManualCopyId(id);
     }
   }
 
@@ -1352,7 +1355,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-3">
                     {area === "admin" ? (
-                      <span className="flex items-center gap-2">
+                      <span className="flex flex-wrap items-center gap-2">
                         <span className="font-mono text-xs font-semibold text-slate-700" title={booking.id}>
                           #{booking.id.slice(0, 8)}…
                         </span>
@@ -1364,6 +1367,21 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                         >
                           Sao chép mã đầy đủ
                         </button>
+                        <details className="inline-block text-xs" open={manualCopyId === booking.id}>
+                          <summary className="cursor-pointer text-slate-500 hover:text-slate-800">
+                            Xem mã đầy đủ
+                          </summary>
+                          <div className="mt-1">
+                            <input
+                              type="text"
+                              readOnly
+                              value={booking.id}
+                              aria-label={`Mã đầy đủ đơn ${booking.id}`}
+                              className="w-72 select-all rounded border border-slate-300 bg-slate-50 px-1.5 py-0.5 font-mono text-xs text-slate-800"
+                              onFocus={(e) => e.target.select()}
+                            />
+                          </div>
+                        </details>
                         {copyFeedback[booking.id] ? (
                           <span className="text-xs text-slate-500" role="status">
                             {copyFeedback[booking.id]}
@@ -1395,12 +1413,19 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                     </>
                   )}
                   <p className="mt-1 text-sm text-slate-600">
-                    {bookingDate(booking, booking.startAt)} → {bookingDate(booking, booking.endAt)}
+                    {area === "admin"
+                      ? `${adminBookingDate(booking, booking.startAt)} → ${adminBookingDate(booking, booking.endAt)}`
+                      : `${bookingDate(booking, booking.startAt)} → ${bookingDate(booking, booking.endAt)}`
+                    }
                   </p>
                   <p className="mt-1 text-sm text-slate-500">
                     {booking.pickupName} → {booking.returnName}
                   </p>
-                  {booking.createdAt ? <p className="mt-1 text-sm text-muted">Tạo lúc {dateTime(booking.createdAt)}</p> : null}
+                  {booking.createdAt ? (
+                    <p className="mt-1 text-sm text-muted">
+                      Tạo lúc {area === "admin" ? adminDateFormat(booking.createdAt, { withTime: true }) : dateTime(booking.createdAt)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-4">
                   <strong>{money(booking.total)}</strong>

@@ -5,7 +5,7 @@ import {JSDOM} from 'jsdom';
 import {createServer} from 'vite';
 import {fileURLToPath,URL} from 'node:url';
 import process from 'node:process';
-import {vietnamDay,visibleBookings} from './bookingQueue.js';
+import {vietnamDay,visibleBookings,adminDateFormat,adminBookingDate} from './bookingQueue.js';
 import {bookingStatusLabels,roleLabels} from './uiLabels.js';
 const now=Date.parse('2026-10-15T17:30:00Z');
 const rows=[
@@ -176,7 +176,23 @@ test('Admin booking list supports sort, pagination, copy UUID feedback, and rese
  };
  await act(async () => copyBtn.click());
  assert.match(c.textContent, /Không thể sao chép tự động/);
+ const manualInput = c.querySelector('input[aria-label^="Mã đầy đủ đơn"]');
+ assert.ok(manualInput);
+ assert.equal(manualInput.value.startsWith('booking-'), true);
+
+ // F03 Date formatting checks
+ assert.match(c.textContent, /\d{2}\/\d{2}\/\d{4}/);
+ assert.match(c.textContent, /Tạo lúc \d{2}:\d{2} \d{2}\/\d{2}\/\d{4}/);
 
  // Restore default rows adapter for other tests
  client.defaults.adapter = async config => ({config, data: rows, status: 200, statusText: 'OK', headers: {}});
-});
+});
+
+test('F03: adminDateFormat formats dd/mm/yyyy and audit HH:mm with VN timezone', () => {
+ const d = '2026-10-20T07:30:00Z';
+ assert.equal(adminDateFormat(d), '20/10/2026');
+ assert.equal(adminDateFormat(d, { withTime: true }), '14:30 20/10/2026');
+ assert.equal(adminBookingDate({ policyVersion: 'calendar-2026-10-17' }, d), '20/10/2026');
+ assert.equal(adminBookingDate({ policyVersion: 'legacy' }, d), '14:30 20/10/2026');
+});
+
