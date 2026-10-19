@@ -1213,6 +1213,7 @@ export function ApiBranchesPage() {
   });
 
   const routeInitialized = useRef(false);
+  const [routeSyncPending, setRouteSyncPending] = useState(false);
   const routeSyncPendingRef = useRef(false);
   const routeSyncTargetRef = useRef(null);
 
@@ -1226,6 +1227,7 @@ export function ApiBranchesPage() {
       const target = routeSyncTargetRef.current;
       if (!target) {
         routeSyncPendingRef.current = false;
+        setRouteSyncPending(false);
         return;
       }
       if (
@@ -1234,6 +1236,7 @@ export function ApiBranchesPage() {
       ) {
         routeSyncPendingRef.current = false;
         routeSyncTargetRef.current = null;
+        setRouteSyncPending(false);
         return;
       }
       const fresh = routes.find(
@@ -1259,10 +1262,12 @@ export function ApiBranchesPage() {
         setRouteConflict(false);
         routeSyncPendingRef.current = false;
         routeSyncTargetRef.current = null;
+        setRouteSyncPending(false);
         setNotice(`Đã cập nhật bản mới nhất của tuyến từ máy chủ (${fresh.fee.toLocaleString("vi-VN")} đ, v${fresh.version}).`);
       } else {
         routeSyncPendingRef.current = false;
         routeSyncTargetRef.current = null;
+        setRouteSyncPending(false);
         setRouteConflict(true);
         setRouteSnapshot(null);
         setError("Tuyến nhận/trả này không còn tồn tại trên hệ thống. Vui lòng chọn cặp chi nhánh khác hoặc tạo mới.");
@@ -1341,6 +1346,7 @@ export function ApiBranchesPage() {
   function editRoute(route) {
     routeSyncPendingRef.current = false;
     routeSyncTargetRef.current = null;
+    setRouteSyncPending(false);
     setRouteForm({
       pickupBranchId: route.pickupBranchId,
       returnBranchId: route.returnBranchId,
@@ -1364,6 +1370,7 @@ export function ApiBranchesPage() {
     setError("");
     setNotice("Đang tải lại dữ liệu mới nhất của tuyến...");
     routeSyncPendingRef.current = true;
+    setRouteSyncPending(true);
     routeSyncTargetRef.current = {
       pickupBranchId: routeForm.pickupBranchId,
       returnBranchId: routeForm.returnBranchId,
@@ -1459,6 +1466,7 @@ export function ApiBranchesPage() {
     const next = { ...routeForm, [key]: value };
     routeSyncPendingRef.current = false;
     routeSyncTargetRef.current = null;
+    setRouteSyncPending(false);
     const savedRoute = routes.find(
       (route) =>
         route.pickupBranchId === next.pickupBranchId &&
@@ -1730,7 +1738,7 @@ export function ApiBranchesPage() {
                   </button>
                 </div>
               ) : null}
-              <button className="btn" disabled={busy || conflict || routeConflict || routeSyncPendingRef.current || routesRequest.loading || branches.length < 1}>
+              <button className="btn" disabled={busy || conflict || routeConflict || routeSyncPending || routesRequest.loading || branches.length < 1}>
                 {busy ? "Đang lưu..." : "Lưu tuyến"}
               </button>
             </form>
