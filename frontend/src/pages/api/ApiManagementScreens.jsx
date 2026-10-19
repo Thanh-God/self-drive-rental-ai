@@ -1218,19 +1218,21 @@ export function ApiBranchesPage() {
   useEffect(() => {
     if (!routeSyncPendingRef.current || routesRequest.loading) return;
     routeSyncPendingRef.current = false;
-    const fresh = routes.find(
-      (route) =>
-        route.pickupBranchId === routeForm.pickupBranchId &&
-        route.returnBranchId === routeForm.returnBranchId,
-    );
-    if (fresh) {
-      setRouteForm((current) => ({
-        ...current,
-        fee: String(fresh.fee),
-        enabled: Boolean(fresh.enabled),
-      }));
-      setRouteSnapshot({ ...fresh });
-    }
+    Promise.resolve().then(() => {
+      const fresh = routes.find(
+        (route) =>
+          route.pickupBranchId === routeForm.pickupBranchId &&
+          route.returnBranchId === routeForm.returnBranchId,
+      );
+      if (fresh) {
+        setRouteForm((current) => ({
+          ...current,
+          fee: String(fresh.fee),
+          enabled: Boolean(fresh.enabled),
+        }));
+        setRouteSnapshot({ ...fresh });
+      }
+    });
   }, [routes, routesRequest.loading, routeForm.pickupBranchId, routeForm.returnBranchId]);
 
   useEffect(() => {
