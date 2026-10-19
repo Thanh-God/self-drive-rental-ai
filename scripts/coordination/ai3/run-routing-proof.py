@@ -38,6 +38,7 @@ def main():
     parser.add_argument('--reuse-evidence', required=True)
     parser.add_argument('--graph-dir', required=True)
     parser.add_argument('--graph-manifest', required=True)
+    parser.add_argument('--browser-script', help='Optional repository proof run against the live regional graph')
     args = parser.parse_args()
     out, build = Path(args.evidence).resolve(), Path(args.backend_root).resolve()
     graph, manifest_path = Path(args.graph_dir).resolve(), Path(args.graph_manifest).resolve()
@@ -152,6 +153,13 @@ def main():
              '--evidence', str(out / 'raw-graph')], log='raw-graph.log')
         adverse('offline')
         previous = native('online', Path(args.reuse_evidence).resolve())
+        if args.browser_script:
+            browser_env = env.copy()
+            browser_env['AI_ROUTING_ENABLED'] = 'true'
+            run([os.sys.executable, str(REPO / 'scripts/coordination/c14-core/run-browser.py'),
+                 '--backend-root', str(build), '--backend-evidence', str(previous),
+                 '--evidence', str(out / 'browser'), '--browser-script', args.browser_script],
+                log='browser-run.log', extra_env=browser_env)
         stop_owned()
         adverse('online')
         native('offline', previous)

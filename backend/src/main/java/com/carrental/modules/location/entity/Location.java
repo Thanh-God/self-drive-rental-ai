@@ -13,6 +13,8 @@ import java.util.UUID;
 @Entity
 @Table(name = "locations")
 public class Location {
+    @Column(name = "visit_metadata", columnDefinition = "TEXT")
+    public String visitMetadata;
     @Id
     public String id = UUID.randomUUID().toString();
 

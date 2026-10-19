@@ -6,6 +6,8 @@ import com.carrental.modules.location.entity.LocationCategory;
 import com.carrental.modules.location.repository.LocationCategoryRepository;
 import com.carrental.modules.location.repository.LocationRepository;
 import com.carrental.security.Actor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.Clock;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
@@ -19,10 +21,14 @@ public class LocationService {
 
     private final LocationRepository locations;
     private final LocationCategoryRepository categories;
+    private final ObjectMapper json;
+    private final Clock clock;
 
-    public LocationService(LocationRepository locations, LocationCategoryRepository categories) {
+    public LocationService(LocationRepository locations, LocationCategoryRepository categories, ObjectMapper json, Clock clock) {
         this.locations = locations;
         this.categories = categories;
+        this.json = json;
+        this.clock = clock;
     }
 
     public record View(
@@ -33,11 +39,16 @@ public class LocationService {
         BigDecimal latitude,
         BigDecimal longitude,
         String status,
-        String revision
+        String revision,
+        VisitMetadata metadata
     ) {}
 
     public record PublicView(String id, String categoryId, String categoryName, String name,
-        BigDecimal latitude, BigDecimal longitude) {}
+        BigDecimal latitude, BigDecimal longitude, VisitMetadata metadata) {
+        public PublicView(String id, String categoryId, String categoryName, String name, BigDecimal latitude, BigDecimal longitude) {
+            this(id, categoryId, categoryName, name, latitude, longitude, null);
+        }
+    }
 
     @Transactional(readOnly = true)
     public List<PublicView> activeCatalog(Actor actor) {
@@ -45,7 +56,7 @@ public class LocationService {
         return locations.findAllWithCategoryOrderByNameAsc().stream()
             .filter(location -> "ACTIVE".equals(location.status))
             .map(location -> new PublicView(location.id, location.category.id, location.category.name,
-                location.name, location.latitude, location.longitude)).toList();
+                location.name, location.latitude, location.longitude, metadata(location))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -93,6 +104,10 @@ public class LocationService {
             throw DomainException.bad("Trạng thái phải là ACTIVE hoặc INACTIVE.");
         }
         location.status = input.status();
+        if (input.metadata() != null) {
+            try { location.visitMetadata = json.writeValueAsString(input.metadata().validated(clock)); }
+            catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw DomainException.bad("Metadata địa điểm không hợp lệ."); }
+        }
     }
 
     private String normalizeName(String submittedName) {
@@ -123,7 +138,8 @@ public class LocationService {
             location.name,
             location.latitude.toPlainString(),
             location.longitude.toPlainString(),
-            location.status
+            location.status,
+            location.visitMetadata == null ? "" : location.visitMetadata
         );
         return new View(
             location.id,
@@ -133,7 +149,8 @@ public class LocationService {
             location.latitude,
             location.longitude,
             location.status,
-            revision
+            revision,
+            metadata(location)
         );
     }
 
@@ -142,6 +159,17 @@ public class LocationService {
         String name,
         BigDecimal latitude,
         BigDecimal longitude,
-        String status
-    ) {}
+        String status,
+        VisitMetadata metadata
+    ) {
+        public Input(String categoryId, String name, BigDecimal latitude, BigDecimal longitude, String status) {
+            this(categoryId, name, latitude, longitude, status, null);
+        }
+    }
+
+    private VisitMetadata metadata(Location location) {
+        if (location.visitMetadata == null) return null;
+        try { return json.readValue(location.visitMetadata, VisitMetadata.class); }
+        catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("Stored location metadata is invalid", error); }
+    }
 }

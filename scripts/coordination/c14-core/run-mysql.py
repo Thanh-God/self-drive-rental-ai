@@ -37,6 +37,8 @@ def main():
         if p.is_file():assert p.read_bytes()==(build/p.relative_to(REPO/'backend')).read_bytes(),p
     jar=build/'target/kdrive-0.1.0-SNAPSHOT.jar';assert jar.is_file(),'Verify before native proof'
     historical=out.parent/'historical-migration';assert len(list(historical.glob('V*.sql')))==2
+    if 'MySqlMigrationTest' in (args.suites or SUITES):
+        assert hashlib.sha256((historical/'V2__incident_audit_and_review_vehicle.sql').read_bytes()).hexdigest() == '7444cb4dadb9499d1ef9c8433e3f7e969f48d00e785578021201816553fa66ce', 'Historical V2 snapshot mismatch; do not substitute current migration'
     with socket.socket() as sock:sock.bind(('127.0.0.1',33676))
     env=os.environ.copy()
     for key in list(env):
@@ -109,7 +111,7 @@ def main():
             counts=[int(report.get(k,'0')) for k in ['tests','failures','errors','skipped']]
             assert counts[0]>0 and counts[1:]==[0,0,0],(suite,counts)
             if suite=='ConcurrencyAndRaceTest':assert counts[0]==8
-            if suite=='MySqlMigrationTest':assert counts[0]==3
+            if suite=='MySqlMigrationTest':assert counts[0]==4
             shutil.copy2(xml,out/xml.name)
             reports.append({'suite':suite,'counts':counts,'schema':schema,'routingMode':args.routing_mode if suite=='LocationRouteHttpServerTest' else None,'methods':[c.get('name') for c in report.findall('testcase')]})
             (out/'progress.json').write_text(json.dumps(reports,indent=2));print(suite+': PASS '+str(counts[0]),flush=True)

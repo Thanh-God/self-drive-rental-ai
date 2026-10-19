@@ -39,3 +39,7 @@
 
 .assistant-natural { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid #e5ddd2; }
 .assistant-natural textarea { width: 100%; resize: vertical; min-height: 85px; padding: 10px; border: 1px solid #bcb0a2; border-radius: 9px; color: #1a1a1a; background: #fffdf9; font: 13px "Segoe UI", system-ui, sans-serif; }
+.assistant-routes { border-top: 1px solid #ddd; margin-top: 1rem; padding-top: 1rem; }
+.assistant-routes > summary { font-weight: 700; cursor: pointer; }
+.assistant-routes p { font-size: .85rem; line-height: 1.5; margin: .5rem 0; }
+.assistant-routes form { margin-top: .75rem; }

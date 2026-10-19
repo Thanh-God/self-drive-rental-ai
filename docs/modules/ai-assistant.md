@@ -14,3 +14,6 @@ Backend AI1 vẫn mặc định tắt bằng AI_RECOMMENDATION_ENABLED; chưa th
 
 
 POST `/api/v1/ai/criteria/parse` chỉ USER, body `{ "text": "..." }` tối đa1000ký tự. Backend từ chối một số mẫu email/số điện thoại/số giấy tờ phổ biến trước khi suy luận; đây không phải bộ phát hiện mọi dữ liệu cá nhân. Không gửi userID/token/hồ sơ hoặc lưu hội thoại cho model. Chỉ đối chiếu tên với điểm nhận/trả ACTIVE qua API nội bộ booking; tên không rõ hoặc nhiều kết quả phải chọn lại. Ngày phải xuất hiện đầy đủ trong câu nhập ở dạng YYYY-MM-DD hoặc ngày/tháng/năm; ngày thiếu năm không tự mặc định. Ưu tiên hộp số chỉ được điền khi câu nhập nêu rõ, không được biến dữ liệu thiếu thành mặc định tự động. READY_FOR_REVIEW trả bản nháp cần kiểm tra, NEEDS_CLARIFICATION yêu cầu bổ sung, OUT_OF_SCOPE không tạo bản nháp. Phản hồi có mâu thuẫn không được dùng để điền. Không hỗ trợ hội thoại nhiều lượt hoặc tự xác nhận nghiệp vụ.
+# Địa điểm và tuyến đường AI3
+
+Trong chatbox, mở “Khám phá địa điểm và tuyến đường” để đọc metadata địa điểm và preview tuyến2–8 điểm theo thứ tự. Graph hiện hỗ trợ vùng Đà Nẵng–Hội An; số liệu chỉ xuất hiện khi tuyến VERIFIED. Thông tin chưa xác minh, nguồn và thời điểm kiểm chứng được hiển thị rõ; không tự lưu itinerary. Xem [contract metadata](location-visit-metadata.md).

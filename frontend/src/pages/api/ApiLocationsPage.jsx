@@ -11,9 +11,11 @@ import Badge from "../../components/common/Badge";
 import EmptyState from "../../components/common/EmptyState";
 import LoadingSkeleton from "../../components/common/LoadingSkeleton";
 import { Field, Notice, Page } from "../../components/common/PageKit";
+import VisitMetadataFields from "../../components/ai/VisitMetadataFields";
 
 const emptyCategory = { id: "", name: "", expectedRevision: "" };
 const emptyLocation = {
+  metadata: null,
   id: "",
   categoryId: "",
   name: "",
@@ -100,6 +102,7 @@ export default function ApiLocationsPage() {
       latitude: locationDraft.latitude,
       longitude: locationDraft.longitude,
       status: locationDraft.status,
+      metadata: locationDraft.metadata,
     };
     try {
       if (isUpdate) {
@@ -289,6 +292,7 @@ export default function ApiLocationsPage() {
                     <option value="INACTIVE">Ngừng hoạt động</option>
                   </select>
                 </Field>
+                <VisitMetadataFields value={locationDraft.metadata} disabled={busy} onChange={metadata=>setLocationDraft({...locationDraft,metadata})}/>
                 <div className="flex flex-wrap gap-2">
                   <button className="btn" disabled={busy || !locationDraft.categoryId} type="submit">
                     {busy ? "Đang lưu..." : locationDraft.id ? "Lưu địa điểm" : "Tạo địa điểm"}
@@ -336,6 +340,7 @@ export default function ApiLocationsPage() {
                           longitude: String(location.longitude),
                           status: location.status,
                           expectedRevision: location.revision,
+                          metadata: location.metadata || null,
                         });
                       }}
                       type="button"

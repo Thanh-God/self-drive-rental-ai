@@ -89,4 +89,6 @@ Phạm vi đầu tiên chỉ USER, không gọi nhà cung cấp AI hoặc Map. N
 
 ## AI cục bộ và dữ liệu tuyến
 
+AI3 MVP dùng graph vùng Đà Nẵng–Hội An; không tuyên bố coverage toàn quốc. Admin quản lý lịch tham quan theo tuần/ngày ngoại lệ, thời lượng ước tính và nguồn kiểm chứng; legacy giữ chưa xác minh. Contract tại [metadata tham quan](../modules/location-visit-metadata.md). USER xem facts/tuyến trong chatbox, không tự lưu itinerary.
+
 Qwen3 cục bộ trích xuất tiêu chí có kiểu, không tự quyết định giá, lịch hoặc hành động đơn thuê. OSRM cung cấp ước tính đường đi theo graph, không cung cấp giao thông trực tiếp, giờ mở cửa hoặc độ nổi tiếng địa điểm. Backend chỉ tính tuyến từ ID địa điểm đang hoạt động; không có tuyến thì không gán quãng đường/thời gian giả hoặc lưu hành trình. Provider mặc định tắt; cấu hình và contract tại [AI cục bộ và định tuyến](../modules/local-ai-routing.md). Chọn provider không tự đóng các quyết định metadata, lưu itinerary hoặc nguồn xu hướng hàng tuần.

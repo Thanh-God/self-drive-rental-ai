@@ -232,6 +232,31 @@ class LocationIntegrationTest {
         mvc.perform(authorized(post("/api/v1/ai/routes/preview"),staff).contentType("application/json").content(route)).andExpect(status().isForbidden());
         mvc.perform(authorized(post("/api/v1/ai/routes/preview"),user).contentType("application/json").content(route)).andExpect(status().isServiceUnavailable());
     }
+    @Test void visitMetadataIsCuratedRevisionedAndVisibleOnlyThroughAllowedCatalog() throws Exception {
+        String admin=token("admin@example.test"), user=token("user@example.test"), staff=token("staff.dn@example.test");
+        String category=createCategory(admin);
+        var payload=new java.util.HashMap<String,Object>(input(category,"Metadata "+UUID.randomUUID(),"16","108","ACTIVE"));
+        var evidence=Map.of("url","https://example.org/official","verifiedAt","2020-01-01T00:00:00Z");
+        var metadata=Map.of("timezone","Asia/Ho_Chi_Minh","weekly",Map.of("MONDAY",Map.of("state","OPEN_24H","intervals",java.util.List.of())),"exceptions",Map.of(),"durationMinutes",60,"hoursEvidence",evidence,"durationEvidence",evidence);
+        payload.put("metadata",metadata);
+        mvc.perform(authorized(post(LOCATIONS),staff).contentType("application/json").content(body(payload))).andExpect(status().isForbidden());
+        JsonNode created=json.readTree(mvc.perform(authorized(post(LOCATIONS),admin).contentType("application/json").content(body(payload)))
+            .andExpect(status().isCreated()).andExpect(jsonPath("$.metadata.durationMinutes").value(60)).andReturn().getResponse().getContentAsString());
+        String id=created.path("id").asText(),revision=created.path("revision").asText();
+        String catalog=mvc.perform(authorized(get("/api/v1/ai/locations"),user)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        JsonNode visible=null;for(JsonNode row:json.readTree(catalog))if(id.equals(row.path("id").asText()))visible=row;
+        assertEquals(60,visible.path("metadata").path("durationMinutes").asInt());
+        payload.put("expectedRevision",revision);
+        payload.put("metadata",Map.of("timezone","Asia/Ho_Chi_Minh","weekly",Map.of(),"exceptions",Map.of()));
+        mvc.perform(authorized(put(LOCATIONS+"/"+id),admin).contentType("application/json").content(body(payload)))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.metadata.weekly.MONDAY.state").value("UNKNOWN"));
+        mvc.perform(authorized(put(LOCATIONS+"/"+id),admin).contentType("application/json").content(body(payload))).andExpect(status().isConflict());
+        payload.remove("expectedRevision");payload.put("metadata",Map.of("timezone","UTC","weekly",Map.of(),"exceptions",Map.of()));
+        int count=jdbc.queryForObject("select count(*) from locations",Integer.class);
+        mvc.perform(authorized(post(LOCATIONS),admin).contentType("application/json").content(body(payload))).andExpect(status().isBadRequest());
+        assertEquals(count,jdbc.queryForObject("select count(*) from locations",Integer.class));
+    }
+
     @Test void naturalCriteriaEndpointIsAuthenticatedUserOnlyAndDisabledByDefault() throws Exception {
         String payload=body(Map.of("text","4 người,3triệu"));
         mvc.perform(post("/api/v1/ai/criteria/parse").contentType("application/json").content(payload)).andExpect(status().isUnauthorized());

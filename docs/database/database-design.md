@@ -1,6 +1,6 @@
 # Thiết kế database
 
-Nguồn schema: [V1](../../backend/src/main/resources/db/migration/V1__rental_schema.sql) và [V2](../../backend/src/main/resources/db/migration/V2__incident_audit_and_review_vehicle.sql). Flyway quản lý lịch sử migration, Hibernate validate schema. V1 định nghĩa25bảng nghiệp vụ và37FK; bảng flyway_schema_history là bảng kỹ thuật.
+Nguồn schema: [V1](../../backend/src/main/resources/db/migration/V1__rental_schema.sql), [V2](../../backend/src/main/resources/db/migration/V2__incident_audit_and_review_vehicle.sql), [V3](../../backend/src/main/resources/db/migration/V3__vehicle_creation_time.sql) và [V4](../../backend/src/main/resources/db/migration/V4__location_visit_metadata.sql). Flyway quản lý lịch sử migration, Hibernate validate schema. V1 định nghĩa25bảng nghiệp vụ và37FK; V3/V4 thêm cột nullable, không thêm bảng. Bảng flyway_schema_history là bảng kỹ thuật.
 
 Không sửa migration đã áp dụng trong môi trường dùng chung. Kiểm kê history/checksum/schema trước nâng cấp; MySQL DDL có thể để lại thay đổi một phần sau lỗi. Không tự clean/repair database. Review liên kết xe thông qua booking, không thêm reviews.vehicle_id trực tiếp.
 
@@ -36,7 +36,7 @@ Trong đó:
 | incident_cases | V1 | id (VARCHAR) | booking_id, reported_by | CHECK(kind, status, amount>=0) | Hồ sơ sự cố | operation | Có | Đã dùng |
 | incident_events | V1 | id (VARCHAR) | case_id, actor_id | V2 đề xuất thêm cột; trạng thái áp dụng chưa xác minh | Nhật ký sự cố | operation | Có (JdbcTemplate) | Đã dùng |
 | location_categories | V1 | id (VARCHAR) | - | UNIQUE(name) | Phân loại địa điểm | location | Không | Chỉ schema |
-| locations | V1 | id (VARCHAR) | category_id | CHECK(lat, long) | Địa điểm tham quan | location | Không | Chỉ schema |
+| locations | V1/V4 | id (VARCHAR) | category_id | CHECK(lat, long); visit_metadata TEXT nullable | Địa điểm và metadata tham quan có kiểu | location | Có | Admin CRUD, USER đọc ACTIVE |
 | itineraries | V1 | id (VARCHAR) | user_id | - | Lịch trình người dùng | ai/itinerary | Không | Chỉ schema |
 | itinerary_days | V1 | id (VARCHAR) | itinerary_id | UNIQUE(itinerary_id, trip_date) | Ngày trong lịch trình| ai/itinerary | Không | Chỉ schema |
 | itinerary_items | V1 | id (VARCHAR) | day_id, location_id | UNIQUE(day_id, sort_order) | Điểm đến | ai/itinerary | Không | Chỉ schema |

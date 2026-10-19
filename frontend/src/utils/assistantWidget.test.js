@@ -22,6 +22,8 @@ async function render(){await act(async()=>root.render(h(Auth.Provider,{value:au
 async function mount(role='USER'){auth={user:{id:'u1',role},token:'test-token',isAuthenticated:true,loading:false};localStorage.setItem('kdrive.jwt',auth.token);c=document.createElement('div');document.body.append(c);root=createRoot(c);await render();}
 const button=name=>[...c.querySelectorAll('button')].find(el=>el.getAttribute('aria-label')===name||el.textContent===name);
 const field=name=>[...c.querySelectorAll('label')].find(el=>el.textContent.startsWith(name))?.querySelector('input,select');
+async function expandRoutes(){const el=c.querySelector('.assistant-routes');await act(async()=>{el.open=true;el.dispatchEvent(new dom.window.Event('toggle'));});}
+async function selectRoute(index,value){const el=field('Điểm '+index);await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLSelectElement.prototype,'value').set.call(el,value);el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
 async function click(el){assert.ok(el);await act(async()=>el.click());}
 function take(url){const req=requests.find(r=>r.config.url===url&&!r.claimed);assert.ok(req,url);req.claimed=true;return req;}
 async function respond(req,data){await act(async()=>req.resolve({config:req.config,status:200,statusText:'OK',headers:{},data}));}
@@ -29,6 +31,20 @@ async function open(){await click(button('Mở Trợ lý KDrive'));await respond
 async function input(name,value){const el=field(name);assert.ok(el,name);await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,'value').set.call(el,value);el.dispatchEvent(new dom.window.Event('input',{bubbles:true}));el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});}
 async function submit(){await act(async()=>c.querySelector('form').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));}
 function ok(req,count=4){return {requestId:JSON.parse(req.config.data).requestId,status:'OK',results:Array.from({length:count},(_,i)=>({vehicleId:'v'+(i+1),vehicleName:'Xe thật '+(i+1),total:2600000,reasonCodes:['ENOUGH_SEATS','WITHIN_TOTAL_BUDGET']}))};}
+test('Routes use active catalog IDs, validated facts and invalidate pending responses on edit/reset',async()=>{
+ await mount();await open();assert.equal(requests.some(r=>r.config.url==='/ai/locations'),false);
+ await expandRoutes();await respond(take('/ai/locations'),[{id:'a',name:'Điểm A',metadata:null},{id:'b',name:'Điểm B',metadata:null}]);
+ await selectRoute(1,'a');await selectRoute(2,'b');assert.match(c.textContent,/Chưa xác minh/);
+ await act(async()=>c.querySelector('form[aria-label="Xem tuyến tham quan"]').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));
+ const request=take('/ai/routes/preview');assert.deepEqual(JSON.parse(request.config.data),{locationIds:['a','b']});
+ await respond(request,{status:'VERIFIED',distanceMeters:30500,durationSeconds:1740,attribution:'OpenStreetMap'});assert.match(c.textContent,/29 phút lái xe/);
+ await selectRoute(2,'a');assert.doesNotMatch(c.textContent,/29 phút lái xe/);
+ await act(async()=>c.querySelector('form[aria-label="Xem tuyến tham quan"]').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));
+ assert.match(c.textContent,/địa điểm khác nhau/);assert.equal(requests.filter(r=>r.config.url==='/ai/routes/preview').length,1);
+ await selectRoute(2,'b');await act(async()=>c.querySelector('form[aria-label="Xem tuyến tham quan"]').dispatchEvent(new dom.window.Event('submit',{bubbles:true,cancelable:true})));
+ const late=take('/ai/routes/preview');await click(button('Bắt đầu lại'));await respond(late,{status:'VERIFIED',distanceMeters:10000,durationSeconds:600,attribution:'OpenStreetMap'});assert.doesNotMatch(c.textContent,/10 phút lái xe/);
+});
+
 test('Closed initially, supported USER only, no eager requests',async()=>{
  await mount('ADMIN');assert.equal(button('Mở Trợ lý KDrive'),undefined);assert.equal(requests.length,0);auth={...auth,user:{id:'staff',role:'STAFF'}};await render();assert.equal(c.querySelector('[role="dialog"]'),null);
  auth={...auth,user:{id:'u1',role:'USER'},loading:true};await render();assert.equal(button('Mở Trợ lý KDrive'),undefined);auth={...auth,loading:false};await render();assert.ok(button('Mở Trợ lý KDrive'));assert.equal(c.querySelector('[role="dialog"]'),null);assert.equal(requests.length,0);

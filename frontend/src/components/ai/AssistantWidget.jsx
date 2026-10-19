@@ -9,6 +9,7 @@ import { recommendVehicles, parseRentalCriteria } from '../../api/recommendation
 import { assistantCriteria, assistantDraft, assistantReasons, assistantSearch, assistantVisible, extractedAssistantDraft } from '../../utils/assistant';
 import { getErrorMessage } from '../../utils/roles';
 import './AssistantWidget.css';
+import RouteExplorer from './RouteExplorer';
 
 export default function AssistantWidget() {
   const { user, token, isAuthenticated, loading } = useAuth();
@@ -21,7 +22,7 @@ export default function AssistantWidget() {
 function AssistantSession({ visible }) {
   const { search } = useLocation();
   const [open, setOpen] = useState(false), [draft, setDraft] = useState(assistantDraft), [result, setResult] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
-  const [naturalText, setNaturalText] = useState(''), [parseNote, setParseNote] = useState('');
+  const [naturalText, setNaturalText] = useState(''), [parseNote, setParseNote] = useState(''), [routeRevision,setRouteRevision]=useState(0);
   const previousOpen = useRef(false);
   const initialized = useRef(false), pending = useRef(null), generation = useRef(0), busyRef = useRef(false), launcher = useRef(null), panel = useRef(null), reply = useRef(null);
   const title = useId();
@@ -40,7 +41,7 @@ function AssistantSession({ visible }) {
   function change(name, value) { invalidate(); setDraft(old => ({ ...old, [name]: value })); }
   function show() { if (!initialized.current) { setDraft(assistantDraft(new URLSearchParams(search))); initialized.current = true; } setOpen(true); }
   function close() { setOpen(false); }
-  function reset() { invalidate(); setDraft(assistantDraft()); setNaturalText(''); }
+  function reset() { invalidate(); setDraft(assistantDraft()); setNaturalText(''); setRouteRevision(old=>old+1); }
   async function submit(event) {
     event.preventDefault();
     if (busyRef.current || DEMO_MODE || branches.loading || catalog.loading || branches.error || catalog.error) return;
@@ -109,6 +110,7 @@ function AssistantSession({ visible }) {
               <Link to={`/vehicles/${encodeURIComponent(item.vehicleId)}${assistantSearch(result.criteria)}`}>Xem xe <span aria-hidden="true">↗</span></Link>
             </article>)}<Link className="assistant-all" to={`/vehicles${assistantSearch(result.criteria)}`}>Tìm thêm xe theo chuyến đi</Link></div>}
           </div>
+          <RouteExplorer key={routeRevision}/>
           <p className="assistant-note">Kiểm tra tiêu chí do trợ lý đọc trước khi tìm xe. Chưa giữ chỗ; giá và lịch được kiểm tra lại khi đặt thuê.</p>
         </>}
       </div>

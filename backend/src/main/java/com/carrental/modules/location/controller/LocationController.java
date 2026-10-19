@@ -1,6 +1,7 @@
 package com.carrental.modules.location.controller;
 
 import com.carrental.modules.location.service.LocationService;
+import com.carrental.modules.location.service.VisitMetadata;
 import com.carrental.security.Actor;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -37,7 +38,8 @@ public class LocationController {
         @NotBlank @Size(max = 200) String name,
         @NotNull @Digits(integer = 3, fraction = 7) @DecimalMin("-90") @DecimalMax("90") BigDecimal latitude,
         @NotNull @Digits(integer = 3, fraction = 7) @DecimalMin("-180") @DecimalMax("180") BigDecimal longitude,
-        @NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status
+        @NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
+        VisitMetadata metadata
     ) {}
 
     public record UpdateInput(
@@ -46,10 +48,11 @@ public class LocationController {
         @NotNull @Digits(integer = 3, fraction = 7) @DecimalMin("-90") @DecimalMax("90") BigDecimal latitude,
         @NotNull @Digits(integer = 3, fraction = 7) @DecimalMin("-180") @DecimalMax("180") BigDecimal longitude,
         @NotBlank @Pattern(regexp = "ACTIVE|INACTIVE") String status,
-        @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String expectedRevision
+        @NotBlank @Pattern(regexp = "[0-9a-f]{64}") String expectedRevision,
+        VisitMetadata metadata
     ) {
         LocationService.Input toInput() {
-            return new LocationService.Input(categoryId, name, latitude, longitude, status);
+            return new LocationService.Input(categoryId, name, latitude, longitude, status, metadata);
         }
     }
 
@@ -67,7 +70,7 @@ public class LocationController {
     @ResponseStatus(HttpStatus.CREATED)
     public LocationService.View create(@AuthenticationPrincipal Actor actor, @Valid @RequestBody Input input) {
         return locations.create(actor, new LocationService.Input(
-            input.categoryId(), input.name(), input.latitude(), input.longitude(), input.status()
+            input.categoryId(), input.name(), input.latitude(), input.longitude(), input.status(), input.metadata()
         ));
     }
 

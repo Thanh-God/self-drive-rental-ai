@@ -125,7 +125,7 @@ public class LocationRouteHttpServerTest {
     private Map<String, List<Map<String, Object>>> captureFullDatabaseSnapshot() {
         Map<String, List<Map<String, Object>>> snapshot = new LinkedHashMap<>();
         // 1. Snapshot bảng locations (sắp xếp id ổn định)
-        snapshot.put("locations", jdbc.queryForList("SELECT id, category_id, name, latitude, longitude, status FROM locations ORDER BY id ASC"));
+        snapshot.put("locations", jdbc.queryForList("SELECT * FROM locations ORDER BY id ASC"));
         snapshot.put("location_categories", jdbc.queryForList("SELECT * FROM location_categories ORDER BY id"));
         snapshot.put("booking_status_history", jdbc.queryForList("SELECT * FROM booking_status_history ORDER BY id"));
         // 2. Snapshot bảng itineraries
