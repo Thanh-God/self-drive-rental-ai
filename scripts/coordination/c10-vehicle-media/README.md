@@ -8,7 +8,7 @@ Run sequentially from repository root in Windows PowerShell 5.1 with Docker Linu
 
 After reviewed source changes, refresh the reference manifest from its actual dependency paths, rerun affected proof, and compare source-before/source-after/final hashes. Do not overwrite artifacts or regenerate a manifest merely to conceal unexpected drift. General Maven verify optional skips do not replace mandatory MySQL tests. Tests inject a repository failure after actual DELETE/partial INSERT inside the real service transaction to prove rollback; the seam is not a physical Docker/DB outage. SQL instrumentation counts top-level JdbcTemplate query entrypoints, avoiding nested overload counts, and verifies actual no-op has no write calls.
 
-No frontend/browser validation is included in this backend-only scope; Cursor's later task must prove UI/API integration against the accepted contract. Image management is C10B, not implemented here.
+No frontend/browser validation is included in this backend-only scope; UI/API integration requires separate browser verification against the documented contract. Image management is C10B, not implemented here.
 
 
 ## C10B backend media proof

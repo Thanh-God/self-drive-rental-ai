@@ -1,6 +1,6 @@
 # C12 dashboard browser acceptance
 
-Run from repository root after frontend final tests/lint/demo build; the runner buildsAPI and owns frontend5299/backend8299. Established Playwright fixture package/cache is reused, no addeddependency. This uses the existing project browser harness; no external canvas/auth plugin needed.
+Run from repository root after frontend final tests/lint/demo build; the runner buildsAPI and owns frontend5299/backend8299. Established Playwright fixture package/cache is reused, no addeddependency. This uses the existing project browser harness.
 
 ```
 python scripts/coordination/c12-dashboard/run-browser.py --backend-root .runtime/coordination-c12-3-20261013/evidence/backend-copy --backend-evidence .runtime/coordination-c12-3-20261013/evidence/mysql-a --evidence .runtime/<new-turn>/evidence/browser --fresh-schema

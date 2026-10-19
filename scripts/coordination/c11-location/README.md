@@ -1,6 +1,6 @@
 # C11 location — kiểm chứng cô lập
 
-Chạy tại root repository trên Windows, JDK21, Python312, Docker mysql:8.4 và Maven cache `.runtime/m2`. Đọc AGENTS.md trước chạy. Không trỏ vào DB33385/3306. Runner từ chối output đã tồn tại hoặc nằm ngoài `.runtime`; mỗi lần chạy dùng output mới, giữ lịch sử.
+Chạy tại root repository trên Windows, JDK21, Python312, Docker mysql:8.4 và Maven cache `.runtime/m2`. Kiểm tra cấu hình và điều kiện môi trường trước khi chạy. Không trỏ vào DB33385/3306. Runner từ chối output đã tồn tại hoặc nằm ngoài `.runtime`; mỗi lần chạy dùng output mới, giữ lịch sử.
 
 1. Tại `backend/`, chạy `./mvnw.cmd -o -B -ntp -Dmaven.repo.local=E:/AI/BERT_Project/codepython/KLTN/.runtime/m2 verify` với JAVA_HOME JDK21. Đây là prerequisite tạo JAR trên source cuối, không coi build là proof HTTP.
 2. Tại root: `E:/MT_Python/python312/python.exe -X utf8 scripts/coordination/c11-location/test_guards.py`.

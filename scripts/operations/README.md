@@ -22,7 +22,7 @@ References: https://docs.docker.com/desktop/features/wsl/ ; https://docs.docker.
 
 `test-fixture-cleanup-guard.ps1 -EvidenceDirectory <new-directory>` exercises the real guard: valid legacy families and negative cases for original/protected targets, identity/image drift, running state, changed mounts, shared volume and absent archive verification.
 
-Keep raw TASK/HANDOFF/ACCEPTANCE and test assertions/readbacks in their original rounds. Use archive manifests to locate historical data after deleting Docker copies. Old superseded retries are not necessarily byte-identical; archive preserves their differences. Unique migration/adverse checkpoints, active findings and unknown ownership stay retained until reviewed. Removing Docker volumes reduces logical data; Windows VHDX file size may require a separate supported reclamation operation. Do not silently compact or delete the full migration backup.
+Keep test plans, review records, assertions and readbacks in their original local directories. Use archive manifests to locate historical data after deleting Docker copies. Old superseded retries are not necessarily byte-identical; archive preserves their differences. Unique migration/adverse checkpoints, active findings and unknown ownership stay retained until reviewed. Removing Docker volumes reduces logical data; Windows VHDX file size may require a separate supported reclamation operation. Do not silently compact or delete the full migration backup.
 
 ## C10B catalog photos — approved local target only
 

@@ -6,7 +6,7 @@ Chạy từ repository root, JDK21, Docker, Node và Python đã có. Dùng đú
 E:\MT_Python\python312\python.exe -X utf8 scripts/coordination/logout-register/run-browser.py --backend-root .runtime/coordination-auth-ui-review-20261013/evidence/backend-copy-final --backend-evidence .runtime/coordination-auth-ui-review-20261013/evidence/mysql-a --evidence .runtime/coordination-logout-register-20261013/evidence/browser-new
 ```
 
-Output phải mới dưới .runtime. Không dùng fresh-schema; không dùng DB gốc 33385/3306. Ports riêng 33674/8298/5298. Runner build API và chạy Playwright/browsers đã có từ phase5; fallback vì Browser plugin/skill browser không được cung cấp ở phiên này. Chỉ desktop theo phạm vi người dùng.
+Output phải mới dưới .runtime. Không dùng fresh-schema; không dùng DB gốc 33385/3306. Ports riêng 33674/8298/5298. Runner build API và chạy Playwright/browsers đã có từ phase5. Chỉ desktop theo phạm vi người dùng.
 
 Browser chứng minh đăng ký một mật khẩu, password-change regression, logout guest ngay khi pending, logout thật thu hồi JWT, lỗi 500/network/403 local clear và warning, 401 local clear, workspace Admin logout thật. HTTP lỗi được chủ động inject trên đường logout, không tuyên bố đó là backend failure thực tế. Kiểm JWT server còn sống trong ca lỗi để không báo revoke PASS giả.
 

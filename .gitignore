@@ -46,3 +46,8 @@ application-secret.yml
 # Python runner bytecode
 __pycache__/
 *.pyc
+
+# Local development guidance and design notes
+/AGENTS.md
+/skills/**/*.md
+/.superdesign/**/*.md

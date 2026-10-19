@@ -150,7 +150,6 @@ frontend/     React SPA, components, API client và frontend tests
 database/     Hướng dẫn database
 docs/         Yêu cầu, kiến trúc, database, API và UI
 scripts/      Khởi động, kiểm chứng và vận hành fixture
-skills/       Hướng dẫn đóng góp và quy trình kiểm thử
 ```
 
 Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `dist/` và `node_modules/` chứa dữ liệu chạy, build, dependency hoặc evidence local; không phải module nghiệp vụ.

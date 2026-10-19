@@ -1,6 +1,6 @@
 # C11-A2 — booking/branch race trên MySQL
 
-Chạy tại root repository Windows với JDK21, Python312, Docker mysql:8.4, Maven cache `.runtime/m2`. Đọc AGENTS.md và TASK của lượt; không trỏ test ghi DB33385/3306.
+Chạy tại root repository Windows với JDK21, Python312, Docker mysql:8.4, Maven cache `.runtime/m2`. Kiểm tra cấu hình và điều kiện môi trường trước khi chạy; không trỏ test ghi DB33385/3306.
 
 1. Tại `backend/`, đặt JAVA_HOME=`E:\Tools\Java\jdk-21.0.12.1+1`, chạy `./mvnw.cmd -o -B -ntp -Dmaven.repo.local=E:/AI/BERT_Project/codepython/KLTN/.runtime/m2 verify` trên source cuối, không nạp biến DB gốc.
 2. Tại root: `E:/MT_Python/python312/python.exe -X utf8 scripts/coordination/c11-branch-booking/test_guards.py`.

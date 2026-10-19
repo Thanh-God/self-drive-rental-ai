@@ -14,7 +14,8 @@ After intentional source/build changes, regenerate the manifest from the actual 
 ```powershell
 . scripts/coordination/c10b-ui-browser/c10b-inputs.ps1
 $proofRoot=(Get-Location).Path
-Get-C10BInputs $proofRoot (Join-Path $proofRoot '.runtime/coordination-c10b-backend-codexa-complete-20261013-101802/evidence/mysql-url-final') | ConvertTo-Json | Set-Content scripts/coordination/c10b-ui-browser/c10b-browser-reference-manifest.json
+$backendEvidence=Read-Host "Path to verified backend evidence (mysql-url-final)"
+Get-C10BInputs $proofRoot $backendEvidence | ConvertTo-Json | Set-Content scripts/coordination/c10b-ui-browser/c10b-browser-reference-manifest.json
 ```
 
-Actual browser imports licensed assets into isolated fixture via Admin API, uses mounted form400/409/POST/reorder and held real PUT, compares SQL UTF8 bytes, tests broken-file HTTP404/recovery, validates RBAC and4pages at3desktop sizes. It records assertions/screenshots; JSON/exit alone does not replace source/readback. Browser plugin with its required browser skill was unavailable in this session; regular Playwright fallback used the recorded local installation. Original MySQL is read for identity protection only.
+Actual browser imports licensed assets into isolated fixture via Admin API, uses mounted form400/409/POST/reorder and held real PUT, compares SQL UTF8 bytes, tests broken-file HTTP404/recovery, validates RBAC and4pages at3desktop sizes. It records assertions/screenshots; JSON/exit alone does not replace source/readback. Browser checks use the existing local Playwright installation. Original MySQL is read for identity protection only.

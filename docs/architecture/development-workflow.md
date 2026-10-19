@@ -22,4 +22,4 @@ Migration duy nhất tại backend/src/main/resources/db/migration. Giữ Flyway
 
 ## Quản lý tài liệu
 
-Tài liệu chia sẻ mô tả chức năng, API, kiến trúc, cách cấu hình và chạy test. Nhật ký điều phối, kế hoạch từng lượt, kết quả kiểm tra, artifact/hash/SHA và biên bản nội bộ được lưu ở thư mục local bị Git bỏ qua. Không ghi tiến trình làm việc của agent vào README hoặc docs công khai.
+Tài liệu chia sẻ mô tả chức năng, API, kiến trúc, cách cấu hình và chạy test. Nhật ký điều phối, kế hoạch từng lượt, kết quả kiểm tra, artifact/hash/SHA và biên bản nội bộ được lưu ở thư mục local bị Git bỏ qua. README và tài liệu công khai tập trung vào thông tin kỹ thuật cần thiết để sử dụng, phát triển và vận hành hệ thống.
