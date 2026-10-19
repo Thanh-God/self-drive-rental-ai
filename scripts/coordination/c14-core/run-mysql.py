@@ -24,7 +24,13 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--backend-root',required=True)
     parser.add_argument('--evidence',required=True);parser.add_argument('--reuse-evidence')
     parser.add_argument('--suites',nargs='+',choices=SUITES)
+    parser.add_argument('--routing-mode',choices=['online','offline'])
     args=parser.parse_args();build=Path(args.backend_root).resolve();out=Path(args.evidence).resolve()
+    if 'LocationRouteHttpServerTest' in (args.suites or SUITES):
+        assert args.routing_mode, 'Routing suite requires explicit --routing-mode'
+        with socket.socket() as probe:
+            online = probe.connect_ex(('127.0.0.1',5000)) == 0
+        assert online == (args.routing_mode == 'online'), 'Routing provider state does not match requested mode'
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
     for p in (REPO/'backend/src').rglob('*'):
@@ -36,6 +42,8 @@ def main():
     for key in list(env):
         if key.startswith(('KDRIVE_TEST_','KDRIVE_MIGRATION_','SPRING_')):env.pop(key)
     env['JAVA_HOME']='E:/Tools/Java/jdk-21.0.12.1+1'
+    env.pop('KDRIVE_ROUTING_MODE',None)
+    if args.routing_mode:env['KDRIVE_ROUTING_MODE']=args.routing_mode
     def run(command,cwd=REPO,log=None,check=True):
         result=subprocess.run(command,cwd=cwd,env=env,capture_output=True,creationflags=FLAGS,timeout=600)
         if log:
@@ -91,14 +99,19 @@ def main():
                 env.update(KDRIVE_MIGRATION_MYSQL_URL='jdbc:mysql://127.0.0.1:33676/mysql?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC',
                            KDRIVE_MIGRATION_MYSQL_USER='root',KDRIVE_MIGRATION_MYSQL_PASSWORD=password,
                            KDRIVE_HISTORICAL_MIGRATION_DIR=str(historical),KDRIVE_MIGRATION_ARTIFACT_DIR=str(out))
-            run([str(build/'mvnw.cmd'),'-o','-B','-ntp',f'-Dmaven.repo.local={REPO/".runtime/m2"}','-Dtest='+suite,'test'],build,suite+'.log')
+            selector=suite
+            if suite=='LocationRouteHttpServerTest':
+                method=('onlineRoutePreview_RequiresLiveOsrm_MustBeVerified_BothDirectionsAndMultiPoint'
+                        if args.routing_mode=='online' else 'offlineRoutePreview_WhenOsrmStopped_ReturnsUnavailableWithNoInventedEstimates')
+                selector+='#httpPermissionsAndInputNegativesWithPerRequestDatabaseInvariance+snapshotDetectsUpdatesWithoutRowCountChanges+'+method
+            run([str(build/'mvnw.cmd'),'-o','-B','-ntp',f'-Dmaven.repo.local={REPO/".runtime/m2"}','-Dtest='+selector,'test'],build,suite+'.log')
             xml=build/f'target/surefire-reports/TEST-com.carrental.{suite}.xml';report=ET.parse(xml).getroot()
             counts=[int(report.get(k,'0')) for k in ['tests','failures','errors','skipped']]
             assert counts[0]>0 and counts[1:]==[0,0,0],(suite,counts)
             if suite=='ConcurrencyAndRaceTest':assert counts[0]==8
             if suite=='MySqlMigrationTest':assert counts[0]==3
             shutil.copy2(xml,out/xml.name)
-            reports.append({'suite':suite,'counts':counts,'schema':schema,'methods':[c.get('name') for c in report.findall('testcase')]})
+            reports.append({'suite':suite,'counts':counts,'schema':schema,'routingMode':args.routing_mode if suite=='LocationRouteHttpServerTest' else None,'methods':[c.get('name') for c in report.findall('testcase')]})
             (out/'progress.json').write_text(json.dumps(reports,indent=2));print(suite+': PASS '+str(counts[0]),flush=True)
         matched=[]
         with zipfile.ZipFile(jar) as z:

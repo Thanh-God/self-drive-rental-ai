@@ -13,6 +13,7 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
@@ -125,6 +126,8 @@ public class LocationRouteHttpServerTest {
         Map<String, List<Map<String, Object>>> snapshot = new LinkedHashMap<>();
         // 1. Snapshot bảng locations (sắp xếp id ổn định)
         snapshot.put("locations", jdbc.queryForList("SELECT id, category_id, name, latitude, longitude, status FROM locations ORDER BY id ASC"));
+        snapshot.put("location_categories", jdbc.queryForList("SELECT * FROM location_categories ORDER BY id"));
+        snapshot.put("booking_status_history", jdbc.queryForList("SELECT * FROM booking_status_history ORDER BY id"));
         // 2. Snapshot bảng itineraries
         snapshot.put("itineraries", jdbc.queryForList("SELECT id, user_id, title, criteria, created_at FROM itineraries ORDER BY id ASC"));
         // 3. Snapshot bảng itinerary_days
@@ -155,6 +158,8 @@ public class LocationRouteHttpServerTest {
             jdbc.update("INSERT INTO bookings(id, user_id, vehicle_id, pickup_branch_id, return_branch_id, start_at, end_at, created_at, expires_at, status, daily_price, rental_days, rental_total, one_way_fee, total, customer_name, vehicle_name, pickup_name, return_name, policy_version, version) " +
                 "VALUES (?, 'demo-user', 'v1', 'dn', 'dn', '2026-10-25 08:00:00', '2026-10-27 08:00:00', '2026-10-19 10:00:00', '2026-10-19 12:00:00', 'CONFIRMED', 650000, 2, 1300000, 0, 1300000, 'Khách mẫu', 'Toyota Vios', 'Đà Nẵng · mẫu', 'Đà Nẵng · mẫu', 'calendar-2026-10-17', 0)",
                 bookingId);
+            jdbc.update("INSERT INTO booking_status_history(id, booking_id, previous_status, next_status, actor_id, occurred_at, reason) VALUES (?, ?, 'PENDING', 'CONFIRMED', 'demo-admin', '2026-10-19 10:00:00', 'Synthetic routing fixture')",
+                UUID.randomUUID().toString(), bookingId);
         }
 
         if (jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class) == 0) {
@@ -187,6 +192,13 @@ public class LocationRouteHttpServerTest {
         String pInactive = createLocation(admin, cat, "Điểm đóng cửa " + UUID.randomUUID(), "16.0500000", "108.2200000", "INACTIVE");
         // Point 5: Địa điểm nằm ngoài mạng lưới giao thông (0, 0)
         String pOffNetwork = createLocation(admin, cat, "Điểm ngoài đảo " + UUID.randomUUID(), "0.0000000", "0.0000000", "ACTIVE");
+
+        String dayId = jdbc.queryForObject("SELECT id FROM itinerary_days ORDER BY id LIMIT 1", String.class);
+        Integer lastOrder = jdbc.queryForObject("SELECT COALESCE(MAX(sort_order), 0) FROM itinerary_items WHERE day_id = ?", Integer.class, dayId);
+        jdbc.update("INSERT INTO itinerary_items(id, day_id, location_id, sort_order, snapshot) VALUES (?, ?, ?, ?, ?)",
+            UUID.randomUUID().toString(), dayId, p1, lastOrder + 1, "Synthetic routing fixture; not a generated itinerary");
+        assertTrue(jdbc.queryForObject("SELECT count(*) FROM booking_status_history", Integer.class) > 0);
+        assertTrue(jdbc.queryForObject("SELECT count(*) FROM itinerary_items", Integer.class) > 0);
 
         return new TestFixtureLocations(p1, p2, p3, pInactive, pOffNetwork, user, staff, admin);
     }
@@ -262,6 +274,28 @@ public class LocationRouteHttpServerTest {
     }
 
     @Test
+    void snapshotDetectsUpdatesWithoutRowCountChanges() throws Exception {
+        setupFixtureLocations();
+        for (var target : Map.of("locations", "name", "location_categories", "name",
+                "booking_status_history", "reason", "itinerary_items", "snapshot").entrySet()) {
+            String table = target.getKey(), column = target.getValue();
+            String id = jdbc.queryForObject("SELECT id FROM " + table + " ORDER BY id LIMIT 1", String.class);
+            String original = jdbc.queryForObject("SELECT " + column + " FROM " + table + " WHERE id = ?", String.class, id);
+            var before = captureFullDatabaseSnapshot();
+            try {
+                jdbc.update("UPDATE " + table + " SET " + column + " = ? WHERE id = ?", "Intentional mutation probe", id);
+                AssertionError detected = assertThrows(AssertionError.class,
+                    () -> assertSnapshotsEqual("Mutation probe", before, captureFullDatabaseSnapshot()));
+                assertTrue(detected.getMessage().contains("data mutated"));
+            } finally {
+                jdbc.update("UPDATE " + table + " SET " + column + " = ? WHERE id = ?", original, id);
+            }
+            assertSnapshotsEqual("Mutation probe restoration", before, captureFullDatabaseSnapshot());
+        }
+    }
+
+    @Test
+    @EnabledIfEnvironmentVariable(named = "KDRIVE_ROUTING_MODE", matches = "online")
     void onlineRoutePreview_RequiresLiveOsrm_MustBeVerified_BothDirectionsAndMultiPoint() throws Exception {
         // Sửa F01: BẮT BUỘC OSRM online và trả về VERIFIED. Nếu OSRM vắng thì bài test này PHẢI FAIL, không được fallback sang UNAVAILABLE!
         TestFixtureLocations fixture = setupFixtureLocations();
@@ -329,6 +363,7 @@ public class LocationRouteHttpServerTest {
     }
 
     @Test
+    @EnabledIfEnvironmentVariable(named = "KDRIVE_ROUTING_MODE", matches = "offline")
     void offlineRoutePreview_WhenOsrmStopped_ReturnsUnavailableWithNoInventedEstimates() throws Exception {
         // Sửa F01: Bài kiểm thử riêng cho trạng thái Offline của OSRM (khi OSRM dừng hoặc unreachable)
         // Yêu cầu: status phải là UNAVAILABLE, metrics bắt buộc là null (không bịa số), và DB bất biến
@@ -339,17 +374,10 @@ public class LocationRouteHttpServerTest {
         assertEquals(200, res.statusCode());
         JsonNode node = json.readTree(res.body());
 
-        // Kiểm tra xem port 5000 có offline không (nếu container đang stopped)
-        // Nếu offline:
-        if ("UNAVAILABLE".equals(node.path("status").asText())) {
-            assertEquals("UNAVAILABLE", node.path("status").asText());
-            assertTrue(node.path("distanceMeters").isNull(), "Offline response must have null distanceMeters");
-            assertTrue(node.path("durationSeconds").isNull(), "Offline response must have null durationSeconds");
-            assertTrue(node.path("attribution").asText().contains("OpenStreetMap"));
-        } else {
-            // Trường hợp container đang bật thì status sẽ là VERIFIED
-            assertEquals("VERIFIED", node.path("status").asText());
-        }
+        assertEquals("UNAVAILABLE", node.path("status").asText(), "Offline-required suite must not accept an online provider");
+        assertTrue(node.path("distanceMeters").isNull(), "Offline response must have null distanceMeters");
+        assertTrue(node.path("durationSeconds").isNull(), "Offline response must have null durationSeconds");
+        assertTrue(node.path("attribution").asText().contains("OpenStreetMap"));
 
         Map<String, List<Map<String, Object>>> snapshotAfter = captureFullDatabaseSnapshot();
         assertSnapshotsEqual("Database invariance after offline route preview check", snapshotBefore, snapshotAfter);
