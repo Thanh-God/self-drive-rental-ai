@@ -1214,26 +1214,61 @@ export function ApiBranchesPage() {
 
   const routeInitialized = useRef(false);
   const routeSyncPendingRef = useRef(false);
+  const routeSyncTargetRef = useRef(null);
 
   useEffect(() => {
     if (!routeSyncPendingRef.current || routesRequest.loading) return;
-    routeSyncPendingRef.current = false;
+    if (routesRequest.error) {
+      // Giữ nguyên cờ phục hồi và xung đột khi có lỗi mạng/500 để lần retry tiếp theo hoàn tất phục hồi
+      return;
+    }
     Promise.resolve().then(() => {
+      const target = routeSyncTargetRef.current;
+      if (!target) {
+        routeSyncPendingRef.current = false;
+        return;
+      }
+      if (
+        routeForm.pickupBranchId !== target.pickupBranchId ||
+        routeForm.returnBranchId !== target.returnBranchId
+      ) {
+        routeSyncPendingRef.current = false;
+        routeSyncTargetRef.current = null;
+        return;
+      }
       const fresh = routes.find(
         (route) =>
-          route.pickupBranchId === routeForm.pickupBranchId &&
-          route.returnBranchId === routeForm.returnBranchId,
+          route.pickupBranchId === target.pickupBranchId &&
+          route.returnBranchId === target.returnBranchId,
       );
       if (fresh) {
-        setRouteForm((current) => ({
-          ...current,
-          fee: String(fresh.fee),
-          enabled: Boolean(fresh.enabled),
-        }));
+        setRouteForm((current) => {
+          if (
+            current.pickupBranchId !== target.pickupBranchId ||
+            current.returnBranchId !== target.returnBranchId
+          ) {
+            return current;
+          }
+          return {
+            ...current,
+            fee: String(fresh.fee),
+            enabled: Boolean(fresh.enabled),
+          };
+        });
         setRouteSnapshot({ ...fresh });
+        setRouteConflict(false);
+        routeSyncPendingRef.current = false;
+        routeSyncTargetRef.current = null;
+        setNotice(`Đã cập nhật bản mới nhất của tuyến từ máy chủ (${fresh.fee.toLocaleString("vi-VN")} đ, v${fresh.version}).`);
+      } else {
+        routeSyncPendingRef.current = false;
+        routeSyncTargetRef.current = null;
+        setRouteConflict(true);
+        setRouteSnapshot(null);
+        setError("Tuyến nhận/trả này không còn tồn tại trên hệ thống. Vui lòng chọn cặp chi nhánh khác hoặc tạo mới.");
       }
     });
-  }, [routes, routesRequest.loading, routeForm.pickupBranchId, routeForm.returnBranchId]);
+  }, [routes, routesRequest.loading, routesRequest.error, routeForm.pickupBranchId, routeForm.returnBranchId]);
 
   useEffect(() => {
     if (
@@ -1304,6 +1339,8 @@ export function ApiBranchesPage() {
   }
 
   function editRoute(route) {
+    routeSyncPendingRef.current = false;
+    routeSyncTargetRef.current = null;
     setRouteForm({
       pickupBranchId: route.pickupBranchId,
       returnBranchId: route.returnBranchId,
@@ -1324,15 +1361,19 @@ export function ApiBranchesPage() {
   }
 
   function reloadFreshRoutes() {
-    setRouteConflict(false);
     setError("");
+    setNotice("Đang tải lại dữ liệu mới nhất của tuyến...");
     routeSyncPendingRef.current = true;
+    routeSyncTargetRef.current = {
+      pickupBranchId: routeForm.pickupBranchId,
+      returnBranchId: routeForm.returnBranchId,
+    };
     routesRequest.reload();
   }
 
   async function saveRoute(event) {
     event.preventDefault();
-    if (!isAdmin || mutationPending.current || conflict || routeConflict) return;
+    if (!isAdmin || mutationPending.current || conflict || routeConflict || routeSyncPendingRef.current || routesRequest.loading) return;
     mutationPending.current = true;
     setError("");
     setNotice("");
@@ -1416,6 +1457,8 @@ export function ApiBranchesPage() {
 
   function changeRoute(key, value) {
     const next = { ...routeForm, [key]: value };
+    routeSyncPendingRef.current = false;
+    routeSyncTargetRef.current = null;
     const savedRoute = routes.find(
       (route) =>
         route.pickupBranchId === next.pickupBranchId &&
@@ -1687,7 +1730,7 @@ export function ApiBranchesPage() {
                   </button>
                 </div>
               ) : null}
-              <button className="btn" disabled={busy || conflict || routeConflict || branches.length < 1}>
+              <button className="btn" disabled={busy || conflict || routeConflict || routeSyncPendingRef.current || routesRequest.loading || branches.length < 1}>
                 {busy ? "Đang lưu..." : "Lưu tuyến"}
               </button>
             </form>
