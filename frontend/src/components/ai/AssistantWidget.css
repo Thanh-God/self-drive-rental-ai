@@ -36,3 +36,6 @@
 .assistant-results article a { display: flex; justify-content: space-between; border-top: 1px solid #e9dfd2; padding-top: 10px; color: #8f3d0f; font-weight: 650; }
 .assistant-all { display: block; margin-top: 15px; color: #8f3d0f; text-decoration: underline; }
 @media (max-width: 767px) { .kdrive-assistant { display: none; } }
+
+.assistant-natural { padding-bottom: 18px; margin-bottom: 18px; border-bottom: 1px solid #e5ddd2; }
+.assistant-natural textarea { width: 100%; resize: vertical; min-height: 85px; padding: 10px; border: 1px solid #bcb0a2; border-radius: 9px; color: #1a1a1a; background: #fffdf9; font: 13px "Segoe UI", system-ui, sans-serif; }

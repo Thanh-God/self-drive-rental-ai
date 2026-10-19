@@ -31,3 +31,4 @@ app:
   gemini-parser-enabled: ${GEMINI_PARSER_ENABLED:false}
   qwen-parser-enabled: ${QWEN_PARSER_ENABLED:false}
   ai-routing-enabled: ${AI_ROUTING_ENABLED:false}
+  qwen-model: ${QWEN_MODEL:qwen3:8b}

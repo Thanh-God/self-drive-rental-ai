@@ -5,8 +5,8 @@ import { useAuth } from '../../context/AuthContext';
 import { DEMO_MODE } from '../../demo/config';
 import { useApiData } from '../../hooks/useApiData';
 import { Field, money } from '../common/PageKit';
-import { recommendVehicles } from '../../api/recommendation';
-import { assistantCriteria, assistantDraft, assistantReasons, assistantSearch, assistantVisible } from '../../utils/assistant';
+import { recommendVehicles, parseRentalCriteria } from '../../api/recommendation';
+import { assistantCriteria, assistantDraft, assistantReasons, assistantSearch, assistantVisible, extractedAssistantDraft } from '../../utils/assistant';
 import { getErrorMessage } from '../../utils/roles';
 import './AssistantWidget.css';
 
@@ -21,6 +21,8 @@ export default function AssistantWidget() {
 function AssistantSession({ visible }) {
   const { search } = useLocation();
   const [open, setOpen] = useState(false), [draft, setDraft] = useState(assistantDraft), [result, setResult] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
+  const [naturalText, setNaturalText] = useState(''), [parseNote, setParseNote] = useState('');
+  const previousOpen = useRef(false);
   const initialized = useRef(false), pending = useRef(null), generation = useRef(0), busyRef = useRef(false), launcher = useRef(null), panel = useRef(null), reply = useRef(null);
   const title = useId();
   const branches = useApiData('/branches', open && visible && !DEMO_MODE);
@@ -28,13 +30,17 @@ function AssistantSession({ visible }) {
   const activeBranches = (branches.data || []).filter(b => b.status === 'ACTIVE');
   const amenities = catalog.data?.amenities || [];
   useEffect(() => () => { generation.current++; pending.current?.abort(); }, []);
-  useEffect(() => { if (open && visible) panel.current?.focus(); }, [open, visible]);
+  useEffect(() => {
+    if (open && visible) panel.current?.focus();
+    else if (previousOpen.current && visible) launcher.current?.focus();
+    previousOpen.current = open;
+  }, [open, visible]);
   useEffect(() => { if (result && open && visible) reply.current?.scrollIntoView?.({ block: 'nearest' }); }, [result, open, visible]);
-  function invalidate() { generation.current++; pending.current?.abort(); busyRef.current = false; setBusy(false); setError(''); setResult(null); }
+  function invalidate() { generation.current++; pending.current?.abort(); busyRef.current = false; setBusy(false); setError(''); setResult(null); setParseNote(''); }
   function change(name, value) { invalidate(); setDraft(old => ({ ...old, [name]: value })); }
   function show() { if (!initialized.current) { setDraft(assistantDraft(new URLSearchParams(search))); initialized.current = true; } setOpen(true); }
-  function close() { setOpen(false); launcher.current?.focus(); }
-  function reset() { invalidate(); setDraft(assistantDraft()); }
+  function close() { setOpen(false); }
+  function reset() { invalidate(); setDraft(assistantDraft()); setNaturalText(''); }
   async function submit(event) {
     event.preventDefault();
     if (busyRef.current || DEMO_MODE || branches.loading || catalog.loading || branches.error || catalog.error) return;
@@ -49,6 +55,20 @@ function AssistantSession({ visible }) {
       if (generation.current === run && !controller.signal.aborted) setError(getErrorMessage(failure, failure.message || 'Chưa lấy được gợi ý xe. Hãy thử lại.'));
     } finally { if (generation.current === run) { busyRef.current = false; setBusy(false); } }
   }
+  async function readNatural() {
+    if (busyRef.current || DEMO_MODE || !naturalText.trim() || branches.loading || branches.error) return;
+    invalidate();
+    const run = ++generation.current, controller = new globalThis.AbortController(); pending.current = controller; busyRef.current = true; setBusy(true); setParseNote('Đang đọc nhu cầu, có thể mất khoảng một phút…');
+    try {
+      const data = await parseRentalCriteria(naturalText, controller.signal);
+      if (generation.current !== run) return;
+      if (data.status === 'OUT_OF_SCOPE') { setParseNote('Trợ lý hiện hỗ trợ đọc nhu cầu tìm xe. Bạn có thể ghi ngày, điểm nhận/trả, số người và ngân sách.'); return; }
+      setDraft(extractedAssistantDraft(data, activeBranches));
+      setParseNote(data.status === 'READY_FOR_REVIEW' ? 'Đã điền nhu cầu. Hãy kiểm tra các trường bên dưới rồi bấm Gợi ý xe phù hợp.' : 'Đã điền phần đọc được. Hãy bổ sung các ô còn trống, kiểm tra ngày gồm cả năm rồi tìm xe.');
+    } catch (failure) {
+      if (generation.current === run && !controller.signal.aborted) { setParseNote(''); setError(getErrorMessage(failure, failure.message || 'Chưa đọc được nhu cầu; hãy dùng biểu mẫu.')); }
+    } finally { if (generation.current === run) { busyRef.current = false; setBusy(false); } }
+  }
   if (!visible) return null;
   return <div className="kdrive-assistant">
     {open && <section ref={panel} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby={title} className="assistant-panel" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
@@ -58,9 +78,15 @@ function AssistantSession({ visible }) {
         <button type="button" aria-label="Đóng trợ lý" onClick={close}><X size={18} /></button>
       </div></header>
       <div className="assistant-body">
-        <p className="assistant-welcome">Bạn đang tìm xe cho chuyến đi nào? Chọn nhu cầu bên dưới để xem xe phù hợp.</p>
+        <p className="assistant-welcome">Bạn đang tìm xe cho chuyến đi nào? Mô tả nhu cầu hoặc điền biểu mẫu bên dưới.</p>
         {DEMO_MODE ? <p role="status">Trợ lý dùng dữ liệu thật ở chế độ API. Bản demo chưa kết nối gợi ý xe.</p> : <>
           {(branches.error || catalog.error) && <div role="alert" className="assistant-error"><p>Chưa tải được chi nhánh hoặc tiện nghi.</p><button type="button" onClick={() => { branches.reload(); catalog.reload(); }}>Tải lại danh mục</button></div>}
+          <div className="assistant-natural">
+            <Field label="Mô tả nhu cầu"><textarea maxLength={1000} rows={3} value={naturalText} onChange={e => { invalidate(); setNaturalText(e.target.value); }} placeholder="Ví dụ: 4 người, nhận và trả tại Đà Nẵng từ 20/10/2026 đến 24/10/2026, tổng ngân sách 3 triệu, xe tự động." /></Field>
+            <p className="assistant-note">Ghi cả năm. Không nhập số điện thoại, email hoặc số giấy tờ.</p>
+            <button className="assistant-submit" type="button" onClick={readNatural} disabled={busy || !naturalText.trim() || branches.loading || Boolean(branches.error)}>Điền nhu cầu bằng AI</button>
+            {parseNote && <p role="status" className="assistant-note">{parseNote}</p>}
+          </div>
           <form onSubmit={submit} aria-label="Nhu cầu thuê xe">
             <div className="assistant-fields">
               <Field label="Ngày nhận"><input type="date" value={draft.start} onChange={e => change('start', e.target.value)} required /></Field>
@@ -83,7 +109,7 @@ function AssistantSession({ visible }) {
               <Link to={`/vehicles/${encodeURIComponent(item.vehicleId)}${assistantSearch(result.criteria)}`}>Xem xe <span aria-hidden="true">↗</span></Link>
             </article>)}<Link className="assistant-all" to={`/vehicles${assistantSearch(result.criteria)}`}>Tìm thêm xe theo chuyến đi</Link></div>}
           </div>
-          <p className="assistant-note">Gợi ý theo tiêu chí, chưa hỗ trợ nhập câu tự nhiên. Chưa giữ chỗ; giá và lịch được kiểm tra lại khi đặt thuê.</p>
+          <p className="assistant-note">Kiểm tra tiêu chí do trợ lý đọc trước khi tìm xe. Chưa giữ chỗ; giá và lịch được kiểm tra lại khi đặt thuê.</p>
         </>}
       </div>
     </section>}

@@ -25,3 +25,14 @@ export function assistantReasons(item, criteria, amenities) {
   for (const amenity of amenities) if (item.reasonCodes.includes(`AMENITY_MATCH:${amenity.id}`)) reasons.push(amenity.name);
   return reasons.join(' · ');
 }
+
+export function extractedAssistantDraft(data, branches) {
+  const value = data.draft;
+  if (!value || typeof value !== 'object') throw new Error('Chưa đọc được nhu cầu rõ ràng. Hãy ghi lại ngày, điểm nhận/trả, số người và ngân sách.');
+  for (const key of ['pickupDate', 'returnDate']) if (value[key] != null && !isRentalDate(value[key])) throw new Error('Ngày do trợ lý đọc chưa hợp lệ.');
+  for (const key of ['pickupBranchId', 'returnBranchId']) if (value[key] != null && !branches.some(b => b.id === value[key] && b.status === 'ACTIVE')) throw new Error('Chi nhánh không còn nhận đơn. Hãy chọn lại.');
+  if (value.passengers != null && (!Number.isInteger(value.passengers) || value.passengers < 2 || value.passengers > 9)) throw new Error('Số người không hợp lệ.');
+  if (value.budgetVndTotal != null && (!Number.isSafeInteger(value.budgetVndTotal) || value.budgetVndTotal < 0)) throw new Error('Ngân sách không hợp lệ.');
+  if (value.transmission != null && !['AUTO', 'MANUAL'].includes(value.transmission)) throw new Error('Hộp số không hợp lệ.');
+  return { start: value.pickupDate ?? '', end: value.returnDate ?? '', pickupBranchId: value.pickupBranchId ?? '', returnBranchId: value.returnBranchId ?? '', passengers: value.passengers == null ? '' : String(value.passengers), budget: value.budgetVndTotal == null ? '' : String(value.budgetVndTotal), transmission: value.transmission ?? '', amenityIds: [] };
+}

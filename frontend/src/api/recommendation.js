@@ -11,3 +11,9 @@ export async function recommendVehicles(criteria, signal) {
   if (data.status !== 'OK' && data.results.length) throw new Error('Phản hồi gợi ý không nhất quán.');
   return data;
 }
+
+export async function parseRentalCriteria(text, signal) {
+  const { data } = await apiClient.post('/ai/criteria/parse', { text }, { signal, timeout: 65000 });
+  if (!['READY_FOR_REVIEW', 'NEEDS_CLARIFICATION', 'OUT_OF_SCOPE'].includes(data?.status) || !Array.isArray(data.unresolvedFields)) throw new Error('Phản hồi đọc nhu cầu không hợp lệ.');
+  return data;
+}

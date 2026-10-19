@@ -17,8 +17,8 @@ Package gốc: `com.carrental`. Một module là một phần mã nghiệp vụ,
 | `contract` | Hồ sơ hợp đồng và snapshot | `booking` để kiểm tra/trích xuất dữ liệu cần thiết |
 | `invoice` | Hồ sơ hóa đơn và snapshot, không thanh toán online | `booking` để kiểm tra/trích xuất dữ liệu cần thiết |
 | `review` | Đánh giá và trạng thái kiểm duyệt | `booking` kiểm tra chủ đơn, xe và điều kiện hoàn tất |
-| `ai/recommendation` | Criteria, hard-filter, điểm và giải thích | `vehicle`, `booking`, Gemini adapter |
-| `ai/itinerary` | Kế hoạch cá nhân và các mục lịch trình | `location`, Gemini adapter, Map adapter |
+| `ai/recommendation` | Criteria, hard-filter, điểm và giải thích | `vehicle`, `booking`, Qwen adapter cục bộ |
+| `ai/itinerary` | Kế hoạch cá nhân và các mục lịch trình | `location`, Qwen adapter cục bộ, Map adapter |
 
 `security`, `config`, `exception` là hạ tầng chung. Kiểm tra chủ sở hữu tài nguyên vẫn nằm ở service nghiệp vụ. Không thêm repository/entity cho recommendation nếu chưa có yêu cầu lưu lịch sử.
 

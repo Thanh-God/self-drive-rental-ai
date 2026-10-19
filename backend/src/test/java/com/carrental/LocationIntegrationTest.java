@@ -232,4 +232,10 @@ class LocationIntegrationTest {
         mvc.perform(authorized(post("/api/v1/ai/routes/preview"),staff).contentType("application/json").content(route)).andExpect(status().isForbidden());
         mvc.perform(authorized(post("/api/v1/ai/routes/preview"),user).contentType("application/json").content(route)).andExpect(status().isServiceUnavailable());
     }
+    @Test void naturalCriteriaEndpointIsAuthenticatedUserOnlyAndDisabledByDefault() throws Exception {
+        String payload=body(Map.of("text","4 người,3triệu"));
+        mvc.perform(post("/api/v1/ai/criteria/parse").contentType("application/json").content(payload)).andExpect(status().isUnauthorized());
+        for(String email:java.util.List.of("admin@example.test","staff.dn@example.test"))mvc.perform(authorized(post("/api/v1/ai/criteria/parse"),token(email)).contentType("application/json").content(payload)).andExpect(status().isForbidden());
+        mvc.perform(authorized(post("/api/v1/ai/criteria/parse"),token("user@example.test")).contentType("application/json").content(payload)).andExpect(status().isServiceUnavailable());
+    }
 }

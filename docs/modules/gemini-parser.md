@@ -1,3 +1,5 @@
+> Adapter Gemini hiện tắt; luồng chatbox dùng [Qwen cục bộ](local-ai-routing.md). Tài liệu này mô tả adapter dự phòng, không phải cấu hình đang chọn.
+
 # Adapter Gemini cho trích xuất nhu cầu
 
 `CriteriaParser` là hợp đồng nội bộ cho đầu ra trích xuất chưa đáng tin. `GeminiCriteriaParser` gọi REST `generateContent` bằng Java HttpClient, không dùng SDK mới hoặc truy cập database. Chỉ được tạo bean khi `app.gemini-parser-enabled=true`; mặc định false.

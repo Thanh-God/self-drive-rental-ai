@@ -66,3 +66,23 @@ test('Demo assistant has explicit unavailable copy and sends no API calls',async
   let calls=0;demoClient.defaults.adapter=async()=>{calls++;throw new Error('Demo must not call API');};c=document.createElement('div');document.body.append(c);root=createRoot(c);await act(async()=>root.render(h(DemoAuth.Provider,{value:{user:{id:'demo-user',role:'USER'},isAuthenticated:true,loading:false}},h(DemoRouter,null,h(DemoWidget)))));await click(button('Mở Trợ lý KDrive'));assert.match(c.textContent,/Bản demo chưa kết nối/);assert.equal(c.querySelector('form'),null);assert.equal(calls,0);await act(async()=>root.unmount());root=null;
  } finally {await demoServer?.close();process.env.VITE_DATA_MODE='api';}
 });
+
+test('Natural text fills reviewable fields but never automatically recommends; reset clears text',async()=>{
+ await mount();await open();
+ const area=c.querySelector('textarea');
+ await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value').set.call(area,'4 người,3triệu,20/10/2100 đến24/10/2100');area.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});
+ await click(button('Điền nhu cầu bằng AI'));await click(button('Điền nhu cầu bằng AI'));
+ const req=take('/ai/criteria/parse');assert.equal(req.config.timeout,65000);
+ await respond(req,{status:'READY_FOR_REVIEW',unresolvedFields:[],draft:{pickupDate:'2100-10-20',returnDate:'2100-10-24',pickupBranchId:'dn',returnBranchId:'hn',passengers:5,budgetVndTotal:2000000,transmission:null}});
+ assert.equal(field('Số người').value,'5');assert.equal(field('Tổng ngân sách').value,'2000000');assert.equal(requests.filter(r=>r.config.url==='/ai/recommendations').length,0);assert.match(c.textContent,/Hãy kiểm tra các trường/);
+ await click(button('Bắt đầu lại'));assert.equal(c.querySelector('textarea').value,'');
+});
+
+test('Reset ignores a late natural-language reply; model failure keeps the manual form available',async()=>{
+ await mount();await open();
+ async function text(value){const area=c.querySelector('textarea');await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value').set.call(area,value);area.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});}
+ await text('4 người,3triệu');await click(button('Điền nhu cầu bằng AI'));const old=take('/ai/criteria/parse');await click(button('Bắt đầu lại'));
+ await respond(old,{status:'READY_FOR_REVIEW',unresolvedFields:[],draft:{passengers:9,budgetVndTotal:999}});assert.equal(field('Tổng ngân sách').value,'');assert.equal(field('Số người').value,'4');
+ await text('4 người');await click(button('Điền nhu cầu bằng AI'));const failed=take('/ai/criteria/parse');await act(async()=>failed.reject(new Error('Qwen unavailable')));
+ assert.ok(c.querySelector('[role="alert"]'));assert.ok(c.querySelector('form'));assert.equal(button('Gợi ý xe phù hợp').disabled,false);
+});

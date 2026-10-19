@@ -6,7 +6,7 @@ Các quy tắc dưới đây định hướng triển khai và vận hành. Ph�
 
 | ID | Quyết định | Lý do và tác động |
 |---|---|---|
-| AD-01 | React/Vite, Spring Boot, MySQL, JPA/Hibernate, Security/JWT; tích hợp AI/Map qua backend | Giữ stack cốt lõi; chọn Qwen3-4B chạy cục bộ qua Ollama cho trích xuất nhu cầu, thay phương án Gemini; giá/lịch/quyền vẫn do backend kiểm tra |
+| AD-01 | React/Vite, Spring Boot, MySQL, JPA/Hibernate, Security/JWT; tích hợp AI/Map qua backend | Giữ stack cốt lõi; chọn Qwen3 chạy cục bộ qua Ollama (model hiện có8B, cấu hình cho phép4B/8B) cho trích xuất nhu cầu, thay phương án Gemini; giá/lịch/quyền vẫn do backend kiểm tra |
 | AD-02 | Modular monolith, một backend/một database | Vừa sức ba tháng, transaction đơn giản; giữ ranh giới module rõ ràng |
 | AD-03 | Đúng bốn actor; Guest không là role tài khoản | Role USER/STAFF/ADMIN; Gemini/Map là hệ thống ngoài |
 | AD-04 | Backend kiểm soát giá, availability, ID, score và trạng thái | AI giải thích/lập phương án trên dữ liệu cấp sẵn; cần validate output |
@@ -89,4 +89,4 @@ Phạm vi đầu tiên chỉ USER, không gọi nhà cung cấp AI hoặc Map. N
 
 ## AI cục bộ và dữ liệu tuyến
 
-Qwen3-4B trích xuất tiêu chí có kiểu, không tự quyết định giá, lịch hoặc hành động đơn thuê. OSRM cung cấp ước tính đường đi theo graph, không cung cấp giao thông trực tiếp, giờ mở cửa hoặc độ nổi tiếng địa điểm. Backend chỉ tính tuyến từ ID địa điểm đang hoạt động; không có tuyến thì không gán quãng đường/thời gian giả hoặc lưu hành trình. Provider mặc định tắt; cấu hình và contract tại [AI cục bộ và định tuyến](../modules/local-ai-routing.md). Chọn provider không tự đóng các quyết định metadata, lưu itinerary hoặc nguồn xu hướng hàng tuần.
+Qwen3 cục bộ trích xuất tiêu chí có kiểu, không tự quyết định giá, lịch hoặc hành động đơn thuê. OSRM cung cấp ước tính đường đi theo graph, không cung cấp giao thông trực tiếp, giờ mở cửa hoặc độ nổi tiếng địa điểm. Backend chỉ tính tuyến từ ID địa điểm đang hoạt động; không có tuyến thì không gán quãng đường/thời gian giả hoặc lưu hành trình. Provider mặc định tắt; cấu hình và contract tại [AI cục bộ và định tuyến](../modules/local-ai-routing.md). Chọn provider không tự đóng các quyết định metadata, lưu itinerary hoặc nguồn xu hướng hàng tuần.
