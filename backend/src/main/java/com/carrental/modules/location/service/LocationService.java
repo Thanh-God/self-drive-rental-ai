@@ -36,6 +36,18 @@ public class LocationService {
         String revision
     ) {}
 
+    public record PublicView(String id, String categoryId, String categoryName, String name,
+        BigDecimal latitude, BigDecimal longitude) {}
+
+    @Transactional(readOnly = true)
+    public List<PublicView> activeCatalog(Actor actor) {
+        actor.require("USER");
+        return locations.findAllWithCategoryOrderByNameAsc().stream()
+            .filter(location -> "ACTIVE".equals(location.status))
+            .map(location -> new PublicView(location.id, location.category.id, location.category.name,
+                location.name, location.latitude, location.longitude)).toList();
+    }
+
     @Transactional(readOnly = true)
     public List<View> list(Actor actor) {
         actor.require("ADMIN");

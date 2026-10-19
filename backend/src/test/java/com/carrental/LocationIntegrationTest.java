@@ -212,4 +212,24 @@ class LocationIntegrationTest {
         mvc.perform(authorized(delete(LOCATIONS + "/" + id), admin)).andExpect(status().isMethodNotAllowed());
         mvc.perform(authorized(get(LOCATIONS + "/" + id), admin)).andExpect(status().isNotFound());
     }
+    @Test
+    void customerCatalogAndRoutingRespectHttpPermissionsAndVisibility() throws Exception {
+        String admin=token("admin@example.test"), user=token("user@example.test"), staff=token("staff.dn@example.test");
+        String category=createCategory(admin);
+        String visible=UUID.randomUUID().toString(), hidden=UUID.randomUUID().toString();
+        for(String name:java.util.List.of(visible,hidden))mvc.perform(authorized(post(LOCATIONS),admin)
+            .contentType("application/json").content(body(input(category,name,"16","108",name.equals(visible)?"ACTIVE":"INACTIVE"))))
+            .andExpect(status().isCreated());
+        mvc.perform(get("/api/v1/ai/locations")).andExpect(status().isUnauthorized());
+        mvc.perform(authorized(get("/api/v1/ai/locations"),admin)).andExpect(status().isForbidden());
+        mvc.perform(authorized(get("/api/v1/ai/locations"),staff)).andExpect(status().isForbidden());
+        String response=mvc.perform(authorized(get("/api/v1/ai/locations"),user)).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        org.junit.jupiter.api.Assertions.assertTrue(response.contains(visible));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains(hidden));
+        org.junit.jupiter.api.Assertions.assertFalse(response.contains("revision"));
+        String route=body(Map.of("locationIds",java.util.List.of("a","b")));
+        mvc.perform(post("/api/v1/ai/routes/preview").contentType("application/json").content(route)).andExpect(status().isUnauthorized());
+        mvc.perform(authorized(post("/api/v1/ai/routes/preview"),staff).contentType("application/json").content(route)).andExpect(status().isForbidden());
+        mvc.perform(authorized(post("/api/v1/ai/routes/preview"),user).contentType("application/json").content(route)).andExpect(status().isServiceUnavailable());
+    }
 }

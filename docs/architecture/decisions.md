@@ -6,7 +6,7 @@ Các quy tắc dưới đây định hướng triển khai và vận hành. Ph�
 
 | ID | Quyết định | Lý do và tác động |
 |---|---|---|
-| AD-01 | React/Vite, Spring Boot, MySQL, JPA/Hibernate, Security/JWT; tích hợp AI/Map qua backend | Giữ stack cốt lõi; Gemini là phương án ban đầu, chưa chốt nhà cung cấp/mô hình AI cuối cùng |
+| AD-01 | React/Vite, Spring Boot, MySQL, JPA/Hibernate, Security/JWT; tích hợp AI/Map qua backend | Giữ stack cốt lõi; chọn Qwen3-4B chạy cục bộ qua Ollama cho trích xuất nhu cầu, thay phương án Gemini; giá/lịch/quyền vẫn do backend kiểm tra |
 | AD-02 | Modular monolith, một backend/một database | Vừa sức ba tháng, transaction đơn giản; giữ ranh giới module rõ ràng |
 | AD-03 | Đúng bốn actor; Guest không là role tài khoản | Role USER/STAFF/ADMIN; Gemini/Map là hệ thống ngoài |
 | AD-04 | Backend kiểm soát giá, availability, ID, score và trạng thái | AI giải thích/lập phương án trên dữ liệu cấp sẵn; cần validate output |
@@ -37,7 +37,7 @@ Các quy tắc dưới đây định hướng triển khai và vận hành. Ph�
 | OP-04 | PENDING/state machine — chốt một phần | Giữ lịch tối đa 2 giờ; đơn theo ngày không vượt hết ngày nhận, đơn cũ không vượt giờ nhận. Đơn theo ngày chỉ bàn giao trong ngày nhận. Luồng PENDING → CONFIRMED → IN_PROGRESS → RETURNED → COMPLETED; còn quy tắc đệm, no-show, gia hạn, trả muộn/đơn kế tiếp | ERD và transaction booking |
 | OP-05 | Hợp đồng/hóa đơn — chốt một phần | Đã duyệt hợp đồng khi xác nhận, hóa đơn khi hoàn tất, lưu snapshot; chính sách sửa/phát hành lại và danh mục phụ phí còn mở | Schema và luồng phát hành |
 | OP-06 | Hủy và Admin can thiệp — chốt một phần | User tự hủy trước mốc nhận ít nhất 24 giờ (đơn theo ngày lấy đầu ngày nhận làm mốc), sát giờ Staff xử lý và ghi lý do; Admin can thiệp hủy, không mặc định giao/nhận; điều kiện ngoại lệ chi tiết còn mở | Ma trận quyền chi tiết/state machine |
-| OP-07 | Map provider | Chọn theo tài khoản, coverage, quota và điều kiện sử dụng; không mặc định OpenStreetMap là một dịch vụ API đầy đủ | Adapter Map |
+| OP-07 | Map provider | Chọn OSRM cục bộ với dữ liệu OpenStreetMap cho định tuyến lái xe; basemap, geocoding và metadata tham quan vẫn cần quyết định riêng; giữ attribution/ODbL và provenance graph | Adapter Map |
 | OP-08 | JWT/khóa tài khoản — chốt một phần | Đã duyệt access token ngắn hạn, không refresh, kiểm tra trạng thái và token_version, đăng xuất mọi phiên. Source dùng TTL mặc định 30 phút (cấu hình 1–120), localStorage; đây là cấu hình hiện tại, cần đánh giá bảo mật client trước phát hành | Phát hành auth |
 | OP-09 | Fallback itinerary — đã chốt MVP | Không đủ dữ liệu kiểm chứng thì dừng/thử lại; không lưu bản thiếu tuyến, chưa triển khai trình chỉnh sửa thủ công đầy đủ | UI/API itinerary |
 | OP-10 | Môi trường và migration | JDK21, Maven Wrapper, Spring Boot, MySQL8.4; H2 dành cho test riêng. Kiểm kê history/checksum/schema của database dùng chung trước nâng cấp; không tự clean/repair | Nâng cấp môi trường |
@@ -85,3 +85,8 @@ Tài khoản có ACTIVE/LOCKED; không mở rộng thu thập CCCD. Token ngắn
 ## Gợi ý xe theo quy tắc AI1
 
 Phạm vi đầu tiên chỉ USER, không gọi nhà cung cấp AI hoặc Map. Ngày thuê, tuyến, đủ chỗ và tổng ngân sách gồm phí tuyến là điều kiện bắt buộc. Điểm ngân sách 40%, số chỗ 25%, sở thích 35%; hộp số và tiện nghi là ưu tiên mềm. Công thức có phiên bản và quyền truy cập được mô tả tại [hợp đồng gợi ý xe](../modules/ai-recommendation.md). Recommendation không giữ chỗ; quote/create kiểm tra lại. Parser ngôn ngữ tự nhiên, provider và hành trình thuộc các giai đoạn sau.
+
+
+## AI cục bộ và dữ liệu tuyến
+
+Qwen3-4B trích xuất tiêu chí có kiểu, không tự quyết định giá, lịch hoặc hành động đơn thuê. OSRM cung cấp ước tính đường đi theo graph, không cung cấp giao thông trực tiếp, giờ mở cửa hoặc độ nổi tiếng địa điểm. Backend chỉ tính tuyến từ ID địa điểm đang hoạt động; không có tuyến thì không gán quãng đường/thời gian giả hoặc lưu hành trình. Provider mặc định tắt; cấu hình và contract tại [AI cục bộ và định tuyến](../modules/local-ai-routing.md). Chọn provider không tự đóng các quyết định metadata, lưu itinerary hoặc nguồn xu hướng hàng tuần.

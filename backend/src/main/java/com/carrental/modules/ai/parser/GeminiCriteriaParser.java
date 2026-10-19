@@ -16,7 +16,6 @@ import org.springframework.stereotype.Component;
 @Component
 @ConditionalOnProperty(name="app.gemini-parser-enabled",havingValue="true")
 public class GeminiCriteriaParser implements CriteriaParser {
-    private static final Set<String> FIELDS=Set.of("pickupDate","returnDate","pickupBranchName","returnBranchName","passengers","budgetVndTotal","transmission");
     private final String key;
     private final URI endpoint;
     private final Duration deadline;
@@ -68,21 +67,9 @@ public class GeminiCriteriaParser implements CriteriaParser {
             String text=parts.get(0).path("text").asText();if(text.length()>4096)throw unavailable();
             JsonNode node=json.readTree(text);
             for(String field:List.of("passengers","budgetVndTotal"))if(node.hasNonNull(field)&&!node.get(field).isIntegralNumber())throw unavailable();
-            var extraction=json.treeToValue(node,Extraction.class);validate(extraction);return extraction;
+            var extraction=json.treeToValue(node,Extraction.class);ExtractionValidation.validate(extraction);return extraction;
         } catch(DomainException e){throw e;}
         catch(Exception failure){throw unavailable();}
-    }
-    private static void validate(Extraction x){
-        if(x==null || x.intent()==null || !Set.of("RECOMMEND_VEHICLE","NEEDS_CLARIFICATION","OUT_OF_SCOPE").contains(x.intent())
-                || x.unresolvedFields()==null || x.conflicts()==null || x.unresolvedFields().size()>7 || x.conflicts().size()>7
-                || x.unresolvedFields().stream().anyMatch(f->f==null||!FIELDS.contains(f))
-                || x.conflicts().stream().anyMatch(f->f==null||f.isBlank()||f.length()>160)
-                || x.passengers()!=null&&(x.passengers()<2||x.passengers()>9)
-                || x.budgetVndTotal()!=null&&(x.budgetVndTotal()<0||x.budgetVndTotal()>9007199254740991L)
-                || x.transmission()!=null&&!Set.of("AUTO","MANUAL").contains(x.transmission()))throw unavailable();
-        for(String name:Arrays.asList(x.pickupBranchName(),x.returnBranchName()))if(name!=null&&(name.isBlank()||name.length()>120))throw unavailable();
-        for(String date:Arrays.asList(x.pickupDate(),x.returnDate()))if(date!=null){if(!date.matches("\\d{4}-\\d{2}-\\d{2}"))throw unavailable();LocalDate.parse(date);}
-        if(x.pickupDate()!=null&&x.returnDate()!=null&&!LocalDate.parse(x.returnDate()).isAfter(LocalDate.parse(x.pickupDate())))throw unavailable();
     }
     private static DomainException unavailable(){return new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa đọc được nhu cầu bằng Gemini; hãy dùng biểu mẫu.");}
 }
