@@ -1,5 +1,5 @@
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
-import { visibleBookings, workStatusLabels, vietnamDay } from "../../utils/bookingQueue";
+import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
 import BookingProgress from "../../components/booking/BookingProgress";
 import FavoritesLink, { FavoriteToggle } from "../../components/vehicle/FavoriteControls";
@@ -1219,8 +1219,38 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
   );
   const [queue, setQueue] = useState("all");
   const [queueDate, setQueueDate] = useState(() => vietnamDay(Date.now()));
+  const [sort, setSort] = useState("createdAt_desc");
+  const [page, setPage] = useState(1);
+  const [copyFeedback, setCopyFeedback] = useState({});
   const now = useNow();
-  const rows = visibleBookings(request.data, { query, status, queue, date: queueDate, mode, now });
+
+  const isFilterActive = area === "admin";
+  const rows = visibleBookings(request.data, {
+    query,
+    status,
+    queue,
+    date: queueDate,
+    mode,
+    now,
+    sort: isFilterActive ? sort : "createdAt_desc",
+  });
+
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const activePage = Math.min(Math.max(1, page), totalPages);
+
+  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const pagedRows = isFilterActive
+    ? rows.slice((activePage - 1) * pageSize, activePage * pageSize)
+    : rows;
+
   const statusLabels = workStatusLabels[mode] || bookingStatusLabels;
   const title =
     area === "user"
@@ -1232,12 +1262,28 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
           : mode === "return"
             ? "Nhận trả xe"
             : "Hàng đợi xử lý";
+
+  async function handleCopyId(id) {
+    try {
+      if (!navigator?.clipboard?.writeText) {
+        throw new Error("Clipboard API not available");
+      }
+      await navigator.clipboard.writeText(id);
+      setCopyFeedback((prev) => ({ ...prev, [id]: "Đã sao chép mã đầy đủ" }));
+    } catch {
+      setCopyFeedback((prev) => ({
+        ...prev,
+        [id]: "Không thể sao chép tự động",
+      }));
+    }
+  }
+
   return (
     <Page
       title={title}
       actions={<button type="button" className="btn-secondary" disabled={request.loading} onClick={request.reload}>Tải lại danh sách</button>}
     >
-      <div className="urban-filter mb-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={`urban-filter mb-6 grid gap-4 sm:grid-cols-2 ${isFilterActive ? "lg:grid-cols-4" : "lg:grid-cols-3"}`}>
         <Field label="Tìm mã đơn, xe hoặc khách hàng">
           <input
             value={query}
@@ -1269,9 +1315,28 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
           </Field>
         ) : null}
         </div>
+        {isFilterActive ? (
+          <Field label="Sắp xếp">
+            <select value={sort} onChange={(event) => setSort(event.target.value)}>
+              {Object.keys(bookingSortLabels).map((val) => (
+                <option key={val} value={val}>
+                  {bookingSortLabels[val]}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
       </div>
       {queue === "date" && !queueDate ? <p className="mb-4 text-sm text-muted" role="status">Vui lòng chọn ngày để xem đơn trong hàng đợi.</p> : null}
-      <p className="mb-4 text-sm text-muted" aria-live="polite">{request.loading ? "Đang tải đơn…" : request.error ? "Chưa tải được danh sách" : `${rows.length} đơn phù hợp · Mới tạo trước`}</p>
+      <p className="mb-4 text-sm text-muted" aria-live="polite">
+        {request.loading
+          ? "Đang tải đơn…"
+          : request.error
+            ? "Chưa tải được danh sách"
+            : isFilterActive
+              ? `Hiển thị ${pagedRows.length}/${rows.length} đơn · Trang ${activePage}/${totalPages} · ${bookingSortLabels[sort] || "Mới tạo trước"}`
+              : `${rows.length} đơn phù hợp · Mới tạo trước`}
+      </p>
       <RequestState
         loading={request.loading}
         error={request.error}
@@ -1279,19 +1344,56 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
       >
         {rows.length ? (
           <div className="space-y-4">
-            {rows.map((booking) => (
+            {pagedRows.map((booking) => (
               <article
                 className={`panel flex flex-wrap items-center justify-between gap-4 ${area === "user" ? "urban-booking-card" : ""}`}
                 key={booking.id}
               >
                 <div>
                   <div className="mb-2 flex flex-wrap items-center gap-3">
-                    <span className="text-xs font-semibold text-slate-500">
-                      {booking.id}
-                    </span>
+                    {area === "admin" ? (
+                      <span className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-semibold text-slate-700" title={booking.id}>
+                          #{booking.id.slice(0, 8)}…
+                        </span>
+                        <button
+                          type="button"
+                          className="text-xs text-brand hover:underline"
+                          onClick={() => handleCopyId(booking.id)}
+                          aria-label={`Sao chép mã đơn ${booking.id}`}
+                        >
+                          Sao chép mã đầy đủ
+                        </button>
+                        {copyFeedback[booking.id] ? (
+                          <span className="text-xs text-slate-500" role="status">
+                            {copyFeedback[booking.id]}
+                          </span>
+                        ) : null}
+                      </span>
+                    ) : (
+                      <span className="text-xs font-semibold text-slate-500">
+                        {booking.id}
+                      </span>
+                    )}
                     <Status status={booking.status} />
                   </div>
-                  <h2 className="font-semibold">{booking.vehicleName}</h2>
+                  {area === "admin" ? (
+                    <div className="mb-1">
+                      <p className="text-base font-bold text-slate-900">
+                        Khách: {booking.customerName || "Chưa có tên"}
+                      </p>
+                      <h2 className="text-sm font-medium text-slate-700">Xe: {booking.vehicleName}</h2>
+                    </div>
+                  ) : (
+                    <>
+                      <h2 className="font-semibold">{booking.vehicleName}</h2>
+                      {area !== "user" ? (
+                        <p className="mt-1 text-sm text-slate-500">
+                          {booking.customerName}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
                   <p className="mt-1 text-sm text-slate-600">
                     {bookingDate(booking, booking.startAt)} → {bookingDate(booking, booking.endAt)}
                   </p>
@@ -1299,11 +1401,6 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                     {booking.pickupName} → {booking.returnName}
                   </p>
                   {booking.createdAt ? <p className="mt-1 text-sm text-muted">Tạo lúc {dateTime(booking.createdAt)}</p> : null}
-                  {area !== "user" ? (
-                    <p className="mt-1 text-sm text-slate-500">
-                      {booking.customerName}
-                    </p>
-                  ) : null}
                 </div>
                 <div className="flex items-center gap-4">
                   <strong>{money(booking.total)}</strong>
@@ -1322,6 +1419,32 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                 </div>
               </article>
             ))}
+
+            {isFilterActive && totalPages > 1 ? (
+              <nav aria-label="Phân trang danh sách đơn" className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4">
+                <span className="text-sm text-slate-600">
+                  Trang {activePage} / {totalPages} ({rows.length} đơn)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={activePage <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  >
+                    Trang trước
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={activePage >= totalPages}
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  >
+                    Trang sau
+                  </button>
+                </div>
+              </nav>
+            ) : null}
           </div>
         ) : (
           <EmptyState

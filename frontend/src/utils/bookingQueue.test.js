@@ -97,3 +97,86 @@ test('Booking lists omit explanatory hints for every account and retain calendar
   assert.doesNotMatch(c.textContent,/Đây là bộ lọc danh sách/);
  }
 });
+
+test('Admin booking list supports sort, pagination, copy UUID feedback, and resets on filter change',async()=>{
+ const manyBookings = Array.from({length: 45}, (_, i) => ({
+  id: `booking-${String(i + 1).padStart(2, '0')}`,
+  vehicleName: `Xe ${i + 1}`,
+  customerName: `Khách ${i + 1}`,
+  status: i % 2 === 0 ? 'CONFIRMED' : 'PENDING',
+  createdAt: new Date(now - i * 3600000).toISOString(),
+  startAt: new Date(now + (45 - i) * 3600000).toISOString(),
+  endAt: new Date(now + (50 - i) * 3600000).toISOString(),
+  total: (i + 1) * 100000,
+  pickupName: 'Đà Nẵng',
+  returnName: 'Hà Nội'
+ }));
+
+ client.defaults.adapter = async (config) => ({
+  config,
+  data: manyBookings,
+  status: 200,
+  statusText: 'OK',
+  headers: {}
+ });
+
+ const c = await mount('all', '/admin/bookings', 'admin');
+ assert.match(c.textContent, /Tra cứu đơn thuê/);
+ assert.match(c.textContent, /Hiển thị 20\/45 đơn · Trang 1\/3/);
+
+ // Default sort is newest first
+ const articlesPage1 = c.querySelectorAll('article');
+ assert.equal(articlesPage1.length, 20);
+ assert.match(articlesPage1[0].textContent, /Khách: Khách 1/);
+ assert.match(articlesPage1[0].textContent, /#booking-/);
+
+ // Test pagination
+ const nextBtn = [...c.querySelectorAll('nav button')].find(b => b.textContent === 'Trang sau');
+ const prevBtn = [...c.querySelectorAll('nav button')].find(b => b.textContent === 'Trang trước');
+ assert.equal(prevBtn.disabled, true);
+ assert.equal(nextBtn.disabled, false);
+
+ await act(async () => nextBtn.click());
+ assert.match(c.textContent, /Hiển thị 20\/45 đơn · Trang 2\/3/);
+ assert.match(c.querySelectorAll('article')[0].textContent, /Khách: Khách 21/);
+ assert.equal(prevBtn.disabled, false);
+
+ await act(async () => nextBtn.click());
+ assert.match(c.textContent, /Hiển thị 5\/45 đơn · Trang 3\/3/);
+ assert.equal(nextBtn.disabled, true);
+
+ // Changing filter resets to page 1
+ const queryInput = c.querySelector('input');
+ await act(async () => {
+  Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value').set.call(queryInput, 'Khách 1');
+  queryInput.dispatchEvent(new dom.window.Event('input', {bubbles: true}));
+ });
+ assert.match(c.textContent, /Trang 1\//);
+
+ // Changing sort
+ const sortSelect = c.querySelectorAll('select')[2];
+ assert.ok(sortSelect);
+ await select(sortSelect, 'createdAt_asc');
+ assert.match(c.textContent, /Cũ tạo trước/);
+
+ // Copy UUID button interaction
+ const copyBtn = c.querySelector('button[aria-label^="Sao chép mã đơn"]');
+ assert.ok(copyBtn);
+ let copiedText = '';
+ dom.window.navigator.clipboard = {
+  writeText: async (text) => { copiedText = text; }
+ };
+ await act(async () => copyBtn.click());
+ assert.equal(copiedText.startsWith('booking-'), true);
+ assert.match(c.textContent, /Đã sao chép mã đầy đủ/);
+
+ // Copy failure fallback
+ dom.window.navigator.clipboard = {
+  writeText: async () => { throw new Error('Blocked'); }
+ };
+ await act(async () => copyBtn.click());
+ assert.match(c.textContent, /Không thể sao chép tự động/);
+
+ // Restore default rows adapter for other tests
+ client.defaults.adapter = async config => ({config, data: rows, status: 200, statusText: 'OK', headers: {}});
+});
