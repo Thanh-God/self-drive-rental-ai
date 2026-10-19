@@ -24,6 +24,20 @@ test('REVIEW: explicit route refresh must replace stale draft/version before nex
  const fee=form.querySelector('input[type="number"]').value;
  await submit(form);const version=JSON.parse(take('/admin/branch-routes').config.data).expectedVersion;
  assert.deepEqual({fee,version},{fee:'120',version:3},'Explicit refresh must load current fee/version before next save');
+});
+test('REVIEW: failed route refresh followed by retry must still synchronize current facts',async()=>{
+ const initial={id:'r',pickupBranchId:'dn',returnBranchId:'dn',fee:100,enabled:true,version:2};
+ const c=await loaded(await mount(),[branch],[initial]);
+ let form=[...c.querySelectorAll('form')].find(f=>f.textContent.includes('Cấu hình tuyến'));
+ await submit(form);await act(async()=>fail(take('/admin/branch-routes'),409,'changed'));
+ await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent.includes('Tải lại dữ liệu tuyến')).click());
+ await act(async()=>fail(take('/branch-routes'),500,'temporary read failure'));
+ await act(async()=>[...c.querySelectorAll('button')].find(b=>b.textContent.includes('Thử tải lại')).click());
+ await act(async()=>{reply(take('/branches'),[branch]);reply(take('/branch-routes'),[{...initial,version:3,fee:120}]);});
+ form=[...c.querySelectorAll('form')].find(f=>f.textContent.includes('Cấu hình tuyến'));
+ const fee=form.querySelector('input[type="number"]').value;
+ await submit(form);const version=JSON.parse(take('/admin/branch-routes').config.data).expectedVersion;
+ assert.deepEqual({fee,version},{fee:'120',version:3},'Retry after a failed read must not reopen stale form');
 });`],
   ['vehicles', 'frontend/src/pages/api/vehiclesManagement.test.js', `
 test('REVIEW: second vehicle save must use version returned by first save',async()=>{
