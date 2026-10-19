@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { dateTime } from "../common/PageKit";
+import { adminDateFormat } from "../../utils/bookingQueue";
 
 import { bookingStatusLabels as bookingStageLabels } from "../../utils/uiLabels";
 export { bookingStageLabels };
@@ -30,7 +31,7 @@ export default function BookingProgress({ booking, history = [], role, actions =
     <summary>Lịch sử trạng thái</summary>
     {events.length ? <ol className="mt-3 space-y-3">{events.map((event, index) => <li className="border-l-2 border-teal-200 pl-4 text-sm" key={`${event.occurred_at}-${index}`}>
       <p className="font-semibold">{event.previous_status ? label(event.previous_status) : "Tạo yêu cầu"} → {label(event.next_status)}</p>
-      <p className="mt-1 text-muted">{dateTime(event.occurred_at)}</p>
+      <p className="mt-1 text-muted">{area === "admin" ? adminDateFormat(event.occurred_at, { withTime: true }) : dateTime(event.occurred_at)}</p>
       {event.reason ? <p className="mt-1 whitespace-pre-wrap break-words">{event.reason}</p> : null}
     </li>)}</ol> : <p className="mt-3 text-sm text-muted">Chưa có lịch sử trạng thái từ hệ thống.</p>}
     </details>

@@ -35,12 +35,12 @@ test('Selected date respects Vietnam midnight and work date; invalid dates fail 
  for(const date of ['', 'bad', '2026-02-30', '2026-10-16T00:00:00Z'])assert.deepEqual(visibleBookings(rows,{queue:'date',date}),[]);
  assert.deepEqual(ids(visibleBookings([...rows,{id:'invalid',createdAt:'bad'}],{queue:'date',date:'2026-10-16'})),['latest','new']);assert.deepEqual(ids(visibleBookings(rows,{queue:'all',date:'bad'})),['latest','new','old','return']);
 });
-let dom,vite,createRoot,List,Topbar,Auth,Router,client,originalNow;const originals=new Map(),roots=[],oldMode=process.env.VITE_DATA_MODE;
+let dom,vite,createRoot,List,Detail,Doc,Topbar,Auth,Router,client,originalNow;const originals=new Map(),roots=[],oldMode=process.env.VITE_DATA_MODE;
 before(async()=>{
  dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost'});
  for(const[k,v]of Object.entries({window:dom.window,document:dom.window.document,navigator:dom.window.navigator,localStorage:dom.window.localStorage,sessionStorage:dom.window.sessionStorage,HTMLElement:dom.window.HTMLElement,Node:dom.window.Node,Event:dom.window.Event,IS_REACT_ACT_ENVIRONMENT:true})){originals.set(k,Object.getOwnPropertyDescriptor(globalThis,k));Object.defineProperty(globalThis,k,{configurable:true,writable:true,value:v});}
  process.env.VITE_DATA_MODE='api';createRoot=(await import('react-dom/client')).createRoot;vite=await createServer({root:fileURLToPath(new URL('../..',import.meta.url)),server:{middlewareMode:true},appType:'custom',logLevel:'error'});
- ({ApiBookingListPage:List}=await vite.ssrLoadModule('/src/pages/api/ApiScreens.jsx'));({default:Topbar}=await vite.ssrLoadModule('/src/layouts/WorkspaceTopbar.jsx'));({default:Auth}=await vite.ssrLoadModule('/src/context/AuthContext.jsx'));({MemoryRouter:Router}=await vite.ssrLoadModule('react-router-dom'));({default:client}=await vite.ssrLoadModule('/src/api/client.js'));client.defaults.adapter=async config=>({config,data:rows,status:200,statusText:'OK',headers:{}});originalNow=Date.now;Date.now=()=>now;
+ ({ApiBookingListPage:List,ApiBookingDetailPage:Detail,ApiDocumentPage:Doc}=await vite.ssrLoadModule('/src/pages/api/ApiScreens.jsx'));({default:Topbar}=await vite.ssrLoadModule('/src/layouts/WorkspaceTopbar.jsx'));({default:Auth}=await vite.ssrLoadModule('/src/context/AuthContext.jsx'));({MemoryRouter:Router}=await vite.ssrLoadModule('react-router-dom'));({default:client}=await vite.ssrLoadModule('/src/api/client.js'));client.defaults.adapter=async config=>({config,data:rows,status:200,statusText:'OK',headers:{}});originalNow=Date.now;Date.now=()=>now;
 });
 afterEach(async()=>{for(const root of roots.splice(0))await act(async()=>root.unmount());document.body.replaceChildren();});
 after(async()=>{Date.now=originalNow;await vite.close();dom.window.close();for(const[k,v]of originals){if(v)Object.defineProperty(globalThis,k,v);else delete globalThis[k];}if(oldMode===undefined)delete process.env.VITE_DATA_MODE;else process.env.VITE_DATA_MODE=oldMode;});
@@ -195,4 +195,100 @@ test('F03: adminDateFormat formats dd/mm/yyyy and audit HH:mm with VN timezone',
  assert.equal(adminBookingDate({ policyVersion: 'calendar-2026-10-17' }, d), '20/10/2026');
  assert.equal(adminBookingDate({ policyVersion: 'legacy' }, d), '14:30 20/10/2026');
 });
+
+test('F03-R: Admin booking detail renders dd/mm/yyyy and audit HH:mm in VN timezone', async () => {
+ const detailBooking = {
+  id: 'detail-admin-01',
+  vehicleName: 'Toyota Vios 2023',
+  customerName: 'Trần Văn An',
+  status: 'PENDING',
+  version: 1,
+  policyVersion: 'calendar-2026-10-17',
+  startAt: '2026-10-20T03:00:00Z',
+  endAt: '2026-10-22T03:00:00Z',
+  expiresAt: '2026-10-20T07:30:00Z',
+  createdAt: '2026-10-20T02:00:00Z',
+  pickupName: 'Chi nhánh Quận 1',
+  returnName: 'Chi nhánh Sân Bay',
+  dailyPrice: 600000,
+  rentalDays: 2,
+  oneWayFee: 100000,
+  total: 1300000,
+ };
+ const detailData = {
+  booking: detailBooking,
+  history: [
+   { previous_status: null, next_status: 'PENDING', occurred_at: '2026-10-20T02:00:00Z', reason: 'Tạo đơn' },
+  ],
+  records: [
+   { kind: 'HANDOVER', occurred_at: '2026-10-20T03:30:00Z', condition_note: 'Giao xe tốt' },
+  ],
+ };
+
+ client.defaults.adapter = async (config) => {
+  if (config.url.includes('/bookings/detail-admin-01/review')) {
+   return { config, data: null, status: 200, statusText: 'OK', headers: {} };
+  }
+  if (config.url.includes('/bookings/detail-admin-01')) {
+   return { config, data: detailData, status: 200, statusText: 'OK', headers: {} };
+  }
+  if (config.url.includes('/incidents')) {
+   return { config, data: [], status: 200, statusText: 'OK', headers: {} };
+  }
+  return { config, data: rows, status: 200, statusText: 'OK', headers: {} };
+ };
+
+ const Routes = (await vite.ssrLoadModule('react-router-dom')).Routes;
+ const Route = (await vite.ssrLoadModule('react-router-dom')).Route;
+
+ // Mount in Admin area
+ const c = document.createElement('div');
+ document.body.append(c);
+ const root = createRoot(c);
+ roots.push(root);
+
+ await act(async () => {
+  root.render(
+   h(Router, { initialEntries: ['/admin/bookings/detail-admin-01'] },
+    h(Auth.Provider, { value: { user: { id: 'admin', role: 'ADMIN', fullName: 'Quản trị viên' } } },
+     h(Routes, null,
+      h(Route, { path: '/:area/bookings/:bookingId', element: h(Detail, { area: 'admin' }) })
+     )
+    )
+   )
+  );
+ });
+
+ // Verify Admin dates
+ assert.match(c.textContent, /20\/10\/2026/);
+ assert.match(c.textContent, /22\/10\/2026/);
+ assert.match(c.textContent, /Yêu cầu giữ lịch đến 14:30 20\/10\/2026/);
+ assert.match(c.textContent, /09:00 20\/10\/2026/); // history occurred_at 02:00 UTC = 09:00 VN
+ assert.match(c.textContent, /10:30 20\/10\/2026/); // handover occurred_at 03:30 UTC = 10:30 VN
+
+ // Mount in User area to ensure regression check: user preserves standard format
+ const cUser = document.createElement('div');
+ document.body.append(cUser);
+ const rootUser = createRoot(cUser);
+ roots.push(rootUser);
+
+ await act(async () => {
+  rootUser.render(
+   h(Router, { initialEntries: ['/user/bookings/detail-admin-01'] },
+    h(Auth.Provider, { value: { user: { id: 'user1', role: 'USER', fullName: 'Khách hàng' } } },
+     h(Routes, null,
+      h(Route, { path: '/:area/bookings/:bookingId', element: h(Detail, { area: 'user' }) })
+     )
+    )
+   )
+  );
+ });
+
+ // User date preserves medium Vietnamese date format (thg 10)
+ assert.match(cUser.textContent, /thg 10/);
+
+ // Restore default rows adapter
+ client.defaults.adapter = async config => ({ config, data: rows, status: 200, statusText: 'OK', headers: {} });
+});
+
 

@@ -281,8 +281,8 @@ function IncidentSection({ booking, records = [], area }) {
                       {incident.description}
                     </p>
                     <p className="mt-1 text-xs text-slate-500">
-                      Xảy ra {dateTime(incident.occurredAt)} · Báo cáo{" "}
-                      {dateTime(incident.reportedAt)}
+                      Xảy ra {area === "admin" ? adminDateFormat(incident.occurredAt, { withTime: true }) : dateTime(incident.occurredAt)} · Báo cáo{" "}
+                      {area === "admin" ? adminDateFormat(incident.reportedAt, { withTime: true }) : dateTime(incident.reportedAt)}
                     </p>
                     {incident.evidenceReference ? (
                       <p className="mt-1 text-xs text-slate-500">
@@ -322,7 +322,7 @@ function IncidentSection({ booking, records = [], area }) {
                       selectedEvents.map((item, index) => (
                         <li key={`${item.occurred_at}-${index}`}>
                           <p>
-                            {incidentStatusLabels[item.action] || "Cập nhật hồ sơ"} · {dateTime(item.occurred_at)}
+                            {incidentStatusLabels[item.action] || "Cập nhật hồ sơ"} · {area === "admin" ? adminDateFormat(item.occurred_at, { withTime: true }) : dateTime(item.occurred_at)}
                             {item.previous_status || item.next_status
                               ? ` · ${incidentStatusLabels[item.previous_status] || "Mới"} → ${incidentStatusLabels[item.next_status] || "Cập nhật hồ sơ"}`
                               : ""}
@@ -469,7 +469,7 @@ function IncidentSection({ booking, records = [], area }) {
           </Field>
           <p className="text-xs text-slate-500 sm:col-span-2">
             {custodyStart
-              ? `Thời điểm phải thuộc thời gian giữ xe thực tế: từ ${dateTime(handoverRecord.occurred_at)} đến ${returnRecord ? dateTime(returnRecord.occurred_at) : "hiện tại"}. Hệ thống vẫn kiểm tra lại theo biên bản.`
+              ? `Thời điểm phải thuộc thời gian giữ xe thực tế: từ ${area === "admin" ? adminDateFormat(handoverRecord.occurred_at, { withTime: true }) : dateTime(handoverRecord.occurred_at)} đến ${returnRecord ? (area === "admin" ? adminDateFormat(returnRecord.occurred_at, { withTime: true }) : dateTime(returnRecord.occurred_at)) : "hiện tại"}. Hệ thống vẫn kiểm tra lại theo biên bản.`
               : "Cần có biên bản giao xe thực tế để xác định thời gian sự cố hợp lệ."}
           </p>
           <Field label="Mô tả có căn cứ">
@@ -1706,7 +1706,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
             </div>
             {booking.status === "PENDING" && booking.expiresAt ? (
               <p className="mb-5 text-sm text-amber-800">
-                Yêu cầu giữ lịch đến {dateTime(booking.expiresAt)}.
+                Yêu cầu giữ lịch đến {area === "admin" ? adminDateFormat(booking.expiresAt, { withTime: true }) : dateTime(booking.expiresAt)}.
               </p>
             ) : null}
             {error ? <Notice error>{error}</Notice> : null}
@@ -1718,8 +1718,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     {[
                       ["Khách hàng", booking.customerName],
                       ["Xe", booking.vehicleName],
-                      [booking.policyVersion === 'calendar-2026-10-17' ? "Ngày nhận" : "Thời gian nhận", bookingDate(booking, booking.startAt)],
-                      [booking.policyVersion === 'calendar-2026-10-17' ? "Ngày trả" : "Thời gian trả", bookingDate(booking, booking.endAt)],
+                      [booking.policyVersion === 'calendar-2026-10-17' ? "Ngày nhận" : "Thời gian nhận", area === "admin" ? adminBookingDate(booking, booking.startAt) : bookingDate(booking, booking.startAt)],
+                      [booking.policyVersion === 'calendar-2026-10-17' ? "Ngày trả" : "Thời gian trả", area === "admin" ? adminBookingDate(booking, booking.endAt) : bookingDate(booking, booking.endAt)],
                       ["Chi nhánh nhận", booking.pickupName],
                       [
                         "Chi nhánh trả",
@@ -1762,7 +1762,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                               : "Nhận trả xe"}
                           </h3>
                           <p className="mt-1 text-sm text-slate-500">
-                            {dateTime(record.occurred_at)}
+                            {area === "admin" ? adminDateFormat(record.occurred_at, { withTime: true }) : dateTime(record.occurred_at)}
                           </p>
                           <p className="mt-2 text-sm leading-6">
                             {record.condition_note}
@@ -2019,7 +2019,9 @@ export function ApiDocumentPage({ kind, area }) {
   const formatValue = (key, value) => {
     if (value == null) return "—";
     if (typeof value === "object") return JSON.stringify(value);
-    if (["startAt", "endAt"].includes(key)) return bookingDate(doc, value);
+    if (["startAt", "endAt"].includes(key)) {
+      return area === "admin" ? adminBookingDate(doc, value) : bookingDate(doc, value);
+    }
     if (["rentalTotal", "oneWayFee", "total"].includes(key))
       return money(value);
     return String(value);
