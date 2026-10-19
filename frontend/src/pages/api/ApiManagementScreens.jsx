@@ -707,10 +707,29 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
     };
     try {
       if (form.id) {
-        await apiClient.put(
+        const response = await apiClient.put(
           `/admin/vehicles/${encodeURIComponent(form.id)}`,
           payload,
         );
+        const updated = response?.data;
+        const targetId = form.id;
+        setForm((current) => {
+          if (current.id !== targetId) return current;
+          if (updated && updated.id === targetId) {
+            return {
+              ...current,
+              ...updated,
+              dailyPrice: String(updated.dailyPrice ?? current.dailyPrice),
+              seats: String(updated.seats ?? current.seats),
+              homeBranchId: updated.homeBranchId || current.homeBranchId || "",
+              version: updated.version ?? (Number(current.version) + 1),
+            };
+          }
+          return {
+            ...current,
+            version: (current.version !== undefined && current.version !== null) ? Number(current.version) + 1 : current.version,
+          };
+        });
         setNotice("Đã cập nhật xe.");
       } else {
         const response = await apiClient.post("/admin/vehicles", payload);
@@ -1194,6 +1213,25 @@ export function ApiBranchesPage() {
   });
 
   const routeInitialized = useRef(false);
+  const routeSyncPendingRef = useRef(false);
+
+  useEffect(() => {
+    if (!routeSyncPendingRef.current || routesRequest.loading) return;
+    routeSyncPendingRef.current = false;
+    const fresh = routes.find(
+      (route) =>
+        route.pickupBranchId === routeForm.pickupBranchId &&
+        route.returnBranchId === routeForm.returnBranchId,
+    );
+    if (fresh) {
+      setRouteForm((current) => ({
+        ...current,
+        fee: String(fresh.fee),
+        enabled: Boolean(fresh.enabled),
+      }));
+      setRouteSnapshot({ ...fresh });
+    }
+  }, [routes, routesRequest.loading, routeForm.pickupBranchId, routeForm.returnBranchId]);
 
   useEffect(() => {
     if (
@@ -1286,6 +1324,7 @@ export function ApiBranchesPage() {
   function reloadFreshRoutes() {
     setRouteConflict(false);
     setError("");
+    routeSyncPendingRef.current = true;
     routesRequest.reload();
   }
 
