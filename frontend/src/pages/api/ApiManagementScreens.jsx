@@ -559,25 +559,74 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
   const branchesRequest = useApiData("/branches");
   const assignmentsRequest = useApiData("/me/branches", fleet);
   const [form, setForm] = useState(initialVehicleForm);
+  const [vehicleQuery, setVehicleQuery] = useState("");
+  const [branchFilter, setBranchFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
+  const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState("info");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const deletePending = useRef(false);
-  const vehicles = Array.isArray(vehiclesRequest.data)
-    ? vehiclesRequest.data
-    : [];
-  const assignedBranchIds = new Set(assignmentsRequest.data || []);
-  const visibleVehicles = fleet
-    ? vehicles.filter((vehicle) =>
-        assignedBranchIds.has(vehicle.currentBranchId),
-      )
-    : vehicles;
+  const vehicles = useMemo(
+    () => (Array.isArray(vehiclesRequest.data) ? vehiclesRequest.data : []),
+    [vehiclesRequest.data],
+  );
+  const assignedBranchIds = useMemo(
+    () => new Set(assignmentsRequest.data || []),
+    [assignmentsRequest.data],
+  );
+  const visibleVehicles = useMemo(
+    () =>
+      fleet
+        ? vehicles.filter((vehicle) =>
+            assignedBranchIds.has(vehicle.currentBranchId),
+          )
+        : vehicles,
+    [fleet, vehicles, assignedBranchIds],
+  );
+
+  const filteredVehicles = useMemo(() => {
+    if (fleet) return visibleVehicles;
+    return vehicles.filter((v) => {
+      if (vehicleQuery.trim()) {
+        const q = vehicleQuery.trim().toLowerCase();
+        const matchName = String(v.name || "").toLowerCase().includes(q);
+        const matchPlate = String(v.plate || "").toLowerCase().includes(q);
+        if (!matchName && !matchPlate) return false;
+      }
+      if (branchFilter && v.currentBranchId !== branchFilter) {
+        return false;
+      }
+      if (statusFilter && v.status !== statusFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [fleet, visibleVehicles, vehicles, vehicleQuery, branchFilter, statusFilter]);
+
+  const pageSize = 20;
+  const totalPages = Math.max(1, Math.ceil(filteredVehicles.length / pageSize));
+  const activePage = Math.min(Math.max(1, page), totalPages);
+
+  const filterKey = `${vehicleQuery}|${branchFilter}|${statusFilter}`;
+  const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
+  if (filterKey !== prevFilterKey) {
+    setPrevFilterKey(filterKey);
+    setPage(1);
+  }
+
+  const pagedVehicles = fleet
+    ? filteredVehicles
+    : filteredVehicles.slice((activePage - 1) * pageSize, activePage * pageSize);
+
   const catalog = catalogRequest.data || {};
   const brands = useMemo(() => catalog.brands || [], [catalog.brands]);
   const categories = useMemo(() => catalog.categories || [], [catalog.categories]);
+  const allBranches = useMemo(() => branchesRequest.data || [], [branchesRequest.data]);
   const branches = useMemo(
-    () => (branchesRequest.data || []).filter((branch) => branch.status === "ACTIVE"),
-    [branchesRequest.data],
+    () => allBranches.filter((branch) => branch.status === "ACTIVE"),
+    [allBranches],
   );
   const brandInitialized = useRef(false);
   const categoryInitialized = useRef(false);
@@ -609,6 +658,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
     });
     setError("");
     setNotice("");
+    setActiveTab("info");
   }
 
   function resetVehicleForm() {
@@ -618,6 +668,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
       categoryId: categories[0]?.id || "",
       homeBranchId: branches[0]?.id || "",
     });
+    setActiveTab("info");
   }
 
   async function deleteVehicle(vehicle) {
@@ -662,10 +713,17 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
         );
         setNotice("Đã cập nhật xe.");
       } else {
-        await apiClient.post("/admin/vehicles", payload);
-        setNotice("Đã tạo xe.");
+        const response = await apiClient.post("/admin/vehicles", payload);
+        const created = response?.data;
+        if (created?.id) {
+          editVehicle(created);
+          setActiveTab("images");
+          setNotice(`Đã tạo xe ${created.name}. Bạn có thể tiếp tục bổ sung hình ảnh và tiện nghi.`);
+        } else {
+          resetVehicleForm();
+          setNotice("Đã tạo xe.");
+        }
       }
-      resetVehicleForm();
       vehiclesRequest.reload();
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể lưu thông tin xe."));
@@ -731,7 +789,53 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
           }
         >
           <div className="space-y-3">
-            {visibleVehicles.map((vehicle) => (
+            {!fleet ? (
+              <div className="panel space-y-3" aria-label="Bộ lọc quản lý xe">
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="Tìm kiếm xe">
+                    <input
+                      placeholder="Tên xe hoặc biển số..."
+                      value={vehicleQuery}
+                      onChange={(e) => setVehicleQuery(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Chi nhánh hiện tại">
+                    <select
+                      value={branchFilter}
+                      onChange={(e) => setBranchFilter(e.target.value)}
+                    >
+                      <option value="">Tất cả chi nhánh</option>
+                      {allBranches.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name}{b.status === "INACTIVE" ? " (Ngừng nhận đơn)" : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Field label="Trạng thái khai thác">
+                    <select
+                      value={statusFilter}
+                      onChange={(e) => setStatusFilter(e.target.value)}
+                    >
+                      <option value="">Tất cả trạng thái</option>
+                      <option value="ACTIVE">Đang khai thác</option>
+                      <option value="MAINTENANCE">Bảo trì</option>
+                      <option value="INACTIVE">Ngừng khai thác</option>
+                    </select>
+                  </Field>
+                </div>
+              </div>
+            ) : null}
+
+            {!fleet && filteredVehicles.length > 0 ? (
+              <div className="flex items-center justify-between text-sm text-slate-600 px-1">
+                <span>
+                  Hiển thị {pagedVehicles.length}/{filteredVehicles.length} xe · Trang {activePage}/{totalPages}
+                </span>
+              </div>
+            ) : null}
+
+            {pagedVehicles.map((vehicle) => (
               <article
                 className="panel space-y-4"
                 key={vehicle.id}
@@ -791,179 +895,274 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                 </div>
               </article>
             ))}
-            {!visibleVehicles.length ? (
+            {!pagedVehicles.length ? (
               <EmptyState
                 title={
                   fleet && !assignedBranchIds.size
                     ? "Chưa được gán chi nhánh"
-                    : "Chưa có xe trong phạm vi"
+                    : (vehicleQuery || branchFilter || statusFilter)
+                      ? "Không có xe phù hợp"
+                      : "Chưa có xe trong phạm vi"
                 }
                 description={
                   fleet && !assignedBranchIds.size
                     ? "Liên hệ quản trị viên để được phân công chi nhánh vận hành."
-                    : undefined
+                    : (vehicleQuery || branchFilter || statusFilter)
+                      ? "Thử thay đổi từ khóa hoặc bộ lọc."
+                      : undefined
                 }
               />
+            ) : null}
+
+            {!fleet && totalPages > 1 ? (
+              <nav className="flex items-center justify-between border-t border-slate-100 pt-3" aria-label="Phân trang danh sách xe">
+                <span className="text-sm text-slate-600">
+                  Trang {activePage}/{totalPages} ({filteredVehicles.length} xe)
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={activePage <= 1}
+                    onClick={() => setPage(activePage - 1)}
+                  >
+                    Trang trước
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    disabled={activePage >= totalPages}
+                    onClick={() => setPage(activePage + 1)}
+                  >
+                    Trang sau
+                  </button>
+                </div>
+              </nav>
             ) : null}
           </div>
           {!fleet ? (
             <div className="space-y-4">
-              <form className="panel h-fit space-y-4" onSubmit={saveVehicle}>
-                <h2 className="text-lg font-semibold">
-                  {form.id ? "Cập nhật xe" : "Thêm xe"}
-                </h2>
-              <Field label="Tên xe">
-                <input
-                  required
-                  maxLength={120}
-                  value={form.name}
-                  onChange={(event) =>
-                    setForm({ ...form, name: event.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Biển số">
-                <input
-                  required
-                  maxLength={20}
-                  value={form.plate}
-                  onChange={(event) =>
-                    setForm({ ...form, plate: event.target.value })
-                  }
-                />
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Hãng xe">
-                  <select
-                    value={form.brandId}
-                    onChange={(event) =>
-                      setForm({ ...form, brandId: event.target.value })
-                    }
-                  >
-                    {brands.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-                <Field label="Loại xe">
-                  <select
-                    value={form.categoryId}
-                    onChange={(event) =>
-                      setForm({ ...form, categoryId: event.target.value })
-                    }
-                  >
-                    {categories.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                </Field>
-              </div>
-              <Field
-                label={`Chi nhánh quản lý${form.id ? " (giữ nguyên khi cập nhật)" : ""}`}
-              >
-                <select
-                  required
-                  disabled={Boolean(form.id)}
-                  value={form.homeBranchId}
-                  onChange={(event) =>
-                    setForm({ ...form, homeBranchId: event.target.value })
-                  }
-                >
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-              <div className="grid grid-cols-2 gap-3">
-                <Field label="Số chỗ">
-                  <input
-                    type="number"
-                    min="2"
-                    max="9"
-                    required
-                    value={form.seats}
-                    onChange={(event) =>
-                      setForm({ ...form, seats: event.target.value })
-                    }
-                  />
-                </Field>
-                <Field label="Hộp số">
-                  <select
-                    value={form.transmission}
-                    onChange={(event) =>
-                      setForm({ ...form, transmission: event.target.value })
-                    }
-                  >
-                    <option value="AUTO">Tự động</option>
-                    <option value="MANUAL">Số sàn</option>
-                  </select>
-                </Field>
-              </div>
-              <Field label="Giá/ngày (VND)">
-                <input
-                  type="number"
-                  min="1"
-                  max="100000000"
-                  required
-                  value={form.dailyPrice}
-                  onChange={(event) =>
-                    setForm({ ...form, dailyPrice: event.target.value })
-                  }
-                />
-              </Field>
-              <Field label="Trạng thái">
-                <select
-                  value={form.status}
-                  onChange={(event) =>
-                    setForm({ ...form, status: event.target.value })
-                  }
-                >
-                  <option value="ACTIVE">Đang khai thác</option>
-                  <option value="MAINTENANCE">Bảo trì</option>
-                  <option value="INACTIVE">Ngừng khai thác</option>
-                </select>
-              </Field>
-              <Field label="Mô tả">
-                <textarea
-                  maxLength={2000}
-                  value={form.description || ""}
-                  onChange={(event) =>
-                    setForm({ ...form, description: event.target.value })
-                  }
-                />
-              </Field>
-              <div className="flex gap-2">
-                <button className="btn" disabled={busy}>
-                  {busy ? "Đang lưu..." : form.id ? "Lưu thay đổi" : "Tạo xe"}
-                </button>
-                {form.id ? (
+              {form.id ? (
+                <div className="flex border-b border-slate-200 gap-2 pb-2" role="tablist" aria-label="Nhóm biên tập xe">
                   <button
                     type="button"
-                    className="btn-secondary"
-                    onClick={resetVehicleForm}
+                    role="tab"
+                    aria-selected={activeTab === "info"}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === "info"
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                    onClick={() => setActiveTab("info")}
                   >
-                    Hủy
+                    Thông tin xe
                   </button>
-                ) : null}
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "images"}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === "images"
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                    onClick={() => setActiveTab("images")}
+                  >
+                    Hình ảnh
+                  </button>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={activeTab === "amenities"}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
+                      activeTab === "amenities"
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-600 hover:bg-slate-100"
+                    }`}
+                    onClick={() => setActiveTab("amenities")}
+                  >
+                    Tiện nghi
+                  </button>
+                </div>
+              ) : null}
+
+              <p className="text-xs text-slate-500">
+                Thông tin xe, hình ảnh và tiện nghi được lưu độc lập theo từng nhóm.
+              </p>
+
+              <div className={activeTab === "info" ? "space-y-4" : "hidden"}>
+                <form className="panel h-fit space-y-4" onSubmit={saveVehicle}>
+                  <h2 className="text-lg font-semibold">
+                    {form.id ? `Cập nhật xe: ${form.name} (${form.plate})` : "Thêm xe"}
+                  </h2>
+                  <Field label="Tên xe">
+                    <input
+                      required
+                      maxLength={120}
+                      value={form.name}
+                      onChange={(event) =>
+                        setForm({ ...form, name: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Biển số">
+                    <input
+                      required
+                      maxLength={20}
+                      value={form.plate}
+                      onChange={(event) =>
+                        setForm({ ...form, plate: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Hãng xe">
+                      <select
+                        value={form.brandId}
+                        onChange={(event) =>
+                          setForm({ ...form, brandId: event.target.value })
+                        }
+                      >
+                        {brands.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    <Field label="Loại xe">
+                      <select
+                        value={form.categoryId}
+                        onChange={(event) =>
+                          setForm({ ...form, categoryId: event.target.value })
+                        }
+                      >
+                        {categories.map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {item.name}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  </div>
+                  <Field
+                    label={`Chi nhánh quản lý${form.id ? " (giữ nguyên khi cập nhật)" : ""}`}
+                  >
+                    <select
+                      required
+                      disabled={Boolean(form.id)}
+                      value={form.homeBranchId}
+                      onChange={(event) =>
+                        setForm({ ...form, homeBranchId: event.target.value })
+                      }
+                    >
+                      {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>
+                          {branch.name}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Số chỗ">
+                      <input
+                        type="number"
+                        min="2"
+                        max="9"
+                        required
+                        value={form.seats}
+                        onChange={(event) =>
+                          setForm({ ...form, seats: event.target.value })
+                        }
+                      />
+                    </Field>
+                    <Field label="Hộp số">
+                      <select
+                        value={form.transmission}
+                        onChange={(event) =>
+                          setForm({ ...form, transmission: event.target.value })
+                        }
+                      >
+                        <option value="AUTO">Tự động</option>
+                        <option value="MANUAL">Số sàn</option>
+                      </select>
+                    </Field>
+                  </div>
+                  <Field label="Giá/ngày (VND)">
+                    <input
+                      type="number"
+                      min="1"
+                      max="100000000"
+                      required
+                      value={form.dailyPrice}
+                      onChange={(event) =>
+                        setForm({ ...form, dailyPrice: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <Field label="Trạng thái">
+                    <select
+                      value={form.status}
+                      onChange={(event) =>
+                        setForm({ ...form, status: event.target.value })
+                      }
+                    >
+                      <option value="ACTIVE">Đang khai thác</option>
+                      <option value="MAINTENANCE">Bảo trì</option>
+                      <option value="INACTIVE">Ngừng khai thác</option>
+                    </select>
+                  </Field>
+                  <Field label="Mô tả">
+                    <textarea
+                      maxLength={2000}
+                      value={form.description || ""}
+                      onChange={(event) =>
+                        setForm({ ...form, description: event.target.value })
+                      }
+                    />
+                  </Field>
+                  <div className="flex flex-wrap gap-2">
+                    <button className="btn" disabled={busy}>
+                      {busy ? "Đang lưu..." : form.id ? "Lưu thay đổi" : "Tạo xe"}
+                    </button>
+                    {form.id ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={() => setActiveTab("images")}
+                        >
+                          Sang Hình ảnh →
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-secondary"
+                          onClick={resetVehicleForm}
+                        >
+                          Hủy
+                        </button>
+                      </>
+                    ) : null}
+                  </div>
+                </form>
               </div>
-            </form>
-            {form.id ? <VehicleImageEditor key={`images-${form.id}`} vehicleId={form.id} /> : null}
-            {form.id ? (
-              <div className="panel h-fit">
-                <VehicleAmenityEditor
-                  key={form.id}
-                  vehicleId={form.id}
-                  catalogAmenities={catalog.amenities || []}
-                />
-              </div>
-            ) : null}
-          </div>
+              {form.id ? (
+                <div className={activeTab === "images" ? "space-y-4" : "hidden"}>
+                  <VehicleImageEditor key={`images-${form.id}`} vehicleId={form.id} />
+                </div>
+              ) : null}
+              {form.id ? (
+                <div className={activeTab === "amenities" ? "space-y-4" : "hidden"}>
+                  <div className="panel h-fit">
+                    <VehicleAmenityEditor
+                      key={form.id}
+                      vehicleId={form.id}
+                      catalogAmenities={catalog.amenities || []}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </div>
           ) : null}
         </div>
       )}
