@@ -90,3 +90,119 @@ test("route configuration retains both inactive branches and version contract",a
  const form=[...c.querySelectorAll("form")].find(f=>f.textContent.includes("Cấu hình tuyến"));assert.equal(form.querySelectorAll("select option").length,4);
  await submit(form);const r=take("/admin/branch-routes");assert.deepEqual(JSON.parse(r.config.data),{pickupBranchId:"dn",returnBranchId:"dn",fee:0,enabled:false,expectedVersion:0});assert.equal(requests.filter(r=>r.config.method==="put").length,1);
 });
+
+test("P0-4: click Chỉnh sửa tuyến fills form, scrolls/focuses, sends no mutation, preserves one-way separation A->B vs B->A", async () => {
+ const branchDN = { id: "dn", name: "Đà Nẵng", address: "DN", status: "ACTIVE", version: 7 };
+ const branchHN = { id: "hn", name: "Hà Nội", address: "HN", status: "INACTIVE", version: 2 };
+ const routeDNHN = { id: "dn-hn", pickupBranchId: "dn", returnBranchId: "hn", fee: 250000, enabled: true, version: 3 };
+ const routeHNDN = { id: "hn-dn", pickupBranchId: "hn", returnBranchId: "dn", fee: 350000, enabled: false, version: 5 };
+
+ const c = await loaded(await mount(), [branchDN, branchHN], [routeDNHN, routeHNDN]);
+
+ // Check route table has 2 rows with one-way header and edit buttons
+ const rows = c.querySelectorAll("table.data-table tbody tr");
+ assert.equal(rows.length, 2);
+ assert.match(rows[0].textContent, /Đà Nẵng.*→.*Hà Nội \(Ngừng nhận đơn\)/);
+ assert.match(rows[0].textContent, /Tạm không nhận đơn mới do chi nhánh ngừng hoạt động/);
+ assert.match(rows[0].textContent, /Phiên bản 3/);
+ assert.match(rows[1].textContent, /Phiên bản 5/);
+
+ // Click "Chỉnh sửa" on row 0 (DN -> HN)
+ const editBtn = rows[0].querySelector("button");
+ assert.ok(editBtn);
+ await act(async () => editBtn.click());
+
+ // Verify NO mutation sent on click
+ assert.equal(requests.filter(r => r.config.method === "put").length, 0);
+
+ // Form populated with DN -> HN data
+ const form = [...c.querySelectorAll("form")].find(f => f.textContent.includes("Cấu hình tuyến"));
+ assert.ok(form);
+ const selects = form.querySelectorAll("select");
+ assert.equal(selects[0].value, "dn");
+ assert.equal(selects[1].value, "hn");
+ const feeInput = form.querySelector('input[type="number"]');
+ assert.equal(feeInput.value, "250000");
+ const enabledCheckbox = form.querySelector('input[type="checkbox"]');
+ assert.equal(enabledCheckbox.checked, true);
+
+ // Inactive warning displayed in form
+ assert.match(form.textContent, /Chi nhánh trả \(Hà Nội\) đang ngừng nhận đơn mới/);
+
+ // Change fee and submit
+ await act(async () => {
+  const prototype = Object.getPrototypeOf(feeInput);
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+  if (descriptor?.set) descriptor.set.call(feeInput, "280000");
+  else feeInput.value = "280000";
+  feeInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  feeInput.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+ });
+
+ await submit(form);
+ const putReq = take("/admin/branch-routes");
+ assert.equal(putReq.config.method, "put");
+ const sentData = JSON.parse(putReq.config.data);
+ assert.deepEqual(sentData, {
+  pickupBranchId: "dn",
+  returnBranchId: "hn",
+  fee: 280000,
+  enabled: true,
+  expectedVersion: 3,
+ });
+
+ // Resolve put and routes reload
+ await act(async () => {
+  reply(putReq, null);
+ });
+ const reloadReq = take("/branch-routes");
+ await act(async () => {
+  reply(reloadReq, [{ ...routeDNHN, fee: 280000, version: 4 }, routeHNDN]);
+ });
+
+ assert.match(c.textContent, /Đã cập nhật tuyến nhận\/trả/);
+});
+
+test("P0-4: route conflict 409 does not overwrite draft, prevents silent bypass, requires explicit fresh reload", async () => {
+ const branchDN = { id: "dn", name: "Đà Nẵng", address: "DN", status: "ACTIVE", version: 7 };
+ const routeDNHN = { id: "dn-hn", pickupBranchId: "dn", returnBranchId: "dn", fee: 100000, enabled: true, version: 2 };
+
+ const c = await loaded(await mount(), [branchDN], [routeDNHN]);
+ const form = [...c.querySelectorAll("form")].find(f => f.textContent.includes("Cấu hình tuyến"));
+ const feeInput = form.querySelector('input[type="number"]');
+
+ await act(async () => {
+  const prototype = Object.getPrototypeOf(feeInput);
+  const descriptor = Object.getOwnPropertyDescriptor(prototype, "value");
+  if (descriptor?.set) descriptor.set.call(feeInput, "150000");
+  else feeInput.value = "150000";
+  feeInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+  feeInput.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
+ });
+
+ await submit(form);
+ const putReq = take("/admin/branch-routes");
+ assert.equal(JSON.parse(putReq.config.data).expectedVersion, 2);
+
+ // 409 conflict
+ await act(async () => fail(putReq, 409, "Tuyến đã bị sửa ở phiên khác"));
+
+ // Verify conflict notice and disabled save button
+ assert.match(c.textContent, /409: Tuyến nhận\/trả đã bị thay đổi ở phiên khác/);
+ const saveBtn = [...form.querySelectorAll("button")].find(b => b.textContent.includes("Lưu tuyến"));
+ assert.equal(saveBtn.disabled, true);
+ // Draft fee is preserved
+ assert.equal(feeInput.value, "150000");
+
+ // Explicit fresh reload
+ const reloadBtn = [...c.querySelectorAll("button")].find(b => b.textContent.includes("Tải lại dữ liệu tuyến"));
+ assert.ok(reloadBtn);
+ await act(async () => reloadBtn.click());
+
+ const freshRoutesReq = take("/branch-routes");
+ await act(async () => reply(freshRoutesReq, [{ ...routeDNHN, version: 3, fee: 120000 }]));
+
+ // Conflict cleared
+ assert.doesNotMatch(c.textContent, /409: Tuyến nhận\/trả đã bị thay đổi/);
+});
+

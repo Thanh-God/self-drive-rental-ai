@@ -1181,6 +1181,9 @@ export function ApiBranchesPage() {
   const [busy, setBusy] = useState(false);
   const mutationPending = useRef(false);
   const [conflict, setConflict] = useState(false);
+  const [routeConflict, setRouteConflict] = useState(false);
+  const [routeSnapshot, setRouteSnapshot] = useState(null);
+  const routeFormRef = useRef(null);
   const branches = useMemo(() => branchesRequest.data || [], [branchesRequest.data]);
   const routes = useMemo(() => routesRequest.data || [], [routesRequest.data]);
   const [routeForm, setRouteForm] = useState({
@@ -1214,6 +1217,8 @@ export function ApiBranchesPage() {
       fee: initialRoute ? String(initialRoute.fee) : "",
       enabled: initialRoute?.enabled ?? false,
     }));
+    setRouteSnapshot(initialRoute ? { ...initialRoute } : null);
+    setRouteConflict(false);
   }, [
     branches,
     routes,
@@ -1258,9 +1263,35 @@ export function ApiBranchesPage() {
     }
   }
 
+  function editRoute(route) {
+    setRouteForm({
+      pickupBranchId: route.pickupBranchId,
+      returnBranchId: route.returnBranchId,
+      fee: String(route.fee),
+      enabled: Boolean(route.enabled),
+    });
+    setRouteSnapshot({ ...route });
+    setRouteConflict(false);
+    setError("");
+    setNotice(`Đang chỉnh sửa tuyến một chiều: ${
+      branches.find((b) => b.id === route.pickupBranchId)?.name || route.pickupBranchId
+    } → ${
+      branches.find((b) => b.id === route.returnBranchId)?.name || route.returnBranchId
+    }`);
+    routeFormRef.current?.scrollIntoView?.({ behavior: "smooth", block: "nearest" });
+    const feeInput = routeFormRef.current?.querySelector('input[type="number"]');
+    feeInput?.focus();
+  }
+
+  function reloadFreshRoutes() {
+    setRouteConflict(false);
+    setError("");
+    routesRequest.reload();
+  }
+
   async function saveRoute(event) {
     event.preventDefault();
-    if (!isAdmin || mutationPending.current || conflict) return;
+    if (!isAdmin || mutationPending.current || conflict || routeConflict) return;
     mutationPending.current = true;
     setError("");
     setNotice("");
@@ -1270,19 +1301,24 @@ export function ApiBranchesPage() {
         route.pickupBranchId === routeForm.pickupBranchId &&
         route.returnBranchId === routeForm.returnBranchId,
     );
+    const expectedVersion = Number(routeSnapshot?.version ?? existingRoute?.version ?? 0);
     try {
       await apiClient.put("/admin/branch-routes", {
         pickupBranchId: routeForm.pickupBranchId,
         returnBranchId: routeForm.returnBranchId,
-        fee: Number(routeForm.fee),
-        enabled: routeForm.enabled,
-        expectedVersion: existingRoute ? Number(existingRoute.version) : 0,
+        fee: Number(routeForm.fee || 0),
+        enabled: Boolean(routeForm.enabled),
+        expectedVersion,
       });
       setNotice("Đã cập nhật tuyến nhận/trả.");
       routesRequest.reload();
+      setRouteSnapshot(existingRoute ? { ...existingRoute, version: expectedVersion + 1, fee: Number(routeForm.fee || 0), enabled: Boolean(routeForm.enabled) } : null);
     } catch (requestError) {
       setError(getErrorMessage(requestError, "Không thể lưu tuyến."));
-      if (requestError.response?.status === 409) routesRequest.reload();
+      if (requestError.response?.status === 409) {
+        setRouteConflict(true);
+        setError("409: Tuyến nhận/trả đã bị thay đổi ở phiên khác. Tải lại bản mới trước khi lưu tiếp; bản sửa chưa được lưu.");
+      }
     } finally {
       mutationPending.current = false;
       setBusy(false);
@@ -1349,6 +1385,8 @@ export function ApiBranchesPage() {
       fee: savedRoute ? String(savedRoute.fee) : "",
       enabled: savedRoute?.enabled ?? false,
     });
+    setRouteSnapshot(savedRoute ? { ...savedRoute } : null);
+    setRouteConflict(false);
   }
 
   const loading = branchesRequest.loading || routesRequest.loading;
@@ -1455,36 +1493,70 @@ export function ApiBranchesPage() {
             </form>
           </div>
           <div className="space-y-4">
-            <section className="panel">
-              <h2 className="mb-4 text-lg font-semibold">
+            <section className="panel space-y-4">
+              <h2 className="text-lg font-semibold">
                 Các tuyến đã cấu hình
               </h2>
+              <p className="text-xs text-slate-500">
+                Mỗi tuyến là một chiều (Nhận → Trả) độc lập. Thay đổi tuyến A → B không ảnh hưởng đến B → A.
+              </p>
               {routes.length ? (
                 <div className="table-wrap">
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Nhận → trả</th>
+                        <th>Tuyến một chiều (Nhận → Trả)</th>
                         <th>Phí</th>
                         <th>Trạng thái</th>
+                        <th>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {routes.map((route) => (
-                        <tr key={route.id}>
-                          <td>
-                            {branches.find(
-                              (branch) => branch.id === route.pickupBranchId,
-                            )?.name || route.pickupBranchId}{" "}
-                            →{" "}
-                            {branches.find(
-                              (branch) => branch.id === route.returnBranchId,
-                            )?.name || route.returnBranchId}
-                          </td>
-                          <td>{money(route.fee)}</td>
-                          <td>{route.enabled ? "Đang mở" : "Đã đóng"}</td>
-                        </tr>
-                      ))}
+                      {routes.map((route) => {
+                        const pickupBranch = branches.find((b) => b.id === route.pickupBranchId);
+                        const returnBranch = branches.find((b) => b.id === route.returnBranchId);
+                        const pickupInactive = pickupBranch?.status === "INACTIVE";
+                        const returnInactive = returnBranch?.status === "INACTIVE";
+                        const branchInactive = pickupInactive || returnInactive;
+                        return (
+                          <tr key={route.id || `${route.pickupBranchId}-${route.returnBranchId}`}>
+                            <td>
+                              <div className="font-medium">
+                                <span>{pickupBranch?.name || route.pickupBranchId}</span>
+                                {pickupInactive ? <span className="ml-1 text-xs text-amber-700 font-normal"> (Ngừng nhận đơn)</span> : null}
+                                <span className="mx-2 text-slate-400">→</span>
+                                <span>{returnBranch?.name || route.returnBranchId}</span>
+                                {returnInactive ? <span className="ml-1 text-xs text-amber-700 font-normal"> (Ngừng nhận đơn)</span> : null}
+                              </div>
+                              <div className="text-xs text-slate-400 mt-0.5">
+                                Phiên bản {route.version}
+                              </div>
+                            </td>
+                            <td>{money(route.fee)}</td>
+                            <td>
+                              <span className={route.enabled ? "text-emerald-700 font-medium" : "text-slate-500"}>
+                                {route.enabled ? "Đang mở" : "Đã đóng"}
+                              </span>
+                              {branchInactive ? (
+                                <p className="text-xs text-amber-700 mt-0.5">
+                                  Tạm không nhận đơn mới do chi nhánh ngừng hoạt động
+                                </p>
+                              ) : null}
+                            </td>
+                            <td>
+                              <button
+                                type="button"
+                                className="btn-secondary text-xs"
+                                disabled={busy || conflict || routeConflict}
+                                onClick={() => editRoute(route)}
+                                aria-label={`Chỉnh sửa tuyến ${pickupBranch?.name || route.pickupBranchId} đến ${returnBranch?.name || route.returnBranchId}`}
+                              >
+                                Chỉnh sửa
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -1492,8 +1564,11 @@ export function ApiBranchesPage() {
                 <p className="text-sm text-slate-500">Chưa có tuyến.</p>
               )}
             </section>
-            <form className="panel space-y-4" onSubmit={saveRoute}>
+            <form ref={routeFormRef} className="panel space-y-4" onSubmit={saveRoute}>
               <h2 className="text-lg font-semibold">Cấu hình tuyến</h2>
+              <p className="text-xs text-slate-500">
+                Tuyến nhận/trả là một chiều riêng biệt. Phiên bản dự kiến: {routeSnapshot ? routeSnapshot.version : 0}.
+              </p>
               <Field label="Chi nhánh nhận">
                 <select
                   required
@@ -1504,7 +1579,7 @@ export function ApiBranchesPage() {
                 >
                   {branches.map((branch) => (
                     <option key={branch.id} value={branch.id}>
-                      {branch.name}
+                      {branch.name}{branch.status === "INACTIVE" ? " (Ngừng nhận đơn)" : ""}
                     </option>
                   ))}
                 </select>
@@ -1519,11 +1594,25 @@ export function ApiBranchesPage() {
                 >
                   {branches.map((branch) => (
                     <option key={branch.id} value={branch.id}>
-                      {branch.name}
+                      {branch.name}{branch.status === "INACTIVE" ? " (Ngừng nhận đơn)" : ""}
                     </option>
                   ))}
                 </select>
               </Field>
+              {(() => {
+                const p = branches.find((b) => b.id === routeForm.pickupBranchId);
+                const r = branches.find((b) => b.id === routeForm.returnBranchId);
+                if (p?.status === "INACTIVE" || r?.status === "INACTIVE") {
+                  return (
+                    <div className="p-3 bg-amber-50 rounded-lg text-xs text-amber-800" role="note">
+                      Lưu ý: {p?.status === "INACTIVE" ? `Chi nhánh nhận (${p.name})` : ""}
+                      {p?.status === "INACTIVE" && r?.status === "INACTIVE" ? " và " : ""}
+                      {r?.status === "INACTIVE" ? `Chi nhánh trả (${r.name})` : ""} đang ngừng nhận đơn mới. Cấu hình tuyến vẫn có thể lưu nhưng khách hàng chưa thể đặt chuyến qua tuyến này.
+                    </div>
+                  );
+                }
+                return null;
+              })()}
               <Field label="Phí tuyến (VND)">
                 <input
                   type="number"
@@ -1549,8 +1638,16 @@ export function ApiBranchesPage() {
                 />{" "}
                 Tuyến đang hoạt động
               </label>
-              <button className="btn" disabled={busy || conflict || branches.length < 1}>
-                Lưu tuyến
+              {routeConflict ? (
+                <div>
+                  <Notice error>Tuyến đã bị thay đổi ở phiên khác. Tải lại bản mới trước khi lưu tiếp.</Notice>
+                  <button type="button" className="btn-secondary mt-2" onClick={reloadFreshRoutes}>
+                    Tải lại dữ liệu tuyến
+                  </button>
+                </div>
+              ) : null}
+              <button className="btn" disabled={busy || conflict || routeConflict || branches.length < 1}>
+                {busy ? "Đang lưu..." : "Lưu tuyến"}
               </button>
             </form>
           </div>
