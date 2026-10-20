@@ -10,6 +10,8 @@ API mode lấy dữ liệu backend/MySQL, demo có model/session riêng và đư
 
 Giao diện có loading/error/empty/pending, chặn gửi lặp và phản hồi cũ. Stale version/revision cần tải lại trước khi gửi tiếp. Quote gắn với input; đổi xe, thời gian hoặc chi nhánh làm quote cũ hết hiệu lực. VND nguyên đồng, thời gian Asia/Ho_Chi_Minh; hóa đơn không chứng minh đã thanh toán. Thông tin [so sánh](vehicle-comparison.md), [yêu thích](vehicle-favorites.md) và [hướng dẫn thuê](rental-guide.md) có contract riêng.
 
+USER có thể mở [hành trình một ngày](../modules/ai-itinerary.md) từ khối khám phá trong Trợ lý, xem preview rồi chủ động lưu. Đổi tiêu chí hủy preview cũ; khi đang lưu, đầu vào bị khóa. Kết quả lưu đọc từ snapshot của chính tài khoản, không phụ thuộc provider còn chạy. Guest được chuyển đến đăng nhập; Staff/Admin không dùng trang planner dành cho khách.
+
 ## Tài khoản và hồ sơ
 
 Đăng ký gồm họ tên, email, mật khẩu và tạo role USER. Email chuẩn hóa/kiểm trùng tại backend. Mật khẩu mới ít nhất 8 ký tự, có hoa/thường/số/ký tự đặc biệt, tối đa 72 byte UTF-8 và không thuộc danh sách phổ biến; tài khoản cũ giữ mật khẩu hiện có. Form có autocomplete, hiện/ẩn mật khẩu và giới hạn gửi request.

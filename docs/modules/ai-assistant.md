@@ -17,3 +17,5 @@ POST `/api/v1/ai/criteria/parse` chỉ USER, body `{ "text": "..." }` tối đa1
 # Địa điểm và tuyến đường AI3
 
 Trong chatbox, mở “Khám phá địa điểm và tuyến đường” để đọc metadata địa điểm và preview tuyến2–8 điểm theo thứ tự. Graph hiện hỗ trợ vùng Đà Nẵng–Hội An; số liệu chỉ xuất hiện khi tuyến VERIFIED. Thông tin chưa xác minh, nguồn và thời điểm kiểm chứng được hiển thị rõ; không tự lưu itinerary. Xem [contract metadata](location-visit-metadata.md).
+
+Khối khám phá có liên kết đến [hành trình một ngày](ai-itinerary.md): USER chủ động preview rồi lưu/xem lại tại trang riêng. Xem tuyến trong chatbox không tự lưu hành trình.
