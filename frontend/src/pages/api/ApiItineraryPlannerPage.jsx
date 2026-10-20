@@ -14,6 +14,20 @@ function formatDateVn(isoDate) {
   return isoDate;
 }
 
+function getVietnamDateStrings() {
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const todayStr = formatter.format(new Date());
+  const now = new Date();
+  const maxDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const maxDateStr = formatter.format(maxDate);
+  return { todayStr, maxDateStr };
+}
+
 export default function ApiItineraryPlannerPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -22,11 +36,8 @@ export default function ApiItineraryPlannerPage() {
   const [categories, setCategories] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
 
-  // Form criteria state
-  const now = new Date();
-  const todayStr = now.toISOString().slice(0, 10);
-  const maxDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
-  const maxDateStr = maxDate.toISOString().slice(0, 10);
+  // Form criteria state tính theo múi giờ Việt Nam Asia/Ho_Chi_Minh (F05)
+  const { todayStr, maxDateStr } = getVietnamDateStrings();
 
   const [tripDate, setTripDate] = useState(todayStr);
   const [startTime, setStartTime] = useState("09:00");
@@ -46,13 +57,60 @@ export default function ApiItineraryPlannerPage() {
   const previewAbortRef = useRef(null);
   const saveAbortRef = useRef(null);
 
-  // Khi thay đổi bất kỳ trường criteria nào, tự động hủy preview cũ và disable nút Lưu (F05)
+  // Khi thay đổi bất kỳ trường criteria nào, tăng generation và abort preview request đang chạy (F05)
   function handleCriteriaChange(setter, value) {
     setter(value);
+    generationRef.current += 1;
+    if (previewAbortRef.current) {
+      previewAbortRef.current.abort();
+      previewAbortRef.current = null;
+    }
     setPreviewResult(null);
     setSaveSuccessId("");
     setError("");
+    setBusy(false);
   }
+
+  const [prevUserKey, setPrevUserKey] = useState(() => `${user?.id || ""}:${user?.role || ""}`);
+  const currentUserKey = `${user?.id || ""}:${user?.role || ""}`;
+
+  // Bảo vệ preview/save khi switch account / logout (F05) - state adjustment an toàn trong render (không đụng ref)
+  if (currentUserKey !== prevUserKey) {
+    setPrevUserKey(currentUserKey);
+    setPreviewResult(null);
+    setSaveSuccessId("");
+    setError("");
+    setBusy(false);
+    setSaving(false);
+  }
+
+  // Hủy các request đang chạy khi user thay đổi (F05) - thực hiện trong effect an toàn cho refs
+  useEffect(() => {
+    generationRef.current += 1;
+    if (previewAbortRef.current) {
+      previewAbortRef.current.abort();
+      previewAbortRef.current = null;
+    }
+    if (saveAbortRef.current) {
+      saveAbortRef.current.abort();
+      saveAbortRef.current = null;
+    }
+  }, [user?.id, user?.role]);
+
+  // Bảo vệ cleanup khi unmount (F05)
+  useEffect(() => {
+    return () => {
+      generationRef.current += 1;
+      if (previewAbortRef.current) {
+        previewAbortRef.current.abort();
+        previewAbortRef.current = null;
+      }
+      if (saveAbortRef.current) {
+        saveAbortRef.current.abort();
+        saveAbortRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -137,6 +195,7 @@ export default function ApiItineraryPlannerPage() {
     }
     const ctrl = new globalThis.AbortController();
     saveAbortRef.current = ctrl;
+    const saveGen = ++generationRef.current;
 
     try {
       // Gửi đúng tiêu chí đã được preview và fingerprint đã xác thực (F02, F05)
@@ -151,8 +210,13 @@ export default function ApiItineraryPlannerPage() {
         orderedLocationIds: previewResult.orderedLocationIds,
       };
       const saved = await saveItinerary(payload, ctrl.signal);
+      if (saveGen !== generationRef.current) return;
       setSaveSuccessId(saved.id);
     } catch (err) {
+      if (saveGen !== generationRef.current) return;
+      if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") {
+        return;
+      }
       if (err.code === "ECONNABORTED" || err.message?.includes("timeout") || !err.response) {
         setError(
           "Yêu cầu lưu hành trình bị gián đoạn do mạng hoặc hết thời gian chờ. Trạng thái lưu có thể chưa rõ, vui lòng kiểm tra danh sách 'Hành trình đã lưu' trước khi thử lại."
@@ -165,7 +229,9 @@ export default function ApiItineraryPlannerPage() {
         setError(err?.response?.data?.message || err.message || "Lưu hành trình thất bại.");
       }
     } finally {
-      setSaving(false);
+      if (saveGen === generationRef.current) {
+        setSaving(false);
+      }
     }
   }
 
@@ -194,7 +260,7 @@ export default function ApiItineraryPlannerPage() {
             <input readOnly value="Đà Nẵng – Hội An (Vùng kiểm chứng OSRM)" className="bg-slate-100" />
           </Field>
 
-          <Field label="Ngày hành trình">
+          <Field label="Ngày hành trình" hint={`Định dạng hiển thị: ${formatDateVn(tripDate)}`}>
             <input
               type="date"
               required
@@ -203,7 +269,6 @@ export default function ApiItineraryPlannerPage() {
               value={tripDate}
               onChange={(e) => handleCriteriaChange(setTripDate, e.target.value)}
             />
-            <p className="mt-1 text-xs text-slate-500">Định dạng hiển thị: {formatDateVn(tripDate)}</p>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -227,9 +292,13 @@ export default function ApiItineraryPlannerPage() {
 
           <Field label="Điểm xuất phát">
             {loadingLocations ? (
-              <p className="text-sm text-slate-500">Đang tải danh mục địa điểm...</p>
+              <select disabled value="">
+                <option value="">Đang tải danh mục địa điểm...</option>
+              </select>
             ) : locations.length === 0 ? (
-              <p className="text-sm text-rose-500">Chưa có địa điểm nào có dữ liệu kiểm chứng.</p>
+              <select disabled value="">
+                <option value="">Chưa có địa điểm nào có dữ liệu kiểm chứng.</option>
+              </select>
             ) : (
               <select
                 required
