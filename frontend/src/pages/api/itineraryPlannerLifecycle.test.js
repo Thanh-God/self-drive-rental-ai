@@ -18,6 +18,7 @@ let ApiItineraryPlannerPage;
 let createRoot;
 let MemoryRouter;
 let AuthContext;
+let AppRoutes;
 
 function deferred() {
   let resolve;
@@ -102,7 +103,25 @@ before(async () => {
 
   const authModule = await viteServer.ssrLoadModule("/src/context/AuthContext.jsx");
   AuthContext = authModule.default || authModule.AuthContext;
+  ({ default: AppRoutes } = await viteServer.ssrLoadModule("/src/routes/AppRoutes.jsx"));
 });
+
+for (const role of [null, "STAFF", "ADMIN", "USER"]) {
+  test(`actual itinerary route admits only USER (${role || "guest"})`, async () => {
+    resetRequests();
+    const container = document.createElement("div");document.body.append(container);
+    const root = createRoot(container);roots.add(root);
+    const user = role ? { id: "route-user", role, fullName: "Fixture" } : null;
+    await act(async () => root.render(createElement(AuthContext.Provider,
+      { value: { user, isAuthenticated: Boolean(user), loading: false } },
+      createElement(MemoryRouter, { initialEntries: ["/ai/itinerary"] }, createElement(AppRoutes)))));
+    if (!role) assert.ok(container.querySelector('input[type="email"]'), "guest redirected to login");
+    else if (role !== "USER") assert.ok(container.textContent.includes("Không có quyền truy cập"));
+    else assert.ok(container.textContent.includes("Lập kế hoạch hành trình 1 ngày"));
+    assert.equal(requests.filter(r => r.config.url === "/ai/locations").length, role === "USER" ? 1 : 0);
+    await unmountAll();
+  });
+}
 
 after(async () => {
   await unmountAll();

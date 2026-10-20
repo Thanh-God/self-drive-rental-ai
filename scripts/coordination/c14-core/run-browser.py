@@ -29,7 +29,8 @@ def main():
   if key.startswith(('SPRING_','VITE_','KDRIVE_TEST_','KDRIVE_MIGRATION_')):env.pop(key)
  env.update(VITE_DATA_MODE='api',VITE_API_BASE_URL='/api/v1',VITE_PROXY_TARGET='http://127.0.0.1:8300',C11_EVIDENCE=str(out),C11_BACKEND_EVIDENCE=str(native),C11_PLAYWRIGHT=str(REPO/'.runtime/phase5-rerun-20261004-1823/playwright/node_modules/playwright'))
  def run(c,cwd=REPO):
-  r=subprocess.run(c,cwd=cwd,env=env,capture_output=True,creationflags=FLAGS,timeout=600)
+  try:r=subprocess.run(c,cwd=cwd,env=env,capture_output=True,creationflags=FLAGS,timeout=600)
+  except subprocess.TimeoutExpired:raise RuntimeError('Native command timed out; private arguments omitted') from None
   if r.returncode:raise RuntimeError('Native failure; private output omitted')
   return r.stdout
  inspection=json.loads(run(['docker','inspect',f['name']]))[0]
@@ -41,7 +42,8 @@ def main():
  try:
   run(['docker','start',f['name']]);started=True;deadline=time.monotonic()+60
   while time.monotonic()<deadline:
-   r=subprocess.run(['docker','exec','-e','MYSQL_PWD='+password,f['name'],'mysql','-uroot','-N','-e','SELECT 1'],capture_output=True,creationflags=FLAGS,timeout=10)
+   try:r=subprocess.run(['docker','exec','-e','MYSQL_PWD='+password,f['name'],'mysql','-uroot','-N','-e','SELECT 1'],capture_output=True,creationflags=FLAGS,timeout=10)
+   except subprocess.TimeoutExpired:continue
    if r.returncode==0 and r.stdout.strip()==b'1':break
    time.sleep(1)
   else:raise RuntimeError('MySQL readiness deadline')
@@ -62,7 +64,7 @@ def main():
   r=subprocess.run(['node',str(proof)],cwd=REPO,env=env,capture_output=True,creationflags=FLAGS,timeout=600)
   (out/'browser.log').write_bytes(r.stdout+r.stderr);(out/'browser-exit.txt').write_text(str(r.returncode));assert r.returncode==0,'Browser failure; see browser.log'
   for rel,sha in before.items():assert hashlib.sha256((REPO/rel).read_bytes()).hexdigest()==sha,rel
-  result={'status':'PASS browser scoped' if a.browser_script else 'PASS C14 linked browser scoped','proofScript':str(proof.relative_to(REPO)),'assertions':len(json.loads((out/'browser-assertions.json').read_text())),'sourceMatch':True}
+  result={'status':'PASS browser scoped' if a.browser_script else 'PASS C14 linked browser scoped','proofScript':str(proof.relative_to(REPO)),'assertions':len(json.loads((out/'browser-assertions.json').read_text(encoding='utf-8'))),'sourceMatch':True}
  finally:
   for process in reversed(procs):
    if process.poll() is None:process.terminate();process.wait(timeout=20)

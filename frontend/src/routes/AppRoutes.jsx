@@ -92,7 +92,7 @@ export default function AppRoutes() {
         <Route path="/ai/recommend" element={screen(<RecommendPage />)} />
         <Route
           path="/ai/itinerary"
-          element={screen(<ItineraryPlannerPage />, <ApiItineraryPlannerPage />)}
+          element={screen(<ItineraryPlannerPage />, <ProtectedRoute roles={[ROLES.USER]}><ApiItineraryPlannerPage /></ProtectedRoute>)}
         />
         <Route
           path="/login"
