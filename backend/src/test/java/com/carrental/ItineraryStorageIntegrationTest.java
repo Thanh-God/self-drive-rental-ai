@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -70,6 +71,8 @@ public class ItineraryStorageIntegrationTest {
                 System.getenv("KDRIVE_TEST_DB_USER"),
                 System.getenv("KDRIVE_TEST_DB_PASSWORD")
             );
+            registry.add("spring.datasource.username", () -> System.getenv("KDRIVE_TEST_DB_USER"));
+            registry.add("spring.datasource.password", () -> System.getenv("KDRIVE_TEST_DB_PASSWORD"));
         }
         registry.add("spring.datasource.url", () -> url == null
             ? "jdbc:h2:mem:itinerarystorage;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
@@ -321,5 +324,66 @@ public class ItineraryStorageIntegrationTest {
         mvc.perform(get(ITINERARIES_URL + "/" + itineraryId)
                 .header("Authorization", "Bearer " + adminToken))
             .andExpect(status().isForbidden());
+
+        var other = mvc.perform(post("/api/v1/auth/register").contentType(MediaType.APPLICATION_JSON)
+            .content(json.writeValueAsString(Map.of("email", "ai4-" + System.nanoTime() + "@example.test",
+                "fullName", "Other fixture user", "password", "IsolatedOnly123!"))))
+            .andExpect(status().isCreated()).andReturn();
+        String otherToken = json.readTree(other.getResponse().getContentAsString()).path("token").asText();
+        mvc.perform(get(ITINERARIES_URL + "/" + itineraryId).header("Authorization", "Bearer " + otherToken))
+            .andExpect(status().isNotFound());
+        mvc.perform(get(ITINERARIES_URL).header("Authorization", "Bearer " + otherToken))
+            .andExpect(jsonPath("$.length()").value(0));
+
+        // Edit authoritative evidence without changing arrival/departure: old preview must still conflict.
+        var locationResult = mvc.perform(get("/api/v1/admin/locations/" + locAId)
+            .header("Authorization", "Bearer " + adminToken)).andExpect(status().isOk()).andReturn();
+        var update = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(locationResult.getResponse().getContentAsString());
+        update.put("expectedRevision", update.path("revision").asText());
+        ((com.fasterxml.jackson.databind.node.ObjectNode) update.path("metadata").path("hoursEvidence"))
+            .put("url", "https://example.com/updated-source");
+        update.remove(List.of("id", "revision", "categoryName"));
+        mvc.perform(put("/api/v1/admin/locations/" + locAId).header("Authorization", "Bearer " + adminToken)
+            .contentType(MediaType.APPLICATION_JSON).content(update.toString())).andExpect(status().isOk());
+        mvc.perform(post(ITINERARIES_URL).header("Authorization", "Bearer " + userToken)
+            .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(saveReq)))
+            .andExpect(status().isConflict());
+        assertEquals(beforeItineraries + 1, jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class));
+
+        when(osrmRoutingClient.route(anyList())).thenThrow(new IllegalStateException("Provider must not be used to read"));
+        when(sequencePlanner.planSequence(anyString(), anyList(), anyInt()))
+            .thenThrow(new IllegalStateException("Qwen must not be used to read"));
+        var offlineRead = mvc.perform(get(ITINERARIES_URL + "/" + itineraryId)
+            .header("Authorization", "Bearer " + userToken)).andExpect(status().isOk()).andReturn();
+        assertEquals(json.readTree(detailRes.getResponse().getContentAsString()),
+            json.readTree(offlineRead.getResponse().getContentAsString()), "saved snapshot immutable after catalog edit/providers off");
+    }
+
+    @Test
+    @org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable(named = "KDRIVE_TEST_DB_URL", matches = "jdbc:mysql:.*")
+    void nativeMySqlRollbackAfterFirstItemInsert() throws Exception {
+        when(sequencePlanner.planSequence(eq(locAId), anyList(), anyInt()))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of(locAId, locBId), "QWEN_OPTIMIZED"));
+        LocalDate date = LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(3);
+        var preview = mvc.perform(post(PREVIEW_URL).header("Authorization", "Bearer " + userToken)
+            .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(new ItineraryPreviewRequest(date, "08:00", "17:00", locAId, null))))
+            .andExpect(status().isOk()).andExpect(jsonPath("$.status").value("VALIDATED")).andReturn();
+        String fp = json.readTree(preview.getResponse().getContentAsString()).path("fingerprint").asText();
+        List<Integer> before = List.of("itineraries", "itinerary_days", "itinerary_items").stream()
+            .map(table -> jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class)).toList();
+        jdbc.execute("CREATE TRIGGER ai4_fail_second_item BEFORE INSERT ON itinerary_items FOR EACH ROW BEGIN "
+            + "IF NEW.sort_order=2 AND EXISTS(SELECT 1 FROM itinerary_items WHERE day_id=NEW.day_id AND sort_order=1) THEN "
+            + "SIGNAL SQLSTATE '23000' SET MESSAGE_TEXT='AI4_AFTER_FIRST_ITEM'; END IF; END");
+        try {
+            mvc.perform(post(ITINERARIES_URL).header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(new CreateItineraryRequest(
+                    "Rollback fixture", fp, date, "08:00", "17:00", locAId, null, List.of(locAId, locBId)))))
+                .andExpect(status().isConflict());
+            List<Integer> after = List.of("itineraries", "itinerary_days", "itinerary_items").stream()
+                .map(table -> jdbc.queryForObject("SELECT COUNT(*) FROM " + table, Integer.class)).toList();
+            assertEquals(before, after, "rollback must retain no itinerary/day/first item");
+        } finally {
+            jdbc.execute("DROP TRIGGER ai4_fail_second_item");
+        }
     }
 }

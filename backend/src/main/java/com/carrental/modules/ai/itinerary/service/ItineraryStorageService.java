@@ -176,7 +176,7 @@ public class ItineraryStorageService {
             .orElseThrow(DomainException::missing);
 
         if (!itinerary.userId.equals(actor.id())) {
-            throw DomainException.forbidden();
+            throw DomainException.missing();
         }
 
         List<ItineraryDay> days = dayRepo.findByItineraryIdOrderByTripDateAsc(itinerary.id);

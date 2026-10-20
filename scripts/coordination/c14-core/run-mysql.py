@@ -12,7 +12,7 @@ SUITES = ['VehicleSearchTest','ConcurrencyAndRaceTest','BranchClosureBookingTest
           'VehicleCatalogHttpServerTest','VehicleAmenityHttpServerTest','VehicleImageHttpServerTest',
           'AccountAssignmentHttpServerTest','IncidentReportIntegrationTest','IncidentReportHttpServerTest',
           'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest',
-          'RecommendationHttpTest','LocationRouteHttpServerTest']
+          'RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest']
 
 def inputs():
     files = list((REPO/'backend/src').rglob('*')) + list((REPO/'backend/.mvn').rglob('*'))
