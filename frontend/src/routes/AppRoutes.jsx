@@ -54,6 +54,9 @@ import {
   ApiVehiclesAdminPage,
 } from "../pages/api/ApiManagementScreens";
 import ApiLocationsPage from "../pages/api/ApiLocationsPage";
+import ApiItineraryPlannerPage from "../pages/api/ApiItineraryPlannerPage";
+import ApiSavedItinerariesPage from "../pages/api/ApiSavedItinerariesPage";
+import ApiItineraryDetailPage from "../pages/api/ApiItineraryDetailPage";
 import {
   BookingDetailScreen,
   BookingListScreen,
@@ -89,7 +92,7 @@ export default function AppRoutes() {
         <Route path="/ai/recommend" element={screen(<RecommendPage />)} />
         <Route
           path="/ai/itinerary"
-          element={screen(<ItineraryPlannerPage />)}
+          element={screen(<ItineraryPlannerPage />, <ApiItineraryPlannerPage />)}
         />
         <Route
           path="/login"
@@ -144,10 +147,10 @@ export default function AppRoutes() {
             <ApiDocumentPage area="user" kind="invoice" />,
           )}
         />
-        <Route path="itineraries" element={screen(<SavedItinerariesPage />)} />
+        <Route path="itineraries" element={screen(<SavedItinerariesPage />, <ApiSavedItinerariesPage />)} />
         <Route
           path="itineraries/:itineraryId"
-          element={screen(<ItineraryDetailScreen />)}
+          element={screen(<ItineraryDetailScreen />, <ApiItineraryDetailPage />)}
         />
         <Route
           path="profile"
