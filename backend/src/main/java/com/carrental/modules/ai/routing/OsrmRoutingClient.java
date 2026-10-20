@@ -16,7 +16,12 @@ public final class OsrmRoutingClient {
         String coordinates(){return Double.toString(longitude)+","+Double.toString(latitude);}
     }
     public enum Status { VERIFIED, NO_ROUTE, UNAVAILABLE }
-    public record Estimate(Status status,Double distanceMeters,Double durationSeconds,String attribution) {}
+    public record Leg(double distanceMeters, double durationSeconds) {}
+    public record Estimate(Status status, Double distanceMeters, Double durationSeconds, String attribution, List<Leg> legs) {
+        public Estimate(Status status, Double distanceMeters, Double durationSeconds, String attribution) {
+            this(status, distanceMeters, durationSeconds, attribution, List.of());
+        }
+    }
     private final URI base;
     private final ObjectMapper json;
     private final HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
@@ -47,9 +52,18 @@ public final class OsrmRoutingClient {
             if(!route.path("distance").isNumber()||!route.path("duration").isNumber())return failed(Status.UNAVAILABLE);
             double meters=route.path("distance").doubleValue(),seconds=route.path("duration").doubleValue();
             if(!Double.isFinite(meters)||!Double.isFinite(seconds)||meters<0||seconds<0)return failed(Status.UNAVAILABLE);
-            return new Estimate(Status.VERIFIED,meters,seconds,"© OpenStreetMap contributors; OSRM driving estimate");
+            List<Leg> legs = new java.util.ArrayList<>();
+            var legsNode = route.path("legs");
+            if (legsNode.isArray()) {
+                for (var legNode : legsNode) {
+                    if (legNode.path("distance").isNumber() && legNode.path("duration").isNumber()) {
+                        legs.add(new Leg(legNode.path("distance").doubleValue(), legNode.path("duration").doubleValue()));
+                    }
+                }
+            }
+            return new Estimate(Status.VERIFIED,meters,seconds,"© OpenStreetMap contributors; OSRM driving estimate",List.copyOf(legs));
         } catch(InterruptedException error){Thread.currentThread().interrupt();return failed(Status.UNAVAILABLE);}
         catch(Exception error){return failed(Status.UNAVAILABLE);}
     }
-    private static Estimate failed(Status status){return new Estimate(status,null,null,"© OpenStreetMap contributors");}
+    private static Estimate failed(Status status){return new Estimate(status,null,null,"© OpenStreetMap contributors",List.of());}
 }
