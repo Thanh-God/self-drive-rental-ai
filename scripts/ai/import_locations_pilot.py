@@ -98,23 +98,70 @@ def validate_dataset(data):
     return errors
 
 
+def canonicalize_intervals(intervals):
+    if not intervals or not isinstance(intervals, list):
+        return []
+    res = []
+    for iv in intervals:
+        if isinstance(iv, dict):
+            res.append({
+                "start": iv.get("start", ""),
+                "end": iv.get("end", ""),
+                "nextDay": bool(iv.get("nextDay", False))
+            })
+    return sorted(res, key=lambda x: (x["start"], x["end"], x["nextDay"]))
+
+
+def canonicalize_hours(h):
+    if not h or not isinstance(h, dict):
+        return {"state": "UNKNOWN", "intervals": []}
+    state = h.get("state", "UNKNOWN")
+    intervals = canonicalize_intervals(h.get("intervals", []))
+    return {"state": state, "intervals": intervals}
+
+
+def canonicalize_evidence(ev):
+    if not ev or not isinstance(ev, dict):
+        return None
+    return {
+        "url": ev.get("url", ""),
+        "verifiedAt": str(ev.get("verifiedAt", "")) if ev.get("verifiedAt") is not None else ""
+    }
+
+
+def canonicalize_metadata(meta):
+    if not meta or not isinstance(meta, dict):
+        return None
+
+    # Weekly
+    weekly = {}
+    days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+    raw_weekly = meta.get("weekly") or {}
+    for d in days:
+        if d in raw_weekly:
+            weekly[d] = canonicalize_hours(raw_weekly[d])
+
+    # Exceptions
+    exceptions = {}
+    raw_exceptions = meta.get("exceptions") or {}
+    for d_str in sorted(raw_exceptions.keys()):
+        exceptions[d_str] = canonicalize_hours(raw_exceptions[d_str])
+
+    return {
+        "timezone": meta.get("timezone", ""),
+        "durationMinutes": meta.get("durationMinutes"),
+        "hoursEvidence": canonicalize_evidence(meta.get("hoursEvidence")),
+        "durationEvidence": canonicalize_evidence(meta.get("durationEvidence")),
+        "weekly": weekly,
+        "exceptions": exceptions
+    }
+
+
 def metadata_matches(ex_meta, pilot_meta):
-    """So sanh metadata giua existing tren server va pilot dataset."""
-    if ex_meta is None and pilot_meta is None:
-        return True
-    if ex_meta is None or pilot_meta is None:
-        return False
-    # So sanh timezone va durationMinutes
-    if ex_meta.get("timezone") != pilot_meta.get("timezone"):
-        return False
-    if ex_meta.get("durationMinutes") != pilot_meta.get("durationMinutes"):
-        return False
-    # So sanh hoursEvidence url
-    ex_h_ev = (ex_meta.get("hoursEvidence") or {}).get("url")
-    pi_h_ev = (pilot_meta.get("hoursEvidence") or {}).get("url")
-    if ex_h_ev != pi_h_ev:
-        return False
-    return True
+    """So sanh metadata canonical toan dien giua existing tren server va pilot dataset."""
+    c_ex = canonicalize_metadata(ex_meta)
+    c_pi = canonicalize_metadata(pilot_meta)
+    return c_ex == c_pi
 
 
 def import_pilot_locations(json_path, base_url, token, dry_run=True):

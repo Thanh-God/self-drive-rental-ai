@@ -171,6 +171,70 @@ class ImportLocationsPilotTest(unittest.TestCase):
         # Restore
         MockBackendHandler.locations[0]["latitude"] = orig_lat
 
+    def test_08_adverse_probe_metadata_matches_weekly_and_exceptions(self):
+        m_base = {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 60,
+            "hoursEvidence": {"url": "https://a.test", "verifiedAt": "2026-10-01T00:00:00Z"},
+            "weekly": {
+                "MONDAY": {"state": "INTERVALS", "intervals": [{"start": "08:00", "end": "17:00", "nextDay": False}]}
+            },
+            "exceptions": {}
+        }
+        # 1. Đổi weekly
+        m_diff_weekly = {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 60,
+            "hoursEvidence": {"url": "https://a.test", "verifiedAt": "2026-10-01T00:00:00Z"},
+            "weekly": {
+                "MONDAY": {"state": "INTERVALS", "intervals": [{"start": "08:00", "end": "18:00", "nextDay": False}]}
+            },
+            "exceptions": {}
+        }
+        self.assertFalse(metadata_matches(m_base, m_diff_weekly), "Doi weekly phai tra ve False.")
+
+        # 2. Đổi exceptions
+        m_diff_exceptions = {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 60,
+            "hoursEvidence": {"url": "https://a.test", "verifiedAt": "2026-10-01T00:00:00Z"},
+            "weekly": {
+                "MONDAY": {"state": "INTERVALS", "intervals": [{"start": "08:00", "end": "17:00", "nextDay": False}]}
+            },
+            "exceptions": {
+                "2026-11-20": {"state": "CLOSED", "intervals": []}
+            }
+        }
+        self.assertFalse(metadata_matches(m_base, m_diff_exceptions), "Them ngay ngoai le phai tra ve False.")
+
+        # 3. Đổi verifiedAt
+        m_diff_evidence = {
+            "timezone": "Asia/Ho_Chi_Minh",
+            "durationMinutes": 60,
+            "hoursEvidence": {"url": "https://a.test", "verifiedAt": "2026-10-15T00:00:00Z"},
+            "weekly": {
+                "MONDAY": {"state": "INTERVALS", "intervals": [{"start": "08:00", "end": "17:00", "nextDay": False}]}
+            },
+            "exceptions": {}
+        }
+        self.assertFalse(metadata_matches(m_base, m_diff_evidence), "Doi verifiedAt phai tra ve False.")
+
+    def test_09_metadata_conflict_triggers_conflict_report(self):
+        json_path = Path(__file__).parent / "locations-pilot.json"
+        # Thay đổi weekly của địa điểm thứ nhất trên mock server
+        orig_meta = MockBackendHandler.locations[0]["metadata"]
+        altered_meta = dict(orig_meta) if orig_meta else {}
+        altered_meta["weekly"] = {"MONDAY": {"state": "CLOSED", "intervals": []}}
+        MockBackendHandler.locations[0]["metadata"] = altered_meta
+
+        res = import_pilot_locations(json_path, self.base_url, token="valid-admin-token", dry_run=False)
+        self.assertEqual(len(res["locationsConflict"]), 1, "Phai phat hien conflict do metadata weekly bi thay doi.")
+        self.assertTrue("metadata/hours facts diff" in res["locationsConflict"][0]["reason"])
+
+        # Restore
+        MockBackendHandler.locations[0]["metadata"] = orig_meta
+
 
 if __name__ == "__main__":
     unittest.main()
+
