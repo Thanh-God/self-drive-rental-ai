@@ -1,0 +1,259 @@
+{
+  "schemaVersion": "kdrive-locations-pilot-v1",
+  "region": "Da Nang - Hoi An",
+  "generatedAt": "2026-10-20T09:50:00Z",
+  "locations": [
+    {
+      "categoryName": "Bảo tàng & Văn hóa",
+      "name": "Bảo tàng Điêu khắc Chăm Đà Nẵng",
+      "latitude": 16.0601630,
+      "longitude": 108.2236160,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Số 2 đường 2 Tháng 9, phường Bình Hiên, quận Hải Châu, Đà Nẵng",
+        "coordinatesSource": "OpenStreetMap node 368725838 (Bảo tàng Điêu khắc Chăm Đà Nẵng)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "TUESDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "WEDNESDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "THURSDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "FRIDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "SATURDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "SUNDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] }
+        },
+        "exceptions": {},
+        "durationMinutes": 90,
+        "hoursEvidence": {
+          "url": "http://chammuseum.danang.vn",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://danangfantasticity.com/diem-den/bao-tang-dieu-khac-cham.html",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Danh thắng Ngũ Hành Sơn",
+      "latitude": 16.0048220,
+      "longitude": 108.2630510,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "81 Huyền Trân Công Chúa, phường Hòa Hải, quận Ngũ Hành Sơn, Đà Nẵng",
+        "coordinatesSource": "OpenStreetMap node 368725841 (Khu du lịch Thắng cảnh Ngũ Hành Sơn)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:30", "nextDay": false }] },
+          "TUESDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:30", "nextDay": false }] },
+          "WEDNESDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:30", "nextDay": false }] },
+          "THURSDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:30", "nextDay": false }] },
+          "FRIDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:30", "nextDay": false }] },
+          "SATURDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:30", "nextDay": false }] },
+          "SUNDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:30", "nextDay": false }] }
+        },
+        "exceptions": {},
+        "durationMinutes": 120,
+        "hoursEvidence": {
+          "url": "https://nguhanhson.org",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://danangfantasticity.com/diem-den/danh-thang-ngu-hanh-son.html",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Bảo tàng & Văn hóa",
+      "name": "Bảo tàng Đà Nẵng",
+      "latitude": 16.0754800,
+      "longitude": 108.2227100,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Số 31 Trần Phú / 42 Bạch Đằng, quận Hải Châu, Đà Nẵng",
+        "coordinatesSource": "OpenStreetMap node 368725839 (Bảo tàng Đà Nẵng)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "CLOSED", "intervals": [] },
+          "TUESDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "11:30", "nextDay": false }, { "start": "14:00", "end": "17:00", "nextDay": false }] },
+          "WEDNESDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "11:30", "nextDay": false }, { "start": "14:00", "end": "17:00", "nextDay": false }] },
+          "THURSDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "11:30", "nextDay": false }, { "start": "14:00", "end": "17:00", "nextDay": false }] },
+          "FRIDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "11:30", "nextDay": false }, { "start": "14:00", "end": "17:00", "nextDay": false }] },
+          "SATURDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "11:30", "nextDay": false }, { "start": "14:00", "end": "17:00", "nextDay": false }] },
+          "SUNDAY": { "state": "CLOSED", "intervals": [] }
+        },
+        "exceptions": {},
+        "durationMinutes": 90,
+        "hoursEvidence": {
+          "url": "https://baotangdanang.vn",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://danangfantasticity.com/diem-den/bao-tang-da-nang.html",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Di tích lịch sử",
+      "name": "Di tích Chùa Cầu Hội An",
+      "latitude": 15.8771400,
+      "longitude": 108.3259800,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Đường Trần Phú nối Nguyễn Thị Minh Khai, phường Minh An, Hội An",
+        "coordinatesSource": "OpenStreetMap node 368725845 (Chùa Cầu / Lai Viễn Kiều)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "17:30", "nextDay": false }] },
+          "TUESDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "17:30", "nextDay": false }] },
+          "WEDNESDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "17:30", "nextDay": false }] },
+          "THURSDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "17:30", "nextDay": false }] },
+          "FRIDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "17:30", "nextDay": false }] },
+          "SATURDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "17:30", "nextDay": false }] },
+          "SUNDAY": { "state": "INTERVALS", "intervals": [{ "start": "08:00", "end": "17:30", "nextDay": false }] }
+        },
+        "exceptions": {},
+        "durationMinutes": 45,
+        "hoursEvidence": {
+          "url": "http://hoianheritage.net",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "http://hoianheritage.net",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Di tích lịch sử",
+      "name": "Hội quán Phúc Kiến Hội An",
+      "latitude": 15.8778000,
+      "longitude": 108.3308000,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "46 Trần Phú, phường Minh An, Hội An",
+        "coordinatesSource": "OpenStreetMap node 368725846 (Hội quán Phúc Kiến)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "TUESDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "WEDNESDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "THURSDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "FRIDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "SATURDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] },
+          "SUNDAY": { "state": "INTERVALS", "intervals": [{ "start": "07:00", "end": "17:00", "nextDay": false }] }
+        },
+        "exceptions": {},
+        "durationMinutes": 45,
+        "hoursEvidence": {
+          "url": "http://hoianheritage.net",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "http://hoianheritage.net",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Chùa Linh Ứng Bãi Bụt Sơn Trà",
+      "latitude": 16.1001700,
+      "longitude": 108.2778500,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Bán đảo Sơn Trà, phường Thọ Quang, quận Sơn Trà, Đà Nẵng",
+        "coordinatesSource": "OpenStreetMap node 368725848 (Chùa Linh Ứng Bãi Bụt)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "INTERVALS", "intervals": [{ "start": "06:30", "end": "20:00", "nextDay": false }] },
+          "TUESDAY": { "state": "INTERVALS", "intervals": [{ "start": "06:30", "end": "20:00", "nextDay": false }] },
+          "WEDNESDAY": { "state": "INTERVALS", "intervals": [{ "start": "06:30", "end": "20:00", "nextDay": false }] },
+          "THURSDAY": { "state": "INTERVALS", "intervals": [{ "start": "06:30", "end": "20:00", "nextDay": false }] },
+          "FRIDAY": { "state": "INTERVALS", "intervals": [{ "start": "06:30", "end": "20:00", "nextDay": false }] },
+          "SATURDAY": { "state": "INTERVALS", "intervals": [{ "start": "06:30", "end": "20:00", "nextDay": false }] },
+          "SUNDAY": { "state": "INTERVALS", "intervals": [{ "start": "06:30", "end": "20:00", "nextDay": false }] }
+        },
+        "exceptions": {},
+        "durationMinutes": 60,
+        "hoursEvidence": {
+          "url": "https://danangfantasticity.com/diem-den/chua-linh-ung-ban-dao-son-tra.html",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        },
+        "durationEvidence": {
+          "url": "https://danangfantasticity.com/diem-den/chua-linh-ung-ban-dao-son-tra.html",
+          "verifiedAt": "2026-10-20T00:00:00Z"
+        }
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Bãi biển Mỹ Khê Đà Nẵng",
+      "latitude": 16.0597300,
+      "longitude": 108.2464700,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Đường Võ Nguyên Giáp, phường Phước Mỹ, quận Sơn Trà, Đà Nẵng",
+        "coordinatesSource": "OpenStreetMap node 368725843 (Bãi biển Mỹ Khê)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "UNKNOWN", "intervals": [] },
+          "TUESDAY": { "state": "UNKNOWN", "intervals": [] },
+          "WEDNESDAY": { "state": "UNKNOWN", "intervals": [] },
+          "THURSDAY": { "state": "UNKNOWN", "intervals": [] },
+          "FRIDAY": { "state": "UNKNOWN", "intervals": [] },
+          "SATURDAY": { "state": "UNKNOWN", "intervals": [] },
+          "SUNDAY": { "state": "UNKNOWN", "intervals": [] }
+        },
+        "exceptions": {},
+        "durationMinutes": null,
+        "hoursEvidence": null,
+        "durationEvidence": null
+      }
+    },
+    {
+      "categoryName": "Danh lam & Thắng cảnh",
+      "name": "Cầu Rồng Đà Nẵng",
+      "latitude": 16.0611000,
+      "longitude": 108.2232000,
+      "status": "ACTIVE",
+      "provenance": {
+        "address": "Cầu Rồng, đường Nguyễn Văn Linh nối Võ Văn Kiệt, Đà Nẵng",
+        "coordinatesSource": "OpenStreetMap way 231362879 (Cầu Rồng Đà Nẵng)"
+      },
+      "metadata": {
+        "timezone": "Asia/Ho_Chi_Minh",
+        "weekly": {
+          "MONDAY": { "state": "UNKNOWN", "intervals": [] },
+          "TUESDAY": { "state": "UNKNOWN", "intervals": [] },
+          "WEDNESDAY": { "state": "UNKNOWN", "intervals": [] },
+          "THURSDAY": { "state": "UNKNOWN", "intervals": [] },
+          "FRIDAY": { "state": "UNKNOWN", "intervals": [] },
+          "SATURDAY": { "state": "UNKNOWN", "intervals": [] },
+          "SUNDAY": { "state": "UNKNOWN", "intervals": [] }
+        },
+        "exceptions": {},
+        "durationMinutes": null,
+        "hoursEvidence": null,
+        "durationEvidence": null
+      }
+    }
+  ]
+}
