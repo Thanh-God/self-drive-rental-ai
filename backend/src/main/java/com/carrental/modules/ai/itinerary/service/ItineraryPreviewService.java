@@ -190,6 +190,17 @@ public class ItineraryPreviewService {
         if (orderedLocationIds == null || orderedLocationIds.size() < 2 || orderedLocationIds.size() > 4) {
             throw DomainException.bad("Danh sách địa điểm lưu phải có từ 2 đến 4 điểm.");
         }
+        for (String id : orderedLocationIds) {
+            if (id == null || id.isBlank()) {
+                throw DomainException.bad("Danh sách địa điểm lưu không được chứa phần tử trống.");
+            }
+        }
+        if (new HashSet<>(orderedLocationIds).size() != orderedLocationIds.size()) {
+            throw DomainException.bad("Các địa điểm trong lộ trình không được trùng lặp.");
+        }
+        if (startLocationId == null || startLocationId.isBlank()) {
+            throw DomainException.bad("Điểm xuất phát không được để trống.");
+        }
         if (!orderedLocationIds.get(0).equals(startLocationId)) {
             throw DomainException.bad("Địa điểm đầu tiên trong lộ trình phải là điểm xuất phát.");
         }
@@ -229,6 +240,9 @@ public class ItineraryPreviewService {
             PublicView view = viewMap.get(id);
             if (view == null) {
                 throw DomainException.conflict("Địa điểm trong lộ trình không còn hoạt động hoặc không tồn tại.");
+            }
+            if (view.metadata() == null || view.metadata().durationMinutes() == null || view.metadata().durationMinutes() <= 0) {
+                throw DomainException.bad("Địa điểm '" + view.name() + "' thiếu dữ liệu thời lượng tham quan hợp lệ.");
             }
             orderedLocations.add(view);
         }
@@ -412,7 +426,8 @@ public class ItineraryPreviewService {
                 durationEvidence != null ? durationEvidence.url() : null,
                 durationEvidence != null && durationEvidence.verifiedAt() != null ? durationEvidence.verifiedAt().toString() : null,
                 "© OpenStreetMap contributors; OSRM driving estimate",
-                CONTRACT_VERSION
+                CONTRACT_VERSION,
+                loc.metadata()
             ));
         }
 
@@ -513,6 +528,67 @@ public class ItineraryPreviewService {
         return t.getHour() * 60 + t.getMinute();
     }
 
+    private static String canonicalMetadataString(VisitMetadata meta) {
+        if (meta == null) return "NO_META";
+        StringBuilder sb = new StringBuilder();
+        sb.append("tz=").append(meta.timezone() != null ? meta.timezone() : "").append(";");
+        sb.append("dur=").append(meta.durationMinutes() != null ? meta.durationMinutes() : "").append(";");
+
+        sb.append("weekly=[");
+        if (meta.weekly() != null) {
+            for (DayOfWeek day : DayOfWeek.values()) {
+                VisitMetadata.Hours h = meta.weekly().get(day);
+                sb.append(day.name()).append(":");
+                if (h != null) {
+                    sb.append(h.state()).append(":");
+                    if (h.intervals() != null) {
+                        for (VisitMetadata.Interval iv : h.intervals()) {
+                            sb.append(iv.start()).append("-").append(iv.end()).append("-").append(iv.nextDay()).append(",");
+                        }
+                    }
+                }
+                sb.append("|");
+            }
+        }
+        sb.append("];");
+
+        sb.append("exc=[");
+        if (meta.exceptions() != null) {
+            var sortedDates = new ArrayList<>(meta.exceptions().keySet());
+            Collections.sort(sortedDates);
+            for (LocalDate d : sortedDates) {
+                VisitMetadata.Hours h = meta.exceptions().get(d);
+                sb.append(d.toString()).append(":");
+                if (h != null) {
+                    sb.append(h.state()).append(":");
+                    if (h.intervals() != null) {
+                        for (VisitMetadata.Interval iv : h.intervals()) {
+                            sb.append(iv.start()).append("-").append(iv.end()).append("-").append(iv.nextDay()).append(",");
+                        }
+                    }
+                }
+                sb.append("|");
+            }
+        }
+        sb.append("];");
+
+        sb.append("hoursEv=");
+        if (meta.hoursEvidence() != null) {
+            sb.append(meta.hoursEvidence().url() != null ? meta.hoursEvidence().url() : "").append("|")
+              .append(meta.hoursEvidence().verifiedAt() != null ? meta.hoursEvidence().verifiedAt().toString() : "");
+        }
+        sb.append(";");
+
+        sb.append("durEv=");
+        if (meta.durationEvidence() != null) {
+            sb.append(meta.durationEvidence().url() != null ? meta.durationEvidence().url() : "").append("|")
+              .append(meta.durationEvidence().verifiedAt() != null ? meta.durationEvidence().verifiedAt().toString() : "");
+        }
+        sb.append(";");
+
+        return sb.toString();
+    }
+
     private static String computeRevision(PublicView view) {
         return CatalogRevision.of(
             view.id(),
@@ -520,8 +596,7 @@ public class ItineraryPreviewService {
             view.name(),
             view.latitude().toString(),
             view.longitude().toString(),
-            view.metadata() != null ? view.metadata().timezone() : "",
-            view.metadata() != null && view.metadata().durationMinutes() != null ? view.metadata().durationMinutes().toString() : ""
+            canonicalMetadataString(view.metadata())
         );
     }
 

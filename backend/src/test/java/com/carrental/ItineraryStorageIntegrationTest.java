@@ -271,19 +271,50 @@ public class ItineraryStorageIntegrationTest {
             .andExpect(jsonPath("$[0].locationCount").value(2));
 
         // 5. Xem chi tiết GET /api/v1/itineraries/{id}
-        mvc.perform(get(ITINERARIES_URL + "/" + itineraryId)
+        var detailRes = mvc.perform(get(ITINERARIES_URL + "/" + itineraryId)
                 .header("Authorization", "Bearer " + userToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.id").value(itineraryId))
             .andExpect(jsonPath("$.title").value("Chuyến đi Đà Nẵng 1 ngày"))
+            .andExpect(jsonPath("$.fingerprint").value(fingerprint))
             .andExpect(jsonPath("$.items[0].locationId").value(locAId))
             .andExpect(jsonPath("$.items[0].dwellMinutes").value(60))
             .andExpect(jsonPath("$.items[0].fullHoursDescription").isNotEmpty())
             .andExpect(jsonPath("$.items[0].osmAttribution").isNotEmpty())
             .andExpect(jsonPath("$.items[1].locationId").value(locBId))
-            .andExpect(jsonPath("$.items[1].dwellMinutes").value(45));
+            .andExpect(jsonPath("$.items[1].dwellMinutes").value(45))
+            .andReturn();
 
-        // 6. Kiểm tra quyền bảo mật: Anonymous bị 401, Admin bị 403 (không truy cập luồng của khách)
+        // Kiểm tra snapshot bất biến chứa metadata đầy đủ (F07)
+        String rawSnapshot = jdbc.queryForObject(
+            "SELECT snapshot FROM itinerary_items WHERE day_id = (SELECT id FROM itinerary_days WHERE itinerary_id = ?) AND sort_order = 1",
+            String.class,
+            itineraryId
+        );
+        assertNotNull(rawSnapshot);
+        assertTrue(rawSnapshot.contains("visitMetadata"));
+        assertTrue(rawSnapshot.contains("Asia/Ho_Chi_Minh"));
+
+        // 6. Kiểm tra duplicate IDs bị từ chối 400 Bad Request (F02)
+        int beforeDupeCheck = jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class);
+        CreateItineraryRequest dupeReq = new CreateItineraryRequest(
+            "Lộ trình trùng ID",
+            fingerprint,
+            LocalDate.parse(tripDate),
+            "08:00",
+            "17:00",
+            locAId,
+            null,
+            List.of(locAId, locAId)
+        );
+        mvc.perform(post(ITINERARIES_URL)
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(dupeReq)))
+            .andExpect(status().isBadRequest());
+        assertEquals(beforeDupeCheck, jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class));
+
+        // 7. Kiểm tra quyền bảo mật: Anonymous bị 401, Admin bị 403 (không truy cập luồng của khách)
         mvc.perform(get(ITINERARIES_URL + "/" + itineraryId))
             .andExpect(status().isUnauthorized());
 

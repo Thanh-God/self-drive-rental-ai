@@ -235,4 +235,86 @@ class ItineraryPreviewServiceTest {
         assertEquals(0, intervals.get(0).startMinute());
         assertEquals(120, intervals.get(0).endMinute()); // 02:00 = 120 phút
     }
+
+    @Test
+    void changedWeeklyScheduleOrEvidenceProducesDifferentFingerprint() {
+        when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
+        when(planner.planSequence(any(), any(), anyInt()))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
+        var leg1 = new OsrmRoutingClient.Leg(10000.0, 900.0);
+        when(routing.route(anyList())).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1)));
+
+        LocalDate tripDate = LocalDate.parse("2026-10-20");
+        ItineraryPreviewRequest req = new ItineraryPreviewRequest(tripDate, "08:00", "14:00", "loc-a", null);
+        ItineraryPreviewResponse res1 = service.preview(user, req);
+
+        // Đổi giờ mở cửa thứ ba của locB từ 07:00 thành 08:00 (vẫn mở kịp cho arrival lúc 09:15)
+        var alteredHoursB = new Hours(State.INTERVALS, List.of(new Interval("08:00", "17:30", false)));
+        var alteredMetaB = new VisitMetadata("Asia/Ho_Chi_Minh", Map.of(DayOfWeek.TUESDAY, alteredHoursB), Map.of(), 90,
+            new Evidence("https://example.com/b", Instant.parse("2026-10-01T00:00:00Z")),
+            new Evidence("https://example.com/b", Instant.parse("2026-10-01T00:00:00Z")));
+        var alteredLocB = new PublicView("loc-b", "cat-2", "Thắng cảnh", "Di tích Ngũ Hành Sơn", new BigDecimal("16.0041"), new BigDecimal("108.2638"), alteredMetaB);
+
+        when(locations.activeCatalog(user)).thenReturn(List.of(locA, alteredLocB));
+        ItineraryPreviewResponse res2 = service.preview(user, req);
+
+        // Schedule timeline vẫn giống nhau nhưng fingerprint PHẢI khác vì facts lịch mở cửa đã thay đổi (F02)
+        assertEquals(res1.items().get(1).arrival(), res2.items().get(1).arrival());
+        assertNotEquals(res1.fingerprint(), res2.fingerprint());
+    }
+
+    @Test
+    void revalidateRejectsDuplicateOrNullIdsWithBadRequest() {
+        LocalDate tripDate = LocalDate.parse("2026-10-20");
+
+        // Duplicate IDs
+        DomainException ex1 = assertThrows(DomainException.class, () ->
+            service.revalidateOrderedLocations(user, tripDate, "08:00", "14:00", "loc-a", null,
+                List.of("loc-a", "loc-a"), "fp")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, ex1.status);
+        assertTrue(ex1.getMessage().contains("không được trùng lặp"));
+
+        // Null in list
+        List<String> listWithNull = new ArrayList<>();
+        listWithNull.add("loc-a");
+        listWithNull.add(null);
+        DomainException ex2 = assertThrows(DomainException.class, () ->
+            service.revalidateOrderedLocations(user, tripDate, "08:00", "14:00", "loc-a", null,
+                listWithNull, "fp")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, ex2.status);
+    }
+
+    @Test
+    void revalidateRejectsLocationMissingDurationWithBadRequest() {
+        // Địa điểm locNoDuration thiếu metadata durationMinutes
+        var metaNoDur = new VisitMetadata("Asia/Ho_Chi_Minh", Map.of(), Map.of(), null, null, null);
+        var locNoDur = new PublicView("loc-no-dur", "cat-1", "Văn hóa", "Địa điểm thiếu thời lượng", new BigDecimal("16.0601"), new BigDecimal("108.2235"), metaNoDur);
+
+        when(locations.activeCatalog(user)).thenReturn(List.of(locA, locNoDur));
+
+        LocalDate tripDate = LocalDate.parse("2026-10-20");
+        DomainException ex = assertThrows(DomainException.class, () ->
+            service.revalidateOrderedLocations(user, tripDate, "08:00", "14:00", "loc-a", null,
+                List.of("loc-a", "loc-no-dur"), "fp")
+        );
+        assertEquals(HttpStatus.BAD_REQUEST, ex.status);
+        assertTrue(ex.getMessage().contains("thiếu dữ liệu thời lượng tham quan"));
+    }
+
+    @Test
+    void revalidateRejectsFingerprintMismatchWithConflict() {
+        when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
+        var leg1 = new OsrmRoutingClient.Leg(10000.0, 900.0);
+        when(routing.route(anyList())).thenReturn(new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1)));
+
+        LocalDate tripDate = LocalDate.parse("2026-10-20");
+        DomainException ex = assertThrows(DomainException.class, () ->
+            service.revalidateOrderedLocations(user, tripDate, "08:00", "14:00", "loc-a", null,
+                List.of("loc-a", "loc-b"), "stale-fingerprint-12345")
+        );
+        assertEquals(HttpStatus.CONFLICT, ex.status);
+        assertTrue(ex.getMessage().contains("đã thay đổi"));
+    }
 }

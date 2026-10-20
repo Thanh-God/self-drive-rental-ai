@@ -26,8 +26,22 @@ public record ItineraryPreviewResponse(
         String endTime,
         String startLocationId,
         String startLocationName,
-        String preferredCategoryId
-    ) {}
+        String preferredCategoryId,
+        String fingerprint
+    ) {
+        public CriteriaInfo(
+            String contractVersion,
+            int planVersion,
+            String tripDate,
+            String startTime,
+            String endTime,
+            String startLocationId,
+            String startLocationName,
+            String preferredCategoryId
+        ) {
+            this(contractVersion, planVersion, tripDate, startTime, endTime, startLocationId, startLocationName, preferredCategoryId, null);
+        }
+    }
 
     public record ScheduleItem(
         int sortOrder,
@@ -49,8 +63,37 @@ public record ItineraryPreviewResponse(
         String durationEvidenceUrl,
         String durationVerifiedAt,
         String osmAttribution,
-        String contractVersion
-    ) {}
+        String contractVersion,
+        com.carrental.modules.location.service.VisitMetadata visitMetadata
+    ) {
+        public ScheduleItem(
+            int sortOrder,
+            String locationId,
+            String locationName,
+            String categoryName,
+            double latitude,
+            double longitude,
+            String arrival,
+            String departure,
+            Integer dwellMinutes,
+            Integer waitMinutes,
+            Integer travelToNextMinutes,
+            Double distanceToNextMeters,
+            String hoursState,
+            String fullHoursDescription,
+            String hoursEvidenceUrl,
+            String hoursVerifiedAt,
+            String durationEvidenceUrl,
+            String durationVerifiedAt,
+            String osmAttribution,
+            String contractVersion
+        ) {
+            this(sortOrder, locationId, locationName, categoryName, latitude, longitude, arrival, departure,
+                 dwellMinutes, waitMinutes, travelToNextMinutes, distanceToNextMeters, hoursState,
+                 fullHoursDescription, hoursEvidenceUrl, hoursVerifiedAt, durationEvidenceUrl, durationVerifiedAt,
+                 osmAttribution, contractVersion, null);
+        }
+    }
 
     public record Totals(
         int totalDwellMinutes,

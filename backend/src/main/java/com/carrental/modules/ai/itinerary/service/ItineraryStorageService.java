@@ -79,8 +79,19 @@ public class ItineraryStorageService {
         Itinerary itinerary = new Itinerary();
         itinerary.userId = actor.id();
         itinerary.title = title;
+        ItineraryPreviewResponse.CriteriaInfo savedCriteria = new ItineraryPreviewResponse.CriteriaInfo(
+            verified.criteria().contractVersion(),
+            verified.criteria().planVersion(),
+            verified.criteria().tripDate(),
+            verified.criteria().startTime(),
+            verified.criteria().endTime(),
+            verified.criteria().startLocationId(),
+            verified.criteria().startLocationName(),
+            verified.criteria().preferredCategoryId(),
+            verified.fingerprint()
+        );
         try {
-            itinerary.criteria = json.writeValueAsString(verified.criteria());
+            itinerary.criteria = json.writeValueAsString(savedCriteria);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Không thể serialize tiêu chí hành trình", e);
         }
@@ -214,7 +225,7 @@ public class ItineraryStorageService {
             day.tripDate.toString(),
             items,
             totals,
-            null
+            criteria.fingerprint()
         );
     }
 }
