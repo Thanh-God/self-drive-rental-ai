@@ -27,7 +27,7 @@ Hợp đồng và hóa đơn lưu snapshot theo đơn thuê. Hệ thống không
 - Homepage, danh sách xe, chi tiết và đơn thuê dùng giao diện Urban nền xám ấm. Card/gallery đọc ảnh từ API; Admin thêm, sửa và sắp xếp ảnh với kiểm tra revision. Có 17 ảnh minh họa mẫu xe cùng hồ sơ tác giả/giấy phép tại `/media/vehicles/licenses.html`; ảnh thiếu hoặc hỏng có fallback trung thực. Seed DB mới không tự gắn ảnh; dùng form Admin hoặc mapping đã kiểm tra, không reset dữ liệu.
 - Admin có báo cáo vận hành tại `/admin` và quản lý danh mục địa điểm tại `/admin/locations`, sử dụng dữ liệu từ API.
 - Trợ lý dành cho USER đã có API xếp hạng xe theo quy tắc, phân tích nhu cầu bằng Qwen chạy cục bộ và xem trước tuyến qua OSRM. Các chức năng này cần bật cấu hình và chuẩn bị dịch vụ tương ứng; có source không đồng nghĩa đã bật trên mọi môi trường. Xếp hạng theo quy tắc không phải mô hình tự huấn luyện.
-- Xem trước tuyến chỉ cung cấp ước tính trên dữ liệu đường đã chuẩn bị; không tự tạo/lưu hành trình hoàn chỉnh hay đặt xe. Quy trình lập hành trình hoàn chỉnh còn đang phát triển.
+- Xem trước tuyến chỉ cung cấp ước tính trên dữ liệu đường đã chuẩn bị, không tự đặt xe. Luồng [hành trình một ngày](docs/modules/ai-itinerary.md) có xem trước, kiểm tra lại và lưu theo thao tác khách hàng; phạm vi pilot Đà Nẵng–Hội An, 2–4 điểm, phụ thuộc dữ liệu giờ mở cửa và dịch vụ cục bộ. Không cam kết tối ưu hay phản ánh giao thông trực tiếp.
 - Demo dành riêng cho xem thử giao diện, không đại diện cho giao dịch hay dữ liệu thuê xe thật.
 
 ## Công nghệ và kiến trúc

@@ -1,6 +1,6 @@
 # Chạy proof AI4 tại local
 
-Đọc `AGENTS.md` và quy tắc fixture trước chạy. Không trỏ test ghi dữ liệu vào33385/3306. Tận dụng harness `../c14-core/run-mysql.py` và `run-browser.py`; không cài dependency mới.
+Kiểm tra cấu hình và quy tắc fixture cô lập trước khi chạy. Không trỏ test ghi dữ liệu vào33385/3306. Tận dụng harness `../c14-core/run-mysql.py` và `run-browser.py`; không cài dependency mới.
 
 1. Copy nguyên backend source, .mvn, pom.xml và Maven wrapper vào thư mục backend mới trong .runtime; copy scripts/ai/locations-pilot.json cạnh backend vào scripts/ai để dataset test đọc được. Java21 Maven verify phải đạt. Giữ Flyway validate/Hibernate validate.
 2. Chạy guarded MySQL runner với `--suites ItineraryStorageIntegrationTest`, backend copy đã verify và `--reuse-evidence` là fixture stopped có identity rõ. Thư mục parent evidence cần historical-migration với2file V1/V2 theo harness; suite này không chạy migration lịch sử. Giữ evidence mới, không overwrite.
