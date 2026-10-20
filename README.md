@@ -1,49 +1,178 @@
-# Hệ thống cho thuê xe tự lái tích hợp AI hỗ trợ lựa chọn phương tiện và lập kế hoạch hành trình cá nhân hóa
+# KDrive — Hệ thống cho thuê xe tự lái
 
-## Trạng thái dự án
+Tôi phát triển KDrive trong khuôn khổ khóa luận tốt nghiệp để giải quyết bài toán quản lý thuê xe tự lái đa chi nhánh, phục vụ khách hàng, nhân viên vận hành và quản trị viên. Hệ thống hỗ trợ tìm xe, kiểm tra lịch và giá, đặt thuê, giao nhận, hồ sơ người thuê và quản lý dữ liệu vận hành.
 
-Giai đoạn 1 đã xác định phạm vi và use case. Giai đoạn 2 đã thống nhất kiến trúc. Giai đoạn 3 đã duyệt 20 bảng nghiệp vụ cơ sở và các chính sách được ghi tại [thiết kế database](docs/database/database-design.md); chưa có migration hoặc database được kiểm thử. Giai đoạn 4 đã hoàn thành triển khai UI/UX web desktop, routing và luồng dữ liệu demo có nhãn ngày 27/09/2026. Xem [biên bản bàn giao và giới hạn](docs/ui/phase-4-handoff.md). Chưa triển khai nghiệp vụ backend hoặc tích hợp Gemini/Map thật.
+Đề tài khóa luận: **Hệ thống cho thuê xe tự lái tích hợp AI hỗ trợ lựa chọn phương tiện và lập kế hoạch hành trình cá nhân hóa**.
 
-## Chạy demo giao diện
+## Cách thực hiện đồ án
 
-Mở terminal tại `E:\AI\BERT_Project\codepython\KLTN\frontend`. Chạy `npm ci` nếu chưa cài thư viện, sau đó `npm run dev -- --host 127.0.0.1`. Mở URL Vite thông báo (mặc định http://127.0.0.1:5173). Không cần backend/MySQL cho chế độ demo.
+Tôi sử dụng AI hỗ trợ phân tích yêu cầu, đề xuất giải pháp, viết và rà soát mã nguồn, xây dựng kiểm thử và biên soạn tài liệu. Tôi chịu trách nhiệm về các quyết định thiết kế, nội dung sử dụng và việc kiểm tra, giải thích kết quả trong đồ án. Việc sử dụng AI hỗ trợ phát triển được phân biệt với các tính năng AI phục vụ khách hàng trong ứng dụng.
 
-Chọn vai trò Guest/User/Staff/Admin ở thanh **DEMO UI**; bấm **Khôi phục mẫu** để đặt lại dữ liệu trong phiên trình duyệt. Xem [hướng dẫn frontend](frontend/README.md) để chọn đúng cú pháp PowerShell hoặc Git Bash.
+## Chức năng
 
-## Tech Stack
+| Người sử dụng | Chức năng |
+|---|---|
+| Khách chưa đăng nhập | Tìm kiếm, lọc và xem thông tin xe; xem đánh giá công khai; đăng ký, đăng nhập. |
+| Khách hàng — USER | Quản lý hồ sơ và GPLX; yêu cầu báo giá, tạo và theo dõi đơn thuê; thao tác hủy theo điều kiện của hệ thống; xem hợp đồng/hóa đơn; gửi đánh giá và báo cáo sự cố. |
+| Nhân viên — STAFF | Xử lý đơn, xác nhận/từ chối, ghi nhận giao nhận và hoàn tất thuê trong phạm vi chi nhánh được phân công; theo dõi đội xe và hồ sơ sự cố. |
+| Quản trị viên — ADMIN | Quản lý tài khoản, phân công chi nhánh, xe, hãng/loại xe, tiện nghi, chi nhánh và tuyến, danh mục địa điểm; xem báo cáo vận hành; kiểm duyệt đánh giá; quản lý URL ảnh, thứ tự và thông tin ghi công qua giao diện Admin. |
 
-- **Frontend**: React 19, Vite 6, React Router 6, Tailwind CSS 4, Lucide, Axios
-- **Backend**: Java Spring Boot 3.x, Spring Security, Spring Data JPA, Hibernate, JWT
-- **Database**: MySQL 8.x
-- **AI & External APIs**: Google Gemini API; Map provider còn chờ chọn
+Backend kiểm tra quyền, chủ sở hữu, chi nhánh, lịch xe và giá trước khi ghi dữ liệu. ADMIN không tự kế thừa quyền giao nhận của STAFF. Đơn mới tính tiền theo chênh lệch ngày nhận và ngày trả tại Việt Nam; đơn cũ giữ chính sách và giá đã lưu. Tiền tính bằng VND nguyên đồng; thời gian lưu UTC và hiển thị theo giờ Việt Nam. Trạng thái xe đang khai thác không thay thế kiểm tra lịch trong báo giá.
 
-## Quy trình làm việc
+Hợp đồng và hóa đơn lưu snapshot theo đơn thuê. Hệ thống không tích hợp thanh toán trực tuyến; hóa đơn không đồng nghĩa với xác nhận đã thanh toán.
 
-**VS Code là môi trường duy nhất để viết, chạy và debug cả Java backend lẫn React frontend.** Hai ứng dụng giao tiếp bằng REST API, không cần liên kết VS Code với NetBeans hay IDE khác.
+### Phạm vi của phiên bản trong repository
 
-- Mở thư mục gốc KLTN trong VS Code; làm việc với `backend/` và `frontend/` trong cùng cửa sổ.
-- Khi có mã ứng dụng: dùng Maven Wrapper cho backend, npm cho frontend; hướng dẫn lệnh chạy sẽ được bổ sung và kiểm thử ở giai đoạn khởi tạo.
-- MySQL Server lưu dữ liệu; DBeaver là công cụ xem dữ liệu tùy chọn, không phải điều kiện để chạy hệ thống.
-- Trình duyệt dùng demo/kiểm thử; Git và GitHub quản lý phiên bản.
-- Word dùng viết báo cáo, PowerPoint dùng làm slide khi đến giai đoạn tương ứng. Figma và các công cụ cloud chỉ bổ sung khi có nhu cầu cụ thể.
+- Giao diện nghiệp vụ sử dụng REST API và MySQL; lỗi API được hiển thị để thử lại, không thay bằng dữ liệu demo.
+- Homepage, danh sách xe, chi tiết và đơn thuê dùng giao diện Urban nền xám ấm. Card/gallery đọc ảnh từ API; Admin thêm, sửa và sắp xếp ảnh với kiểm tra revision. Có 17 ảnh minh họa mẫu xe cùng hồ sơ tác giả/giấy phép tại `/media/vehicles/licenses.html`; ảnh thiếu hoặc hỏng có fallback trung thực. Seed DB mới không tự gắn ảnh; dùng form Admin hoặc mapping đã kiểm tra, không reset dữ liệu.
+- Admin có báo cáo vận hành tại `/admin` và quản lý danh mục địa điểm tại `/admin/locations`, sử dụng dữ liệu từ API.
+- Trợ lý dành cho USER đã có API xếp hạng xe theo quy tắc, phân tích nhu cầu bằng Qwen chạy cục bộ và xem trước tuyến qua OSRM. Các chức năng này cần bật cấu hình và chuẩn bị dịch vụ tương ứng; có source không đồng nghĩa đã bật trên mọi môi trường. Xếp hạng theo quy tắc không phải mô hình tự huấn luyện.
+- Xem trước tuyến chỉ cung cấp ước tính trên dữ liệu đường đã chuẩn bị, không tự đặt xe. Luồng [hành trình một ngày](docs/modules/ai-itinerary.md) có xem trước, kiểm tra lại và lưu theo thao tác khách hàng; phạm vi pilot Đà Nẵng–Hội An, 2–4 điểm, phụ thuộc dữ liệu giờ mở cửa và dịch vụ cục bộ. Không cam kết tối ưu hay phản ánh giao thông trực tiếp.
+- Demo dành riêng cho xem thử giao diện, không đại diện cho giao dịch hay dữ liệu thuê xe thật.
 
-Chi tiết và các điều kiện môi trường còn thiếu: [Quy trình công cụ](docs/architecture/development-workflow.md).
+## Công nghệ và kiến trúc
 
-## Project Structure
+| Thành phần | Công nghệ |
+|---|---|
+| Frontend | React 19, Vite 6, React Router 6, Tailwind CSS 4, Lucide React, Axios |
+| Backend | Java 21, Spring Boot 3.5.16, Spring Security/JWT, Spring Data JPA/Hibernate, JdbcTemplate |
+| Database | MySQL 8, Flyway |
+| Kiểm thử | JUnit/Spring Boot Test, H2, MySQL cô lập; Node test runner, JSDOM và browser integration |
+| Build | Maven Wrapper, npm |
 
-- `backend/`: Mã nguồn Spring Boot REST API
-- `frontend/`: Mã nguồn React.js SPA
-- `backend/src/main/resources/db/migration/`: Nguồn migration Flyway duy nhất
-- `database/`: Hướng dẫn database và dữ liệu demo; không chứa bản schema chỉnh tay song song
-- `docs/`: Tài liệu thiết kế kiến trúc, Use Case, API Specs
+React SPA giao tiếp với Spring Boot modular monolith qua `/api/v1`. Backend sở hữu nghiệp vụ và persistence; frontend hiển thị dữ liệu và thao tác theo quyền. Một MySQL lưu dữ liệu ứng dụng. Flyway là nguồn migration duy nhất, Hibernate kiểm tra schema bằng `validate`.
 
-## Tài liệu
+## Yêu cầu môi trường
 
-- [Phạm vi và yêu cầu](docs/requirements/system-scope.md)
-- [Actor và use case](docs/requirements/use-cases.md)
-- [Kiến trúc tổng thể](docs/architecture/system-architecture.md)
-- [Ranh giới module và quyền](docs/architecture/module-boundaries.md)
-- [Cấu trúc thư mục](docs/architecture/project-structure.md)
-- [Quyết định và vấn đề còn mở](docs/architecture/decisions.md)
-- [Sơ đồ component](docs/diagrams/component-diagram.md)
-- [Hướng dẫn database](database/README.md)
+- JDK **21**; `JAVA_HOME` trỏ đúng JDK.
+- Node.js **22 trở lên** và npm để chạy frontend và các công cụ kiểm thử.
+- MySQL 8 đang chạy và database dành riêng cho KDrive. Docker Desktop với Linux engine là một cách cung cấp MySQL.
+- Git Bash trên Windows để dùng các script khởi động dưới đây. Maven Wrapper nằm sẵn trong `backend/`.
+
+## Cấu hình
+
+Tạo `backend/.env.local` bằng cấu hình riêng; không đưa file này vào Git. Ví dụ dùng cổng MySQL local 33385; thay port, schema và tài khoản theo môi trường thực tế:
+
+```dotenv
+DB_URL=jdbc:mysql://127.0.0.1:33385/kdrive?useSSL=false&connectionTimeZone=UTC
+DB_USER=kdrive
+DB_PASSWORD=<mat_khau_database>
+JWT_SECRET=<bi_mat_ngau_nhien_it_nhat_32_byte>
+PORT=8080
+FRONTEND_ORIGIN=http://127.0.0.1:5173
+SEED_ENABLED=false
+```
+
+Thay các giá trị trong dấu `<...>`. JWT secret phải có ít nhất 32 byte; không dùng giá trị mẫu hoặc đặt secret trong biến frontend `VITE_*`.
+
+Script backend đọc file env và ưu tiên biến đã export trong terminal. Spring Boot không tự đọc `.env.local` nếu chạy bằng cách khác. Dùng đúng database/port, không mặc định trỏ vào cổng 3306 của ứng dụng khác.
+
+Flyway áp dụng migration khi backend khởi động. Không sửa migration đã áp dụng, bật `clean` hoặc reset database để xử lý lỗi. Xem [hướng dẫn database](database/README.md).
+
+Với database phát triển mới chưa có tài khoản, có thể bật `SEED_ENABLED=true` và cung cấp `SEED_PASSWORD` ít nhất 12 ký tự để tạo dữ liệu mẫu. Seed bỏ qua khi users đã có dữ liệu, không dùng để reset. Tài khoản mẫu: `admin@example.test`, `user@example.test`, `staff.dn@example.test`, `staff.hn@example.test`; mật khẩu do bạn đặt qua `SEED_PASSWORD`. Dữ liệu seed không phải cấu hình kinh doanh chính thức.
+
+## Chạy giao diện sử dụng API thật
+
+Mở terminal tại **thư mục gốc repository**. Cài dependency frontend một lần:
+
+```bash
+cd frontend
+npm ci
+cd ..
+```
+
+Đảm bảo `java -version` báo Java 21, MySQL đã chạy và cấu hình backend đầy đủ. Mở hai terminal Git Bash tại thư mục gốc:
+
+**Terminal 1 — backend**
+
+```bash
+bash scripts/run-backend-gitbash.sh
+```
+
+**Terminal 2 — frontend**
+
+```bash
+bash scripts/run-frontend-gitbash.sh
+```
+
+Mở **http://127.0.0.1:5173**. Frontend script bật `VITE_DATA_MODE=api`, dùng `/api/v1` qua proxy tới backend port 8080. Script kiểm tra cổng và backend health trước build; nếu backend chưa sẵn sàng hoặc cổng frontend đang bận thì dừng với thông báo. Backend script cũng từ chối cổng đang dùng trước build, tránh ghi đè JAR của phiên đang chạy. Backend script build bằng Maven Wrapper trước khi chạy JAR. Nếu đổi backend port, đồng bộ Vite proxy và cấu hình origin.
+
+Health: `http://127.0.0.1:8080/api/v1/health`; qua proxy: `http://127.0.0.1:5173/api/v1/health`. Health xác nhận dịch vụ phản hồi, không thay thế kiểm thử nghiệp vụ. Giữ hai terminal mở, dùng Ctrl+C để dừng process tương ứng. Script không tự khởi động, dừng hoặc reset MySQL.
+
+### Khi không khởi động hoặc đăng nhập được
+
+Khởi động backend trước và chờ thông báo `Started KDriveApplication`, rồi chạy frontend. Lỗi `ECONNREFUSED` trong terminal Vite nghĩa là proxy không kết nối được backend; không chứng minh email/mật khẩu sai. Nếu backend build hoặc startup thất bại, xử lý lỗi ở terminal backend trước. Không chạy đồng thời nhiều phiên trên cùng cổng.
+
+Cổng mặc định: backend 8080, frontend 5173. Có thể đổi bằng `PORT` cho backend và `FRONTEND_PORT` cho frontend; khi đổi backend cần đặt `VITE_PROXY_TARGET` tương ứng, khi đổi frontend cần đồng bộ `FRONTEND_ORIGIN` của backend. Ví dụ một môi trường **đã cấu hình database riêng**:
+
+```bash
+# Terminal backend: file env chứa DB riêng và FRONTEND_ORIGIN=http://127.0.0.1:5299
+PORT=8299 bash scripts/run-backend-gitbash.sh --env-file <duong-dan-env-rieng>
+# Terminal frontend, sau khi backend sẵn sàng
+FRONTEND_PORT=5299 VITE_PROXY_TARGET=http://127.0.0.1:8299 bash scripts/run-frontend-gitbash.sh
+```
+
+Thay placeholder trước khi chạy; không nhập nguyên dấu `<...>` vào shell. Hai script chỉ kiểm tra/build/khởi động ứng dụng, không tự dừng tiến trình đang giữ cổng hoặc sửa dữ liệu để vượt lỗi.
+
+### Xem thử demo giao diện
+
+Trong `frontend/`, dùng PowerShell:
+
+```powershell
+$env:VITE_DATA_MODE = "demo"
+npm run dev -- --host 127.0.0.1
+```
+
+Demo có nhãn **DEMO UI**, dữ liệu mẫu và bộ chọn vai trò. Không nhập thông tin đăng nhập thật trong chế độ này. Chi tiết tại [hướng dẫn frontend](frontend/README.md).
+
+## Kiểm thử và build
+
+Backend, trong `backend/`, dùng JDK 21:
+
+```powershell
+./mvnw.cmd verify
+```
+
+Git Bash dùng `./mvnw verify`. Kiểm tra MySQL phải chạy trên fixture/schema riêng; H2 hoặc test SKIP không thay thế integration/concurrency MySQL. Xem [runner ảnh và tiện nghi](scripts/coordination/c10-vehicle-media/README.md).
+
+Frontend, trong `frontend/`:
+
+```powershell
+npm test
+npm run lint
+$env:VITE_DATA_MODE = "api"
+$env:VITE_API_BASE_URL = "/api/v1"
+npm run build
+```
+
+Build không thay thế kiểm thử tương tác bằng trình duyệt. Không trỏ test ghi dữ liệu vào MySQL vận hành của người dùng.
+
+## Cấu trúc repository
+
+```text
+backend/      Spring Boot REST API, Maven Wrapper và backend tests
+frontend/     React SPA, components, API client và frontend tests
+database/     Hướng dẫn database
+docs/         Yêu cầu, kiến trúc, database, API và UI
+scripts/      Khởi động, kiểm chứng và vận hành fixture
+```
+
+Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `dist/` và `node_modules/` chứa dữ liệu chạy, build, dependency hoặc evidence local; không phải module nghiệp vụ.
+
+## Tài liệu dự án
+
+- [Phạm vi hệ thống](docs/requirements/system-scope.md) và [use case](docs/requirements/use-cases.md).
+- [Kiến trúc](docs/architecture/system-architecture.md), [ranh giới module](docs/architecture/module-boundaries.md), [cấu trúc project](docs/architecture/project-structure.md).
+- [Quyết định nghiệp vụ](docs/architecture/decisions.md).
+- [Database](docs/database/database-design.md) và [API ảnh xe](docs/api/c10b-vehicle-images.md).
+- [Báo cáo vận hành](docs/modules/operational-reports.md), [danh mục địa điểm](docs/modules/location-catalog.md), [trạng thái chi nhánh](docs/modules/branch-status.md).
+- [Frontend](frontend/README.md), [vận hành và phát triển](docs/architecture/development-workflow.md).
+- [Trợ lý khách hàng](docs/modules/ai-assistant.md), [API gợi ý xe](docs/modules/ai-recommendation.md), [Qwen và tuyến đường cục bộ](docs/modules/local-ai-routing.md).
+- [Tìm xe theo chuyến](docs/api/vehicle-trip-search.md), [quy tắc giao diện khách hàng](docs/ui/customer-experience.md).
+
+
+## Báo cáo vận hành Admin
+
+Trong chế độ API, Admin mở `/admin` để xem đơn tạo trong khoảng, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; bảng phân rã trạng thái hiện tại của các đơn tạo trong khoảng. Chọn Từ ngày/Đến ngày theo giờ Việt Nam (bao gồm hai ngày, tối đa 366 ngày), mặc định tháng hiện tại; dùng Xem báo cáo/Làm mới để tải dữ liệu. Khoảng rỗng hiển thị 0, lỗi tải có nút Thử tải lại. Tổng hóa đơn là giá trị phát hành, không xác nhận tiền đã thu. USER/STAFF/Guest không có quyền báo cáo.
+
+Backend: GET `/api/v1/admin/reports/operations?from=YYYY-MM-DD&to=YYYY-MM-DD`. Khởi động lại backend/frontend bằng script dev hiện có sau khi cập nhật source; không cần migration/bảng/phụ thuộc mới cho báo cáo. DemoDashboard vẫn là dữ liệu demo riêng.

@@ -1,0 +1,5 @@
+# Startup checks
+
+`python scripts/coordination/c13-startup/test_startup.py` exercises actual Git Bash entrypoints with controlled JDK/build doubles: invalid/missing settings, occupied ports, backend readiness, failed build and API mode. These tests do not prove application startup.
+
+`python scripts/coordination/c13-startup/run-startup.py --backend-evidence <isolated native fixture evidence> --evidence .runtime/<new-output>` builds a source-only snapshot, installs exact npm lockfile dependencies offline, runs the actual startup scripts and executes browser integration on an exact stopped test MySQL fixture. Ports33675/8299/5299 are isolated. Git Bash defaults to this workstation's installation; override KDRIVE_GIT_BASH for another installation. JDK/cache paths are local proof configuration. Source hashes, logs/config, assertions and screenshots stay in ignored runtime output. Owned process trees/fixture are stopped; volumeKEEP; original database/services are untouched. No checkout/worktree or stale target/dist is used.

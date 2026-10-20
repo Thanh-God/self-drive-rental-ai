@@ -1,6 +1,6 @@
-# Giai đoạn 2 — Kiến trúc tổng thể
+# Kiến trúc hệ thống
 
-Trạng thái: kiến trúc được người dùng duyệt ngày 25/09/2026; chưa phải hệ thống đã triển khai. Phạm vi nghiệp vụ theo [Giai đoạn 1](../requirements/system-scope.md); các chính sách chưa chốt theo [sổ quyết định](decisions.md).
+KDrive sử dụng React SPA, Spring Boot modular monolith và MySQL. Phạm vi chức năng nằm trong [yêu cầu hệ thống](../requirements/system-scope.md); chính sách nghiệp vụ tại [sổ quyết định](decisions.md).
 
 ## 1. Mục tiêu và hình thức triển khai
 
@@ -10,7 +10,7 @@ Phù hợp đồ án cá nhân khoảng ba tháng: giao dịch đặt xe có th�
 
 [Sơ đồ component và cách đọc](../diagrams/component-diagram.md).
 
-Trong phát triển, VS Code mở toàn bộ repository; hai tiến trình backend/frontend chạy riêng, giao tiếp qua HTTP. IDE không tham gia kiến trúc runtime. MySQL là dịch vụ riêng; dữ liệu không nằm trong editor. Cổng, origin và cấu hình triển khai sẽ được chốt khi khởi tạo ứng dụng.
+Trong phát triển, VS Code mở repository; frontend/backend chạy riêng qua HTTP. MySQL là dịch vụ riêng. Cấu hình hiện tại: Vite 5173, backend 8080, CORS mặc định http://127.0.0.1:5173; cấu hình chính xác nằm trong application.yml và frontend/src/api/client.js. IDE không tham gia runtime.
 
 ## 2. Quy tắc tổ chức
 
@@ -28,15 +28,19 @@ Liên hệ: FR-05–FR-10, UC-U02, UC-S01–UC-S04.
 1. User gửi ID xe, thời gian và điểm nhận/trả; backend kiểm tra tài khoản, quyền và input.
 2. `booking` mở transaction, yêu cầu `vehicle` khóa bản ghi xe theo cơ chế thống nhất rồi kiểm tra trạng thái và lịch đang bị chiếm.
 3. `booking` tính tiền theo chính sách, lưu snapshot và tạo đơn; commit trước khi trả kết quả.
-4. Staff xác nhận/từ chối qua `booking`. Điều kiện và trạng thái chiếm lịch sẽ theo state machine được chốt sau.
+4. Staff xác nhận/từ chối qua `booking`, theo chi nhánh nhận. PENDING còn hạn, CONFIRMED và IN_PROGRESS chiếm lịch; phải kiểm tra cả chuỗi chi nhánh.
 5. Khi giao/nhận, `operation` điều phối transaction: ghi hồ sơ, gọi `booking` chuyển trạng thái và `vehicle` cập nhật tình trạng khi phù hợp. Lỗi ở một bước phải rollback toàn bộ thay đổi liên quan.
-6. `contract` và `invoice` cung cấp hồ sơ theo quyền; thời điểm phát hành còn mở, chưa mặc định tạo ở mọi bước.
+6. `RentalWorkflow` hiện phát hành hợp đồng khi CONFIRMED, hóa đơn khi COMPLETED trong cùng transaction với chuyển trạng thái. Hai hồ sơ là snapshot, không xác nhận đã thu tiền.
 
-Hướng chống đặt trùng: khóa bản ghi xe để tuần tự hóa các yêu cầu cùng xe, sau đó kiểm tra overlap bằng truy vấn đọc trạng thái hiện hành trong transaction. Kiểm tra lại trạng thái đơn khi cập nhật để chống hai Staff xử lý cùng lúc. Mọi thao tác làm chiếm/thay đổi lịch phải theo cùng giao thức khóa; cần quy định thứ tự khóa nhất quán và kiểm thử đồng thời trên MySQL thật ở giai đoạn triển khai. Không chỉ khóa các đơn tìm được vì khi chưa có đơn sẽ không có gì để khóa.
+Hướng chống đặt trùng: khóa bản ghi xe để tuần tự hóa các yêu cầu cùng xe, sau đó kiểm tra overlap bằng truy vấn đọc trạng thái hiện hành trong transaction. Kiểm tra lại trạng thái đơn khi cập nhật để chống hai Staff xử lý cùng lúc. Mọi thao tác làm chiếm/thay đổi lịch phải theo cùng giao thức khóa; cần quy định thứ tự khóa nhất quán và kiểm thử đồng thời trên MySQL thật. Không chỉ khóa các đơn tìm được vì khi chưa có đơn sẽ không có gì để khóa.
 
-Khoảng thuê dùng điều kiện `newStart < existingEnd AND newEnd > existingStart`; thời gian đệm, trạng thái giữ lịch và hết hạn cần chốt trước khi cài đặt. Kết quả tìm xe trước đó không bảo đảm đặt thành công tại thời điểm sau.
+Khoảng thuê dùng điều kiện `newStart < existingEnd AND newEnd > existingStart`. Đơn theo ngày giữ xe từ đầu ngày nhận đến hết ngày trả tại Việt Nam; kể cả đã trả/hoàn tất sớm, lịch mới bắt đầu từ ngày kế tiếp. Số ngày tính phí là chênh lệch hai ngày, không phải số block của khoảng giữ xe. PENDING giữ tối đa 2 giờ: đơn theo ngày không vượt hết ngày nhận, đơn cũ không vượt giờ nhận; khoảng đệm/no-show/gia hạn chưa có. Kết quả tìm xe/báo giá không bảo đảm đặt thành công về sau.
+
+Web đặt xe mới gửi `pickupDate`/`returnDate` theo ngày Việt Nam; backend tính tiền theo chênh lệch ngày và gắn `calendar-2026-10-17`. API còn nhận cặp `startAt`/`endAt` cho client dùng hợp đồng thời gian cũ, với chính sách riêng; không nhận trộn hai dạng trong cùng request. Bản ghi cũ và snapshot chứng từ không được chuyển đổi hoặc tính lại tự động.
 
 ## 4. Hai luồng AI
+
+Phần này mô tả phương án thiết kế ban đầu, chưa có adapter/engine/API thực thi. Provider hoặc mô hình tự train chưa chốt (AD-13); quyết định cuối không được suy ra từ tên folder `gemini`. Các ranh giới kiểm chứng dữ liệu dưới đây vẫn phải được giữ khi thay provider.
 
 ### Gợi ý xe — FR-12–FR-14, UC-G04
 
@@ -55,23 +59,23 @@ Input → validate → `location` lấy catalog ứng viên → Map adapter lấ
 - Kiểm tra schema, ID, ngày, thứ tự, thời gian di chuyển và khung giờ khả thi theo dữ liệu có sẵn. Không coi validation JSON là đủ để chứng minh lịch khả thi.
 - Gemini không gọi database; Map không quyết định đơn thuê hoặc giá xe.
 - Không giữ transaction/khóa database trong khi chờ API ngoài. Trước khi lưu, kiểm tra lại các tham chiếu nội bộ và quyền sở hữu cần thiết.
-- Map lỗi: không bịa distance/duration, không âm thầm lưu như hành trình đã kiểm tra tuyến. Nếu cho phép kế hoạch thiếu tuyến, phải có lựa chọn rõ ràng và trạng thái chưa kiểm chứng; chi tiết fallback còn mở.
-- Gemini lỗi/kết quả sai: không lưu; hỗ trợ thử lại. Luồng tự sắp xếp địa điểm cần được chốt về phạm vi trước khi xây dựng.
+- Map lỗi/thiếu tuyến: MVP đã chốt dừng/thử lại, không bịa distance/duration và không lưu kế hoạch thiếu dữ liệu kiểm chứng.
+- AI lỗi/kết quả sai: không lưu, hỗ trợ thử lại; chưa có trình chỉnh sửa thủ công đầy đủ trong MVP.
 
 ## 5. Bảo mật, lỗi và vận hành
 
 - Spring Security kiểm tra JWT và role; service kiểm tra chủ sở hữu đơn/hành trình cùng trạng thái tài khoản. Admin không mặc nhiên kế thừa mọi quyền User/Staff.
 - Mật khẩu được hash; API key nằm ở backend qua cấu hình môi trường, không đưa vào frontend, Git hoặc log. Chỉ gửi dữ liệu cần thiết cho AI, không gửi giấy tờ/mật khẩu/token.
 - Route guard của React hỗ trợ điều hướng; không thay kiểm tra quyền backend.
-- Chốt chính sách hết hạn, đăng xuất/thu hồi token và khóa tài khoản trước khi triển khai auth; tránh coi xóa token ở frontend là đã thu hồi quyền server.
-- API dùng lỗi nhất quán, thông báo dễ hiểu; lỗi validation, thiếu quyền, xung đột lịch và lỗi tích hợp được phân biệt. Hợp đồng response chi tiết thuộc giai đoạn API.
+- Hiện có TTL 30 phút mặc định, không refresh; TokenFilter kiểm tra trạng thái và token_version mỗi request; logout/đổi mật khẩu/khóa tăng phiên bản. Frontend lưu token localStorage. Cần kiểm thử thêm phiên hết hạn và các request đang chạy khi thu hồi.
+- API dùng lỗi nhất quán, thông báo dễ hiểu; lỗi validation, thiếu quyền, xung đột lịch và lỗi tích hợp được phân biệt. Hợp đồng response chi tiết được mô tả theo từng API/module.
 - Adapter giới hạn timeout, kích thước input/output và số lần gọi. Chỉ retry có giới hạn cho lỗi tạm thời phù hợp, tránh tăng chi phí/quota không kiểm soát.
-- Log có mã liên hệ request để truy vết, không ghi bí mật; dashboard và audit nâng cao là phần mở rộng.
+- Log không được ghi bí mật, mật khẩu hoặc token.
+- Báo cáo vận hành Admin sử dụng `GET /api/v1/admin/reports/operations`. Service tổng hợp qua API nội bộ có kiểu của booking/invoice trong transaction chỉ đọc với mức cô lập REPEATABLE_READ. Báo cáo thể hiện đơn tạo, đơn hoàn tất, số hóa đơn và tổng giá trị hóa đơn; không xác nhận tiền đã thu. Xem [contract báo cáo](../modules/operational-reports.md).
 
-## 6. Kiểm chứng khi triển khai và trình bày báo cáo
+## 6. Chiến lược kiểm thử
 
-Các ca kiểm thử trọng tâm: hai yêu cầu đặt trùng chỉ một thành công; User không xem đơn người khác; Staff không đổi role; Admin can thiệp vẫn qua quy tắc trạng thái; giao nhận rollback khi lỗi; recommendation không bịa xe; itinerary sai không được lưu; timeout API không gây sai dữ liệu. Đây là kế hoạch kiểm thử, chưa phải kết quả đã chạy.
+Các ca cần kiểm chứng: đặt trùng đồng thời trên MySQL; hai Staff xử lý đồng thời; rollback lỗi phát hành; hết hạn/thu hồi phiên; sự cố ngoài thời gian giữ xe; AI không bịa facts và không lưu hành trình sai. Kết hợp unit, integration và browser test; MySQL và H2 phục vụ các mục đích kiểm tra khác nhau.
 
-Tài liệu kiến trúc, module và sơ đồ phục vụ Chương II; quy trình công cụ và kiểm thử phục vụ Chương III. Khung báo cáo tham khảo từ RAR chưa có trong repository và chưa được xác nhận là quy định chính thức.
 
 Cách giải thích trước hội đồng: AI hỗ trợ hiểu yêu cầu và đề xuất phương án; backend kiểm chứng và chịu trách nhiệm về dữ liệu giao dịch. VS Code là công cụ phát triển; hệ thống chạy bằng React, Spring Boot và MySQL, không phụ thuộc việc editor đang mở.

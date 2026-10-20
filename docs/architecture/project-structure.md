@@ -1,73 +1,19 @@
-# Cấu trúc thư mục Giai đoạn 2
+# Cấu trúc repository
 
-Các đường dẫn trong tài liệu tính từ thư mục gốc repository. Đây là cấu trúc module đã thống nhất; ứng dụng chưa có mã thực thi, `pom.xml`, `package.json` hoặc migration SQL.
+| Thư mục | Vai trò |
+|---|---|
+| backend/src/main/java | Spring Boot modules, controller/service/repository và security/config |
+| backend/src/main/resources | Cấu hình và Flyway migrations |
+| backend/src/test | Unit/integration tests và fixture |
+| frontend/src/api | HTTP nghiệp vụ |
+| frontend/src/hooks, context | Trạng thái dữ liệu và phiên |
+| frontend/src/components, layouts, pages, routes | Giao diện và điều hướng |
+| frontend/src/utils | Hàm dùng chung và tests frontend |
+| frontend/public | Tài nguyên tĩnh, ảnh và thông tin bản quyền |
+| database | Hướng dẫn database, không chứa datadir runtime |
+| docs | Yêu cầu, API, kiến trúc, database và quy tắc UI |
+| scripts | Khởi động, test runners và vận hành fixture |
 
-```text
-KLTN/
-├── backend/
-│   └── src/
-│       ├── main/
-│       │   ├── java/com/carrental/
-│       │   │   ├── config/
-│       │   │   ├── security/
-│       │   │   ├── common/
-│       │   │   ├── exception/
-│       │   │   ├── modules/
-│       │   │   │   ├── auth/
-│       │   │   │   ├── user/
-│       │   │   │   ├── vehicle/
-│       │   │   │   ├── booking/
-│       │   │   │   ├── operation/
-│       │   │   │   ├── branch/
-│       │   │   │   ├── location/
-│       │   │   │   ├── contract/
-│       │   │   │   ├── invoice/
-│       │   │   │   ├── review/
-│       │   │   │   └── ai/
-│       │   │   │       ├── recommendation/ (controller, dto, service, engine)
-│       │   │   │       └── itinerary/ (controller, dto, service, entity, repository)
-│       │   │   └── integration/
-│       │   │       ├── gemini/dto/
-│       │   │       └── map/dto/
-│       │   └── resources/db/migration/
-│       └── test/java/com/carrental/
-├── frontend/
-│   ├── public/
-│   └── src/
-│       ├── api/
-│       ├── assets/ (images, icons)
-│       ├── components/ (common, vehicle, booking, inspection, ai)
-│       ├── context/
-│       ├── hooks/
-│       ├── layouts/
-│       ├── pages/ (guest, shared, user, staff, admin)
-│       ├── routes/
-│       └── utils/
-├── database/README.md
-├── docs/
-│   ├── requirements/
-│   ├── architecture/
-│   ├── diagrams/
-│   └── api_specs/
-└── README.md
-```
+Backend gồm auth/user/vehicle/branch/booking/operation/contract/invoice/review/location/ai; Staff/Admin là quyền, không phải module dữ liệu riêng. Frontend API và demo có nguồn riêng. Xem [ranh giới module](module-boundaries.md).
 
-Các module CRUD hiện dùng `controller`, `dto`, `service`, `entity`, `repository`. `auth` chỉ cần controller/dto/service và dùng tài khoản của `user`. Chỉ thêm tầng khi có trách nhiệm thực tế; không sinh lớp rỗng để đủ mẫu. Test sẽ chia theo module khi có code.
-
-## Đối chiếu scaffold ban đầu
-
-| Vị trí | Thay đổi Giai đoạn 2 | Lý do |
-|---|---|---|
-| `modules/staff` | Bỏ 5 file `.gitkeep` và các thư mục trống | Tài khoản Staff thuộc user, nghiệp vụ thuộc booking/operation |
-| `modules/admin` | Bỏ 3 file `.gitkeep` và các thư mục trống | Quản trị đặt trong module sở hữu dữ liệu |
-| `modules/location` | Thêm 5 thư mục tầng với `.gitkeep` | Catalog địa điểm tham quan độc lập |
-| `modules/branch` | Giữ | Chi nhánh giao nhận; không gộp với điểm tham quan |
-| `modules/operation` | Giữ, giới hạn trách nhiệm | Giao nhận và điều phối; không tự sở hữu trạng thái đơn |
-| `modules/ai` | Giữ lowercase và hai chức năng | recommendation/engine tính điểm; itinerary lưu kế hoạch |
-| `integration/map` | Giữ | Adapter nhà cung cấp, không giữ catalog nội bộ |
-| `frontend/src/pages` | Giữ đủ các khu vực | Pages theo actor giúp điều hướng, không quyết định phân quyền server |
-| `frontend/src/context`, `api` | Giữ, mô tả lại trách nhiệm | Context nhỏ; API client tập trung |
-| `database/migrations` | Bỏ placeholder và thư mục trống | Tránh nguồn migration thứ hai |
-| `docs/architecture` | Thêm tài liệu kiến trúc/quy trình/quyết định | Cơ sở thiết kế chi tiết và báo cáo |
-
-Không có mã nghiệp vụ phải di chuyển ở giai đoạn này. Các file khởi tạo Spring Boot, Vite, Maven Wrapper và cấu hình chạy/debug VS Code chỉ bổ sung ở giai đoạn triển khai sau khi kiểm tra môi trường.
+MySQL lưu dữ liệu trong datadir/volume; không có file database.db kiểu SQLite. target/dist/node_modules là build/dependencies, .runtime là dữ liệu chạy riêng; không phải module nghiệp vụ và không đưa vào Git. File placeholder rỗng không chứng minh module đã triển khai.

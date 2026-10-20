@@ -1,50 +1,29 @@
-# Quy trình công cụ đơn giản cho KLTN
+# Phát triển và vận hành
 
-## Nguyên tắc đã chốt
+## Công cụ
 
-VS Code là nơi viết, chạy và debug cả backend Java và frontend React. Không phụ thuộc NetBeans hoặc cấu hình Maven đi kèm NetBeans để chạy dự án. Chỉ bổ sung công cụ khi giúp hoàn thành một việc cụ thể và người dùng có thể hiểu quy trình đó.
+JDK21 và Maven Wrapper cho backend; Node/npm cho frontend; MySQL8.4 lưu dữ liệu. Docker là cách chạy MySQL local khi dùng container; IDE không tham gia runtime. Git quản lý source/tests/tài liệu kỹ thuật. DBeaver hoặc công cụ tương đương có thể dùng để đọc schema.
 
-| Công cụ | Vai trò | Mức cần thiết |
-|---|---|---|
-| VS Code | Mở repository, sửa Java/React/tài liệu, chạy terminal/debug | Môi trường phát triển thống nhất |
-| JDK + Maven Wrapper | Biên dịch, test và chạy Spring Boot | Bắt buộc khi triển khai backend |
-| Node.js + npm | Cài dependency, chạy/build React | Bắt buộc khi triển khai frontend |
-| MySQL Server | Lưu dữ liệu ứng dụng | Bắt buộc khi chạy nghiệp vụ |
-| Trình duyệt | Xem giao diện và demo/kiểm thử | Bắt buộc |
-| Git + GitHub | Lịch sử thay đổi và bản sao mã nguồn | Công cụ quản lý phiên bản |
-| DBeaver | Xem bảng và truy vấn phục vụ học/debug | Tùy chọn; dùng một GUI database là đủ |
-| Word / PowerPoint | Báo cáo / slide bảo vệ | Dùng khi đến giai đoạn tài liệu tương ứng |
-| Figma, Canva, Google Drive | Thiết kế hoặc cộng tác khi có yêu cầu | Không là điều kiện chạy/demo |
-| Docker, NetBeans, Workbench, SSMS | Không nằm trong quy trình chạy mặc định | Không phải học hoặc mở cùng dự án |
+## Chạy dự án
 
-MySQL Workbench có thể thay DBeaver nếu cần, không yêu cầu dùng cả hai. SSMS không dùng thay MySQL. Docker chỉ xem xét nếu có nhu cầu triển khai cụ thể; ưu tiên hướng chạy local trực tiếp để ít tầng vận hành.
+Xem [README](../../README.md) và [frontend](../../frontend/README.md) cho lệnh theo shell. Cấu hình backend bằng biến môi trường; Spring Boot không tự đọc backend/.env.local. Các script khởi động nạp file env và không dừng/reset Docker. Chạy frontend API qua /api/v1 và Vite proxy trỏ đúng backend. Kiểm tra cổng trước khởi động, giữ terminal của từng dịch vụ; sau thay source/backend env, khởi động lại dịch vụ tương ứng.
 
-## Tình trạng khảo sát máy ngày 25/09/2026
+Không commit credentials, env riêng, database dump, dependency hoặc build output. Không dùng database của dự án khác. Seed chỉ bật khi chủ động cấu hình, không dùng để reset database đang vận hành.
 
-- Đã chạy được Git 2.50.1, Java/javac 23, Node 24.11.0, npm 11.6.1 và Python 3.12.0.
-- Maven 3.9.9 hiện được tìm thấy bên trong NetBeans; dự án sẽ có Maven Wrapper để không phụ thuộc đường dẫn IDE đó.
-- Đã phát hiện VS Code, DBeaver, MySQL Workbench và Microsoft Office. Có ứng dụng không có nghĩa mọi chức năng đã được kiểm thử.
-- Chưa xác nhận MySQL Server hoạt động. XAMPP trên máy cung cấp MariaDB 10.4.32; không tự thay stack MySQL đã chốt bằng MariaDB.
-- Docker CLI có mặt nhưng không kết nối được engine trong lần khảo sát; Docker không là điều kiện bắt buộc của quy trình này.
-- Chưa chốt phiên bản JDK/Spring Boot cho project; phiên bản đang cài không tự động là phiên bản chuẩn. Chọn phiên bản tương thích và ghi cố định khi khởi tạo.
+## Kiểm thử
 
-## Cách chạy dự kiến khi ứng dụng đã được khởi tạo
+Backend: tại backend dùng ./mvnw.cmd verify (PowerShell) hoặc ./mvnw verify (Git Bash), JDK21. Frontend: tại frontend dùng npm test, npm run lint, npm run build; build riêng VITE_DATA_MODE=demo và api. Mã test/runner được quản lý trong Git để tái chạy.
 
-1. Mở một thư mục KLTN trong VS Code, không cần mở NetBeans.
-2. Bảo đảm MySQL Server chạy và cấu hình môi trường backend hợp lệ.
-3. Chạy backend từ thư mục backend bằng Maven Wrapper; backend áp dụng Flyway và kết nối MySQL.
-4. Chạy frontend từ thư mục frontend bằng npm trong terminal thứ hai.
-5. Mở URL frontend trong trình duyệt. React gửi REST request đến backend; backend truy cập database và API ngoài.
-6. Khi có lỗi, xem terminal backend/frontend tương ứng; mở DBeaver chỉ nếu cần kiểm tra dữ liệu.
+Test ghi dữ liệu phải dùng schema/instance cô lập và kiểm tra marker/host/port trước khi chạy. H2 không thay chứng minh transaction/snapshot trên MySQL. Browser API cần backend/MySQL thật, không fallback sang demo. Chỉ dừng dịch vụ do chính lượt test tạo; giữ dữ liệu vận hành. Runner và chính sách fixture xem [scripts operations](../../scripts/operations/README.md).
 
-Đây là trình tự dự kiến, chưa phải hướng dẫn lệnh chạy hiện có. Giai đoạn khởi tạo sẽ bổ sung lệnh chính xác, URL, cấu hình môi trường mẫu không chứa bí mật và cấu hình Run/Debug dễ dùng; kiểm thử trước khi đưa vào README. Hướng dẫn sẽ giải thích chức năng từng tiến trình, không chỉ đưa các lệnh để sao chép.
+## Database
 
-## Việc cần làm ở giai đoạn khởi tạo
+Migration duy nhất tại backend/src/main/resources/db/migration. Giữ Flyway validation, Hibernate validate, clean-disabled và không baseline tự động. Không sửa migration đã áp dụng; trước nâng cấp database có dữ liệu phải kiểm history/checksum/schema và backup. MySQL DDL có thể tồn tại một phần sau lỗi, không tự repair/clean hoặc giả định rollback toàn migration.
 
-- Kiểm tra extension Java/React cần thiết trong VS Code và sự tương thích JDK/Spring Boot.
-- Chuẩn bị MySQL Server và database dành riêng cho demo; không sử dụng database cá nhân có sẵn.
-- Thêm Maven Wrapper, cấu hình backend và frontend cùng lockfile; không cài dependency ở Giai đoạn 2.
-- Kiểm thử quy trình trên máy từ trạng thái dừng đến chạy thành công, gồm migration/seed và trường hợp API ngoài thiếu key.
-- Ghi lại quy trình demo dễ lặp lại: khởi động dịch vụ, đăng nhập theo actor, chạy nghiệp vụ và hai AI, dừng ứng dụng.
+## Sử dụng AI trong phát triển
 
-Mã nguồn và migration nằm trong Git; dữ liệu runtime nằm trong MySQL; API key qua môi trường; bản báo cáo/slide là artifact riêng. Không cần đưa mọi dữ liệu vào repository hoặc chuyển qua nhiều ứng dụng để một chức năng hoạt động.
+AI được sử dụng để hỗ trợ phân tích, đề xuất mã nguồn, rà soát và soạn tài liệu. Người phát triển chịu trách nhiệm lựa chọn giải pháp, kiểm tra mã nguồn và giải thích hành vi của hệ thống. Đề xuất chưa kiểm tra không được trình bày như chức năng đã hoàn tất. Không đưa dữ liệu cá nhân, mật khẩu hoặc khóa truy cập vào nội dung yêu cầu hỗ trợ.
+
+## Quản lý tài liệu
+
+Tài liệu chia sẻ mô tả chức năng, API, kiến trúc, cách cấu hình và chạy test. Nhật ký điều phối, kế hoạch từng lượt, kết quả kiểm tra, artifact/hash/SHA và biên bản nội bộ được lưu ở thư mục local bị Git bỏ qua. README và tài liệu công khai tập trung vào thông tin kỹ thuật cần thiết để sử dụng, phát triển và vận hành hệ thống.
