@@ -11,24 +11,29 @@ import com.carrental.modules.location.service.LocationService.PublicView;
 import com.carrental.modules.location.service.VisitMetadata;
 import com.carrental.modules.location.service.VisitMetadata.*;
 import com.carrental.security.Actor;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.*;
 import java.util.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
 
+@ExtendWith(MockitoExtension.class)
 class ItineraryPreviewServiceTest {
-    private final Actor user = new Actor("user-1", "USER", "Khách");
-    private final LocationService locations = mock(LocationService.class);
-    private final OsrmRoutingClient routing = mock(OsrmRoutingClient.class);
-    private final ObjectMapper json = new ObjectMapper();
-    private final Clock clock = Clock.fixed(Instant.parse("2026-10-20T08:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
+    @Mock private LocationService locations;
+    @Mock private OsrmRoutingClient routing;
+    @Mock private QwenItinerarySequencePlanner planner;
 
-    private QwenItinerarySequencePlanner planner;
+    private final Clock clock = Clock.fixed(Instant.parse("2026-10-20T00:00:00Z"), ZoneId.of("Asia/Ho_Chi_Minh"));
+    private final Actor user = new Actor("u1", "USER", "Khách hàng");
+
     private ItineraryPreviewService service;
 
     private PublicView locA;
@@ -37,8 +42,7 @@ class ItineraryPreviewServiceTest {
 
     @BeforeEach
     void setUp() {
-        planner = new QwenItinerarySequencePlanner(json, "qwen3:8b", false);
-        service = new ItineraryPreviewService(locations, routing, planner, json, clock);
+        service = new ItineraryPreviewService(locations, routing, planner, clock);
 
         var hoursA = new Hours(State.INTERVALS, List.of(new Interval("07:30", "17:00", false)));
         var metaA = new VisitMetadata("Asia/Ho_Chi_Minh", Map.of(DayOfWeek.TUESDAY, hoursA), Map.of(), 60,
@@ -63,14 +67,15 @@ class ItineraryPreviewServiceTest {
     @Test
     void successfulPreviewWithCalculatedTimelineAndFingerprint() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB, locC));
+        when(planner.planSequence(eq("loc-a"), anyList(), anyInt()))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
 
         // 2026-10-20 là Thứ Ba
         LocalDate tripDate = LocalDate.parse("2026-10-20");
         ItineraryPreviewRequest req = new ItineraryPreviewRequest(tripDate, "08:00", "14:00", "loc-a", null);
 
         var leg1 = new OsrmRoutingClient.Leg(10000.0, 900.0); // 10km, 15 phút
-        var leg2 = new OsrmRoutingClient.Leg(8000.0, 720.0);  // 8km, 12 phút
-        var estimate = new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 18000.0, 1620.0, "OSM", List.of(leg1, leg2));
+        var estimate = new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 10000.0, 900.0, "OSM", List.of(leg1));
 
         when(routing.route(anyList())).thenReturn(estimate);
 
@@ -78,8 +83,9 @@ class ItineraryPreviewServiceTest {
 
         assertEquals(ItineraryPreviewResponse.Status.VALIDATED, res.status());
         assertEquals("loc-a", res.criteria().startLocationId());
-        assertTrue(res.orderedLocationIds().size() >= 2);
+        assertEquals(2, res.orderedLocationIds().size());
         assertEquals("loc-a", res.orderedLocationIds().get(0));
+        assertEquals("loc-b", res.orderedLocationIds().get(1));
 
         assertNotNull(res.fingerprint());
         assertFalse(res.fingerprint().isBlank());
@@ -106,17 +112,53 @@ class ItineraryPreviewServiceTest {
     }
 
     @Test
-    void rejectsPastDateOrWindowLessThanTwoHours() {
+    void rejectsPastDateOrPastTimeTodayOrReversedTime() {
+        // Ngày hôm qua
         LocalDate pastDate = LocalDate.parse("2026-10-19");
         ItineraryPreviewRequest pastReq = new ItineraryPreviewRequest(pastDate, "08:00", "12:00", "loc-a", null);
         assertThrows(DomainException.class, () -> service.preview(user, pastReq));
 
-        LocalDate validDate = LocalDate.parse("2026-10-21");
-        ItineraryPreviewRequest shortReq = new ItineraryPreviewRequest(validDate, "08:00", "09:30", "loc-a", null);
-        assertThrows(DomainException.class, () -> service.preview(user, shortReq));
+        // Ngày hôm nay nhưng giờ bắt đầu trước giờ hiện tại (clock là 07:00 VN)
+        LocalDate validDate = LocalDate.parse("2026-10-20");
+        ItineraryPreviewRequest pastTimeReq = new ItineraryPreviewRequest(validDate, "06:00", "12:00", "loc-a", null);
+        assertThrows(DomainException.class, () -> service.preview(user, pastTimeReq));
 
+        // Giờ bắt đầu sau giờ kết thúc
         ItineraryPreviewRequest invertedReq = new ItineraryPreviewRequest(validDate, "14:00", "09:30", "loc-a", null);
         assertThrows(DomainException.class, () -> service.preview(user, invertedReq));
+
+        // Ngày vượt quá 90 ngày
+        LocalDate farFuture = validDate.plusDays(95);
+        ItineraryPreviewRequest farReq = new ItineraryPreviewRequest(farFuture, "08:00", "12:00", "loc-a", null);
+        assertThrows(DomainException.class, () -> service.preview(user, farReq));
+    }
+
+    @Test
+    void returnsUnavailableWhenQwenFailsOrIsDisabled() {
+        when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
+        when(planner.planSequence(any(), any(), anyInt()))
+            .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(503, "Dịch vụ AI hiện không khả dụng (bị tắt)."));
+
+        LocalDate validDate = LocalDate.parse("2026-10-20");
+        ItineraryPreviewRequest req = new ItineraryPreviewRequest(validDate, "08:00", "14:00", "loc-a", null);
+
+        var res = service.preview(user, req);
+        assertEquals(ItineraryPreviewResponse.Status.UNAVAILABLE, res.status());
+        assertTrue(res.notices().get(0).contains("không khả dụng"));
+        assertNull(res.fingerprint());
+    }
+
+    @Test
+    void throwsTooManyRequestsWhenQwenIsBusy() {
+        when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
+        when(planner.planSequence(any(), any(), anyInt()))
+            .thenThrow(new QwenItinerarySequencePlanner.QwenPlanningException(429, "Dịch vụ AI đang bận"));
+
+        LocalDate validDate = LocalDate.parse("2026-10-20");
+        ItineraryPreviewRequest req = new ItineraryPreviewRequest(validDate, "08:00", "14:00", "loc-a", null);
+
+        DomainException ex = assertThrows(DomainException.class, () -> service.preview(user, req));
+        assertEquals(HttpStatus.TOO_MANY_REQUESTS, ex.status);
     }
 
     @Test
@@ -135,6 +177,9 @@ class ItineraryPreviewServiceTest {
     @Test
     void returnsNoFeasiblePlanWhenOsrmHasNoRoute() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
+        when(planner.planSequence(any(), any(), anyInt()))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
+
         LocalDate validDate = LocalDate.parse("2026-10-20");
         ItineraryPreviewRequest req = new ItineraryPreviewRequest(validDate, "08:00", "12:00", "loc-a", null);
 
@@ -148,6 +193,9 @@ class ItineraryPreviewServiceTest {
     @Test
     void returnsNoFeasiblePlanWhenTimeExceedsEndTime() {
         when(locations.activeCatalog(user)).thenReturn(List.of(locA, locB));
+        when(planner.planSequence(any(), any(), anyInt()))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of("loc-a", "loc-b"), "QWEN_OPTIMIZED"));
+
         LocalDate validDate = LocalDate.parse("2026-10-20");
         // Giờ bắt đầu 08:00, dwell 60, đi 90 phút (đến 10:30), dwell 90 phút -> 12:00 vượt quá endTime 11:00
         ItineraryPreviewRequest req = new ItineraryPreviewRequest(validDate, "08:00", "11:00", "loc-a", null);
@@ -166,5 +214,25 @@ class ItineraryPreviewServiceTest {
         LocalDate validDate = LocalDate.parse("2026-10-20");
         ItineraryPreviewRequest req = new ItineraryPreviewRequest(validDate, "08:00", "12:00", "loc-a", null);
         assertThrows(DomainException.class, () -> service.preview(staff, req));
+    }
+
+    @Test
+    void overnightIntervalFromYesterdayIsRecognizedAsOpenToday() {
+        // Ngày hôm trước (Monday) có khung giờ 22:00 -> 02:00 nextDay = true
+        var prevHours = new Hours(State.INTERVALS, List.of(new Interval("22:00", "02:00", true)));
+        var todayHours = new Hours(State.CLOSED, List.of());
+        var meta = new VisitMetadata("Asia/Ho_Chi_Minh",
+            Map.of(DayOfWeek.MONDAY, prevHours, DayOfWeek.TUESDAY, todayHours),
+            Map.of(),
+            45,
+            new Evidence("https://example.com", Instant.parse("2026-10-01T00:00:00Z")),
+            new Evidence("https://example.com", Instant.parse("2026-10-01T00:00:00Z"))
+        );
+
+        LocalDate tuesday = LocalDate.parse("2026-10-20");
+        List<ItineraryPreviewService.EffectiveInterval> intervals = service.effectiveIntervals(meta, tuesday);
+        assertEquals(1, intervals.size());
+        assertEquals(0, intervals.get(0).startMinute());
+        assertEquals(120, intervals.get(0).endMinute()); // 02:00 = 120 phút
     }
 }

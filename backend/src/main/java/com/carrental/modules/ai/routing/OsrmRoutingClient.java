@@ -57,10 +57,15 @@ public final class OsrmRoutingClient {
             List<Leg> legs = new java.util.ArrayList<>();
             var legsNode = route.path("legs");
             if (legsNode.isArray()) {
+                if (legsNode.size() != points.size() - 1) return failed(Status.UNAVAILABLE);
                 for (var legNode : legsNode) {
-                    if (legNode.path("distance").isNumber() && legNode.path("duration").isNumber()) {
-                        legs.add(new Leg(legNode.path("distance").doubleValue(), legNode.path("duration").doubleValue()));
-                    }
+                    var distNode = legNode.path("distance");
+                    var durNode = legNode.path("duration");
+                    if (!distNode.isNumber() || !durNode.isNumber()) return failed(Status.UNAVAILABLE);
+                    double d = distNode.doubleValue();
+                    double s = durNode.doubleValue();
+                    if (!Double.isFinite(d) || d < 0 || !Double.isFinite(s) || s < 0) return failed(Status.UNAVAILABLE);
+                    legs.add(new Leg(d, s));
                 }
             }
             return new Estimate(Status.VERIFIED,meters,seconds,"© OpenStreetMap contributors; OSRM driving estimate",List.copyOf(legs));

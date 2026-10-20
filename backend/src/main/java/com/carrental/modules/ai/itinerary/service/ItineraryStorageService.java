@@ -1,7 +1,10 @@
 package com.carrental.modules.ai.itinerary.service;
 
 import com.carrental.exception.DomainException;
-import com.carrental.modules.ai.itinerary.dto.*;
+import com.carrental.modules.ai.itinerary.dto.CreateItineraryRequest;
+import com.carrental.modules.ai.itinerary.dto.ItineraryDetailDto;
+import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewResponse;
+import com.carrental.modules.ai.itinerary.dto.ItinerarySummaryDto;
 import com.carrental.modules.ai.itinerary.entity.Itinerary;
 import com.carrental.modules.ai.itinerary.entity.ItineraryDay;
 import com.carrental.modules.ai.itinerary.entity.ItineraryItem;
@@ -13,7 +16,8 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,18 +58,21 @@ public class ItineraryStorageService {
         if (request.fingerprint() == null || request.fingerprint().isBlank()) {
             throw DomainException.bad("Chữ ký xác thực (fingerprint) không được để trống.");
         }
-        if (request.preview() == null) {
-            throw DomainException.bad("Thông tin xem trước hành trình không được để trống.");
+        if (request.orderedLocationIds() == null || request.orderedLocationIds().isEmpty()) {
+            throw DomainException.bad("Danh sách địa điểm lưu không được để trống.");
         }
 
-        // Tái thẩm định toàn vẹn: tính toán lại preview hoàn toàn từ server facts
-        var recalculated = previewService.preview(actor, request.preview());
-        if (recalculated.status() != ItineraryPreviewResponse.Status.VALIDATED) {
-            throw DomainException.bad("Hành trình không khả thi hoặc thiếu dữ liệu kiểm chứng.");
-        }
-        if (recalculated.fingerprint() == null || !recalculated.fingerprint().equals(request.fingerprint())) {
-            throw DomainException.bad("Chữ ký xác thực hành trình không khớp hoặc dữ liệu đã bị sửa đổi. Vui lòng xem trước lại.");
-        }
+        // Tái thẩm định toàn vẹn trực tiếp từ server facts và OSRM chặng (F02: Không gọi lại Qwen)
+        var verified = previewService.revalidateOrderedLocations(
+            actor,
+            request.tripDate(),
+            request.startTime(),
+            request.endTime(),
+            request.startLocationId(),
+            request.preferredCategoryId(),
+            request.orderedLocationIds(),
+            request.fingerprint()
+        );
 
         Instant now = Instant.now(clock);
 
@@ -73,7 +80,7 @@ public class ItineraryStorageService {
         itinerary.userId = actor.id();
         itinerary.title = title;
         try {
-            itinerary.criteria = json.writeValueAsString(recalculated.criteria());
+            itinerary.criteria = json.writeValueAsString(verified.criteria());
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("Không thể serialize tiêu chí hành trình", e);
         }
@@ -82,10 +89,10 @@ public class ItineraryStorageService {
 
         ItineraryDay day = new ItineraryDay();
         day.itineraryId = itinerary.id;
-        day.tripDate = request.preview().tripDate();
+        day.tripDate = request.tripDate();
         day = dayRepo.save(day);
 
-        List<ItineraryPreviewResponse.ScheduleItem> items = recalculated.items();
+        List<ItineraryPreviewResponse.ScheduleItem> items = verified.items();
         for (var scheduleItem : items) {
             ItineraryItem item = new ItineraryItem();
             item.dayId = day.id;
@@ -103,11 +110,11 @@ public class ItineraryStorageService {
             itinerary.id,
             itinerary.title,
             itinerary.createdAt,
-            recalculated.criteria(),
+            verified.criteria(),
             day.tripDate.toString(),
             items,
-            recalculated.totals(),
-            recalculated.fingerprint()
+            verified.totals(),
+            verified.fingerprint()
         );
     }
 

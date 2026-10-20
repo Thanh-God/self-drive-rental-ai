@@ -4,6 +4,9 @@ import com.carrental.modules.location.service.CatalogRevision;
 import java.util.List;
 
 public final class ItineraryFingerprint {
+    public static final String CONTRACT_VERSION = "kdrive-itinerary-v1";
+    public static final int PLAN_VERSION = 1;
+
     private ItineraryFingerprint() {}
 
     public static String compute(
@@ -19,6 +22,8 @@ public final class ItineraryFingerprint {
             List<Integer> travelMinutes,
             List<Double> distanceMeters) {
         return CatalogRevision.of(
+            CONTRACT_VERSION,
+            Integer.toString(PLAN_VERSION),
             tripDate != null ? tripDate : "",
             startTime != null ? startTime : "",
             endTime != null ? endTime : "",

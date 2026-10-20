@@ -1,15 +1,8 @@
 package com.carrental;
 
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.carrental.modules.ai.itinerary.dto.CreateItineraryRequest;
 import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewRequest;
+import com.carrental.modules.ai.itinerary.service.QwenItinerarySequencePlanner;
 import com.carrental.modules.ai.routing.OsrmRoutingClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,10 +21,18 @@ import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
 @SpringBootTest(properties = {
-    "app.jwt-secret=itinerary-storage-test-secret-at-least-32-bytes",
     "app.seed-enabled=true",
-    "app.seed-password=PilotTestOnly123!"
+    "app.seed-password=LocationApiTestOnly123!",
+    "app.jwt-secret=storage-http-test-secret-at-least-32-bytes"
 })
 @AutoConfigureMockMvc
 public class ItineraryStorageIntegrationTest {
@@ -49,6 +50,9 @@ public class ItineraryStorageIntegrationTest {
 
     @MockBean
     private OsrmRoutingClient osrmRoutingClient;
+
+    @MockBean
+    private QwenItinerarySequencePlanner sequencePlanner;
 
     private String userToken;
     private String adminToken;
@@ -72,25 +76,27 @@ public class ItineraryStorageIntegrationTest {
             : url);
     }
 
-    private String login(String email, String password) throws Exception {
-        var res = mvc.perform(post("/api/v1/auth/login")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(json.writeValueAsString(Map.of("email", email, "password", password))))
-            .andReturn();
-        JsonNode node = json.readTree(res.getResponse().getContentAsString());
-        return node.path("token").asText();
-    }
-
     @BeforeEach
     void setUp() throws Exception {
-        adminToken = login("admin@example.test", "PilotTestOnly123!");
-        userToken = login("user@example.test", "PilotTestOnly123!");
+        var userLoginRes = mvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("email", "user@example.test", "password", "LocationApiTestOnly123!"))))
+            .andExpect(status().isOk())
+            .andReturn();
+        userToken = json.readTree(userLoginRes.getResponse().getContentAsString()).path("token").asText();
 
-        // Tạo category nếu chưa có
+        var adminLoginRes = mvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("email", "admin@example.test", "password", "LocationApiTestOnly123!"))))
+            .andExpect(status().isOk())
+            .andReturn();
+        adminToken = json.readTree(adminLoginRes.getResponse().getContentAsString()).path("token").asText();
+
         var catRes = mvc.perform(post("/api/v1/admin/location-categories")
                 .header("Authorization", "Bearer " + adminToken)
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"Di tích Storage Test\"}"))
+                .content(json.writeValueAsString(Map.of("name", "Văn hóa Storage " + System.nanoTime()))))
+            .andExpect(status().isCreated())
             .andReturn();
         String catId = json.readTree(catRes.getResponse().getContentAsString()).path("id").asText();
 
@@ -137,12 +143,13 @@ public class ItineraryStorageIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of(
                     "categoryId", catId,
-                    "name", "Bảo tàng Storage Test",
+                    "name", "Bảo tàng Storage Test " + System.nanoTime(),
                     "latitude", 16.0601,
                     "longitude", 108.2235,
                     "status", "ACTIVE",
                     "metadata", json.readTree(metaA)
                 ))))
+            .andExpect(status().isCreated())
             .andReturn();
         locAId = json.readTree(locRes1.getResponse().getContentAsString()).path("id").asText();
 
@@ -151,12 +158,13 @@ public class ItineraryStorageIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of(
                     "categoryId", catId,
-                    "name", "Bãi biển Storage Test",
+                    "name", "Bãi biển Storage Test " + System.nanoTime(),
                     "latitude", 16.0041,
                     "longitude", 108.2638,
                     "status", "ACTIVE",
                     "metadata", json.readTree(metaB)
                 ))))
+            .andExpect(status().isCreated())
             .andReturn();
         locBId = json.readTree(locRes2.getResponse().getContentAsString()).path("id").asText();
 
@@ -168,12 +176,20 @@ public class ItineraryStorageIntegrationTest {
 
     @Test
     void saveAndRetrieveItineraryFlow() throws Exception {
+        when(sequencePlanner.planSequence(eq(locAId), anyList(), anyInt()))
+            .thenReturn(new QwenItinerarySequencePlanner.SequenceResult(List.of(locAId, locBId), "QWEN_OPTIMIZED"));
+
         String tripDate = LocalDate.now().plusDays(3).toString();
+
+        // 1. Thực hiện xem trước (Preview)
         ItineraryPreviewRequest previewReq = new ItineraryPreviewRequest(
-            LocalDate.parse(tripDate), "08:00", "13:00", locAId, null
+            LocalDate.parse(tripDate),
+            "08:00",
+            "17:00",
+            locAId,
+            null
         );
 
-        // 1. Preview để lấy fingerprint thật
         var previewRes = mvc.perform(post(PREVIEW_URL)
                 .header("Authorization", "Bearer " + userToken)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -192,21 +208,39 @@ public class ItineraryStorageIntegrationTest {
         int beforeDays = jdbc.queryForObject("SELECT count(*) FROM itinerary_days", Integer.class);
         int beforeItems = jdbc.queryForObject("SELECT count(*) FROM itinerary_items", Integer.class);
 
-        // 2. Thử gửi fingerprint giả mạo -> Phải bị từ chối 400 Bad Request
-        CreateItineraryRequest forgedReq = new CreateItineraryRequest("Hành trình giả mạo", "fake-hash-123", previewReq);
+        // 2. Thử gửi fingerprint giả mạo/stale -> Phải bị từ chối 409 Conflict (F02)
+        CreateItineraryRequest forgedReq = new CreateItineraryRequest(
+            "Hành trình giả mạo",
+            "fake-fingerprint-conflict",
+            LocalDate.parse(tripDate),
+            "08:00",
+            "17:00",
+            locAId,
+            null,
+            List.of(locAId, locBId)
+        );
         mvc.perform(post(ITINERARIES_URL)
                 .header("Authorization", "Bearer " + userToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(forgedReq)))
-            .andExpect(status().isBadRequest());
+            .andExpect(status().isConflict());
 
-        // Đảm bảo không có record nào bị ghi khi lỗi
+        // Đảm bảo không có record nào bị ghi khi lỗi 409
         assertEquals(beforeItineraries, jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class));
         assertEquals(beforeDays, jdbc.queryForObject("SELECT count(*) FROM itinerary_days", Integer.class));
         assertEquals(beforeItems, jdbc.queryForObject("SELECT count(*) FROM itinerary_items", Integer.class));
 
-        // 3. Gửi request lưu hợp lệ
-        CreateItineraryRequest saveReq = new CreateItineraryRequest("Chuyến đi Đà Nẵng 1 ngày", fingerprint, previewReq);
+        // 3. Gửi request lưu hợp lệ (F02: Gửi orderedLocationIds, không gọi lại Qwen)
+        CreateItineraryRequest saveReq = new CreateItineraryRequest(
+            "Chuyến đi Đà Nẵng 1 ngày",
+            fingerprint,
+            LocalDate.parse(tripDate),
+            "08:00",
+            "17:00",
+            locAId,
+            null,
+            List.of(locAId, locBId)
+        );
         var saveRes = mvc.perform(post(ITINERARIES_URL)
                 .header("Authorization", "Bearer " + userToken)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -215,6 +249,9 @@ public class ItineraryStorageIntegrationTest {
             .andExpect(jsonPath("$.id").isNotEmpty())
             .andExpect(jsonPath("$.title").value("Chuyến đi Đà Nẵng 1 ngày"))
             .andExpect(jsonPath("$.items.length()").value(2))
+            .andExpect(jsonPath("$.items[0].fullHoursDescription").isNotEmpty())
+            .andExpect(jsonPath("$.items[0].osmAttribution").value("© OpenStreetMap contributors; OSRM driving estimate"))
+            .andExpect(jsonPath("$.items[0].contractVersion").value("kdrive-itinerary-v1"))
             .andReturn();
 
         String itineraryId = json.readTree(saveRes.getResponse().getContentAsString()).path("id").asText();
@@ -241,6 +278,8 @@ public class ItineraryStorageIntegrationTest {
             .andExpect(jsonPath("$.title").value("Chuyến đi Đà Nẵng 1 ngày"))
             .andExpect(jsonPath("$.items[0].locationId").value(locAId))
             .andExpect(jsonPath("$.items[0].dwellMinutes").value(60))
+            .andExpect(jsonPath("$.items[0].fullHoursDescription").isNotEmpty())
+            .andExpect(jsonPath("$.items[0].osmAttribution").isNotEmpty())
             .andExpect(jsonPath("$.items[1].locationId").value(locBId))
             .andExpect(jsonPath("$.items[1].dwellMinutes").value(45));
 

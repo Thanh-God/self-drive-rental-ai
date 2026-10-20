@@ -19,6 +19,8 @@ public record ItineraryPreviewResponse(
     }
 
     public record CriteriaInfo(
+        String contractVersion,
+        int planVersion,
         String tripDate,
         String startTime,
         String endTime,
@@ -41,7 +43,13 @@ public record ItineraryPreviewResponse(
         Integer travelToNextMinutes,
         Double distanceToNextMeters,
         String hoursState,
-        String hoursEvidenceUrl
+        String fullHoursDescription,
+        String hoursEvidenceUrl,
+        String hoursVerifiedAt,
+        String durationEvidenceUrl,
+        String durationVerifiedAt,
+        String osmAttribution,
+        String contractVersion
     ) {}
 
     public record Totals(

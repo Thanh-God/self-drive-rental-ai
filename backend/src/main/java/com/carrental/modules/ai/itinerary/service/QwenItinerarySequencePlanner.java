@@ -4,6 +4,7 @@ import com.carrental.exception.DomainException;
 import com.carrental.modules.ai.LocalHttp;
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -15,6 +16,25 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class QwenItinerarySequencePlanner {
+    public enum SequenceReasonCode {
+        QWEN_OPTIMIZED,
+        PROXIMITY_FLOW,
+        CULTURAL_SEQUENCE,
+        SCENIC_ROUTE,
+        TIME_EFFICIENCY
+    }
+
+    public static class QwenPlanningException extends RuntimeException {
+        private final int statusCode;
+        public QwenPlanningException(int statusCode, String message) {
+            super(message);
+            this.statusCode = statusCode;
+        }
+        public int getStatusCode() {
+            return statusCode;
+        }
+    }
+
     private final ObjectMapper json;
     private final URI endpoint;
     private final Duration timeout;
@@ -62,18 +82,20 @@ public class QwenItinerarySequencePlanner {
             throw DomainException.bad("Điểm bắt đầu phải nằm trong danh sách ứng viên.");
         }
 
-        // Nếu Qwen không được bật hoặc gặp sự cố, thực hiện sắp xếp suy diễn tất định (Deterministic fallback)
+        // Qwen không được bật: ném lỗi rõ ràng, không fake AI plan (F01)
         if (!enabled) {
-            return deterministicPlan(startId, candidates, targetCount);
+            throw new QwenPlanningException(503, "Dịch vụ AI gợi ý lộ trình hiện không khả dụng (bị tắt).");
         }
 
         if (!capacity.tryAcquire()) {
-            // Khi đang tải cao, fallback sang thuật toán nội bộ để không chặn preview của người dùng
-            return deterministicPlan(startId, candidates, targetCount);
+            // Khi đang tải cao, trả 429
+            throw new QwenPlanningException(429, "Dịch vụ AI đang bận xử lý yêu cầu khác, vui lòng thử lại sau.");
         }
 
         try {
             var candidateIds = candidates.stream().map(Candidate::id).toList();
+            var allowedReasonCodes = Arrays.stream(SequenceReasonCode.values()).map(Enum::name).toList();
+
             var properties = new LinkedHashMap<String, Object>();
             properties.put("orderedLocationIds", Map.of(
                 "type", "array",
@@ -81,7 +103,10 @@ public class QwenItinerarySequencePlanner {
                 "minItems", Math.min(2, candidates.size()),
                 "maxItems", Math.min(4, candidates.size())
             ));
-            properties.put("reasonCode", Map.of("type", "string", "maxLength", 50));
+            properties.put("reasonCode", Map.of(
+                "type", "string",
+                "enum", allowedReasonCodes
+            ));
             var schema = Map.of(
                 "type", "object",
                 "properties", properties,
@@ -120,49 +145,87 @@ public class QwenItinerarySequencePlanner {
 
             var response = LocalHttp.send(client, request, timeout, 16384);
             if (response.status() != 200) {
-                return deterministicPlan(startId, candidates, targetCount);
+                throw new QwenPlanningException(503, "Dịch vụ AI trả về mã lỗi HTTP " + response.status());
             }
 
             var envelope = json.readTree(response.body());
             var message = envelope.path("message");
             if (!envelope.path("done").asBoolean() || !"assistant".equals(message.path("role").asText())) {
-                return deterministicPlan(startId, candidates, targetCount);
+                throw new QwenPlanningException(503, "Phản hồi AI không đúng định dạng trợ lý.");
             }
 
             String content = message.path("content").textValue();
-            var node = json.readTree(content);
+            if (content == null || content.isBlank()) {
+                throw new QwenPlanningException(503, "Mô hình AI trả về nội dung trống.");
+            }
+
+            JsonNode node = json.readTree(content);
+            if (!node.isObject()) {
+                throw new QwenPlanningException(503, "Phản hồi AI không phải JSON object.");
+            }
+
+            // Thực thi unknown-property validation (F01)
+            Set<String> fieldNames = new HashSet<>();
+            node.fieldNames().forEachRemaining(fieldNames::add);
+            fieldNames.remove("orderedLocationIds");
+            fieldNames.remove("reasonCode");
+            if (!fieldNames.isEmpty()) {
+                throw new QwenPlanningException(503, "Phản hồi AI chứa trường không cho phép trong schema: " + fieldNames);
+            }
+
+            if (!node.hasNonNull("orderedLocationIds") || !node.path("orderedLocationIds").isArray()) {
+                throw new QwenPlanningException(503, "Thiếu trường orderedLocationIds hợp lệ.");
+            }
+
             List<String> ids = new ArrayList<>();
             for (var elem : node.path("orderedLocationIds")) {
                 ids.add(elem.asText());
             }
 
             // Kiểm tra tính hợp lệ nghiêm ngặt:
-            // 1. Phải bắt đầu bằng startId
-            // 2. Không được có ID trùng lặp
-            // 3. Toàn bộ ID phải thuộc candidate pool
-            // 4. Số lượng từ 2 đến 4
-            if (ids.size() >= 2 && ids.size() <= 4 && ids.get(0).equals(startId)
-                    && new HashSet<>(ids).size() == ids.size()
-                    && candidateIds.containsAll(ids)) {
-                return new SequenceResult(ids, node.path("reasonCode").asText("QWEN_OPTIMIZED"));
+            if (ids.size() < 2 || ids.size() > 4) {
+                throw new QwenPlanningException(503, "Số lượng địa điểm gợi ý (" + ids.size() + ") phải từ 2 đến 4.");
+            }
+            if (!ids.get(0).equals(startId)) {
+                throw new QwenPlanningException(503, "Lộ trình gợi ý không bắt đầu bằng địa điểm yêu cầu.");
+            }
+            if (new HashSet<>(ids).size() != ids.size()) {
+                throw new QwenPlanningException(503, "Lộ trình gợi ý chứa địa điểm trùng lặp.");
+            }
+            if (!candidateIds.containsAll(ids)) {
+                throw new QwenPlanningException(503, "Lộ trình gợi ý chứa địa điểm ngoài danh mục ứng viên.");
             }
 
-            return deterministicPlan(startId, candidates, targetCount);
+            // Validate reasonCode enum (F01)
+            String rawReason = node.path("reasonCode").asText();
+            SequenceReasonCode reasonCode;
+            try {
+                reasonCode = SequenceReasonCode.valueOf(rawReason);
+            } catch (Exception e) {
+                throw new QwenPlanningException(503, "Mã lý do không hợp lệ: " + rawReason);
+            }
+
+            return new SequenceResult(ids, reasonCode.name());
+        } catch (QwenPlanningException qpe) {
+            throw qpe;
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new QwenPlanningException(503, "Xử lý AI bị gián đoạn.");
         } catch (Exception e) {
-            return deterministicPlan(startId, candidates, targetCount);
+            throw new QwenPlanningException(503, "Lỗi phân tích phản hồi AI: " + e.getMessage());
         } finally {
             capacity.release();
         }
     }
 
-    private SequenceResult deterministicPlan(String startId, List<Candidate> candidates, int targetCount) {
+    public SequenceResult deterministicPlan(String startId, List<Candidate> candidates, int targetCount) {
         List<String> list = new ArrayList<>();
         list.add(startId);
         for (Candidate c : candidates) {
-            if (!c.id().equals(startId) && list.size() < targetCount) {
+            if (!c.id().equals(startId) && list.size() < Math.min(targetCount, 4)) {
                 list.add(c.id());
             }
         }
-        return new SequenceResult(list, "DETERMINISTIC_FALLBACK");
+        return new SequenceResult(list, SequenceReasonCode.PROXIMITY_FLOW.name());
     }
 }
