@@ -68,6 +68,7 @@ test("previewItinerary dispatches POST /ai/itineraries/preview with criteria", a
   const result = await itinerariesApi.previewItinerary(payload);
   assert.equal(capturedConfig.method, "post");
   assert.equal(capturedConfig.url, "/ai/itineraries/preview");
+  assert.equal(capturedConfig.timeout, 65000, "allow bounded 60s local model inference");
   assert.deepEqual(JSON.parse(capturedConfig.data), payload);
   assert.equal(result.status, "VALIDATED");
   assert.equal(result.fingerprint, "test-fp-123");

@@ -113,6 +113,47 @@ after(async () => {
   }
 });
 
+for (const stage of ["preview", "save"]) {
+  for (const action of ["switch", "logout", "unmount"]) {
+    test(`planner ${stage}: ${action} aborts request and ignores its late result`, async () => {
+      resetRequests();
+      const container = document.createElement("div");
+      document.body.append(container);
+      const root = createRoot(container);
+      roots.add(root);
+      const render = (user) => root.render(createElement(AuthContext.Provider, { value: { user } },
+        createElement(MemoryRouter, null, createElement(ApiItineraryPlannerPage))));
+      await act(async () => render({ id: "u1", role: "USER" }));
+      await act(async () => resolve(take("/ai/locations"), [
+        { id: "loc-1", name: "Test A", categoryId: "c1", categoryName: "Test", metadata: { durationMinutes: 30 } },
+        { id: "loc-2", name: "Test B", categoryId: "c1", categoryName: "Test", metadata: { durationMinutes: 30 } },
+      ]));
+      await act(async () => container.querySelector("form").dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+      let pending = take("/ai/itineraries/preview", "post");
+      const preview = {
+        status: "VALIDATED", fingerprint: "fp", orderedLocationIds: ["loc-1", "loc-2"],
+        criteria: { tripDate: "2026-10-25", startTime: "09:00", endTime: "17:00", startLocationId: "loc-1" },
+        items: [], totals: { totalDwellMinutes: 60, totalTravelMinutes: 5, totalDistanceMeters: 1000 },
+      };
+      if (stage === "save") {
+        await act(async () => resolve(pending, preview));
+        await act(async () => container.querySelectorAll("form")[1].dispatchEvent(new dom.window.Event("submit", { bubbles: true, cancelable: true })));
+        pending = take("/itineraries", "post");
+      }
+      await act(async () => {
+        if (action === "unmount") { root.unmount(); roots.delete(root); }
+        else render(action === "logout" ? null : { id: "u2", role: "USER" });
+      });
+      assert.equal(pending.config.signal.aborted, true, `${stage} canceled on ${action}`);
+      await act(async () => resolve(pending, stage === "preview" ? preview : { id: "previous-user-plan" }));
+      assert.ok(!container.textContent.includes("HÀNH TRÌNH KHẢ THI"));
+      assert.equal(container.querySelector('a[href*="previous-user-plan"]'), null);
+      assert.ok(container.querySelectorAll("form").length <= 1, "no stale save form");
+      await unmountAll();
+    });
+  }
+}
+
 test("ApiItineraryPlannerPage: criteria change aborts pending preview and rejects late responses", async () => {
   resetRequests();
   const container = document.createElement("div");
@@ -173,15 +214,15 @@ test("ApiItineraryPlannerPage: criteria change aborts pending preview and reject
   assert.ok(previewReq1, "Phải gửi request preview");
 
   // 3. Đổi input giờ bắt đầu trong khi request preview đang bay (Pending)
-  const timeInput = container.querySelector("input[type='time']");
+  const timeInput = container.querySelectorAll("select")[1];
   assert.ok(timeInput, "Phải có trường giờ");
 
   await act(async () => {
-    const prototype = dom.window.HTMLInputElement.prototype;
-    Object.getOwnPropertyDescriptor(prototype, "value").set.call(timeInput, "10:00");
-    timeInput.dispatchEvent(new dom.window.Event("input", { bubbles: true }));
+    timeInput.value = "cat-2";
     timeInput.dispatchEvent(new dom.window.Event("change", { bubbles: true }));
   });
+  assert.equal(timeInput.value, "cat-2", "criteria actually changed");
+  assert.equal(previewReq1.config.signal.aborted, true, "old preview aborted");
 
   // 4. Phản hồi trễ từ previewReq1 trả về sau khi criteria đã đổi
   await act(async () => {
@@ -198,9 +239,8 @@ test("ApiItineraryPlannerPage: criteria change aborts pending preview and reject
   });
 
   // 5. Kết quả preview cũ KHÔNG ĐƯỢC PHÉP hiển thị hoặc cho phép Lưu
-  const saveBtn = container.querySelector("button.btn-primary[type='button']");
-  assert.equal(saveBtn, null, "Preview cũ không được khôi phục sau khi criteria đã đổi");
-  assert.ok(!container.textContent.includes("stale-fingerprint-old"));
+  assert.equal(container.querySelectorAll("form").length, 1, "old preview cannot restore save form");
+  assert.ok(!container.textContent.includes("HÀNH TRÌNH KHẢ THI"));
 
   await unmountAll();
 });
@@ -305,6 +345,12 @@ test("ApiItineraryPlannerPage: network interruption or timeout on save displays 
 
   const saveReq = take("/itineraries", "post");
   assert.ok(saveReq, "Phải gửi request POST /itineraries");
+  assert.equal(container.querySelector("fieldset").disabled, true, "criteria locked while saving");
+  const previewCount = requests.filter(r => r.config.url === "/ai/itineraries/preview").length;
+  await act(async () => submitBtn.click());
+  assert.equal(requests.filter(r => r.config.url === "/ai/itineraries/preview").length, previewCount);
+  await act(async () => saveBtn.click());
+  assert.equal(requests.filter(r => r.config.url === "/itineraries").length, 1, "no duplicate POST");
 
   // Giả lập lỗi timeout mạng (ECONNABORTED)
   await act(async () => {
@@ -316,6 +362,8 @@ test("ApiItineraryPlannerPage: network interruption or timeout on save displays 
     container.textContent.includes("kiểm tra danh sách 'Hành trình đã lưu'"),
     "Phải hướng dẫn người dùng kiểm tra danh sách đã lưu khi gặp timeout"
   );
+  assert.equal(container.querySelector("fieldset").disabled, false, "save failure releases criteria");
+  assert.equal(saveBtn.disabled, false, "no stranded saving flag");
 
   await unmountAll();
 });

@@ -49,7 +49,7 @@ export default function ApiSavedItinerariesPage() {
             <article className="panel space-y-3" key={item.id}>
               <div className="flex items-center justify-between">
                 <span className="inline-block rounded bg-sky-100 px-2.5 py-0.5 text-xs font-semibold text-sky-800">
-                  {item.tripDate}
+                  {item.tripDate?.split("-").reverse().join("/")}
                 </span>
                 <span className="text-xs text-slate-400">
                   {item.locationCount} điểm tham quan

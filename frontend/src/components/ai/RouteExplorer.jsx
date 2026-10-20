@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Field } from '../common/PageKit';
 import { useApiData } from '../../hooks/useApiData';
 import { previewLocationRoute } from '../../api/locationRoutes';
@@ -34,6 +35,7 @@ export default function RouteExplorer() {
   return <details className="assistant-routes" onToggle={event=>{setExpanded(event.currentTarget.open);if(!event.currentTarget.open)invalidate();}}>
     <summary>Khám phá địa điểm và tuyến đường</summary>
     {expanded&&<div className="space-y-3"><p>Phạm vi hiện có: Đà Nẵng–Hội An. Chọn các điểm theo thứ tự bạn muốn đi.</p>
+      <p><Link className="btn-secondary" to="/ai/itinerary">Lập hành trình một ngày</Link> <Link to="/user/itineraries">Hành trình đã lưu</Link></p>
       {catalog.loading?<p role="status">Đang tải địa điểm…</p>:catalog.error?<div role="alert"><p>{catalog.error}</p><button type="button" onClick={catalog.reload}>Tải lại địa điểm</button></div>:!locations.length?<p>Chưa có địa điểm đang hoạt động.</p>:<form aria-label="Xem tuyến tham quan" onSubmit={submit} className="space-y-3">
         {ids.map((id,index)=><div key={index}><Field label={`Điểm ${index+1}`}><select required value={id} onChange={event=>change(ids.map((old,i)=>i===index?event.target.value:old))}><option value="">Chọn địa điểm</option>{locations.map(location=><option key={location.id} value={location.id}>{location.name}</option>)}</select></Field>
           {ids.length>2&&<button type="button" onClick={()=>change(ids.filter((_,i)=>i!==index))}>Bỏ điểm {index+1}</button>}

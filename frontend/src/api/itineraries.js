@@ -6,7 +6,7 @@ export async function listActiveLocations(signal) {
 }
 
 export async function previewItinerary(payload, signal) {
-  const { data } = await apiClient.post("/ai/itineraries/preview", payload, { signal });
+  const { data } = await apiClient.post("/ai/itineraries/preview", payload, { signal, timeout: 65000 });
   return data;
 }
 

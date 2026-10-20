@@ -59,6 +59,7 @@ export default function ApiItineraryPlannerPage() {
 
   // Khi thay đổi bất kỳ trường criteria nào, tăng generation và abort preview request đang chạy (F05)
   function handleCriteriaChange(setter, value) {
+    if (saveAbortRef.current) return;
     setter(value);
     generationRef.current += 1;
     if (previewAbortRef.current) {
@@ -142,6 +143,7 @@ export default function ApiItineraryPlannerPage() {
 
   async function handlePreview(e) {
     e.preventDefault();
+    if (saveAbortRef.current) return;
     setError("");
     setPreviewResult(null);
     setSaveSuccessId("");
@@ -179,6 +181,7 @@ export default function ApiItineraryPlannerPage() {
 
   async function handleSave(e) {
     e.preventDefault();
+    if (saveAbortRef.current) return;
     if (!user || user.role !== "USER") {
       navigate("/login");
       return;
@@ -229,6 +232,7 @@ export default function ApiItineraryPlannerPage() {
         setError(err?.response?.data?.message || err.message || "Lưu hành trình thất bại.");
       }
     } finally {
+      if (saveAbortRef.current === ctrl) saveAbortRef.current = null;
       if (saveGen === generationRef.current) {
         setSaving(false);
       }
@@ -256,6 +260,7 @@ export default function ApiItineraryPlannerPage() {
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[340px_1fr]">
         <form className="panel h-fit space-y-4" onSubmit={handlePreview}>
+          <fieldset disabled={saving} className="space-y-4">
           <Field label="Khu vực hoạt động">
             <input readOnly value="Đà Nẵng – Hội An (Vùng kiểm chứng OSRM)" className="bg-slate-100" />
           </Field>
@@ -332,11 +337,12 @@ export default function ApiItineraryPlannerPage() {
 
           <button
             type="submit"
-            disabled={busy || loadingLocations || locations.length === 0}
+            disabled={saving || busy || loadingLocations || locations.length === 0}
             className="btn w-full justify-center"
           >
             {busy ? "Đang tính toán tuyến đường..." : "Xem trước kế hoạch"}
           </button>
+          </fieldset>
         </form>
 
         <div className="space-y-6">
@@ -457,7 +463,8 @@ export default function ApiItineraryPlannerPage() {
                             required
                             maxLength={200}
                             value={saveTitle}
-                            onChange={(e) => setSaveTitle(e.target.value)}
+              onChange={(e) => setSaveTitle(e.target.value)}
+              disabled={saving}
                             placeholder="Đặt tên cho hành trình..."
                             className="flex-1 min-w-[200px]"
                           />
