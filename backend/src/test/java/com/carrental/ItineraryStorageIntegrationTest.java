@@ -1,0 +1,255 @@
+package com.carrental;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import com.carrental.modules.ai.itinerary.dto.CreateItineraryRequest;
+import com.carrental.modules.ai.itinerary.dto.ItineraryPreviewRequest;
+import com.carrental.modules.ai.routing.OsrmRoutingClient;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest(properties = {
+    "app.jwt-secret=itinerary-storage-test-secret-at-least-32-bytes",
+    "app.seed-enabled=true",
+    "app.seed-password=PilotTestOnly123!"
+})
+@AutoConfigureMockMvc
+public class ItineraryStorageIntegrationTest {
+    private static final String PREVIEW_URL = "/api/v1/ai/itineraries/preview";
+    private static final String ITINERARIES_URL = "/api/v1/itineraries";
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Autowired
+    private ObjectMapper json;
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @MockBean
+    private OsrmRoutingClient osrmRoutingClient;
+
+    private String userToken;
+    private String adminToken;
+    private String locAId;
+    private String locBId;
+
+    @DynamicPropertySource
+    static void database(DynamicPropertyRegistry registry) {
+        String url = System.getenv("KDRIVE_TEST_DB_URL");
+        if (url != null && !url.isBlank()) {
+            CancelBoundaryTest.verifySafeIsolatedDatabase(
+                url,
+                System.getenv("KDRIVE_TEST_REQUIRED_SCHEMA_PREFIX"),
+                System.getenv("KDRIVE_TEST_FIXTURE_MARKER_TOKEN"),
+                System.getenv("KDRIVE_TEST_DB_USER"),
+                System.getenv("KDRIVE_TEST_DB_PASSWORD")
+            );
+        }
+        registry.add("spring.datasource.url", () -> url == null
+            ? "jdbc:h2:mem:itinerarystorage;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
+            : url);
+    }
+
+    private String login(String email, String password) throws Exception {
+        var res = mvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of("email", email, "password", password))))
+            .andReturn();
+        JsonNode node = json.readTree(res.getResponse().getContentAsString());
+        return node.path("token").asText();
+    }
+
+    @BeforeEach
+    void setUp() throws Exception {
+        adminToken = login("admin@example.test", "PilotTestOnly123!");
+        userToken = login("user@example.test", "PilotTestOnly123!");
+
+        // Tạo category nếu chưa có
+        var catRes = mvc.perform(post("/api/v1/admin/location-categories")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"name\":\"Di tích Storage Test\"}"))
+            .andReturn();
+        String catId = json.readTree(catRes.getResponse().getContentAsString()).path("id").asText();
+
+        String metaA = """
+            {
+                "timezone": "Asia/Ho_Chi_Minh",
+                "weekly": {
+                    "MONDAY": {"state": "INTERVALS", "intervals": [{"start": "07:30", "end": "17:00", "nextDay": false}]},
+                    "TUESDAY": {"state": "INTERVALS", "intervals": [{"start": "07:30", "end": "17:00", "nextDay": false}]},
+                    "WEDNESDAY": {"state": "INTERVALS", "intervals": [{"start": "07:30", "end": "17:00", "nextDay": false}]},
+                    "THURSDAY": {"state": "INTERVALS", "intervals": [{"start": "07:30", "end": "17:00", "nextDay": false}]},
+                    "FRIDAY": {"state": "INTERVALS", "intervals": [{"start": "07:30", "end": "17:00", "nextDay": false}]},
+                    "SATURDAY": {"state": "INTERVALS", "intervals": [{"start": "07:30", "end": "17:00", "nextDay": false}]},
+                    "SUNDAY": {"state": "INTERVALS", "intervals": [{"start": "07:30", "end": "17:00", "nextDay": false}]}
+                },
+                "exceptions": {},
+                "durationMinutes": 60,
+                "hoursEvidence": {"url": "https://example.com/a", "verifiedAt": "2026-10-01T00:00:00Z"},
+                "durationEvidence": {"url": "https://example.com/a", "verifiedAt": "2026-10-01T00:00:00Z"}
+            }
+            """;
+
+        String metaB = """
+            {
+                "timezone": "Asia/Ho_Chi_Minh",
+                "weekly": {
+                    "MONDAY": {"state": "OPEN_24H", "intervals": []},
+                    "TUESDAY": {"state": "OPEN_24H", "intervals": []},
+                    "WEDNESDAY": {"state": "OPEN_24H", "intervals": []},
+                    "THURSDAY": {"state": "OPEN_24H", "intervals": []},
+                    "FRIDAY": {"state": "OPEN_24H", "intervals": []},
+                    "SATURDAY": {"state": "OPEN_24H", "intervals": []},
+                    "SUNDAY": {"state": "OPEN_24H", "intervals": []}
+                },
+                "exceptions": {},
+                "durationMinutes": 45,
+                "hoursEvidence": {"url": "https://example.com/b", "verifiedAt": "2026-10-01T00:00:00Z"},
+                "durationEvidence": {"url": "https://example.com/b", "verifiedAt": "2026-10-01T00:00:00Z"}
+            }
+            """;
+
+        var locRes1 = mvc.perform(post("/api/v1/admin/locations")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of(
+                    "categoryId", catId,
+                    "name", "Bảo tàng Storage Test",
+                    "latitude", 16.0601,
+                    "longitude", 108.2235,
+                    "status", "ACTIVE",
+                    "metadata", json.readTree(metaA)
+                ))))
+            .andReturn();
+        locAId = json.readTree(locRes1.getResponse().getContentAsString()).path("id").asText();
+
+        var locRes2 = mvc.perform(post("/api/v1/admin/locations")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(Map.of(
+                    "categoryId", catId,
+                    "name", "Bãi biển Storage Test",
+                    "latitude", 16.0041,
+                    "longitude", 108.2638,
+                    "status", "ACTIVE",
+                    "metadata", json.readTree(metaB)
+                ))))
+            .andReturn();
+        locBId = json.readTree(locRes2.getResponse().getContentAsString()).path("id").asText();
+
+        var leg = new OsrmRoutingClient.Leg(12000.0, 1080.0);
+        when(osrmRoutingClient.route(anyList())).thenReturn(
+            new OsrmRoutingClient.Estimate(OsrmRoutingClient.Status.VERIFIED, 12000.0, 1080.0, "OSM Test", List.of(leg))
+        );
+    }
+
+    @Test
+    void saveAndRetrieveItineraryFlow() throws Exception {
+        String tripDate = LocalDate.now().plusDays(3).toString();
+        ItineraryPreviewRequest previewReq = new ItineraryPreviewRequest(
+            LocalDate.parse(tripDate), "08:00", "13:00", locAId, null
+        );
+
+        // 1. Preview để lấy fingerprint thật
+        var previewRes = mvc.perform(post(PREVIEW_URL)
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(previewReq)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("VALIDATED"))
+            .andReturn();
+
+        JsonNode previewNode = json.readTree(previewRes.getResponse().getContentAsString());
+        String fingerprint = previewNode.path("fingerprint").asText();
+        assertNotNull(fingerprint);
+        assertFalse(fingerprint.isBlank());
+
+        // Snapshot counts trước khi lưu
+        int beforeItineraries = jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class);
+        int beforeDays = jdbc.queryForObject("SELECT count(*) FROM itinerary_days", Integer.class);
+        int beforeItems = jdbc.queryForObject("SELECT count(*) FROM itinerary_items", Integer.class);
+
+        // 2. Thử gửi fingerprint giả mạo -> Phải bị từ chối 400 Bad Request
+        CreateItineraryRequest forgedReq = new CreateItineraryRequest("Hành trình giả mạo", "fake-hash-123", previewReq);
+        mvc.perform(post(ITINERARIES_URL)
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(forgedReq)))
+            .andExpect(status().isBadRequest());
+
+        // Đảm bảo không có record nào bị ghi khi lỗi
+        assertEquals(beforeItineraries, jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class));
+        assertEquals(beforeDays, jdbc.queryForObject("SELECT count(*) FROM itinerary_days", Integer.class));
+        assertEquals(beforeItems, jdbc.queryForObject("SELECT count(*) FROM itinerary_items", Integer.class));
+
+        // 3. Gửi request lưu hợp lệ
+        CreateItineraryRequest saveReq = new CreateItineraryRequest("Chuyến đi Đà Nẵng 1 ngày", fingerprint, previewReq);
+        var saveRes = mvc.perform(post(ITINERARIES_URL)
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(json.writeValueAsString(saveReq)))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.id").isNotEmpty())
+            .andExpect(jsonPath("$.title").value("Chuyến đi Đà Nẵng 1 ngày"))
+            .andExpect(jsonPath("$.items.length()").value(2))
+            .andReturn();
+
+        String itineraryId = json.readTree(saveRes.getResponse().getContentAsString()).path("id").asText();
+
+        // Kiểm tra đúng 3 bảng DB được ghi nguyên tử (atomic)
+        assertEquals(beforeItineraries + 1, jdbc.queryForObject("SELECT count(*) FROM itineraries", Integer.class));
+        assertEquals(beforeDays + 1, jdbc.queryForObject("SELECT count(*) FROM itinerary_days", Integer.class));
+        assertEquals(beforeItems + 2, jdbc.queryForObject("SELECT count(*) FROM itinerary_items", Integer.class));
+
+        // 4. Lấy danh sách GET /api/v1/itineraries
+        mvc.perform(get(ITINERARIES_URL)
+                .header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(itineraryId))
+            .andExpect(jsonPath("$[0].title").value("Chuyến đi Đà Nẵng 1 ngày"))
+            .andExpect(jsonPath("$[0].tripDate").value(tripDate))
+            .andExpect(jsonPath("$[0].locationCount").value(2));
+
+        // 5. Xem chi tiết GET /api/v1/itineraries/{id}
+        mvc.perform(get(ITINERARIES_URL + "/" + itineraryId)
+                .header("Authorization", "Bearer " + userToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(itineraryId))
+            .andExpect(jsonPath("$.title").value("Chuyến đi Đà Nẵng 1 ngày"))
+            .andExpect(jsonPath("$.items[0].locationId").value(locAId))
+            .andExpect(jsonPath("$.items[0].dwellMinutes").value(60))
+            .andExpect(jsonPath("$.items[1].locationId").value(locBId))
+            .andExpect(jsonPath("$.items[1].dwellMinutes").value(45));
+
+        // 6. Kiểm tra quyền bảo mật: Anonymous bị 401, Admin bị 403 (không truy cập luồng của khách)
+        mvc.perform(get(ITINERARIES_URL + "/" + itineraryId))
+            .andExpect(status().isUnauthorized());
+
+        mvc.perform(get(ITINERARIES_URL + "/" + itineraryId)
+                .header("Authorization", "Bearer " + adminToken))
+            .andExpect(status().isForbidden());
+    }
+}
