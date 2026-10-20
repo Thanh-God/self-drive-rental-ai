@@ -21,6 +21,7 @@ from import_locations_pilot import (
 
 
 class MockBackendHandler(http.server.BaseHTTPRequestHandler):
+    fail_location_at = None
     categories = [{"id": "cat-1", "name": "Bảo tàng & Văn hóa"}]
     locations = []
     auth_token = "valid-admin-token"
@@ -66,6 +67,11 @@ class MockBackendHandler(http.server.BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps(new_cat).encode("utf-8"))
         elif self.path == "/api/v1/admin/locations":
+            if len(self.locations) == self.fail_location_at:
+                self.send_response(503)
+                self.end_headers()
+                self.wfile.write(b'{"error":"Injected partial failure"}')
+                return
             new_loc = dict(body)
             new_loc["id"] = f"loc-{len(self.locations)+1}"
             self.locations.append(new_loc)
@@ -233,6 +239,28 @@ class ImportLocationsPilotTest(unittest.TestCase):
 
         # Restore
         MockBackendHandler.locations[0]["metadata"] = orig_meta
+
+    def test_10_partial_failure_then_safe_rerun(self):
+        previous = MockBackendHandler.locations
+        MockBackendHandler.locations = []
+        MockBackendHandler.fail_location_at = 3
+        json_path = Path(__file__).parent / "locations-pilot.json"
+        try:
+            failed = import_pilot_locations(json_path, self.base_url, "valid-admin-token", dry_run=False)
+            self.assertEqual(len(failed["locationsCreated"]), 3)
+            self.assertTrue(failed["errors"])
+            self.assertEqual(len(MockBackendHandler.locations), 3)
+            first_ids = [loc["id"] for loc in MockBackendHandler.locations]
+            MockBackendHandler.fail_location_at = None
+            recovered = import_pilot_locations(json_path, self.base_url, "valid-admin-token", dry_run=False)
+            self.assertEqual(recovered["errors"], [])
+            self.assertEqual(len(recovered["locationsCreated"]), 5)
+            self.assertEqual(len(recovered["locationsSkipped"]), 3)
+            self.assertEqual(len(MockBackendHandler.locations), 8)
+            self.assertEqual([loc["id"] for loc in MockBackendHandler.locations[:3]], first_ids)
+        finally:
+            MockBackendHandler.locations = previous
+            MockBackendHandler.fail_location_at = None
 
 
 if __name__ == "__main__":
