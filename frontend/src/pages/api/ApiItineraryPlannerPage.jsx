@@ -1,39 +1,58 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { listActiveLocations, previewItinerary, saveItinerary } from "../../api/itineraries";
-import { useAuth } from "../../context/AuthContext";
 import { Page, Field } from "../../components/common/PageKit";
 import EmptyState from "../../components/common/EmptyState";
+import { useAuth } from "../../context/AuthContext";
+
+function formatDateVn(isoDate) {
+  if (!isoDate || typeof isoDate !== "string") return "";
+  const parts = isoDate.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return isoDate;
+}
 
 export default function ApiItineraryPlannerPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().slice(0, 10);
-  const maxDate = new Date();
-  maxDate.setDate(maxDate.getDate() + 90);
-  const maxDateStr = maxDate.toISOString().slice(0, 10);
-
   const [locations, setLocations] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loadingLocations, setLoadingLocations] = useState(true);
 
-  const [tripDate, setTripDate] = useState(tomorrowStr);
-  const [startTime, setStartTime] = useState("08:00");
+  // Form criteria state
+  const now = new Date();
+  const todayStr = now.toISOString().slice(0, 10);
+  const maxDate = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000);
+  const maxDateStr = maxDate.toISOString().slice(0, 10);
+
+  const [tripDate, setTripDate] = useState(todayStr);
+  const [startTime, setStartTime] = useState("09:00");
   const [endTime, setEndTime] = useState("17:00");
   const [startLocationId, setStartLocationId] = useState("");
   const [preferredCategoryId, setPreferredCategoryId] = useState("");
 
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  // Result & UI state
   const [previewResult, setPreviewResult] = useState(null);
-
-  const [saveTitle, setSaveTitle] = useState("");
+  const [busy, setBusy] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveTitle, setSaveTitle] = useState("");
   const [saveSuccessId, setSaveSuccessId] = useState("");
+  const [error, setError] = useState("");
+
+  const generationRef = useRef(0);
+  const previewAbortRef = useRef(null);
+  const saveAbortRef = useRef(null);
+
+  // Khi thay đổi bất kỳ trường criteria nào, tự động hủy preview cũ và disable nút Lưu (F05)
+  function handleCriteriaChange(setter, value) {
+    setter(value);
+    setPreviewResult(null);
+    setSaveSuccessId("");
+    setError("");
+  }
 
   useEffect(() => {
     let active = true;
@@ -41,7 +60,7 @@ export default function ApiItineraryPlannerPage() {
     listActiveLocations(ctrl.signal)
       .then((data) => {
         if (!active) return;
-        const valid = data.filter((l) => l.metadata && l.metadata.durationMinutes > 0);
+        const valid = (data || []).filter((l) => l.metadata && l.metadata.durationMinutes > 0);
         setLocations(valid);
         if (valid.length > 0) {
           setStartLocationId(valid[0].id);
@@ -70,6 +89,13 @@ export default function ApiItineraryPlannerPage() {
     setSaveSuccessId("");
     setBusy(true);
 
+    const gen = ++generationRef.current;
+    if (previewAbortRef.current) {
+      previewAbortRef.current.abort();
+    }
+    const ctrl = new globalThis.AbortController();
+    previewAbortRef.current = ctrl;
+
     try {
       const payload = {
         tripDate,
@@ -78,13 +104,18 @@ export default function ApiItineraryPlannerPage() {
         startLocationId,
         preferredCategoryId: preferredCategoryId || null,
       };
-      const res = await previewItinerary(payload);
+      const res = await previewItinerary(payload, ctrl.signal);
+      if (gen !== generationRef.current) return;
+
       setPreviewResult(res);
-      setSaveTitle(`Hành trình Đà Nẵng · ${tripDate}`);
+      setSaveTitle(`Hành trình Đà Nẵng · Ngày ${formatDateVn(tripDate)}`);
     } catch (err) {
+      if (gen !== generationRef.current) return;
       setError(err?.response?.data?.message || err.message || "Lập lịch trình thất bại.");
     } finally {
-      setBusy(false);
+      if (gen === generationRef.current) {
+        setBusy(false);
+      }
     }
   }
 
@@ -94,30 +125,51 @@ export default function ApiItineraryPlannerPage() {
       navigate("/login");
       return;
     }
-    if (!previewResult || !previewResult.fingerprint) return;
+    if (!previewResult || !previewResult.fingerprint || previewResult.status !== "VALIDATED") {
+      return;
+    }
 
     setSaving(true);
     setError("");
+
+    if (saveAbortRef.current) {
+      saveAbortRef.current.abort();
+    }
+    const ctrl = new globalThis.AbortController();
+    saveAbortRef.current = ctrl;
+
     try {
+      // Gửi đúng tiêu chí đã được preview và fingerprint đã xác thực (F02, F05)
       const payload = {
-        title: saveTitle.trim(),
+        title: saveTitle.trim() || `Hành trình Đà Nẵng · Ngày ${formatDateVn(previewResult.criteria.tripDate)}`,
         fingerprint: previewResult.fingerprint,
-        preview: {
-          tripDate,
-          startTime,
-          endTime,
-          startLocationId,
-          preferredCategoryId: preferredCategoryId || null,
-        },
+        tripDate: previewResult.criteria.tripDate,
+        startTime: previewResult.criteria.startTime,
+        endTime: previewResult.criteria.endTime,
+        startLocationId: previewResult.criteria.startLocationId,
+        preferredCategoryId: previewResult.criteria.preferredCategoryId || null,
+        orderedLocationIds: previewResult.orderedLocationIds,
       };
-      const saved = await saveItinerary(payload);
+      const saved = await saveItinerary(payload, ctrl.signal);
       setSaveSuccessId(saved.id);
     } catch (err) {
-      setError(err?.response?.data?.message || err.message || "Lưu hành trình thất bại.");
+      if (err.code === "ECONNABORTED" || err.message?.includes("timeout") || !err.response) {
+        setError(
+          "Yêu cầu lưu hành trình bị gián đoạn do mạng hoặc hết thời gian chờ. Trạng thái lưu có thể chưa rõ, vui lòng kiểm tra danh sách 'Hành trình đã lưu' trước khi thử lại."
+        );
+      } else if (err.response?.status === 409) {
+        setError(
+          "Dữ liệu lộ trình hoặc giờ hoạt động của địa điểm đã thay đổi so với thời điểm xem trước. Vui lòng bấm 'Xem trước kế hoạch' để cập nhật lại trước khi lưu."
+        );
+      } else {
+        setError(err?.response?.data?.message || err.message || "Lưu hành trình thất bại.");
+      }
     } finally {
       setSaving(false);
     }
   }
+
+  const isCustomer = user && user.role === "USER";
 
   return (
     <Page
@@ -130,6 +182,9 @@ export default function ApiItineraryPlannerPage() {
           <li>Chỉ kết hợp 2–4 điểm tham quan có dữ liệu giờ mở cửa và thời lượng được kiểm chứng.</li>
           <li>Thời gian di chuyển từng chặng được đo chính xác bằng mạng đường bộ OSRM (làm tròn lên phút).</li>
           <li>Không bịa đặt giờ mở cửa, giá vé, hay tuyến đường giả định.</li>
+          <li className="font-medium text-amber-900">
+            Lưu ý: Lộ trình và thời gian được tính từ điểm xuất phát tới lần lượt các điểm tham quan. Không bao gồm chặng đón từ xa hoặc chặng quay về điểm ban đầu.
+          </li>
         </ul>
       </div>
 
@@ -146,8 +201,9 @@ export default function ApiItineraryPlannerPage() {
               min={todayStr}
               max={maxDateStr}
               value={tripDate}
-              onChange={(e) => setTripDate(e.target.value)}
+              onChange={(e) => handleCriteriaChange(setTripDate, e.target.value)}
             />
+            <p className="mt-1 text-xs text-slate-500">Định dạng hiển thị: {formatDateVn(tripDate)}</p>
           </Field>
 
           <div className="grid grid-cols-2 gap-3">
@@ -156,7 +212,7 @@ export default function ApiItineraryPlannerPage() {
                 type="time"
                 required
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
+                onChange={(e) => handleCriteriaChange(setStartTime, e.target.value)}
               />
             </Field>
             <Field label="Giờ kết thúc">
@@ -164,7 +220,7 @@ export default function ApiItineraryPlannerPage() {
                 type="time"
                 required
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
+                onChange={(e) => handleCriteriaChange(setEndTime, e.target.value)}
               />
             </Field>
           </div>
@@ -178,7 +234,7 @@ export default function ApiItineraryPlannerPage() {
               <select
                 required
                 value={startLocationId}
-                onChange={(e) => setStartLocationId(e.target.value)}
+                onChange={(e) => handleCriteriaChange(setStartLocationId, e.target.value)}
               >
                 {locations.map((loc) => (
                   <option key={loc.id} value={loc.id}>
@@ -192,7 +248,7 @@ export default function ApiItineraryPlannerPage() {
           <Field label="Sở thích ưu tiên (không bắt buộc)">
             <select
               value={preferredCategoryId}
-              onChange={(e) => setPreferredCategoryId(e.target.value)}
+              onChange={(e) => handleCriteriaChange(setPreferredCategoryId, e.target.value)}
             >
               <option value="">Tất cả danh mục</option>
               {categories.map((cat) => (
@@ -225,7 +281,9 @@ export default function ApiItineraryPlannerPage() {
                         <span className="inline-block rounded bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-800">
                           HÀNH TRÌNH KHẢ THI
                         </span>
-                        <h2 className="mt-2 text-xl font-bold">Kế hoạch chi tiết ngày {previewResult.criteria.tripDate}</h2>
+                        <h2 className="mt-2 text-xl font-bold">
+                          Kế hoạch chi tiết ngày {formatDateVn(previewResult.criteria.tripDate)}
+                        </h2>
                         <p className="text-sm text-slate-500">
                           Khung giờ dự kiến: {previewResult.criteria.startTime} – {previewResult.criteria.endTime}
                         </p>
@@ -273,9 +331,15 @@ export default function ApiItineraryPlannerPage() {
                             </div>
                           )}
 
+                          {item.fullHoursDescription && (
+                            <div className="mt-2 text-xs text-slate-600">
+                              Lịch mở cửa: <span className="font-medium">{item.fullHoursDescription}</span>
+                            </div>
+                          )}
+
                           {item.hoursEvidenceUrl && (
-                            <div className="mt-2 text-xs text-slate-400">
-                              Nguồn kiểm chứng giờ mở cửa:{" "}
+                            <div className="mt-1 text-xs text-slate-400">
+                              Nguồn kiểm chứng:{" "}
                               <a
                                 href={item.hoursEvidenceUrl}
                                 target="_blank"
@@ -295,8 +359,9 @@ export default function ApiItineraryPlannerPage() {
                               </span>
                               <span>·</span>
                               <span className="font-medium text-slate-900">
-                                ~{item.travelToNextMinutes} phút lái xe (OSRM)
+                                ~{item.travelToNextMinutes} phút lái xe
                               </span>
+                              <span className="text-slate-400">({item.osmAttribution || "OSRM"})</span>
                             </div>
                           )}
                         </div>
@@ -327,13 +392,23 @@ export default function ApiItineraryPlannerPage() {
                             placeholder="Đặt tên cho hành trình..."
                             className="flex-1 min-w-[200px]"
                           />
-                          <button
-                            type="submit"
-                            disabled={saving}
-                            className="btn"
-                          >
-                            {saving ? "Đang lưu..." : "Lưu vào tài khoản"}
-                          </button>
+                          {isCustomer ? (
+                            <button
+                              type="submit"
+                              disabled={saving}
+                              className="btn"
+                            >
+                              {saving ? "Đang lưu..." : "Lưu vào tài khoản"}
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => navigate("/login")}
+                              className="btn-secondary"
+                            >
+                              Đăng nhập tài khoản để lưu
+                            </button>
+                          )}
                         </form>
                       )}
                     </div>

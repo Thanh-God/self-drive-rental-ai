@@ -10,8 +10,8 @@ export async function previewItinerary(payload, signal) {
   return data;
 }
 
-export async function saveItinerary(payload) {
-  const { data } = await apiClient.post("/itineraries", payload);
+export async function saveItinerary(payload, signal) {
+  const { data } = await apiClient.post("/itineraries", payload, { signal });
   return data;
 }
 

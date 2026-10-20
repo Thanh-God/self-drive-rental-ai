@@ -4,6 +4,15 @@ import { getSavedItinerary } from "../../api/itineraries";
 import { Page } from "../../components/common/PageKit";
 import EmptyState from "../../components/common/EmptyState";
 
+function formatDateVn(isoDate) {
+  if (!isoDate || typeof isoDate !== "string") return isoDate;
+  const parts = isoDate.split("-");
+  if (parts.length === 3) {
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  }
+  return isoDate;
+}
+
 export default function ApiItineraryDetailPage() {
   const { itineraryId } = useParams();
   const [plan, setPlan] = useState(null);
@@ -33,7 +42,7 @@ export default function ApiItineraryDetailPage() {
   return (
     <Page
       title={plan ? plan.title : "Chi tiết hành trình"}
-      description={plan ? `Hành trình 1 ngày vào ${plan.tripDate}` : ""}
+      description={plan ? `Hành trình 1 ngày vào ngày ${formatDateVn(plan.tripDate)}` : ""}
       actions={
         <Link className="btn-secondary" to="/user/itineraries">
           ← Danh sách hành trình
@@ -46,31 +55,36 @@ export default function ApiItineraryDetailPage() {
         <div className="panel rounded bg-rose-50 p-4 text-rose-600">{error}</div>
       ) : plan ? (
         <div className="space-y-6">
-          <div className="panel flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Thời gian dự kiến</p>
-              <p className="text-lg font-bold text-slate-900">
-                {plan.criteria.startTime} – {plan.criteria.endTime}
-              </p>
+          <div className="panel flex flex-col gap-3">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Thời gian dự kiến</p>
+                <p className="text-lg font-bold text-slate-900">
+                  {plan.criteria.startTime} – {plan.criteria.endTime}
+                </p>
+              </div>
+              <div className="flex gap-6 text-sm">
+                <div>
+                  <p className="text-slate-400">Điểm tham quan</p>
+                  <p className="font-bold text-slate-800">{plan.totals.locationCount} điểm</p>
+                </div>
+                <div>
+                  <p className="text-slate-400">Tổng tham quan</p>
+                  <p className="font-bold text-slate-800">{plan.totals.totalDwellMinutes} phút</p>
+                </div>
+                <div>
+                  <p className="text-slate-400">Tổng lái xe (OSRM)</p>
+                  <p className="font-bold text-slate-800">{plan.totals.totalTravelMinutes} phút</p>
+                </div>
+                <div>
+                  <p className="text-slate-400">Tổng quãng đường</p>
+                  <p className="font-bold text-slate-800">{(plan.totals.totalDistanceMeters / 1000).toFixed(1)} km</p>
+                </div>
+              </div>
             </div>
-            <div className="flex gap-6 text-sm">
-              <div>
-                <p className="text-slate-400">Điểm tham quan</p>
-                <p className="font-bold text-slate-800">{plan.totals.locationCount} điểm</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Tổng tham quan</p>
-                <p className="font-bold text-slate-800">{plan.totals.totalDwellMinutes} phút</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Tổng lái xe (OSRM)</p>
-                <p className="font-bold text-slate-800">{plan.totals.totalTravelMinutes} phút</p>
-              </div>
-              <div>
-                <p className="text-slate-400">Tổng quãng đường</p>
-                <p className="font-bold text-slate-800">{(plan.totals.totalDistanceMeters / 1000).toFixed(1)} km</p>
-              </div>
-            </div>
+            <p className="border-t border-slate-100 pt-2 text-xs italic text-slate-400">
+              * Lưu ý: Thời gian và quãng đường chỉ tính giữa các điểm tham quan liên tiếp trong lộ trình; không bao gồm chặng di chuyển từ điểm xuất phát ban đầu đến điểm thứ nhất và chặng quay về sau điểm cuối cùng.
+            </p>
           </div>
 
           <div className="space-y-4">
