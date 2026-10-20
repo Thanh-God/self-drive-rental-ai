@@ -1,6 +1,6 @@
 # Hợp đồng API gợi ý xe AI1
 
-AI1 gợi ý xe bằng quy tắc; chưa phân tích văn bản tự do, gọi nhà cung cấp AI hoặc Map. Chỉ USER được dùng; Guest nhận401, Staff/Admin nhận403. Biến `AI_RECOMMENDATION_ENABLED` mặc định false trước nghiệm thu core. Không thêm migration hay lưu lịch sử gợi ý.
+API gợi ý xe xếp hạng bằng quy tắc, không gọi mô hình ngôn ngữ hoặc dịch vụ bản đồ trong bước xếp hạng. Phân tích văn bản và xem trước tuyến là các API riêng, được kết nối qua [trợ lý khách hàng](ai-assistant.md). Chỉ USER được dùng; Guest nhận401, Staff/Admin nhận403. Biến `AI_RECOMMENDATION_ENABLED` mặc định false; cần chủ động bật trên môi trường đã chuẩn bị. Không thêm migration hay lưu lịch sử gợi ý.
 
 POST `/api/v1/ai/recommendations`:
 ```json
@@ -17,4 +17,4 @@ Phiên bản `rules-2026-10-18-v1`: điểm = round(40×budgetFit +25×seatFit +
 
 Sở thích nhận hộp số AUTO/MANUAL và tối đa20 mã tiện nghi khác nhau, mỗi mã dài1–36. Mã tiện nghi chưa tồn tại được xem là ưu tiên không khớp, không bịa ra tiện nghi có trên xe. Reason codes chỉ dựa trên dữ liệu trả về; không phải lời giải thích từ LLM. Không trả dữ liệu khách hàng, GPLX hay hồ sơ đơn thuê.
 
-Kết quả có thể hết hiệu lực ngay sau phản hồi. Parser ngôn ngữ tự nhiên, giải thích từ AI và lập hành trình/tuyến thuộc giai đoạn khác. Trang AI demo hiện tại chưa kết nối API này.
+Kết quả có thể hết hiệu lực ngay sau phản hồi. Phân tích ngôn ngữ tự nhiên và xem trước tuyến dùng dịch vụ riêng; API này không sinh lời giải thích từ mô hình ngôn ngữ hoặc tạo hành trình. Trợ lý trong chế độ API gọi endpoint này; trang AI demo độc lập không phải bằng chứng tích hợp.

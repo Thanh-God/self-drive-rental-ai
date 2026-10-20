@@ -20,6 +20,10 @@ Test ghi dữ liệu phải dùng schema/instance cô lập và kiểm tra marke
 
 Migration duy nhất tại backend/src/main/resources/db/migration. Giữ Flyway validation, Hibernate validate, clean-disabled và không baseline tự động. Không sửa migration đã áp dụng; trước nâng cấp database có dữ liệu phải kiểm history/checksum/schema và backup. MySQL DDL có thể tồn tại một phần sau lỗi, không tự repair/clean hoặc giả định rollback toàn migration.
 
+## Sử dụng AI trong phát triển
+
+AI được sử dụng để hỗ trợ phân tích, đề xuất mã nguồn, rà soát và soạn tài liệu. Người phát triển chịu trách nhiệm lựa chọn giải pháp, kiểm tra mã nguồn và giải thích hành vi của hệ thống. Đề xuất chưa kiểm tra không được trình bày như chức năng đã hoàn tất. Không đưa dữ liệu cá nhân, mật khẩu hoặc khóa truy cập vào nội dung yêu cầu hỗ trợ.
+
 ## Quản lý tài liệu
 
 Tài liệu chia sẻ mô tả chức năng, API, kiến trúc, cách cấu hình và chạy test. Nhật ký điều phối, kế hoạch từng lượt, kết quả kiểm tra, artifact/hash/SHA và biên bản nội bộ được lưu ở thư mục local bị Git bỏ qua. README và tài liệu công khai tập trung vào thông tin kỹ thuật cần thiết để sử dụng, phát triển và vận hành hệ thống.

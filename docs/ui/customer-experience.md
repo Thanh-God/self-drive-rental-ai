@@ -6,7 +6,7 @@ React/Vite SPA dùng React Router, API client tập trung và layout Guest/User/
 
 Đơn API mới chọn ngày nhận và ngày trả, không chọn giờ. Số ngày tính bằng chênh lệch hai ngày tại Việt Nam: nhận 17/10, trả 21/10 là 4 ngày thuê. Có thể chọn ngày nhận hôm nay; ngày trả phải sau ngày nhận, tối đa 90 ngày thuê. Khách được trả trong cả ngày trả; xe chỉ nhận lịch mới từ ngày kế tiếp, kể cả khách trả sớm. Staff xác nhận bàn giao trong ngày nhận; biên bản vẫn lưu giờ giao/nhận thực tế. Đơn cũ tiếp tục hiển thị giờ và giữ giá, hợp đồng/hóa đơn đã lưu theo chính sách cũ.
 
-API mode lấy dữ liệu backend/MySQL, demo có model/session riêng và được nhận diện rõ. Lỗi API phải hiển thị lỗi/thử lại, không thay bằng dữ liệu mẫu. Backend kiểm tra quyền, chủ sở hữu, chi nhánh, trạng thái, lịch và giá. Admin không kế thừa giao nhận của Staff; AI/Map chưa tích hợp.
+API mode lấy dữ liệu backend/MySQL, demo có model/session riêng và được nhận diện rõ. Lỗi API phải hiển thị lỗi/thử lại, không thay bằng dữ liệu mẫu. Backend kiểm tra quyền, chủ sở hữu, chi nhánh, trạng thái, lịch và giá. Admin không kế thừa giao nhận của Staff. [Trợ lý khách hàng](../modules/ai-assistant.md) tích hợp API gợi ý xe, phân tích nhu cầu và xem trước tuyến, phụ thuộc cấu hình và dịch vụ cục bộ; không tự đặt xe hoặc lưu hành trình.
 
 Giao diện có loading/error/empty/pending, chặn gửi lặp và phản hồi cũ. Stale version/revision cần tải lại trước khi gửi tiếp. Quote gắn với input; đổi xe, thời gian hoặc chi nhánh làm quote cũ hết hiệu lực. VND nguyên đồng, thời gian Asia/Ho_Chi_Minh; hóa đơn không chứng minh đã thanh toán. Thông tin [so sánh](vehicle-comparison.md), [yêu thích](vehicle-favorites.md) và [hướng dẫn thuê](rental-guide.md) có contract riêng.
 

@@ -1,8 +1,12 @@
 # KDrive — Hệ thống cho thuê xe tự lái
 
-KDrive là ứng dụng web quản lý thuê xe tự lái đa chi nhánh, phục vụ khách hàng, nhân viên vận hành và quản trị viên. Hệ thống hỗ trợ tìm xe, kiểm tra lịch và giá, đặt thuê, giao nhận, hồ sơ người thuê và quản lý dữ liệu vận hành.
+Tôi phát triển KDrive trong khuôn khổ khóa luận tốt nghiệp để giải quyết bài toán quản lý thuê xe tự lái đa chi nhánh, phục vụ khách hàng, nhân viên vận hành và quản trị viên. Hệ thống hỗ trợ tìm xe, kiểm tra lịch và giá, đặt thuê, giao nhận, hồ sơ người thuê và quản lý dữ liệu vận hành.
 
 Đề tài khóa luận: **Hệ thống cho thuê xe tự lái tích hợp AI hỗ trợ lựa chọn phương tiện và lập kế hoạch hành trình cá nhân hóa**.
+
+## Cách thực hiện đồ án
+
+Tôi sử dụng AI hỗ trợ phân tích yêu cầu, đề xuất giải pháp, viết và rà soát mã nguồn, xây dựng kiểm thử và biên soạn tài liệu. Tôi chịu trách nhiệm về các quyết định thiết kế, nội dung sử dụng và việc kiểm tra, giải thích kết quả trong đồ án. Việc sử dụng AI hỗ trợ phát triển được phân biệt với các tính năng AI phục vụ khách hàng trong ứng dụng.
 
 ## Chức năng
 
@@ -13,7 +17,7 @@ KDrive là ứng dụng web quản lý thuê xe tự lái đa chi nhánh, phục
 | Nhân viên — STAFF | Xử lý đơn, xác nhận/từ chối, ghi nhận giao nhận và hoàn tất thuê trong phạm vi chi nhánh được phân công; theo dõi đội xe và hồ sơ sự cố. |
 | Quản trị viên — ADMIN | Quản lý tài khoản, phân công chi nhánh, xe, hãng/loại xe, tiện nghi, chi nhánh và tuyến, danh mục địa điểm; xem báo cáo vận hành; kiểm duyệt đánh giá; quản lý URL ảnh, thứ tự và thông tin ghi công qua giao diện Admin. |
 
-Backend kiểm tra quyền, chủ sở hữu, chi nhánh, lịch xe và giá trước khi ghi dữ liệu. ADMIN không tự kế thừa quyền giao nhận của STAFF. Tiền thuê tính theo block 24 giờ, đơn vị VND; thời gian lưu UTC và hiển thị theo giờ Việt Nam. Trạng thái xe đang khai thác không thay thế kiểm tra lịch trong báo giá.
+Backend kiểm tra quyền, chủ sở hữu, chi nhánh, lịch xe và giá trước khi ghi dữ liệu. ADMIN không tự kế thừa quyền giao nhận của STAFF. Đơn mới tính tiền theo chênh lệch ngày nhận và ngày trả tại Việt Nam; đơn cũ giữ chính sách và giá đã lưu. Tiền tính bằng VND nguyên đồng; thời gian lưu UTC và hiển thị theo giờ Việt Nam. Trạng thái xe đang khai thác không thay thế kiểm tra lịch trong báo giá.
 
 Hợp đồng và hóa đơn lưu snapshot theo đơn thuê. Hệ thống không tích hợp thanh toán trực tuyến; hóa đơn không đồng nghĩa với xác nhận đã thanh toán.
 
@@ -22,7 +26,8 @@ Hợp đồng và hóa đơn lưu snapshot theo đơn thuê. Hệ thống không
 - Giao diện nghiệp vụ sử dụng REST API và MySQL; lỗi API được hiển thị để thử lại, không thay bằng dữ liệu demo.
 - Homepage, danh sách xe, chi tiết và đơn thuê dùng giao diện Urban nền xám ấm. Card/gallery đọc ảnh từ API; Admin thêm, sửa và sắp xếp ảnh với kiểm tra revision. Có 17 ảnh minh họa mẫu xe cùng hồ sơ tác giả/giấy phép tại `/media/vehicles/licenses.html`; ảnh thiếu hoặc hỏng có fallback trung thực. Seed DB mới không tự gắn ảnh; dùng form Admin hoặc mapping đã kiểm tra, không reset dữ liệu.
 - Admin có báo cáo vận hành tại `/admin` và quản lý danh mục địa điểm tại `/admin/locations`, sử dụng dữ liệu từ API.
-- Recommendation, itinerary và AI/Map chưa có dịch vụ tích hợp tương ứng. Các màn hình chưa có API hiển thị thông báo trong API mode.
+- Trợ lý dành cho USER đã có API xếp hạng xe theo quy tắc, phân tích nhu cầu bằng Qwen chạy cục bộ và xem trước tuyến qua OSRM. Các chức năng này cần bật cấu hình và chuẩn bị dịch vụ tương ứng; có source không đồng nghĩa đã bật trên mọi môi trường. Xếp hạng theo quy tắc không phải mô hình tự huấn luyện.
+- Xem trước tuyến chỉ cung cấp ước tính trên dữ liệu đường đã chuẩn bị; không tự tạo/lưu hành trình hoàn chỉnh hay đặt xe. Quy trình lập hành trình hoàn chỉnh còn đang phát triển.
 - Demo dành riêng cho xem thử giao diện, không đại diện cho giao dịch hay dữ liệu thuê xe thật.
 
 ## Công nghệ và kiến trúc
@@ -154,7 +159,7 @@ scripts/      Khởi động, kiểm chứng và vận hành fixture
 
 Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `dist/` và `node_modules/` chứa dữ liệu chạy, build, dependency hoặc evidence local; không phải module nghiệp vụ.
 
-## Tài liệu tham khảo
+## Tài liệu dự án
 
 - [Phạm vi hệ thống](docs/requirements/system-scope.md) và [use case](docs/requirements/use-cases.md).
 - [Kiến trúc](docs/architecture/system-architecture.md), [ranh giới module](docs/architecture/module-boundaries.md), [cấu trúc project](docs/architecture/project-structure.md).
@@ -162,6 +167,8 @@ Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `
 - [Database](docs/database/database-design.md) và [API ảnh xe](docs/api/c10b-vehicle-images.md).
 - [Báo cáo vận hành](docs/modules/operational-reports.md), [danh mục địa điểm](docs/modules/location-catalog.md), [trạng thái chi nhánh](docs/modules/branch-status.md).
 - [Frontend](frontend/README.md), [vận hành và phát triển](docs/architecture/development-workflow.md).
+- [Trợ lý khách hàng](docs/modules/ai-assistant.md), [API gợi ý xe](docs/modules/ai-recommendation.md), [Qwen và tuyến đường cục bộ](docs/modules/local-ai-routing.md).
+- [Tìm xe theo chuyến](docs/api/vehicle-trip-search.md), [quy tắc giao diện khách hàng](docs/ui/customer-experience.md).
 
 
 ## Báo cáo vận hành Admin
