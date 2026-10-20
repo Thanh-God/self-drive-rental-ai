@@ -7,6 +7,7 @@ import java.time.Duration;
 import java.util.List;
 
 /** Driving estimates from a locally prepared OSRM graph, never a live-traffic promise. */
+@org.springframework.stereotype.Component
 public final class OsrmRoutingClient {
     public record Point(double latitude,double longitude) {
         public Point {
@@ -26,6 +27,7 @@ public final class OsrmRoutingClient {
     private final ObjectMapper json;
     private final HttpClient client=HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(2))
         .followRedirects(HttpClient.Redirect.NEVER).build();
+    @org.springframework.beans.factory.annotation.Autowired
     public OsrmRoutingClient(ObjectMapper json){this(json,URI.create("http://127.0.0.1:5000"));}
     OsrmRoutingClient(ObjectMapper json,URI base){
         if(!"http".equals(base.getScheme())||!"127.0.0.1".equals(base.getHost())||base.getUserInfo()!=null
