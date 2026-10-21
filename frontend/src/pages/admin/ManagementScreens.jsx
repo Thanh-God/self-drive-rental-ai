@@ -78,7 +78,7 @@ const definitions = {
     ],
   },
   locations: {
-    title: "Địa điểm tham quan",
+    title: "Điểm du lịch",
     description:
       "Catalog phục vụ lập hành trình; tách biệt với chi nhánh nhận/trả xe.",
     fields: [

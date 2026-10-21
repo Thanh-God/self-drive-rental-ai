@@ -1,6 +1,6 @@
 import AdminAreaContext from "../../context/AdminAreaContext";
 import { Link } from "react-router-dom";
-import { cloneElement, useId, useState, useContext } from "react";
+import { cloneElement, useId, useState, useContext, useEffect } from "react";
 import { useDemo } from "../../context/DemoContext";
 import { DEMO_MODE } from "../../demo/config";
 import EmptyState from "./EmptyState";
@@ -52,6 +52,14 @@ export function Page({ title, description, children, actions }) {
 }
 export function Notice({ children, error = false, toast = false }) {
   const [dismissed, setDismissed] = useState(null);
+  const toastId = useId();
+  useEffect(() => {
+    if (!toast) return undefined;
+    const replacePrevious = event => { if (event.detail !== toastId) setDismissed(children); };
+    window.addEventListener("kdrive:toast", replacePrevious);
+    window.dispatchEvent(new window.CustomEvent("kdrive:toast", { detail: toastId }));
+    return () => window.removeEventListener("kdrive:toast", replacePrevious);
+  }, [toast, toastId, children]);
   if (toast && dismissed === children) return null;
   return (
     <div

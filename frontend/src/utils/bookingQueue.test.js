@@ -290,5 +290,3 @@ test('F03-R: Admin booking detail renders dd/mm/yyyy and audit HH:mm in VN timez
  // Restore default rows adapter
  client.defaults.adapter = async config => ({ config, data: rows, status: 200, statusText: 'OK', headers: {} });
 });
-
-

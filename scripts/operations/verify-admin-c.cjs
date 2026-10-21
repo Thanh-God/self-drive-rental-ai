@@ -1,0 +1,50 @@
+// Read-only main API/browser proof. Mutations are blocked; error injection is UI-only.
+const fs=require("node:fs"),path=require("node:path"),assert=require("node:assert/strict");
+const {chromium}=require(path.resolve(".runtime/phase5-rerun-20261004-1823/playwright/node_modules/playwright"));
+const out=path.resolve(process.argv[2]);assert.ok(out.includes(path.sep+".runtime"+path.sep));assert.ok(!fs.existsSync(out));fs.mkdirSync(out);
+const base="http://127.0.0.1:5173",api="http://127.0.0.1:8080/api/v1",checks=[],errors=[],writes=[];
+function check(name,actual,expected=true){assert.deepEqual(actual,expected,name);checks.push({name,actual,expected});fs.writeFileSync(path.join(out,"assertions.json"),JSON.stringify(checks,null,2));}
+async function main(){
+ const crypto=require("node:crypto");
+ function inputs(){const files=[];function walk(dir){for(const item of fs.readdirSync(dir,{withFileTypes:true})){const file=path.join(dir,item.name);if(item.isDirectory())walk(file);else files.push(file);}}walk("frontend/src");files.push("frontend/package.json","frontend/package-lock.json","frontend/vite.config.js",__filename);return Object.fromEntries(files.map(f=>[path.relative(process.cwd(),f),crypto.createHash("sha256").update(fs.readFileSync(f)).digest("hex")]));}
+ const sourceBefore=inputs();fs.writeFileSync(path.join(out,"inputs-before.json"),JSON.stringify(sourceBefore,null,2));
+
+ const env=fs.readFileSync("backend/.env.local","utf8");const password=process.env.KDRIVE_ADMIN_PASSWORD||env.match(/^SEED_PASSWORD=(.*)$/m)?.[1]?.trim().replace(/^["']|["']$/g,"");assert.ok(password,"Private local Admin credential required");
+ const login=await fetch(api+"/auth/login",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({email:"admin@example.test",password})});assert.equal(login.status,200,"Local Admin login");const token=(await login.json()).token;
+ const browser=await chromium.launch({headless:true});
+ try {
+ const context=await browser.newContext({viewport:{width:1440,height:900},locale:"en-US"});await context.addInitScript(jwt=>localStorage.setItem("kdrive.jwt",jwt),token);
+ const p=await context.newPage();p.setDefaultTimeout(15000);p.on("pageerror",e=>errors.push(e.message));let mockedFailure=false;
+ await p.route("**/api/v1/**",async route=>{const r=route.request(),method=r.method();if(["GET","HEAD","OPTIONS"].includes(method))return route.continue();writes.push({method,path:new URL(r.url()).pathname});if(mockedFailure){mockedFailure=false;return route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({message:"Không thể xóa: dữ liệu đang được sử dụng (mô phỏng kiểm thử giao diện)."})});}return route.abort("blockedbyclient");});
+ const main=p.locator(".admin-main"),aside=p.locator(".admin-workspace > aside"),header=p.locator(".admin-shell > header");
+ await p.goto(base+"/admin");await p.locator('[data-metric="Đơn tạo trong khoảng"]').waitFor();check("Actual Admin overview",await p.locator("h1").textContent(),"Tổng quan");check("Menu overview first",await aside.locator("a").first().textContent(),"Tổng quan");check("Admin breadcrumb",await p.locator(".eyebrow").textContent(),"Quản trị / Tổng quan");check("Four existing KPI",await p.locator("[data-metric]").count(),4);
+ check("Locale-independent date",await p.getByRole("textbox",{name:"Đến ngày",exact:true}).inputValue(),"31/10/2026");await p.screenshot({path:path.join(out,"overview-1440.png")});
+ // Invalid calendar dates cannot request a report; valid input retains ISO API payload.
+ let reports=0;p.on("request",r=>{if(r.url().includes("/admin/reports"))reports++;});
+ await p.getByRole("textbox",{name:"Đến ngày",exact:true}).fill("31/02/2026");check("Impossible date is invalid",await p.getByRole("textbox",{name:"Đến ngày",exact:true}).evaluate(e=>e.validity.valid),false);const beforeReports=reports;await p.getByRole("button",{name:"Xem báo cáo",exact:true}).click();check("Invalid date sends no report",reports,beforeReports);
+ await p.getByRole("textbox",{name:"Đến ngày",exact:true}).fill("31/10/2026");await p.getByRole("button",{name:"Xem báo cáo",exact:true}).click();await p.locator('[data-metric="Đơn tạo trong khoảng"]').waitFor();
+ await aside.getByRole("link",{name:"Tra cứu đơn thuê",exact:true}).click();await p.locator(".admin-booking-table tbody tr").first().waitFor();check("Real API booking table exists",await p.locator(".admin-booking-table tbody tr").count()>0);
+ await p.getByLabel("Tìm mã đơn, xe hoặc khách hàng",{exact:true}).fill("impossible-match-qa");await p.getByText("Không có đơn phù hợp",{exact:true}).waitFor();check("Search updates actual list",await p.locator(".admin-booking-table").count(),0);await p.getByLabel("Tìm mã đơn, xe hoặc khách hàng",{exact:true}).fill("");await p.locator(".admin-booking-table").waitFor();await p.screenshot({path:path.join(out,"bookings-1440.png")});
+ for(const viewport of [{width:1366,height:768},{width:1093,height:614},{width:1366,height:420}]){
+  await p.setViewportSize(viewport);await p.goto(base+"/admin/catalog");await p.getByRole("heading",{name:"Hãng xe",exact:true}).waitFor();
+  const hb=await header.boundingBox(),ab=await aside.boundingBox();await main.evaluate(e=>{e.scrollTop=e.scrollHeight;});await p.waitForTimeout(100);
+  check(`Header stable ${viewport.width}x${viewport.height}`,Math.abs((await header.boundingBox()).y-hb.y)<1);check(`Sidebar stable ${viewport.width}x${viewport.height}`,Math.abs((await aside.boundingBox()).y-ab.y)<1);
+  check(`No outer page scroll ${viewport.width}`,await p.evaluate(()=>document.documentElement.scrollHeight<=window.innerHeight+1));check(`No page horizontal overflow ${viewport.width}`,await p.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1));
+  await aside.getByRole("link",{name:"Kiểm duyệt đánh giá",exact:true}).scrollIntoViewIfNeeded();check(`Last menu reachable ${viewport.width}`,await aside.getByRole("link",{name:"Kiểm duyệt đánh giá",exact:true}).isVisible());
+  await aside.getByRole("link",{name:"Tổng quan",exact:true}).click();await p.locator('[data-metric="Đơn tạo trong khoảng"]').waitFor();check(`Route resets main ${viewport.width}`,await main.evaluate(e=>e.scrollTop),0);await p.screenshot({path:path.join(out,`overview-${viewport.width}x${viewport.height}.png`)});
+ }
+ await p.setViewportSize({width:1366,height:768});
+ async function cancel(label){const before=writes.length;await label.click();await p.getByRole("dialog").waitFor();await p.getByRole("button",{name:"Hủy",exact:true}).click();check("Cancel sends no mutation",writes.length,before);check("Cancel closes modal",await p.getByRole("dialog").count(),0);}
+ await p.goto(base+"/admin/vehicles");await p.getByLabel("Tên xe",{exact:true}).waitFor();check("Brand placeholder",await p.getByLabel("Hãng xe",{exact:true}).inputValue(),"");check("Category placeholder",await p.getByLabel("Loại xe",{exact:true}).inputValue(),"");await cancel(p.getByRole("button",{name:"Xóa xe",exact:true}).first());
+ await p.getByRole("button",{name:"Xóa xe",exact:true}).first().click();await p.getByRole("dialog").waitFor();await p.screenshot({path:path.join(out,"confirmation-1366.png")});const mainBefore=await main.evaluate(e=>e.scrollTop);await main.hover();await p.mouse.wheel(0,500);await p.waitForTimeout(100);check("Modal locks main scrolling",await main.evaluate(e=>e.scrollTop),mainBefore);await p.keyboard.press("Escape");check("Escape closes modal",await p.getByRole("dialog").count(),0);
+ // Error toast UI proof: intercepted DELETE never reaches the database.
+ mockedFailure=true;await p.getByRole("button",{name:"Xóa xe",exact:true}).first().click();await p.getByRole("button",{name:"Xác nhận",exact:true}).click();await p.locator('.admin-toast[role="alert"]').waitFor();check("Injected API conflict visible",await p.locator('.admin-toast').textContent().then(t=>t.includes("đang được sử dụng")));await p.screenshot({path:path.join(out,"error-toast.png")});await p.getByRole("button",{name:"Đóng thông báo"}).click();check("Toast dismiss",await p.locator('.admin-toast').count(),0);
+ await p.goto(base+"/admin/branches");await p.getByRole("heading",{name:"Chi nhánh & tuyến nhận/trả"}).waitFor();check("Branch technical version hidden",await main.textContent().then(t=>!t.includes("Phiên bản")));await cancel(p.getByRole("button",{name:/^Ngừng nhận đơn mới:/}).first());await cancel(p.getByRole("button",{name:/^Xóa chi nhánh /}).first());
+ await p.goto(base+"/admin/accounts");await p.getByRole("button",{name:"Khóa tài khoản",exact:true}).first().waitFor();await cancel(p.getByRole("button",{name:"Khóa tài khoản",exact:true}).first());
+ await p.goto(base+"/admin/reviews");await p.getByRole("heading",{name:"Kiểm duyệt đánh giá",exact:true}).waitFor();if(await p.getByRole("button",{name:"Ẩn đánh giá",exact:true}).count())await cancel(p.getByRole("button",{name:"Ẩn đánh giá",exact:true}).first());
+ await p.goto(base+"/admin/locations");await p.getByRole("heading",{name:"Điểm du lịch",exact:true}).waitFor();check("No backend jargon on locations",await main.textContent().then(t=>!t.includes("backend")));check("No page runtime errors",errors.length,0);check("Only mutation intercepted, no main writes",writes.length,1);
+ check("Source unchanged during proof",inputs(),sourceBefore);
+ fs.writeFileSync(path.join(out,"result.json"),JSON.stringify({status:"PASS scoped read-only browser",assertions:checks.length,errors,writes,mutationProof:"UI error injection only; confirmation positive persistence covered by DOM tests, not main DB mutation",browser:"Installed Playwright; Browser plugin not available",zoom:"1093x614 effective viewport only; real125% zoom separately required"},null,2));console.log("PASS",checks.length,"browser assertions; no business-data writes");
+ } finally {await browser.close();}
+}
+main().catch(e=>{console.error(e.message);process.exitCode=1;});

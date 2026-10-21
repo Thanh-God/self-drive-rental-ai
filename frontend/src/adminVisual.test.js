@@ -6,7 +6,7 @@ import {displayCalendarDate, parseCalendarDate} from "./utils/calendarDate.js";
 import {act,createElement as h} from "react";
 import {JSDOM} from "jsdom";
 import {createServer} from "vite";
-let dom,vite,createRoot,MemoryRouter,Routes,Route,Link,NavigationEffects,Modal,Status,Page,DateField,AdminBookingTable,ApiVehicleCatalogPage,ApiVehiclesAdminPage,apiClient,AdminAreaContext;
+let dom,vite,createRoot,MemoryRouter,Routes,Route,Link,NavigationEffects,Modal,Status,Notice,Page,DateField,AdminBookingTable,ApiVehicleCatalogPage,ApiVehiclesAdminPage,apiClient,AdminAreaContext;
 const descriptors=new Map();
 before(async()=>{
  process.env.VITE_DATA_MODE="api";dom=new JSDOM("<!doctype html><body></body>",{url:"http://localhost/"});
@@ -14,7 +14,7 @@ before(async()=>{
  ({createRoot}=await import("react-dom/client"));({MemoryRouter,Routes,Route,Link}=await import("react-router-dom"));
  vite=await createServer({root:fileURLToPath(new URL("..",import.meta.url)),logLevel:"error",optimizeDeps:{noDiscovery:true},server:{middlewareMode:true}});
  ({default:NavigationEffects}=await vite.ssrLoadModule("/src/routes/NavigationEffects.jsx"));({default:Modal}=await vite.ssrLoadModule("/src/components/common/Modal.jsx"));
- ({Status,Page}=await vite.ssrLoadModule("/src/components/common/PageKit.jsx"));
+ ({Status,Notice,Page}=await vite.ssrLoadModule("/src/components/common/PageKit.jsx"));
  ({default:DateField}=await vite.ssrLoadModule("/src/components/common/DateField.jsx"));
  ({default:AdminAreaContext}=await vite.ssrLoadModule("/src/context/AdminAreaContext.js"));
  ({default:apiClient}=await vite.ssrLoadModule("/src/api/client.js"));
@@ -79,4 +79,9 @@ test("Vehicle create form waits for explicit brand/category and edit keeps exist
  const selects=()=>[...page.host.querySelectorAll("select")].filter(x=>x.querySelector('option[value="b1"],option[value="c1"]'));
  assert.equal(selects().length,2);assert.deepEqual(selects().map(x=>x.value),["",""]);assert.ok(selects().every(x=>x.required));assert.match(selects()[0].options[0].textContent,/Chọn hãng xe/);
  await act(async()=>button(page.host,"Chỉnh sửa").click());assert.deepEqual(selects().map(x=>x.value),["b1","c1"]);await page.close();
+});
+
+test("A newer Admin toast replaces the previous toast instead of overlapping",async()=>{
+ const page=await mount(h("div",null,h(Notice,{toast:true},"Đã lưu hãng xe"),h(Notice,{toast:true,error:true},"Không thể lưu loại xe")));
+ assert.equal(page.host.querySelectorAll(".admin-toast").length,1);assert.match(page.host.querySelector(".admin-toast").textContent,/Không thể lưu loại xe/);await page.close();
 });
