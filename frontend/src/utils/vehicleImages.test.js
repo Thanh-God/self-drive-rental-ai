@@ -96,3 +96,53 @@ test("Staff handover list keeps operational action and does not use customer car
   assert.equal(element.querySelector(".urban-booking-card"), null);
   assert.equal(element.querySelector('a').getAttribute("href"), "/staff/handover/bk1");
 });
+
+test("UX02b Gallery attribution is placed in expandable details with accessible URL links", async () => {
+  const customImages = [
+    {
+      id: "img-1",
+      url: "/media/test-1.jpg",
+      sortOrder: 0,
+      attribution: "PhotoAuthor · CC BY 4.0 · https://example.com/photo-1 · <script>alert(1)</script>"
+    },
+    {
+      id: "img-2",
+      url: "/media/test-2.jpg",
+      sortOrder: 1,
+      attribution: null
+    }
+  ];
+  const { element } = await mount(Gallery, { vehicle: { id: "v10", name: "TestCar", noLocalAsset: true, images: customImages } });
+
+  // Verify label "Ảnh minh họa"
+  assert.ok(element.textContent.includes("Ảnh minh họa"));
+
+  // Verify details and summary
+  const details = element.querySelector("details");
+  assert.ok(details, "Expected <details> element for attribution");
+  const summary = details.querySelector("summary");
+  assert.ok(summary, "Expected <summary> element");
+  assert.equal(summary.textContent.trim(), "Nguồn ảnh và giấy phép");
+
+  // Verify markup is rendered safely as text without script tags
+  assert.equal(element.querySelector("script"), null);
+  assert.ok(element.textContent.includes("<script>alert(1)</script>"));
+
+  // Verify URL link rendered with target and rel
+  const link = details.querySelector('a[href="https://example.com/photo-1"]');
+  assert.ok(link, "Expected clickable link for attribution URL");
+  assert.equal(link.getAttribute("target"), "_blank");
+  assert.equal(link.getAttribute("rel"), "noopener noreferrer");
+
+  // Verify toggling open attribute
+  assert.equal(details.open, false);
+  await act(async () => {
+    details.open = true;
+    details.dispatchEvent(new window.Event("toggle"));
+  });
+  assert.equal(details.open, true);
+
+  // Switch to image 2 without attribution
+  await click(element.querySelector('[aria-label="Xem ảnh 2"]'));
+  assert.ok(element.textContent.includes("Chưa cung cấp thông tin nguồn ảnh"));
+});
