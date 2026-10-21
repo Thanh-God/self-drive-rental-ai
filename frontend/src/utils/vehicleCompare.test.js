@@ -181,3 +181,15 @@ test("UX01 compare page displays choose trip CTA when trip is inactive and guide
  assert.ok([...c.querySelectorAll("button")].find(b=>b.textContent==="Kiểm tra lại giá & lịch"));
  assert.ok([...c.querySelectorAll("a")].find(a=>a.textContent==="Thay đổi chuyến"));
 });
+
+test("UX03 compare page displays standardized empty amenity advice when amenities is empty", async () => {
+  handler = config => {
+    if (config.url === "/vehicles/v-empty") {
+      return { ...cars[0], id: "v-empty", name: "Car Empty", amenities: [] };
+    }
+    return defaults(config);
+  };
+  const c = await mount("/vehicles/compare?compare=v-empty");
+  assert.match(c.textContent, /Chưa có thông tin tiện nghi được cung cấp; vui lòng xác nhận với chi nhánh\./);
+  assert.doesNotMatch(c.textContent, /Xe chưa có thông tin tiện nghi\./);
+});

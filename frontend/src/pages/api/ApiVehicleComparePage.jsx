@@ -22,7 +22,7 @@ function CompareColumn({ id, catalog, branches, search, trip, pricing, budget, o
         <dt>Loại xe</dt><dd>{catalog?.categories?.find(c=>c.id===vehicle.categoryId)?.name || "Chưa tải được loại xe"}</dd>
         <dt>Số chỗ (gồm người lái)</dt><dd>{vehicle.seats}</dd>
         <dt>Hộp số</dt><dd>{vehicle.transmission}</dd>
-        <dt>Tiện nghi</dt><dd>{vehicle.amenities?.length ? vehicle.amenities.map(a=>a.name).join(", ") : "Chưa có thông tin tiện nghi"}</dd>
+        <dt>Tiện nghi</dt><dd>{vehicle.amenities?.length ? vehicle.amenities.map(a=>a.name).join(", ") : "Chưa có thông tin tiện nghi được cung cấp; vui lòng xác nhận với chi nhánh."}</dd>
         <dt>Chi nhánh hiện tại</dt><dd>{branches?.find(b=>b.id===vehicle.currentBranchId)?.name || "Chưa tải được chi nhánh"}</dd>
         <dt>Giá / ngày</dt><dd>{money(vehicle.price)}</dd>
       </dl>

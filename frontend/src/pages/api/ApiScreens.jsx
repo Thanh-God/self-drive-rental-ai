@@ -797,7 +797,7 @@ export function ApiVehicleDetailPage() {
                 </div>
               ) : (
                 <p className="mt-5 border-t border-slate-100 pt-5 text-sm text-slate-500">
-                  Xe chưa có thông tin tiện nghi.
+                  Chưa có thông tin tiện nghi được cung cấp; vui lòng xác nhận với chi nhánh.
                 </p>
               )}
             </section>

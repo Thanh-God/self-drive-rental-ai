@@ -169,3 +169,17 @@ test("late password success does not log out a newly established session",async(
  assert.equal(localStorage.getItem("kdrive.jwt"),"new-user-token");assert.equal(alerts.length,0);
  assert.equal(JSON.parse(localStorage.getItem("kdrive.user")).id,"new-user");
 });
+
+test("UX03 desktop navbar includes 'Hướng dẫn thuê xe' link next to 'Tìm xe' for guest and user", async () => {
+  const guestNav = await mount("/", Navbar, false);
+  const guestGuideLink = guestNav.querySelector('a[href="/rental-guide"]');
+  assert.ok(guestGuideLink, "Expected /rental-guide link in guest navbar");
+  assert.equal(guestGuideLink.textContent.trim(), "Hướng dẫn thuê xe");
+  const guestVehiclesLink = guestNav.querySelector('a[href="/vehicles"]');
+  assert.ok(guestVehiclesLink, "Expected /vehicles link in guest navbar");
+
+  const userNav = await mount("/", Navbar, true);
+  const userGuideLink = userNav.querySelector('a[href="/rental-guide"]');
+  assert.ok(userGuideLink, "Expected /rental-guide link in user navbar");
+  assert.equal(userGuideLink.textContent.trim(), "Hướng dẫn thuê xe");
+});

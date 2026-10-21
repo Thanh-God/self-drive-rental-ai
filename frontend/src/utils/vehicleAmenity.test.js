@@ -747,3 +747,40 @@ test("Late save of an old vehicle cannot claim success on the new editor", async
   assert.equal(newForm.querySelectorAll('input[type="checkbox"]')[1].checked, true);
   await mounted.unmount();
 });
+
+test("DOM: ApiVehicleDetailPage displays standardized empty amenity advice when amenities is empty", async () => {
+  const { MemoryRouter, Routes, Route } = await viteServer.ssrLoadModule("react-router-dom");
+  const mounted = await mount(
+    createElement(
+      AuthProvider,
+      null,
+      createElement(
+        MemoryRouter,
+        { initialEntries: ["/vehicles/veh-empty"] },
+        createElement(
+          Routes,
+          null,
+          createElement(Route, {
+            path: "/vehicles/:vehicleId",
+            element: createElement(ApiVehicleDetailPage),
+          }),
+        ),
+      ),
+    ),
+  );
+
+  await act(async () => {
+    fulfill(takeRequest("/vehicles/veh-empty"), {
+      ...mockVehicles[0],
+      id: "veh-empty",
+      amenities: [],
+    });
+    fulfill(takeRequest("/vehicles/catalog"), mockCatalog);
+    fulfill(takeRequest("/vehicles/veh-empty/reviews"), []);
+  });
+
+  assert.match(mounted.container.textContent, /Chưa có thông tin tiện nghi được cung cấp; vui lòng xác nhận với chi nhánh\./);
+  assert.doesNotMatch(mounted.container.textContent, /Xe chưa có thông tin tiện nghi\./);
+
+  await mounted.unmount();
+});

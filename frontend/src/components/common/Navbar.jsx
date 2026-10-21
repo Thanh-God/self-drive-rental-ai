@@ -7,6 +7,7 @@ import { DEMO_MODE } from "../../demo/config";
 
 const publicLinks = [
   { to: "/vehicles", label: "Tìm xe" },
+  { to: "/rental-guide", label: "Hướng dẫn thuê xe" },
   ...(DEMO_MODE
     ? [
         { to: "/ai/recommend", label: "Gợi ý AI" },
