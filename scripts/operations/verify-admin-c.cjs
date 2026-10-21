@@ -2,7 +2,7 @@
 const fs=require("node:fs"),path=require("node:path"),assert=require("node:assert/strict");
 const {chromium}=require(path.resolve(".runtime/phase5-rerun-20261004-1823/playwright/node_modules/playwright"));
 const out=path.resolve(process.argv[2]);assert.ok(out.includes(path.sep+".runtime"+path.sep));assert.ok(!fs.existsSync(out));fs.mkdirSync(out);
-const base="http://127.0.0.1:5173",api="http://127.0.0.1:8080/api/v1",checks=[],errors=[],writes=[];
+const base="http://127.0.0.1:5173",api="http://127.0.0.1:8080/api/v1",checks=[],errors=[],consoleLogs=[],writes=[];
 function check(name,actual,expected=true){assert.deepEqual(actual,expected,name);checks.push({name,actual,expected});fs.writeFileSync(path.join(out,"assertions.json"),JSON.stringify(checks,null,2));}
 async function main(){
  const crypto=require("node:crypto");
@@ -14,7 +14,7 @@ async function main(){
  const browser=await chromium.launch({headless:true});
  try {
  const context=await browser.newContext({viewport:{width:1440,height:900},locale:"en-US"});await context.addInitScript(jwt=>localStorage.setItem("kdrive.jwt",jwt),token);
- const p=await context.newPage();p.setDefaultTimeout(15000);p.on("pageerror",e=>errors.push(e.message));let mockedFailure=false;
+ const p=await context.newPage();p.setDefaultTimeout(15000);p.on("pageerror",e=>errors.push(e.message));p.on("console",m=>{if(["error","warning"].includes(m.type()))consoleLogs.push({level:m.type(),text:m.text()});});let mockedFailure=false;
  await p.route("**/api/v1/**",async route=>{const r=route.request(),method=r.method();if(["GET","HEAD","OPTIONS"].includes(method))return route.continue();writes.push({method,path:new URL(r.url()).pathname});if(mockedFailure){mockedFailure=false;return route.fulfill({status:409,contentType:"application/json",body:JSON.stringify({message:"Không thể xóa: dữ liệu đang được sử dụng (mô phỏng kiểm thử giao diện)."})});}return route.abort("blockedbyclient");});
  const main=p.locator(".admin-main"),aside=p.locator(".admin-workspace > aside"),header=p.locator(".admin-shell > header");
  await p.goto(base+"/admin");await p.locator('[data-metric="Đơn tạo trong khoảng"]').waitFor();check("Actual Admin overview",await p.locator("h1").textContent(),"Tổng quan");check("Menu overview first",await aside.locator("a").first().textContent(),"Tổng quan");check("Admin breadcrumb",await p.locator(".eyebrow").textContent(),"Quản trị / Tổng quan");check("Four existing KPI",await p.locator("[data-metric]").count(),4);
@@ -42,9 +42,9 @@ async function main(){
  await p.goto(base+"/admin/branches");await p.getByRole("heading",{name:"Chi nhánh & tuyến nhận/trả"}).waitFor();check("Branch technical version hidden",await main.textContent().then(t=>!t.includes("Phiên bản")));await cancel(p.getByRole("button",{name:/^Ngừng nhận đơn mới:/}).first());await cancel(p.getByRole("button",{name:/^Xóa chi nhánh /}).first());
  await p.goto(base+"/admin/accounts");await p.getByRole("button",{name:"Khóa tài khoản",exact:true}).first().waitFor();await cancel(p.getByRole("button",{name:"Khóa tài khoản",exact:true}).first());
  await p.goto(base+"/admin/reviews");await p.getByRole("heading",{name:"Kiểm duyệt đánh giá",exact:true}).waitFor();if(await p.getByRole("button",{name:"Ẩn đánh giá",exact:true}).count())await cancel(p.getByRole("button",{name:"Ẩn đánh giá",exact:true}).first());
- await p.goto(base+"/admin/locations");await p.getByRole("heading",{name:"Điểm du lịch",exact:true}).waitFor();check("No backend jargon on locations",await main.textContent().then(t=>!t.includes("backend")));check("No page runtime errors",errors.length,0);check("Only mutation intercepted, no main writes",writes.length,1);
+ await p.goto(base+"/admin/locations");await p.getByRole("heading",{name:"Điểm du lịch",exact:true}).waitFor();check("No backend jargon on locations",await main.textContent().then(t=>!t.includes("backend")));check("No page runtime errors",errors.length,0);check("No framework overlay",await p.locator("vite-error-overlay").count(),0);check("No unexpected console errors",consoleLogs.filter(m=>m.level==="error"&&!/Failed to load resource.*409/.test(m.text)).length,0);check("Only mutation intercepted, no main writes",writes.length,1);
  check("Source unchanged during proof",inputs(),sourceBefore);
- fs.writeFileSync(path.join(out,"result.json"),JSON.stringify({status:"PASS scoped read-only browser",assertions:checks.length,errors,writes,mutationProof:"UI error injection only; confirmation positive persistence covered by DOM tests, not main DB mutation",browser:"Installed Playwright; Browser plugin not available",zoom:"1093x614 effective viewport only; real125% zoom separately required"},null,2));console.log("PASS",checks.length,"browser assertions; no business-data writes");
+ fs.writeFileSync(path.join(out,"result.json"),JSON.stringify({status:"PASS scoped read-only browser",assertions:checks.length,errors,consoleLogs,writes,mutationProof:"UI error injection only; confirmation positive persistence covered by DOM tests, not main DB mutation",browser:"Installed Playwright; Browser plugin not available",zoom:"1093x614 effective viewport only; real125% zoom separately required"},null,2));console.log("PASS",checks.length,"browser assertions; no business-data writes");
  } finally {await browser.close();}
 }
 main().catch(e=>{console.error(e.message);process.exitCode=1;});
