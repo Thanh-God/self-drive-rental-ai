@@ -5,7 +5,7 @@ import { JSDOM } from "jsdom";
 import { createServer } from "vite";
 import { fileURLToPath, URL } from "node:url";
 import process from "node:process";
-import { passwordError } from "./passwordPolicy.js";
+import { passwordError, passwordHint } from "./passwordPolicy.js";
 
 let dom, vite, createRoot, AuthProvider, useAuth, RegisterPage, ApiProfilePage, Navbar, WorkspaceTopbar, ApiErrorBridge, Router, Routes, Route, client;
 const originals = new Map(), roots = [], writes = [];
@@ -49,6 +49,10 @@ test("password policy boundaries and composition are explicit",()=>{
   assert.equal(passwordError("87654321"),"Mật khẩu cần có: chữ hoa, chữ thường, ký tự đặc biệt.");
   for(const value of ["abcdefgh","ABCDEFGH","Abcdefgh","Abcdef12","Password1!","Ab1!"+"é".repeat(35)])assert.ok(passwordError(value));
   assert.equal(passwordError("Ax2#bcdE"),"");assert.equal(passwordError("Ab1!"+"é".repeat(34)),"");
+  assert.equal(passwordError("A".repeat(73)), "Mật khẩu quá dài. Vui lòng rút ngắn mật khẩu.");
+  assert.equal(passwordError("Ab1!" + "é".repeat(35)), "Mật khẩu quá dài. Vui lòng rút ngắn mật khẩu.");
+  assert.doesNotMatch(passwordHint, /byte UTF-8/i);
+  assert.doesNotMatch(passwordError("A".repeat(73)), /byte UTF-8/i);
 });
 test("registration needs one password, toggles visibility and prevents duplicate writes",async()=>{
   const c=await mount("/register",RegisterPage);

@@ -54,7 +54,7 @@ export default function RegisterPage() {
     <div className="mx-auto max-w-md px-4 py-16">
       <h1 className="text-2xl font-bold text-slate-900">Đăng ký tài khoản</h1>
       <p className="mt-2 text-sm text-slate-500">
-        Tài khoản mới nhận vai trò khách hàng (USER).
+        Tạo tài khoản để đặt xe và theo dõi đơn thuê.
       </p>
       <form
         onSubmit={onSubmit}
