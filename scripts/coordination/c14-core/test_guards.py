@@ -1,5 +1,5 @@
 """Call actual runner entrypoints; refusals must precede native commands or writes."""
-import importlib.util, json, sys, tempfile, unittest
+import copy, importlib.util, json, sys, tempfile, unittest
 from pathlib import Path
 from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[3]
@@ -35,7 +35,7 @@ class RunnerGuards(unittest.TestCase):
         with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
             folder=Path(directory);output=folder/'output'
             with self.assertRaises(FileNotFoundError):
-                self.invoke(module,['--backend-root',str(folder),'--evidence',str(output)])
+                self.invoke(module,['--backend-root',str(folder),'--evidence',str(output),'--suites','VehicleSearchTest','--new-fixture-reason','guard source mismatch test'])
             self.assertFalse(output.exists())
 
     def test_browser_refuses_protected_port_before_native_or_output(self):
@@ -47,6 +47,50 @@ class RunnerGuards(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 self.invoke(module,['--backend-evidence',str(native),'--backend-root',str(folder),'--evidence',str(output)])
             self.assertEqual(fixture.read_bytes(),original);self.assertFalse(output.exists())
+
+    def test_missing_registry_refuses_at_entrypoint_before_native_or_output(self):
+        module=load('run-mysql')
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            folder=Path(directory);output=folder/'new'
+            with self.assertRaisesRegex(AssertionError,'No registered fixture'):
+                self.invoke(module,['--backend-root',str(folder),'--evidence',str(output),'--fixture-registry',str(folder/'absent.json'),'--suites','VehicleSearchTest'])
+            self.assertFalse(output.exists())
+
+    def test_new_fixture_requires_explicit_reason_and_cannot_mix_reuse(self):
+        module=load('run-mysql')
+        self.assertEqual(module.fixture_source(new_reason='approved server isolation test'),(None,None))
+        with self.assertRaisesRegex(AssertionError,'specific approved reason'):
+            module.fixture_source(new_reason='')
+        with self.assertRaisesRegex(AssertionError,'not both'):
+            module.fixture_source(reuse='anything',new_reason='approved server isolation test')
+
+    def test_registry_selects_same_fixture_and_rejects_identity_or_path_drift(self):
+        module=load('run-mysql')
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            folder=Path(directory);previous=folder/'previous';previous.mkdir()
+            fixture={'id':'a'*64,'name':'kltn-c14-core-test','port':33676,'volume':'vol-test'}
+            (previous/'fixture.json').write_text(json.dumps(fixture))
+            entry={**fixture,'imageId':'sha256:'+'b'*64,'evidence':previous.relative_to(ROOT).as_posix()}
+            registry=folder/'registry.json';registry.write_text(json.dumps(entry))
+            self.assertEqual(module.fixture_source(registry=registry),(previous,entry))
+            entry['id']='c'*64;registry.write_text(json.dumps(entry))
+            with self.assertRaisesRegex(AssertionError,'identity mismatch'):
+                module.fixture_source(registry=registry)
+            entry['evidence']='../outside';registry.write_text(json.dumps(entry))
+            with self.assertRaisesRegex(AssertionError,'Runtime fixture evidence'):
+                module.fixture_source(registry=registry)
+
+    def test_live_fixture_metadata_guard_refuses_wrong_target_image_mount_state_or_port(self):
+        module=load('run-mysql')
+        fixture={'id':'a'*64,'name':'kltn-c14-core-test','port':33676,'volume':'vol-test'}
+        actual={'Id':'a'*64,'Name':'/kltn-c14-core-test','Image':'sha256:fixed',
+                'State':{'Status':'exited'},'Config':{'Image':'mysql:8.4'},
+                'HostConfig':{'PortBindings':{'3306/tcp':[{'HostIp':'127.0.0.1','HostPort':'33676'}]}},
+                'Mounts':[{'Type':'volume','Name':'vol-test','Destination':'/var/lib/mysql'}]}
+        module.validate_reuse(fixture,actual,{'imageId':'sha256:fixed'})
+        for key,value in [('Id','other'),('Image','sha256:other'),('Name','/kltn-phase5-rerun'),('State',{'Status':'running'}),('Config',{'Image':'mysql:8.4.11'}),('Mounts',[]),('HostConfig',{'PortBindings':{}})]:
+            changed=copy.deepcopy(actual);changed[key]=value
+            with self.assertRaises(AssertionError):module.validate_reuse(fixture,changed,{'imageId':'sha256:fixed'})
 
     def test_browser_refuses_existing_output_without_native_commands(self):
         module=load('run-browser')

@@ -1,5 +1,19 @@
 # Docker storage verification
 
+## Reuse and metadata inventory
+
+Read `skills/kltn-docker-fixtures/SKILL.md` before Docker QA operations. Current
+MySQL and OSRM proof runners reuse locally registered exact fixtures; new servers
+require an explicit approved isolation reason. Website DB and test schemas remain
+separate. Reusing a container does not mean sharing one mutable schema across tests.
+
+`python scripts/operations/inventory-docker-fixtures.py --evidence .runtime/<NEW>/inventory`
+only reads Docker metadata and exact-ID fixture references. It excludes Env and
+commands, writes JSON/CSV/Markdown locally, and never starts/stops/deletes containers
+or volumes. `REVIEW_CLEANUP` is a candidate for further review, never deletion
+approval. `KEEP_NEEDS_EVIDENCE` and unreferenced volumes are not automatically safe
+to remove. No cleanup guard or archive retention policy is relaxed by the inventory.
+
 Run from KLTN root using PowerShell. This operation is separate from C6 browser acceptance.
 
 `verify-docker-storage.ps1 -OutputDirectory <NEW_DIRECTORY>` checks the current Docker engine, records sorted container/image/volume inventory, starts **kltn-phase5-rerun** only if needed, waits for MySQL, captures a read-only ordered mysqldump of **kdrive**, captures Flyway history/table count, and verifies localhost:33385. It does not start the application backend or mutate schema/business data. Output includes **private database contents**: use ignored/private evidence directories; never commit/share raw SQL. Container secrets are used inside the container without printing them.

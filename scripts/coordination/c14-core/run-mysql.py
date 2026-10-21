@@ -6,6 +6,36 @@ import zipfile
 
 REPO = Path(__file__).resolve().parents[3]
 FLAGS = subprocess.CREATE_NO_WINDOW
+REGISTRY = REPO/'.runtime/docker-fixtures/mysql-core.json'
+
+def fixture_source(reuse=None, new_reason=None, registry=REGISTRY):
+    """Reuse is the default. Never silently fall back to docker run."""
+    assert not (reuse and new_reason), 'Choose reuse or explicit new fixture, not both'
+    if new_reason is not None:
+        assert len(new_reason.strip()) >= 12, 'New fixture needs a specific approved reason (12+ characters)'
+        return None, None
+    if reuse:
+        previous=Path(reuse).resolve();assert previous.is_relative_to(REPO/'.runtime'), 'Runtime fixture evidence required'
+        return previous, None
+    registry=Path(registry).resolve()
+    assert registry.is_relative_to(REPO/'.runtime') and registry.is_file(), 'No registered fixture: register a verified pool or use --reuse-evidence; creation is not automatic'
+    entry=json.loads(registry.read_text(encoding='utf-8-sig'))
+    previous=(REPO/entry['evidence']).resolve()
+    assert previous.is_relative_to(REPO/'.runtime'), 'Runtime fixture evidence required'
+    fixture=json.loads((previous/'fixture.json').read_text())
+    assert all(entry[k]==fixture[k] for k in ['id','name','volume','port']), 'Registry/evidence identity mismatch'
+    assert entry.get('imageId','').startswith('sha256:'), 'Pinned registry image required'
+    return previous, entry
+
+def validate_reuse(fixture, inspection, pinned=None):
+    assert fixture['name'].startswith('kltn-c14-core-') and fixture['port']==33676, 'Only isolated core fixture allowed'
+    assert inspection['Id']==fixture['id'] and inspection['Name'].lstrip('/')==fixture['name'], 'Fixture identity drift'
+    assert inspection['State']['Status']=='exited', 'Reusable fixture must be stopped, not paused/running'
+    assert inspection['Config']['Image']=='mysql:8.4', 'MySQL fixture image drift'
+    assert inspection['HostConfig']['PortBindings']=={'3306/tcp':[{'HostIp':'127.0.0.1','HostPort':'33676'}]}, 'Fixture port drift'
+    mounts=inspection['Mounts']
+    assert len(mounts)==1 and mounts[0]['Type']=='volume' and mounts[0]['Name']==fixture['volume'] and mounts[0]['Destination']=='/var/lib/mysql', 'Fixture mount drift'
+    if pinned:assert inspection['Image']==pinned['imageId'], 'Pinned fixture image drift'
 SUITES = ['VehicleSearchTest','ConcurrencyAndRaceTest','BranchClosureBookingTest','BranchStatusHttpServerTest',
           'OperationalReportIntegrationTest','OperationalReportMySqlTest','RentalIntegrationTest',
           'CancelBoundaryTest','MySqlMigrationTest','LocationCategoryIntegrationTest','LocationIntegrationTest',
@@ -23,9 +53,14 @@ def inputs():
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--backend-root',required=True)
     parser.add_argument('--evidence',required=True);parser.add_argument('--reuse-evidence')
+    parser.add_argument('--fixture-registry',default=str(REGISTRY))
+    parser.add_argument('--new-fixture-reason',help='Exceptional new container only; requires a specific approved reason')
     parser.add_argument('--suites',nargs='+',choices=SUITES)
     parser.add_argument('--routing-mode',choices=['online','offline'])
     args=parser.parse_args();build=Path(args.backend_root).resolve();out=Path(args.evidence).resolve()
+    assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
+    assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
+    previous,pinned=fixture_source(args.reuse_evidence,args.new_fixture_reason,args.fixture_registry)
     if 'LocationRouteHttpServerTest' in (args.suites or SUITES):
         assert args.routing_mode, 'Routing suite requires explicit --routing-mode'
         with socket.socket() as probe:
@@ -54,16 +89,14 @@ def main():
         return result
     name='kltn-c14-core-'+uuid.uuid4().hex[:12];volume='vol-'+name
     password,token=uuid.uuid4().hex,uuid.uuid4().hex;identity=None;owned=False;final=None
-    if args.reuse_evidence:
-        previous=Path(args.reuse_evidence).resolve();assert previous.is_relative_to(REPO/'.runtime')
+    if previous:
         f=json.loads((previous/'fixture.json').read_text())
         assert f['name'].startswith('kltn-c14-core-') and f['port']==33676
         name,volume,identity=f['name'],f['volume'],f['id']
         password=next(l.split('=',1)[1] for l in (previous/'mysql.private.env').read_text().splitlines() if l.startswith('MYSQL_ROOT_PASSWORD='))
         token=(previous/'marker.private.token').read_text().strip()
         inspection=json.loads(run(['docker','inspect',name]).stdout)[0]
-        assert inspection['Id']==identity and not inspection['State']['Running']
-        assert [m['Name'] for m in inspection['Mounts'] if m['Destination']=='/var/lib/mysql']==[volume]
+        validate_reuse(f,inspection,pinned)
     else:
         assert name not in run(['docker','ps','-a','--format','{{.Names}}']).stdout.decode().splitlines()
         assert volume not in run(['docker','volume','ls','--format','{{.Name}}']).stdout.decode().splitlines()
@@ -75,10 +108,10 @@ def main():
     def sql(query,check=True):
         return run(['docker','exec','-e','MYSQL_PWD='+password,name,'mysql','-uroot','--batch','--raw','-N','-e',query],check=check)
     try:
-        if args.reuse_evidence:run(['docker','start',name])
+        if previous:run(['docker','start',name])
         else:identity=run(['docker','run','-d','--name',name,'-p','127.0.0.1:33676:3306','--env-file',str(private),'-v',volume+':/var/lib/mysql','mysql:8.4']).stdout.decode().strip()
         owned=True
-        fixture={'name':name,'id':identity,'volume':volume,'port':33676,'schema':'kdrive_c14_core','policy':'KEEP stopped'}
+        fixture={'name':name,'id':identity,'volume':volume,'port':33676,'schema':'kdrive_c14_core','policy':'KEEP reusable stopped','reuseEvidence':str(previous) if previous else None,'newFixtureReason':args.new_fixture_reason}
         (out/'fixture.json').write_text(json.dumps(fixture,indent=2))
         deadline=time.monotonic()+90;ready=0
         while time.monotonic()<deadline:
@@ -86,7 +119,11 @@ def main():
             if ready>=2:break
             time.sleep(1)
         else:raise RuntimeError('MySQL readiness deadline')
-        sql(f'CREATE DATABASE IF NOT EXISTS {marker}; CREATE TABLE IF NOT EXISTS {marker}.__kdrive_test_fixture_marker(id INT PRIMARY KEY,target_schema VARCHAR(255),marker_token VARCHAR(255));')
+        assert len(token)==32 and all(c in '0123456789abcdef' for c in token), 'Invalid private marker token'
+        if previous:
+            count=sql(f"SELECT COUNT(*) FROM {marker}.__kdrive_test_fixture_marker WHERE marker_token='{token}'").stdout.decode().strip()
+            assert count.isdecimal() and int(count)>0, 'Existing fixture marker mismatch; do not create or repair markers'
+        else:sql(f'CREATE DATABASE IF NOT EXISTS {marker}; CREATE TABLE IF NOT EXISTS {marker}.__kdrive_test_fixture_marker(id INT PRIMARY KEY,target_schema VARCHAR(255),marker_token VARCHAR(255));')
         reports=[]
         for suite in args.suites or SUITES:
             schema='kdrive_c14_'+uuid.uuid4().hex[:12]

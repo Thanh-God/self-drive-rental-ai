@@ -24,6 +24,29 @@ METHODS = {
     'offline': 'offlineRoutePreview_WhenOsrmStopped_ReturnsUnavailableWithNoInventedEstimates',
 }
 
+def osrm_fixture(registry, new_reason=None):
+    if new_reason is not None:
+        assert len(new_reason.strip()) >= 12, 'New OSRM fixture requires a specific approved reason'
+        return None
+    registry = Path(registry).resolve()
+    assert registry.is_relative_to(REPO / '.runtime') and registry.is_file(), 'No registered OSRM fixture; creation is not automatic'
+    entry = json.loads(registry.read_text(encoding='utf-8-sig'))
+    evidence = (REPO / entry['evidence']).resolve()
+    assert evidence.is_relative_to(REPO / '.runtime'), 'Runtime OSRM evidence required'
+    original = json.loads((evidence / 'osrm-identity.json').read_text())
+    assert all(entry[k] == original[k] for k in ['id', 'name']), 'OSRM registry/evidence identity mismatch'
+    assert entry['name'].startswith('kltn-ai3-proof-') and original['image'] == IMAGE, 'Only registered test OSRM allowed'
+    return entry
+
+def validate_osrm_reuse(entry, data, graph):
+    assert data['Id'] == entry['id'] and data['Name'].lstrip('/') == entry['name'], 'OSRM identity drift'
+    assert data['State']['Status'] == 'exited', 'OSRM test fixture must be stopped'
+    assert data['Config']['Image'] == IMAGE and data['Image'] == entry['imageId'], 'OSRM image drift'
+    assert data['Config']['Cmd'] == ['osrm-routed', '--algorithm', 'mld', '/data/central.osrm'], 'OSRM command drift'
+    assert data['HostConfig']['PortBindings'] == {'5000/tcp': [{'HostIp':'127.0.0.1','HostPort':'5000'}]}, 'OSRM port drift'
+    mounts = data['Mounts']
+    assert len(mounts) == 1 and mounts[0]['Type'] == 'bind' and mounts[0]['Destination'] == '/data' and not mounts[0]['RW'] and Path(mounts[0]['Source']).resolve() == graph.resolve(), 'OSRM graph mount drift'
+
 
 def listening():
     with socket.socket() as sock:
@@ -36,6 +59,8 @@ def main():
     parser.add_argument('--backend-root', required=True)
     parser.add_argument('--evidence', required=True)
     parser.add_argument('--reuse-evidence', required=True)
+    parser.add_argument('--osrm-registry', default=str(REPO / '.runtime/docker-fixtures/osrm.json'))
+    parser.add_argument('--new-fixture-reason', help='Exceptional new OSRM container only, with approved reason')
     parser.add_argument('--graph-dir', required=True)
     parser.add_argument('--graph-manifest', required=True)
     parser.add_argument('--browser-script', help='Optional repository proof run against the live regional graph')
@@ -43,6 +68,7 @@ def main():
     out, build = Path(args.evidence).resolve(), Path(args.backend_root).resolve()
     graph, manifest_path = Path(args.graph_dir).resolve(), Path(args.graph_manifest).resolve()
     assert out.is_relative_to(REPO / '.runtime') and not out.exists(), 'New runtime evidence required'
+    reusable = osrm_fixture(args.osrm_registry, args.new_fixture_reason)
     assert build.is_relative_to(REPO / '.runtime') and (build / 'target/kdrive-0.1.0-SNAPSHOT.jar').is_file()
     assert graph.is_relative_to(REPO / '.runtime') and manifest_path.is_relative_to(REPO / '.runtime')
     assert not listening(), 'Port5000 already occupied; do not stop someone else\'s provider'
@@ -61,6 +87,8 @@ def main():
     env['JAVA_HOME'] = 'E:/Tools/Java/jdk-21.0.12.1+1'
     owned = None
     name = 'kltn-ai3-proof-' + uuid.uuid4().hex[:12]
+    if reusable:
+        name = reusable['name']
 
     def run(command, log=None, check=True, cwd=REPO, extra_env=None):
         result = subprocess.run(command, cwd=cwd, env=extra_env or env, capture_output=True,
@@ -120,10 +148,16 @@ def main():
         assert not listening(), 'Owned OSRM port must close'
 
     try:
-        owned = run(['docker', 'run', '-d', '--name', name, '--memory', '2g', '--cpus', '2',
-                     '-p', '127.0.0.1:5000:5000', '--mount',
-                     'type=bind,source=' + str(graph) + ',target=/data,readonly', IMAGE,
-                     'osrm-routed', '--algorithm', 'mld', '/data/central.osrm']).stdout.decode().strip()
+        if reusable:
+            data = json.loads(run(['docker', 'inspect', name]).stdout)[0]
+            validate_osrm_reuse(reusable, data, graph)
+            owned = reusable['id']
+            run(['docker', 'start', name])
+        else:
+            owned = run(['docker', 'run', '-d', '--name', name, '--memory', '2g', '--cpus', '2',
+                         '-p', '127.0.0.1:5000:5000', '--mount',
+                         'type=bind,source=' + str(graph) + ',target=/data,readonly', IMAGE,
+                         'osrm-routed', '--algorithm', 'mld', '/data/central.osrm']).stdout.decode().strip()
         (out / 'osrm-identity.json').write_text(json.dumps({'name': name, 'id': owned, 'image': IMAGE}, indent=2))
         deadline = time.monotonic() + 60
         while not listening():

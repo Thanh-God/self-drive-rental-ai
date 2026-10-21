@@ -4,8 +4,11 @@ These runners exercise real MySQL, application services and desktop UI. They
 never target the application's local database at port 33385 or another database
 at port 3306. Tests use one dedicated MySQL 8.4 container at port 33676 and fresh
 schemas for individual suites. The browser uses backend 8300 and frontend 5300.
-All three ports must be free. Containers are stopped afterwards and their volumes
-are retained for inspection; there is no automatic deletion.
+All three ports must be free. The verified fixture registered in
+`.runtime/docker-fixtures/mysql-core.json` is reused by default, across days and
+agents working sequentially. Missing registry or identity/image/mount/marker
+drift is a refusal, never an implicit new container. Containers are stopped
+afterwards and their volumes are retained; there is no automatic deletion.
 
 For vehicle administration, select `--suites VehicleAdminHttpServerTest MySqlMigrationTest`
 in `run-mysql.py`. The migration suite covers fresh, V1 upgrade, V2 upgrade and
@@ -39,6 +42,14 @@ with zero failures, errors and skips. The native runner verifies an exact fixtur
 identity and marker before database writes. A retry can use `--reuse-evidence`
 with an existing stopped fixture and `--suites` to select affected suites; it does
 not erase earlier outputs. Keep the original successful suite outputs as well.
+
+`--new-fixture-reason "<specific approved isolation reason>"` is reserved for a
+genuine exception requiring a fresh server. It cannot be combined with
+`--reuse-evidence`, and the flag does not itself authorize creation. Registering
+an existing fixture requires matching its full ID/name/volume/port with its
+original evidence and pinning its Docker image ID. Registry files contain no
+credentials and stay ignored/local. The runner reads the existing marker before
+creating a new suite schema; it never repairs a missing marker on a reused pool.
 
 The browser creates same-branch and cross-branch rentals through the UI, including
 quote acceptance, Staff transitions and customer reviews. It independently reads
