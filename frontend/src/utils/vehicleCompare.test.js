@@ -146,3 +146,38 @@ test("price API failure or one vehicle failure never presents zero, stale total 
  handler=config=>{if(config.url==='/vehicles/v2')throw new Error('Vehicle failed');return config.url.startsWith('/vehicles/search?')?prices():defaults(config);};
  c=await mount('/vehicles/compare?'+trip);assert.match(c.textContent,/Vehicle failed/);assert.equal(c.querySelectorAll('[data-trip-total]').length,1);assert.doesNotMatch(c.textContent,/rẻ nhất/i);
 });
+
+test("UX01 compare page displays choose trip CTA when trip is inactive and guides invalid trip without pricing search",async()=>{
+ let searchCalled=false;
+ handler=config=>{
+  if(config.url.startsWith("/vehicles/search?")){
+   searchCalled=true;
+   return prices();
+  }
+  return defaults(config);
+ };
+ let c=await mount("/vehicles/compare?compare=v1,v2&brand=b");
+ assert.equal(searchCalled,false);
+ assert.match(c.textContent,/Chưa chọn chuyến/);
+ const chooseCta=[...c.querySelectorAll("a")].find(a=>a.textContent==="Chọn chuyến để kiểm tra giá");
+ assert.ok(chooseCta);
+ const ctaUrl=new URL(chooseCta.href,"http://localhost");
+ assert.equal(ctaUrl.pathname,"/vehicles");
+ assert.equal(ctaUrl.searchParams.get("compare"),"v1,v2");
+ assert.equal(ctaUrl.searchParams.get("brand"),"b");
+ assert.match(c.textContent,/Chọn ngày nhận, ngày trả và chi nhánh để so sánh tổng giá chuyến/);
+ assert.ok([...c.querySelectorAll("button")].find(b=>b.textContent==="Tải lại thông tin xe"));
+ assert.equal([...c.querySelectorAll("button")].some(b=>b.textContent==="Kiểm tra lại giá & lịch"),false);
+
+ c=await mount("/vehicles/compare?compare=v1,v2&start=2026-11-20T10%3A00");
+ assert.equal(searchCalled,false);
+ assert.match(c.textContent,/Thông số chuyến chưa hợp lệ/);
+ assert.match(c.textContent,/Hãy chọn đủ thời gian và điểm nhận\/trả hợp lệ để tìm xe/);
+ assert.equal([...c.querySelectorAll("button")].some(b=>b.textContent==="Kiểm tra lại giá & lịch"),false);
+ assert.ok([...c.querySelectorAll("a")].find(a=>a.textContent==="Thay đổi chuyến"));
+
+ c=await mount("/vehicles/compare?"+trip);
+ assert.equal(searchCalled,true);
+ assert.ok([...c.querySelectorAll("button")].find(b=>b.textContent==="Kiểm tra lại giá & lịch"));
+ assert.ok([...c.querySelectorAll("a")].find(a=>a.textContent==="Thay đổi chuyến"));
+});

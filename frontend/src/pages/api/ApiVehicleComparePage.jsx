@@ -52,9 +52,26 @@ export default function ApiVehicleComparePage() {
     <Link className="btn-secondary mb-5 inline-flex" to={`/vehicles${searchSuffix(params)}`}>Về danh sách xe</Link>
     <div className="panel mb-5">
       <p>{trip.active ? `${params.get("start") || "?"} → ${params.get("end") || "?"} · Giờ Việt Nam` : "Chưa chọn chuyến"}</p>
-      {trip.active ? <p className="mt-2 text-sm">{branches.data?.find(b=>b.id===params.get("pickupBranchId"))?.name || "Điểm nhận chưa tải"} → {branches.data?.find(b=>b.id===(params.get("returnBranchId") || params.get("pickupBranchId")))?.name || "Điểm trả chưa tải"}</p> : null}
+      {trip.active && !trip.error ? <p className="mt-2 text-sm">{branches.data?.find(b=>b.id===params.get("pickupBranchId"))?.name || "Điểm nhận chưa tải"} → {branches.data?.find(b=>b.id===(params.get("returnBranchId") || params.get("pickupBranchId")))?.name || "Điểm trả chưa tải"}</p> : null}
+      {trip.error ? <div className="mt-2"><Notice error>{trip.error}</Notice><p className="mt-1 text-xs text-slate-600">Thông số chuyến chưa hợp lệ: hãy chọn đủ ngày nhận, ngày trả và chi nhánh hợp lệ để kiểm tra giá.</p></div> : null}
       <p className="mt-2 text-xs text-slate-500">Tổng chuyến gồm tiền thuê và phí tuyến, chưa gồm cọc/phát sinh. Kết quả chưa giữ chỗ; báo giá và tạo đơn sẽ kiểm tra lại.</p>
-      <div className="mt-3 flex flex-wrap gap-3"><Link className="btn-secondary" to={`/vehicles${searchSuffix(params)}`}>Thay đổi chuyến</Link><button className="btn-secondary" onClick={()=>{setRevision(value=>value+1);pricing.reload();catalog.reload();branches.reload();}}>Kiểm tra lại giá & lịch</button></div>
+      {!trip.active ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Link className="btn-secondary" to={`/vehicles${searchSuffix(params)}`}>Chọn chuyến để kiểm tra giá</Link>
+          <span className="text-xs text-slate-600">Chọn ngày nhận, ngày trả và chi nhánh để so sánh tổng giá chuyến.</span>
+          <button className="btn-secondary" onClick={()=>{setRevision(value=>value+1);catalog.reload();branches.reload();}}>Tải lại thông tin xe</button>
+        </div>
+      ) : trip.error ? (
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <Link className="btn-secondary" to={`/vehicles${searchSuffix(params)}`}>Thay đổi chuyến</Link>
+          <button className="btn-secondary" onClick={()=>{setRevision(value=>value+1);catalog.reload();branches.reload();}}>Tải lại thông tin xe</button>
+        </div>
+      ) : (
+        <div className="mt-3 flex flex-wrap gap-3">
+          <Link className="btn-secondary" to={`/vehicles${searchSuffix(params)}`}>Thay đổi chuyến</Link>
+          <button className="btn-secondary" onClick={()=>{setRevision(value=>value+1);pricing.reload();catalog.reload();branches.reload();}}>Kiểm tra lại giá & lịch</button>
+        </div>
+      )}
       {pricing.data?.checkedAt ? <p className="mt-2 text-xs">Kiểm tra lúc {dateTime(pricing.data.checkedAt)}</p> : null}
       {pricing.error ? <Notice error>{pricing.error}</Notice> : null}
     </div>
