@@ -1,246 +1,119 @@
-const http = require('http');
-const assert = require('assert/strict');
-const path = require('path');
-const fs = require('fs');
-const { moderateDesktopReviews, allowlist } = require('./moderate-desktop-reviews.cjs');
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const os = require('node:os');
+const path = require('node:path');
+const { moderateDesktopReviews } = require('./moderate-desktop-reviews.cjs');
 
-const out = path.resolve('.runtime/ux-desktop-improvement-fix-20261021-112200/isolated-moderation-tests');
-if (!fs.existsSync(out)) fs.mkdirSync(out, { recursive: true });
-
-async function createMockServer(handler) {
-  const server = http.createServer(handler);
-  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
-  const port = server.address().port;
-  return {
-    url: `http://127.0.0.1:${port}`,
-    close: () => new Promise((resolve) => server.close(resolve))
+// Independent fixtures: do not derive expected identities from the runner allowlist.
+const fixtures = [
+  ['7ef0e6f2-7585-4ae2-8cf2-e35d973fc179', '479804a3-32da-4eb0-acf9-0870bac4671f', '1791128697216'],
+  ['d57edd95-ca99-464d-95be-866efd045a70', '6510429c-aaf8-4623-a1d5-9a2c52cfab20', '1791116304068'],
+  ['b8388572-9673-4419-bf48-1954897141a7', '6ee1ceed-ea1a-46f2-ba76-fad88ba4d71e', '6ee1ceed-ea1a-46f2-ba76-fad88ba4d71e'],
+  ['e353d927-5091-4f63-9357-ba4733361e59', 'fb37e8dd-ab03-48a1-ada1-038ea7f1c4c2', '1791123669318'],
+];
+async function fixture(run, setup = () => {}) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'kdrive-review-test-'));
+  const state = {
+    rows: fixtures.map(([id, booking_id, token]) => ({ id, booking_id, content: `Phase 5 browser verification review ${token}.`, rating: 5, hidden: false, version: 2 })),
+    bookings: fixtures.map(([, id]) => ({ id, vehicleId: 'v3', status: 'COMPLETED' })),
+    patches: [], requests: [], publicExtra: [{ id: 'legitimate', rating: 4, content: 'Real review' }],
   };
+  const output = path.join(root, 'evidence');
+  const previousFetch = global.fetch;
+  setup(state);
+  global.fetch = async (url, options = {}) => {
+    const endpoint = new URL(url).pathname;
+    state.requests.push(endpoint);
+    let body;
+    if (state.fail === endpoint) return { status: state.status, json: async () => ({}) };
+    if (endpoint === '/auth/login') body = { token: 'isolated-token' };
+    else if (endpoint === '/bookings') body = state.bookings;
+    else if (endpoint === '/admin/reviews') body = state.rows;
+    else if (endpoint === '/vehicles/v3/reviews') body = [...state.rows.filter(row => !row.hidden && fixtures.some(([id]) => row.id === id)), ...state.publicExtra];
+    else if (options.method === 'PATCH') {
+      state.patches.push({ endpoint, body: JSON.parse(options.body) });
+      const row = state.rows.find(item => endpoint.endsWith(item.id));
+      row.hidden = true; row.version++;
+      state.afterPatch?.(state);
+      body = {};
+    } else throw Error(`Unexpected endpoint ${endpoint}`);
+    return { status: 200, json: async () => {
+      if (options.method === 'PATCH') throw new SyntaxError('Empty response body');
+      return structuredClone(body);
+    } };
+  };
+  try { await run(state, output); }
+  finally {
+    global.fetch = previousFetch;
+    assert.ok(path.resolve(root).startsWith(path.resolve(os.tmpdir()) + path.sep), 'Cleanup stays inside temp');
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 }
 
-async function runTests() {
-  const testResults = [];
+test('approved visible records are hidden with exact versions; legitimate reviews remain public', async () => fixture(async (state, output) => {
+  const result = await moderateDesktopReviews('http://isolated.invalid', output, 'fake', { apply: true });
+  assert.equal(state.patches.length, 4);
+  assert.deepEqual(state.patches.map(item => item.body), Array(4).fill({ hidden: true, version: 2 }));
+  assert.deepEqual(result.publicAfter, state.publicExtra);
+  assert.ok(fs.existsSync(path.join(output, 'after.json')));
+}));
 
-  // CASE 1: Guard refusal on unknown review ID
-  {
-    const server = await createMockServer((req, res) => {
-      if (req.url === '/auth/login') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ token: 'mock-admin-token' }));
-      }
-      if (req.url === '/admin/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        // Return only 1 of the 4 allowlisted reviews
-        return res.end(JSON.stringify([
-          { id: allowlist[0].id, content: '1791128697216 test', booking_id: 'b1', rating: 5, hidden: false, version: 1, created_at: new Date().toISOString() }
-        ]));
-      }
-      if (req.url === '/vehicles/v3/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify([]));
-      }
-      res.writeHead(404);
-      res.end();
-    });
+test('already-hidden records verify read-only without PATCH', async () => fixture(async (state, output) => {
+  const result = await moderateDesktopReviews('http://isolated.invalid', output, 'fake');
+  assert.equal(state.patches.length, 0);
+  assert.deepEqual(result.changedIds, []);
+}, state => state.rows.forEach(row => { row.hidden = true; row.version = 3; })));
 
-    let threw = false;
-    try {
-      await moderateDesktopReviews(server.url, out, 'any_password');
-    } catch (err) {
-      threw = true;
-      assert.ok(err.message.includes('Guard failed: review not found in admin list'), `Unexpected error message: ${err.message}`);
-    } finally {
-      await server.close();
-    }
-    assert.ok(threw, 'Case 1: Must throw when review not in allowlist');
-    testResults.push({ case: 'Unknown review refusal', status: 'PASS' });
-  }
+const drifts = [
+  ['content substring', state => { state.rows[3].content += ' changed'; }, /Content drift/],
+  ['booking identity', state => { state.rows[3].booking_id = 'wrong'; }, /Booking drift/],
+  ['rating', state => { state.rows[3].rating = 1; }, /Rating drift/],
+  ['visible version', state => { state.rows[3].version = 4; }, /Version drift/],
+  ['hidden version', state => { state.rows[3].hidden = true; state.rows[3].version = 4; }, /Version drift/],
+  ['invalid hidden', state => { state.rows[3].hidden = 'false'; }, /Invalid hidden/],
+  ['missing target', state => { state.rows.pop(); }, /Missing approved review/],
+  ['duplicate target', state => { state.rows.push({ ...state.rows[0] }); }, /Duplicate review/],
+  ['vehicle mapping', state => { state.bookings[3].vehicleId = 'other'; }, /Vehicle drift/],
+  ['booking status', state => { state.bookings[3].status = 'IN_PROGRESS'; }, /Booking status drift/],
+  ['missing booking', state => { state.bookings.pop(); }, /Missing\/duplicate booking/],
+];
+for (const [name, setup, expected] of drifts) test(`refuses ${name} before any PATCH, including drift on fourth target`, async () => fixture(async (state, output) => {
+  await assert.rejects(moderateDesktopReviews('http://isolated.invalid', output, 'fake', { apply: true }), expected);
+  assert.equal(state.patches.length, 0);
+}, setup));
 
-  // CASE 2: Guard refusal on content mismatch
-  {
-    const server = await createMockServer((req, res) => {
-      if (req.url === '/auth/login') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ token: 'mock-admin-token' }));
-      }
-      if (req.url === '/admin/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify(allowlist.map((item, i) => ({
-          id: item.id,
-          // Intentionally wrong content for the first item
-          content: i === 0 ? 'Tampered content without matching regex' : '1791116304068 test',
-          booking_id: `b${i}`,
-          rating: 5,
-          hidden: false,
-          version: 1,
-          created_at: new Date().toISOString()
-        }))));
-      }
-      if (req.url === '/vehicles/v3/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify([]));
-      }
-      res.writeHead(404);
-      res.end();
-    });
+test('default mode cannot mutate visible reviews', async () => fixture(async (state, output) => {
+  await assert.rejects(moderateDesktopReviews('http://isolated.invalid', output, 'fake'), /Read-only/);
+  assert.equal(state.patches.length, 0);
+}));
 
-    let threw = false;
-    try {
-      await moderateDesktopReviews(server.url, out, 'any_password');
-    } catch (err) {
-      threw = true;
-      assert.ok(err.message.includes('Guard failed: content regex mismatch'), `Unexpected error message: ${err.message}`);
-    } finally {
-      await server.close();
-    }
-    assert.ok(threw, 'Case 2: Must throw on content regex mismatch');
-    testResults.push({ case: 'Content mismatch refusal', status: 'PASS' });
-  }
-
-  // CASE 3: 401 Unauthorized handling (invalid admin password)
-  {
-    const server = await createMockServer((req, res) => {
-      if (req.url === '/auth/login') {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: 'Unauthorized' }));
-      }
-      res.writeHead(404);
-      res.end();
-    });
-
-    let threw = false;
-    try {
-      await moderateDesktopReviews(server.url, out, 'wrong_password');
-    } catch (err) {
-      threw = true;
-      assert.ok(err.message.includes('Admin login failed with status 401'), `Unexpected error: ${err.message}`);
-    } finally {
-      await server.close();
-    }
-    assert.ok(threw, 'Case 3: Must throw on 401 Unauthorized');
-    testResults.push({ case: '401 Unauthorized refusal', status: 'PASS' });
-  }
-
-  // CASE 4: 403 Forbidden handling (non-admin token accessing /admin/reviews)
-  {
-    const server = await createMockServer((req, res) => {
-      if (req.url === '/auth/login') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ token: 'mock-user-token' }));
-      }
-      if (req.url === '/admin/reviews') {
-        res.writeHead(403, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: 'Forbidden' }));
-      }
-      res.writeHead(404);
-      res.end();
-    });
-
-    let threw = false;
-    try {
-      await moderateDesktopReviews(server.url, out, 'any_password');
-    } catch (err) {
-      threw = true;
-      assert.ok(err.message.includes('GET /admin/reviews failed'), `Unexpected error: ${err.message}`);
-    } finally {
-      await server.close();
-    }
-    assert.ok(threw, 'Case 4: Must throw on 403 Forbidden');
-    testResults.push({ case: '403 Forbidden refusal', status: 'PASS' });
-  }
-
-  // CASE 5: 409 Conflict handling (version mismatch on PATCH)
-  {
-    const server = await createMockServer((req, res) => {
-      if (req.url === '/auth/login') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ token: 'mock-admin-token' }));
-      }
-      if (req.url === '/admin/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify(allowlist.map((item, i) => ({
-          id: item.id,
-          content: '1791128697216 1791116304068 6ee1ceed-ea1a-46f2-ba76-fad88ba4d71e 1791123669318',
-          booking_id: `b${i}`,
-          rating: 5,
-          hidden: false,
-          version: 1,
-          created_at: new Date().toISOString()
-        }))));
-      }
-      if (req.url === '/vehicles/v3/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify([{ id: allowlist[0].id }]));
-      }
-      if (req.method === 'PATCH' && req.url.startsWith('/admin/reviews/')) {
-        res.writeHead(409, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ error: 'Conflict: version mismatch' }));
-      }
-      res.writeHead(404);
-      res.end();
-    });
-
-    let threw = false;
-    try {
-      await moderateDesktopReviews(server.url, out, 'any_password');
-    } catch (err) {
-      threw = true;
-      assert.ok(err.message.includes('PATCH /admin/reviews/'), `Unexpected error: ${err.message}`);
-    } finally {
-      await server.close();
-    }
-    assert.ok(threw, 'Case 5: Must throw on 409 Conflict');
-    testResults.push({ case: '409 Conflict refusal', status: 'PASS' });
-  }
-
-  // CASE 6: Idempotent positive pass: reviews already hidden (version >= 3), public reviews empty
-  {
-    let patchCount = 0;
-    const server = await createMockServer((req, res) => {
-      if (req.url === '/auth/login') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ token: 'mock-admin-token' }));
-      }
-      if (req.url === '/admin/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify(allowlist.map((item, i) => ({
-          id: item.id,
-          content: '1791128697216 1791116304068 6ee1ceed-ea1a-46f2-ba76-fad88ba4d71e 1791123669318',
-          booking_id: `b${i}`,
-          rating: 5,
-          hidden: true,
-          version: 3,
-          created_at: new Date().toISOString()
-        }))));
-      }
-      if (req.url === '/vehicles/v3/reviews') {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify([]));
-      }
-      if (req.method === 'PATCH' && req.url.startsWith('/admin/reviews/')) {
-        patchCount++;
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        return res.end(JSON.stringify({ status: 'ok' }));
-      }
-      res.writeHead(404);
-      res.end();
-    });
-
-    try {
-      const res = await moderateDesktopReviews(server.url, out, 'any_password');
-      assert.equal(patchCount, 0, 'No PATCH should be executed if reviews are already hidden');
-      assert.equal(res.postSnapshot.targetReviewsAfter.length, 4);
-      assert.equal(res.postSnapshot.publicV3ReviewsCount, 0);
-    } finally {
-      await server.close();
-    }
-    testResults.push({ case: 'Idempotent already-moderated verification', status: 'PASS' });
-  }
-
-  fs.writeFileSync(path.join(out, 'isolated-test-results.json'), JSON.stringify(testResults, null, 2));
-  console.log('PASS: All 6 isolated moderation runner guard tests passed successfully.');
+for (const [endpoint, status] of [['/auth/login', 401], ['/admin/reviews', 403], [`/admin/reviews/${fixtures[0][0]}`, 409]]) {
+  test(`fails on exact HTTP ${status}`, async () => fixture(async (state, output) => {
+    await assert.rejects(moderateDesktopReviews('http://isolated.invalid', output, 'fake', { apply: true }), new RegExp(`HTTP ${status}`));
+    assert.equal(state.patches.length, 0);
+  }, state => { state.fail = endpoint; state.status = status; }));
 }
 
-runTests().catch(err => {
-  console.error('ISOLATED MODERATION TESTS FAILED:', err);
-  process.exit(1);
-});
+for (const field of ['content', 'booking_id', 'rating']) test(`readback rejects changed target ${field}`, async () => fixture(async (state, output) => {
+  await assert.rejects(moderateDesktopReviews('http://isolated.invalid', output, 'fake', { apply: true }), /Readback drift/);
+  assert.equal(state.patches.length, 4);
+}, state => { state.afterPatch = s => { s.rows[0][field] = field === 'rating' ? 1 : 'changed'; }; }));
+
+test('unrelated Admin review must remain equivalent as API data', async () => fixture(async (state, output) => {
+  await assert.rejects(moderateDesktopReviews('http://isolated.invalid', output, 'fake', { apply: true }), /Readback drift/);
+}, state => {
+  state.rows.push({ id: 'other', content: 'preserve', hidden: true, version: 1 });
+  state.afterPatch = s => { s.rows.at(-1).content = 'changed'; };
+}));
+
+test('unrelated public review changes fail readback', async () => fixture(async (state, output) => {
+  await assert.rejects(moderateDesktopReviews('http://isolated.invalid', output, 'fake', { apply: true }), /Unrelated public reviews changed/);
+}, state => { state.afterPatch = s => { s.publicExtra[0].content = 'changed'; }; }));
+
+test('reused evidence refuses before requests and preserves existing files', async () => fixture(async (state, output) => {
+  fs.mkdirSync(output); fs.writeFileSync(path.join(output, 'sentinel'), 'original');
+  await assert.rejects(moderateDesktopReviews('http://isolated.invalid', output, 'fake', { apply: true }), /EEXIST/);
+  assert.equal(state.requests.length, 0);
+  assert.equal(fs.readFileSync(path.join(output, 'sentinel'), 'utf8'), 'original');
+}));
