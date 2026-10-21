@@ -12,8 +12,8 @@ import WorkspaceTopbar from "./WorkspaceTopbar";
 import { DEMO_MODE } from "../demo/config";
 
 const adminNav = [
-  { to: "/admin/bookings", label: "Tra cứu đơn thuê", icon: Car },
   { to: "/admin", label: "Tổng quan", icon: LayoutDashboard, end: true },
+  { to: "/admin/bookings", label: "Tra cứu đơn thuê", icon: Car },
   { to: "/admin/accounts", label: "Quản lý tài khoản", icon: Users },
   { to: "/admin/vehicles", label: "Quản lý xe", icon: Car },
   { to: "/admin/catalog", label: "Danh mục xe", icon: Building2 },
@@ -24,11 +24,11 @@ const adminNav = [
 
 export default function AdminLayout() {
   return (
-    <div className="flex min-h-screen flex-col bg-slate-100">
+    <div className="admin-shell">
       <WorkspaceTopbar areaLabel="Quản trị" />
-      <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+      <div className="admin-workspace">
         <Sidebar title="Quản trị hệ thống" items={adminNav} />
-        <main className="min-w-0 flex-1 p-4 lg:p-6">
+        <main className="admin-main" data-workspace-scroll>
           <Outlet />
         </main>
       </div>

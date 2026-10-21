@@ -12,6 +12,8 @@ export default function Modal({ open, title, children, onClose, footer }) {
     if (!open) return undefined;
     const previousFocus = document.activeElement;
     const overflow = document.body.style.overflow;
+    const workspace = document.querySelector("[data-workspace-scroll]");
+    const workspaceOverflow = workspace?.style.overflow;
     const focusable = () => [
       ...dialogRef.current.querySelectorAll(
         'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), a[href], [tabindex="0"]',
@@ -39,9 +41,11 @@ export default function Modal({ open, title, children, onClose, footer }) {
     };
     window.addEventListener("keydown", onKey);
     document.body.style.overflow = "hidden";
+    if (workspace) workspace.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
       document.body.style.overflow = overflow;
+      if (workspace) workspace.style.overflow = workspaceOverflow;
       previousFocus?.focus();
     };
   }, [open]);

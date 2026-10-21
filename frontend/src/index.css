@@ -307,3 +307,60 @@ body {
 .booking-identity p:empty { display: none; }
 .urban-shell .booking-identity .btn-secondary { padding: .5rem .875rem; font-size: .8125rem; }
 .booking-history summary { cursor: pointer; min-height: 44px; display: list-item; padding: .625rem 0; font-weight: 600; }
+
+/* Admin C: operational palette stays separate from the customer Urban shell. */
+.admin-shell {
+  --admin-bg: #f3f5f2;
+  --admin-surface: #ffffff;
+  --admin-sidebar: #123a36;
+  --admin-sidebar-hover: #1b4c46;
+  --admin-sidebar-text: #e2eeeb;
+  --admin-primary: #0f766e;
+  --admin-primary-hover: #115e59;
+  --admin-primary-soft: #d9eeE8;
+  --admin-accent: #f59e0b;
+  --admin-text: #172b28;
+  --admin-muted: #475569;
+  --admin-border: #d5dfda;
+  --admin-danger: #be123c;
+  --admin-danger-bg: #fff1f2;
+  --admin-danger-border: #fda4af;
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  background: var(--admin-bg);
+  color: var(--admin-text);
+}
+.admin-shell > header { position: relative; z-index: 20; background: var(--admin-surface); border-color: var(--admin-border); }
+.admin-workspace { display: grid; grid-template-columns: 232px minmax(0, 1fr); min-height: 0; overflow: hidden; }
+.admin-workspace > aside { width: auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--admin-sidebar); color: var(--admin-sidebar-text); border: 0; }
+.admin-workspace > aside > div { padding: 24px 20px 16px; }
+.admin-workspace > aside p { color: var(--admin-sidebar-text); font-size: 11px; letter-spacing: .1em; }
+.admin-workspace > aside nav { display: flex; flex-direction: column; overflow: visible; padding: 0 12px 24px; }
+.admin-workspace > aside a { position: relative; min-width: 0; min-height: 44px; padding: 12px; color: var(--admin-sidebar-text); border-radius: 8px; }
+.admin-workspace > aside a svg { flex-shrink: 0; }
+.admin-workspace > aside a:hover { background: var(--admin-sidebar-hover); }
+.admin-workspace > aside a[aria-current="page"] { background: var(--admin-sidebar-hover); color: var(--admin-surface); font-weight: 700; }
+.admin-workspace > aside a[aria-current="page"]::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 3px; border-radius: 2px; background: var(--admin-accent); }
+.admin-main { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; padding: 28px 32px; }
+.admin-main > .page-shell { max-width: 1360px; padding: 8px 0 24px; }
+.admin-shell .panel { background: var(--admin-surface); border-color: var(--admin-border); border-radius: 14px; box-shadow: 0 1px 2px rgb(23 43 40 / 3%); }
+.admin-shell :is(.text-slate-400, .text-slate-500, .text-slate-600, .text-muted) { color: var(--admin-muted); }
+.admin-shell :is(.text-slate-900, .text-slate-800) { color: var(--admin-text); }
+.admin-shell .eyebrow { color: var(--admin-muted); font-size: 12px; font-weight: 500; letter-spacing: .02em; text-transform: none; }
+.admin-shell .btn { background: var(--admin-primary); color: var(--admin-surface); border-radius: 10px; }
+.admin-shell .btn:hover { background: var(--admin-primary-hover); }
+.admin-shell .btn-secondary { background: var(--admin-surface); color: var(--admin-text); border-color: var(--admin-border); border-radius: 10px; }
+.admin-shell .btn-secondary:hover { background: var(--admin-bg); }
+.admin-shell :is(.btn-danger, .btn-secondary.text-red-700) { color: var(--admin-danger); background: var(--admin-danger-bg); border: 1px solid var(--admin-danger-border); border-radius: 10px; gap: .5rem; }
+.admin-shell :is(.btn-danger, .btn-secondary.text-red-700):hover { border-color: var(--admin-danger); }
+.admin-shell .urban-filter { background: var(--admin-surface); border-color: var(--admin-border); border-radius: 14px; padding: 20px; }
+.admin-shell .field :is(input:not([type="checkbox"]), select, textarea) { border-color: var(--admin-border); border-radius: 10px; }
+.admin-shell :focus-visible { outline-color: var(--admin-primary); }
+.admin-workspace > aside :focus-visible { outline-color: var(--admin-accent); outline-offset: -2px; }
+.admin-shell .data-table th { color: var(--admin-muted); background: var(--admin-bg); }
+.admin-shell .data-table td { border-color: var(--admin-border); }
+@media (max-width: 1100px) { .admin-main { padding: 24px; } }
+@media (max-width: 700px) { .admin-workspace { grid-template-columns: 180px minmax(0, 1fr); } .admin-main { padding: 16px; } .admin-workspace > aside a { font-size: 12px; gap: 6px; padding: 10px 8px; } }
