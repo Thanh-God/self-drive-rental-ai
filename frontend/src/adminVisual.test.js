@@ -6,7 +6,7 @@ import {displayCalendarDate, parseCalendarDate} from "./utils/calendarDate.js";
 import {act,createElement as h} from "react";
 import {JSDOM} from "jsdom";
 import {createServer} from "vite";
-let dom,vite,createRoot,MemoryRouter,Routes,Route,Link,NavigationEffects,Modal,Status,Page,DateField,AdminBookingTable;
+let dom,vite,createRoot,MemoryRouter,Routes,Route,Link,NavigationEffects,Modal,Status,Page,DateField,AdminBookingTable,ApiVehicleCatalogPage,ApiVehiclesAdminPage,apiClient,AdminAreaContext;
 const descriptors=new Map();
 before(async()=>{
  process.env.VITE_DATA_MODE="api";dom=new JSDOM("<!doctype html><body></body>",{url:"http://localhost/"});
@@ -16,6 +16,10 @@ before(async()=>{
  ({default:NavigationEffects}=await vite.ssrLoadModule("/src/routes/NavigationEffects.jsx"));({default:Modal}=await vite.ssrLoadModule("/src/components/common/Modal.jsx"));
  ({Status,Page}=await vite.ssrLoadModule("/src/components/common/PageKit.jsx"));
  ({default:DateField}=await vite.ssrLoadModule("/src/components/common/DateField.jsx"));
+ ({default:AdminAreaContext}=await vite.ssrLoadModule("/src/context/AdminAreaContext.js"));
+ ({default:apiClient}=await vite.ssrLoadModule("/src/api/client.js"));
+ ({default:ApiVehicleCatalogPage}=await vite.ssrLoadModule("/src/pages/api/ApiVehicleCatalogPage.jsx"));
+ ({ApiVehiclesAdminPage}=await vite.ssrLoadModule("/src/pages/api/ApiManagementScreens.jsx"));
  ({default:AdminBookingTable}=await vite.ssrLoadModule("/src/components/booking/AdminBookingTable.jsx"));
 });
 after(async()=>{await vite?.close();dom.window.close();for(const [k,d] of descriptors){if(d)Object.defineProperty(globalThis,k,d);else delete globalThis[k];}});
@@ -37,7 +41,7 @@ test("Date parser rejects impossible days and preserves leap days without timezo
 });
 test("Admin breadcrumb is scoped and all booking states have distinct tones",async()=>{
  const states=["PENDING","CONFIRMED","IN_PROGRESS","RETURNED","COMPLETED","CANCELLED"];
- const page=await mount(h(MemoryRouter,{initialEntries:["/admin/vehicles"]},h(Page,{title:"Quản lý xe"},states.map(s=>h(Status,{key:s,status:s})))));
+ const page=await mount(h(MemoryRouter,{initialEntries:["/admin/vehicles"]},h(AdminAreaContext.Provider,{value:true},h(Page,{title:"Quản lý xe"},states.map(s=>h(Status,{key:s,status:s}))))));
  assert.equal(page.host.querySelector(".eyebrow").textContent,"Quản trị / Quản lý xe");
  const badges=[...page.host.querySelectorAll("span.rounded-full")];assert.equal(badges.length,6);assert.equal(new Set(badges.map(x=>x.className)).size,6);
  await page.close();
@@ -51,4 +55,28 @@ test("Admin table preserves identity, Vietnamese dates, copy and detail links",a
  let copied="";const booking={id:"12345678-full-id",customerName:"Khách kiểm thử",vehicleName:"Xe kiểm thử",status:"IN_PROGRESS",total:2100000,policyVersion:"calendar-2026-10-17",startAt:"2026-10-22T00:00:00+07:00",endAt:"2026-10-23T00:00:00+07:00",pickupName:"Đà Nẵng",returnName:"Huế"};
  const page=await mount(h(MemoryRouter,null,h(AdminBookingTable,{bookings:[booking],onCopy:id=>{copied=id;},copyFeedback:{},manualCopyId:null})));
  assert.equal(page.host.querySelectorAll("tbody tr").length,1);assert.equal(page.host.querySelector("a").getAttribute("href"),"/admin/bookings/12345678-full-id");assert.match(page.host.textContent,/22\/10\/2026/);assert.match(page.host.textContent,/Đang thuê/);await act(async()=>page.host.querySelector("button").click());assert.equal(copied,booking.id);assert.equal(page.host.querySelector("input").value,booking.id);await page.close();
+});
+
+function button(host,text){const found=[...host.querySelectorAll("button")].find(x=>x.textContent===text);assert.ok(found,`Button ${text}`);return found;}
+function mockApi(getData, mutate){apiClient.defaults.adapter=async config=>({data:config.method==="get"?getData(config.url):await mutate(config),status:200,statusText:"OK",headers:{},config});}
+test("Catalog cancel never sends DELETE; confirmation keeps revision and success toast",async()=>{
+ const calls=[];let removed=false;
+ mockApi(url=>url.includes("vehicle-brands")&&!removed?[{id:"brand-1",name:"Hãng thử",revision:7}]:[],async c=>{calls.push(c);removed=true;return {};});
+ const page=await mount(h(MemoryRouter,{initialEntries:["/admin/catalog"]},h(ApiVehicleCatalogPage)));
+ await act(async()=>page.host.querySelector('button[aria-label="Xóa Hãng thử"]').click());assert.equal(calls.length,0);assert.ok(page.host.querySelector('[role="dialog"]'));
+ await act(async()=>button(page.host,"Hủy").click());assert.equal(calls.length,0);assert.equal(page.host.querySelector('[role="dialog"]'),null);
+ await act(async()=>page.host.querySelector('button[aria-label="Xóa Hãng thử"]').click());await act(async()=>button(page.host,"Xác nhận").click());assert.equal(calls.length,1);assert.equal(calls[0].params.expectedRevision,7);assert.equal(calls[0].method,"delete");assert.match(page.host.querySelector('.admin-toast').textContent,/Đã xóa/);assert.equal(page.host.querySelector('button[aria-label="Xóa Hãng thử"]'),null);
+ await act(async()=>page.host.querySelector('button[aria-label="Đóng thông báo"]').click());assert.equal(page.host.querySelector('.admin-toast'),null);await page.close();
+});
+test("Catalog API conflict retains data and exposes error toast instead of success",async()=>{
+ mockApi(url=>url.includes("vehicle-brands")?[{id:"brand-1",name:"Hãng thử",revision:7}]:[],async()=>{throw {response:{status:409,data:{message:"Danh mục đang được sử dụng"}}};});
+ const page=await mount(h(MemoryRouter,{initialEntries:["/admin/catalog"]},h(ApiVehicleCatalogPage)));
+ await act(async()=>page.host.querySelector('button[aria-label="Xóa Hãng thử"]').click());await act(async()=>button(page.host,"Xác nhận").click());assert.ok(page.host.querySelector('button[aria-label="Xóa Hãng thử"]'));assert.ok(page.host.querySelector('.admin-toast[role="alert"]'));assert.equal(page.host.querySelector('.admin-toast[role="status"]'),null);await page.close();
+});
+test("Vehicle create form waits for explicit brand/category and edit keeps existing IDs",async()=>{
+ mockApi(url=>url==="/vehicles"?[{id:"v1",name:"Xe thử",plate:"AB-123",brandId:"b1",categoryId:"c1",homeBranchId:"dn",currentBranchId:"dn",seats:5,dailyPrice:600000,status:"ACTIVE",transmission:"AUTO",version:2}]:url==="/vehicles/catalog"?{brands:[{id:"b1",name:"Ford"}],categories:[{id:"c1",name:"Sedan"}]}:url==="/branches"?[{id:"dn",name:"Đà Nẵng",status:"ACTIVE"}]:[],async()=>({}));
+ const page=await mount(h(MemoryRouter,{initialEntries:["/admin/vehicles"]},h(ApiVehiclesAdminPage,{})));
+ const selects=()=>[...page.host.querySelectorAll("select")].filter(x=>x.querySelector('option[value="b1"],option[value="c1"]'));
+ assert.equal(selects().length,2);assert.deepEqual(selects().map(x=>x.value),["",""]);assert.ok(selects().every(x=>x.required));assert.match(selects()[0].options[0].textContent,/Chọn hãng xe/);
+ await act(async()=>button(page.host,"Chỉnh sửa").click());assert.deepEqual(selects().map(x=>x.value),["b1","c1"]);await page.close();
 });

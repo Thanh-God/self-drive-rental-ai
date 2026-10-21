@@ -516,12 +516,14 @@ test("DOM: ApiAccountsPage status toggle sends PATCH with version for STAFF/USER
   });
 
   // Click lock button
-  const lockBtn = container.querySelector("button.btn-secondary");
+  const lockBtn = [...container.querySelectorAll("button")].find(b => b.textContent.trim() === "Khóa tài khoản");
   assert.ok(lockBtn.textContent.includes("Khóa tài khoản"), "Lock button for ACTIVE staff");
 
   await act(async () => {
     lockBtn.click();
   });
+  assert.ok(container.querySelector('[role="dialog"]'));
+  await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "Xác nhận").click());
 
   // Check PATCH request
   const patchReq = takeRequest("/admin/accounts/1");
@@ -961,7 +963,7 @@ test("DOM: ApiAccountsPage changeStatus synchronous pending guard holds double d
     fulfill(staffBranchesReq1, []);
   });
 
-  const lockBtn = container.querySelector("button.btn-secondary");
+  const lockBtn = [...container.querySelectorAll("button")].find(b => b.textContent.trim() === "Khóa tài khoản");
   assert.equal(lockBtn.textContent.trim(), "Khóa tài khoản");
 
   // Synchronous double click
@@ -969,6 +971,8 @@ test("DOM: ApiAccountsPage changeStatus synchronous pending guard holds double d
     lockBtn.click();
     lockBtn.click();
   });
+  assert.ok(container.querySelector('[role="dialog"]'));
+  await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "Xác nhận").click());
 
   const patchRequests = requests.filter(r => r.config.url.startsWith("/admin/accounts/") && r.config.method?.toLowerCase() === "patch");
   assert.equal(patchRequests.length, 1, "Exactly one PATCH request issued despite double click");

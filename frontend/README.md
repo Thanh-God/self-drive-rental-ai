@@ -137,3 +137,7 @@ Backend: GET `/api/v1/admin/reports/operations?from=YYYY-MM-DD&to=YYYY-MM-DD`. K
 ## Quy tắc giao diện khách hàng
 
 Xem [giao diện khách hàng và tích hợp API](../docs/ui/customer-experience.md) cho đăng nhập/hồ sơ, thanh hãng, trạng thái request và token độ tương phản. Các chức năng [so sánh](../docs/ui/vehicle-comparison.md), [yêu thích](../docs/ui/vehicle-favorites.md), [hướng dẫn thuê](../docs/ui/rental-guide.md) có contract riêng.
+
+### Giao diện quản trị
+
+Admin dùng shell cao theo viewport với header luôn hiển thị, sidebar và nội dung cuộn độc lập. Token `--admin-*` trong `src/index.css` tách khỏi giao diện khách hàng. Tổng quan hiển thị bốn số liệu hiện có; tổng giá trị hóa đơn không xác nhận tiền đã thanh toán. Tra cứu đơn dùng bảng, giữ bộ lọc và phân trang. Ô ngày báo cáo hiển thị dd/mm/yyyy và gửi ngày ISO qua API. Các thao tác nguy hiểm yêu cầu xác nhận trước khi gửi; kết quả được thông báo bằng toast có nút đóng.

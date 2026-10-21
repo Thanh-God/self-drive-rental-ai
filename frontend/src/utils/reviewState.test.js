@@ -778,7 +778,7 @@ test("DOM: ApiReviewsAdminPage moderation handles stale 409 conflict with reload
   // Check DOM: Review rendered with 'Ẩn đánh giá' button
   assert.ok(container.textContent.includes("Nội dung ban đầu của đánh giá"));
   assert.ok(container.textContent.includes("Đang công khai"));
-  let hideBtn = container.querySelector("button.btn-secondary");
+  let hideBtn = [...container.querySelectorAll("button")].find(b => b.textContent.trim() === "Ẩn đánh giá");
   assert.ok(hideBtn);
   assert.equal(hideBtn.textContent.trim(), "Ẩn đánh giá");
 
@@ -786,6 +786,8 @@ test("DOM: ApiReviewsAdminPage moderation handles stale 409 conflict with reload
   await act(async () => {
     hideBtn.click();
   });
+  assert.ok(container.querySelector('[role="dialog"]'));
+  await act(async () => [...container.querySelectorAll("button")].find(b => b.textContent === "Xác nhận").click());
 
   const patchReq1 = takeRequest("/admin/reviews/rev-mod-1");
   assert.equal(patchReq1.config.method, "patch");

@@ -1,3 +1,4 @@
+import AdminAreaContext from "../context/AdminAreaContext";
 import { Outlet } from "react-router-dom";
 import {
   Building2,
@@ -24,7 +25,7 @@ const adminNav = [
 
 export default function AdminLayout() {
   return (
-    <div className="admin-shell">
+    <AdminAreaContext.Provider value={true}><div className="admin-shell">
       <WorkspaceTopbar areaLabel="Quản trị" />
       <div className="admin-workspace">
         <Sidebar title="Quản trị hệ thống" items={adminNav} />
@@ -32,6 +33,6 @@ export default function AdminLayout() {
           <Outlet />
         </main>
       </div>
-    </div>
+    </div></AdminAreaContext.Provider>
   );
 }

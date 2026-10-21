@@ -317,7 +317,13 @@ body {
   --admin-sidebar-text: #e2eeeb;
   --admin-primary: #0f766e;
   --admin-primary-hover: #115e59;
-  --admin-primary-soft: #d9eeE8;
+  --admin-primary-soft: #d9eee8;
+  --admin-info-bg: #dbeafe;
+  --admin-info-text: #1e40af;
+  --admin-success-bg: #dcfce7;
+  --admin-success-text: #166534;
+  --admin-warning-bg: #fef3c7;
+  --admin-warning-text: #92400e;
   --admin-accent: #f59e0b;
   --admin-text: #172b28;
   --admin-muted: #475569;
@@ -392,3 +398,10 @@ body {
 .admin-booking-table .btn-secondary { min-height: 36px; padding: 6px 12px; font-size: 12px; }
 .admin-copy { display: flex; align-items: center; gap: 4px; color: var(--admin-primary-hover); font-size: 11px; margin: 8px 0; text-align: left; }
 .admin-full-id { width: 160px; padding: 6px; border: 1px solid var(--admin-border); border-radius: 6px; margin-top: 6px; }
+
+.admin-toast { position: fixed; z-index: 60; right: 24px; bottom: 24px; max-width: min(440px, calc(100vw - 48px)); margin: 0; padding: 16px 48px 16px 20px; box-shadow: 0 6px 24px rgb(23 43 40 / 15%); }
+.admin-toast > button { position: absolute; right: 8px; top: 8px; width: 32px; height: 32px; border-radius: 6px; font-size: 24px; }
+
+.admin-metric-info .admin-metric-icon { background: var(--admin-info-bg); color: var(--admin-info-text); }
+.admin-metric-success .admin-metric-icon { background: var(--admin-success-bg); color: var(--admin-success-text); }
+.admin-metric-warning .admin-metric-icon { background: var(--admin-warning-bg); color: var(--admin-warning-text); }

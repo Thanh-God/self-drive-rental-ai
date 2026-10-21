@@ -137,23 +137,23 @@ function setSelectValue(select, value) {
 
 test("vehicle delete cancel sends no request; actions share a separate bottom row", async () => {
   const container = await loaded();
-  let confirmation;
-  window.confirm = (message) => { confirmation = message; return false; };
   const article = container.querySelector("article");
   const actions = article.lastElementChild;
   assert.equal(button(container, "Xóa xe").parentElement, actions);
   assert.equal(button(container, "Chỉnh sửa").parentElement, actions);
   assert.match(article.textContent, /Chi nhánh thử nghiệm/);
   await act(async () => button(container, "Xóa xe").click());
-  assert.match(confirmation, /Xe mới \(TEST-01\)/);
+  assert.match(container.querySelector('[role="dialog"]').textContent, /Xe mới \(TEST-01\)/);
+  await act(async () => button(container, "Hủy").click());
   assert.equal(requests.filter((item) => item.config.method === "delete").length, 0);
   await unmountAll();
 });
 
 test("confirmed delete uses current version, blocks controls while pending and reloads after success", async () => {
   const container = await loaded();
-  window.confirm = () => true;
   await act(async () => { button(container, "Xóa xe").click(); button(container, "Xóa xe").click(); });
+  assert.equal(requests.filter(item => item.config.method === "delete").length, 0);
+  await act(async () => { button(container, "Xác nhận").click(); });
   assert.equal(requests.filter((item) => item.config.method === "delete").length, 1);
   const request = take("/admin/vehicles/new", "delete");
   assert.deepEqual(request.config.params, { version: 4 });
@@ -170,8 +170,8 @@ test("confirmed delete uses current version, blocks controls while pending and r
 
 test("history or stale conflict keeps vehicle and displays server message without success", async () => {
   const container = await loaded();
-  window.confirm = () => true;
   await act(async () => button(container, "Xóa xe").click());
+  await act(async () => button(container, "Xác nhận").click());
   await act(async () => reject(take("/admin/vehicles/new", "delete"), 409, { message: "Xe đã có đơn thuê. Hãy dùng Ngừng khai thác." }));
   assert.match(container.querySelector('[role="alert"]').textContent, /Ngừng khai thác/);
   assert.equal(container.querySelectorAll("article").length, 1);
@@ -198,6 +198,7 @@ test("P0-2: create201 transitions to edit mode, requests image and amenity witho
     setInputValue(priceInput, "750000");
   });
 
+  await act(async () => { const selects = container.querySelectorAll("form select"); setSelectValue(selects[0], "brand"); setSelectValue(selects[1], "category"); });
   const createBtn = button(container, "Tạo xe");
   assert.ok(createBtn);
   await act(async () => createBtn.click());
@@ -278,6 +279,7 @@ test("P0-2: create400/409/500 does not fake success and does not open image/amen
     setInputValue(inputs[3], "500000");
   });
 
+  await act(async () => { const selects = container.querySelectorAll("form select"); setSelectValue(selects[0], "brand"); setSelectValue(selects[1], "category"); });
   await act(async () => button(container, "Tạo xe").click());
   const postReq = take("/admin/vehicles", "post");
   await act(async () => reject(postReq, 400, { message: "Biển số xe đã được đăng ký" }));

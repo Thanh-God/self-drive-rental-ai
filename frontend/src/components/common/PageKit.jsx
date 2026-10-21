@@ -1,5 +1,6 @@
-import { Link, useLocation } from "react-router-dom";
-import { cloneElement, useId } from "react";
+import AdminAreaContext from "../../context/AdminAreaContext";
+import { Link } from "react-router-dom";
+import { cloneElement, useId, useState, useContext } from "react";
 import { useDemo } from "../../context/DemoContext";
 import { DEMO_MODE } from "../../demo/config";
 import EmptyState from "./EmptyState";
@@ -28,8 +29,7 @@ export const toUTC = (value) => new Date(`${value.length === 10 ? value + 'T00:0
 export const dateOnly = value => value ? new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeZone:'Asia/Ho_Chi_Minh'}).format(new Date(value)) : '—';
 export const bookingDate = (booking, value) => booking.policyVersion === 'calendar-2026-10-17' ? dateOnly(value) : dateTime(value);
 export function Page({ title, description, children, actions }) {
-  const { pathname } = useLocation();
-  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
+  const isAdmin = useContext(AdminAreaContext);
   return (
     <div className="page-shell">
       <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
@@ -50,13 +50,16 @@ export function Page({ title, description, children, actions }) {
     </div>
   );
 }
-export function Notice({ children, error = false }) {
+export function Notice({ children, error = false, toast = false }) {
+  const [dismissed, setDismissed] = useState(null);
+  if (toast && dismissed === children) return null;
   return (
     <div
       role={error ? "alert" : "status"}
-      className={`notice ${error ? "notice-error" : ""}`}
+      className={`notice ${error ? "notice-error" : ""} ${toast ? "admin-toast" : ""}`}
     >
       {children}
+      {toast && <button type="button" onClick={() => setDismissed(children)} aria-label="Đóng thông báo">×</button>}
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import useConfirmAction from "../../hooks/useConfirmAction";
 import { roleLabels, accountStatusLabels, vehicleStatusLabels } from "../../utils/uiLabels";
 import VehicleImageEditor from "../../components/vehicle/VehicleImageEditor";
 import { useCallback, useEffect, useState, useRef, useMemo } from "react";
@@ -12,6 +13,7 @@ import LoadingSkeleton from "../../components/common/LoadingSkeleton";
 import Badge from "../../components/common/Badge";
 
 export function ApiAccountsPage() {
+  const { confirm, confirmation } = useConfirmAction();
   const accountsRequest = useApiData("/admin/accounts");
   const allBranchesRequest = useApiData("/branches");
   const staffBranchesRequest = useApiData("/admin/staff-branches");
@@ -87,6 +89,7 @@ export function ApiAccountsPage() {
   }
 
   async function changeStatus(account, status) {
+    if (status === "LOCKED" && !(await confirm(`Khóa tài khoản ${account.fullName} (${account.email})? Người dùng sẽ không thể tiếp tục sử dụng tài khoản cho đến khi được mở khóa.`))) return;
     const key = account.id;
     if (inFlightRef.current.has(key)) {
       return;
@@ -176,8 +179,9 @@ export function ApiAccountsPage() {
       title="Quản lý tài khoản"
       description="Quản lý trạng thái khách hàng/nhân viên và phân công phạm vi chi nhánh."
     >
-      {notice ? <Notice>{notice}</Notice> : null}
-      {error ? <Notice error>{error}</Notice> : null}
+      {confirmation}
+      {notice ? <Notice toast>{notice}</Notice> : null}
+      {error ? <Notice error toast>{error}</Notice> : null}
       <div className="mb-6 grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {isLoading ? (
           <LoadingSkeleton rows={3} />
@@ -215,7 +219,7 @@ export function ApiAccountsPage() {
                     <div className="mt-4 flex flex-wrap items-center gap-3">
                       {account.role !== "ADMIN" ? (
                         <button
-                          className="btn-secondary"
+                          className={account.status === "ACTIVE" ? "btn-danger" : "btn-secondary"}
                           disabled={isBusy(account.id)}
                           onClick={() =>
                             changeStatus(
@@ -554,6 +558,7 @@ const initialVehicleForm = {
 };
 
 export function ApiVehiclesAdminPage({ fleet = false }) {
+  const { confirm, confirmation } = useConfirmAction();
   const vehiclesRequest = useApiData("/vehicles");
   const catalogRequest = useApiData("/vehicles/catalog");
   const branchesRequest = useApiData("/branches");
@@ -628,20 +633,8 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
     () => allBranches.filter((branch) => branch.status === "ACTIVE"),
     [allBranches],
   );
-  const brandInitialized = useRef(false);
-  const categoryInitialized = useRef(false);
   const branchInitialized = useRef(false);
 
-  useEffect(() => {
-    if (brandInitialized.current || form.brandId || !brands.length) return;
-    brandInitialized.current = true;
-    setForm((current) => ({ ...current, brandId: brands[0].id }));
-  }, [brands, form.brandId]);
-  useEffect(() => {
-    if (categoryInitialized.current || form.categoryId || !categories.length) return;
-    categoryInitialized.current = true;
-    setForm((current) => ({ ...current, categoryId: categories[0].id }));
-  }, [categories, form.categoryId]);
   useEffect(() => {
     if (branchInitialized.current || form.homeBranchId || !branches.length) return;
     branchInitialized.current = true;
@@ -664,17 +657,18 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
   function resetVehicleForm() {
     setForm({
       ...initialVehicleForm,
-      brandId: brands[0]?.id || "",
-      categoryId: categories[0]?.id || "",
+      brandId: "",
+      categoryId: "",
       homeBranchId: branches[0]?.id || "",
     });
     setActiveTab("info");
   }
 
   async function deleteVehicle(vehicle) {
-    if (busy || deletePending.current || !window.confirm(
+    if (busy || deletePending.current || !(await confirm(
       `Xóa xe ${vehicle.name} (${vehicle.plate}) khỏi hệ thống? Thao tác không thể hoàn tác. Xe đã có đơn thuê sẽ không được xóa; hãy dùng Ngừng khai thác.`,
-    )) return;
+    ))) return;
+    if (deletePending.current) return;
     deletePending.current = true;
     setError("");
     setNotice("");
@@ -790,8 +784,9 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
           : "Quản lý xe, giá niêm yết và chi nhánh quản lý. Giá đặt xe được máy chủ kiểm tra lại."
       }
     >
-      {notice ? <Notice>{notice}</Notice> : null}
-      {error ? <Notice error>{error}</Notice> : null}
+      {confirmation}
+      {notice ? <Notice toast={!fleet}>{notice}</Notice> : null}
+      {error ? <Notice error toast={!fleet}>{error}</Notice> : null}
       {loading ? (
         <LoadingSkeleton rows={3} />
       ) : loadError ? (
@@ -1036,12 +1031,13 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                   </Field>
                   <div className="grid grid-cols-2 gap-3">
                     <Field label="Hãng xe">
-                      <select
+                      <select required
                         value={form.brandId}
                         onChange={(event) =>
                           setForm({ ...form, brandId: event.target.value })
                         }
                       >
+                        <option value="">Chọn hãng xe…</option>
                         {brands.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.name}
@@ -1050,12 +1046,13 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
                       </select>
                     </Field>
                     <Field label="Loại xe">
-                      <select
+                      <select required
                         value={form.categoryId}
                         onChange={(event) =>
                           setForm({ ...form, categoryId: event.target.value })
                         }
                       >
+                        <option value="">Chọn loại xe…</option>
                         {categories.map((item) => (
                           <option key={item.id} value={item.id}>
                             {item.name}
@@ -1190,6 +1187,7 @@ export function ApiVehiclesAdminPage({ fleet = false }) {
 }
 
 export function ApiBranchesPage() {
+  const { confirm, confirmation } = useConfirmAction();
   const { user } = useAuth();
   const isAdmin = user?.role === "ADMIN";
   const branchesRequest = useApiData("/branches", isAdmin);
@@ -1263,7 +1261,7 @@ export function ApiBranchesPage() {
         routeSyncPendingRef.current = false;
         routeSyncTargetRef.current = null;
         setRouteSyncPending(false);
-        setNotice(`Đã cập nhật bản mới nhất của tuyến từ máy chủ (${fresh.fee.toLocaleString("vi-VN")} đ, v${fresh.version}).`);
+        setNotice(`Đã tải lại tuyến với phí ${fresh.fee.toLocaleString("vi-VN")} đ.`);
       } else {
         routeSyncPendingRef.current = false;
         routeSyncTargetRef.current = null;
@@ -1416,6 +1414,8 @@ export function ApiBranchesPage() {
 
   async function toggleBranch(branch) {
     if (!isAdmin || mutationPending.current || conflict) return;
+    if (branch.status === "ACTIVE" && !(await confirm(`Ngừng nhận đơn mới tại ${branch.name}? Đơn thuê cũ tiếp tục được xử lý theo quyền.`))) return;
+    if (mutationPending.current) return;
     mutationPending.current = true;
     setBusy(true);
     setError("");
@@ -1446,7 +1446,8 @@ export function ApiBranchesPage() {
   }
 
   async function deleteBranch(branch) {
-    if (!isAdmin || mutationPending.current || conflict || !window.confirm(`Xóa chi nhánh “${branch.name}”? Chi nhánh còn xe, đơn thuê, tuyến hoặc nhân viên sẽ không được xóa. Thao tác không thể hoàn tác.`)) return;
+    if (!isAdmin || mutationPending.current || conflict || !(await confirm(`Xóa chi nhánh “${branch.name}”? Chi nhánh còn xe, đơn thuê, tuyến hoặc nhân viên sẽ không được xóa. Thao tác không thể hoàn tác.`))) return;
+    if (mutationPending.current) return;
     mutationPending.current = true;
     setBusy(true); setError(""); setNotice("");
     try {
@@ -1489,8 +1490,9 @@ export function ApiBranchesPage() {
       title="Chi nhánh & tuyến nhận/trả"
       description="Quản lý điểm giao nhận và phí tuyến. Không nhầm chi nhánh với địa điểm du lịch."
     >
-      {notice ? <Notice>{notice}</Notice> : null}
-      {error ? <Notice error>{error}</Notice> : null}
+      {confirmation}
+      {notice ? <Notice toast>{notice}</Notice> : null}
+      {error ? <Notice error toast>{error}</Notice> : null}
       <p className="mb-4 text-sm text-slate-600">Ngừng nhận đơn mới sẽ chặn báo giá và đặt xe mới. Đơn cũ tiếp tục theo quyền; xe, tuyến và phân công nhân viên được giữ nguyên.</p>
       {conflict ? <div className="mb-4"><Notice error>Chi nhánh đã thay đổi. Tải dữ liệu mới trước khi thử lại; bản sửa chưa được lưu.</Notice><button type="button" className="btn-secondary" disabled={busy} onClick={reloadFreshBranches}>Tải dữ liệu mới</button></div> : null}
       {loading ? (
@@ -1524,7 +1526,7 @@ export function ApiBranchesPage() {
                       {branch.address}
                     </p>
                     <p className="mt-1 text-xs text-slate-400">
-                      {branch.status === "ACTIVE" ? "Đang nhận đơn mới" : "Ngừng nhận đơn mới"} · Phiên bản {branch.version}
+                      {branch.status === "ACTIVE" ? "Đang nhận đơn mới" : "Ngừng nhận đơn mới"}
                     </p>
                   </div>
                   <div className="flex flex-wrap gap-2"><button
@@ -1534,7 +1536,7 @@ export function ApiBranchesPage() {
                   >
                     Chỉnh sửa
                   </button>
-                  <button type="button" className="btn-secondary" disabled={busy || conflict} onClick={() => toggleBranch(branch)} aria-label={`${branch.status === "ACTIVE" ? "Ngừng" : "Mở"} nhận đơn mới: ${branch.name}`}>{busy ? "Đang xử lý..." : branch.status === "ACTIVE" ? "Ngừng nhận đơn mới" : "Mở nhận đơn mới"}</button>
+                  <button type="button" className={branch.status === "ACTIVE" ? "btn-danger" : "btn-secondary"} disabled={busy || conflict} onClick={() => toggleBranch(branch)} aria-label={`${branch.status === "ACTIVE" ? "Ngừng" : "Mở"} nhận đơn mới: ${branch.name}`}>{busy ? "Đang xử lý..." : branch.status === "ACTIVE" ? "Ngừng nhận đơn mới" : "Mở nhận đơn mới"}</button>
                   <button type="button" className="btn-secondary text-red-700" disabled={busy || conflict} onClick={() => deleteBranch(branch)} aria-label={`Xóa chi nhánh ${branch.name}`}>Xóa chi nhánh</button></div>
                 </article>
               ))}
@@ -1621,7 +1623,7 @@ export function ApiBranchesPage() {
                                 {returnInactive ? <span className="ml-1 text-xs text-amber-700 font-normal"> (Ngừng nhận đơn)</span> : null}
                               </div>
                               <div className="text-xs text-slate-400 mt-0.5">
-                                Phiên bản {route.version}
+                                Tuyến đã cấu hình
                               </div>
                             </td>
                             <td>{money(route.fee)}</td>
@@ -1659,7 +1661,7 @@ export function ApiBranchesPage() {
             <form ref={routeFormRef} className="panel space-y-4" onSubmit={saveRoute}>
               <h2 className="text-lg font-semibold">Cấu hình tuyến</h2>
               <p className="text-xs text-slate-500">
-                Tuyến nhận/trả là một chiều riêng biệt. Phiên bản dự kiến: {routeSnapshot ? routeSnapshot.version : 0}.
+                Tuyến nhận/trả là một chiều riêng biệt. Kiểm tra đúng chiều nhận và trả trước khi lưu.
               </p>
               <Field label="Chi nhánh nhận">
                 <select
@@ -1750,6 +1752,7 @@ export function ApiBranchesPage() {
 }
 
 export function ApiReviewsAdminPage() {
+  const { confirm, confirmation } = useConfirmAction();
   const reviewsRequest = useApiData("/admin/reviews");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -1757,6 +1760,7 @@ export function ApiReviewsAdminPage() {
   const reviews = Array.isArray(reviewsRequest.data) ? reviewsRequest.data : [];
   async function moderate(review) {
     if (busyId) return;
+    if (!review.hidden && !(await confirm("Ẩn đánh giá này khỏi phần đánh giá công khai? Bạn có thể hiển thị lại sau."))) return;
     setError("");
     setNotice("");
     setBusyId(review.id);
@@ -1781,8 +1785,9 @@ export function ApiReviewsAdminPage() {
       title="Kiểm duyệt đánh giá"
       description="Ẩn hoặc hiển thị đánh giá; thay đổi được ghi nhận phía máy chủ."
     >
-      {notice ? <Notice>{notice}</Notice> : null}
-      {error ? <Notice error>{error}</Notice> : null}
+      {confirmation}
+      {notice ? <Notice toast>{notice}</Notice> : null}
+      {error ? <Notice error toast>{error}</Notice> : null}
       {reviewsRequest.loading ? (
         <LoadingSkeleton rows={3} />
       ) : reviewsRequest.error ? (
@@ -1810,7 +1815,7 @@ export function ApiReviewsAdminPage() {
                   </p>
                 </div>
                 <button
-                  className="btn-secondary"
+                  className={review.hidden ? "btn-secondary" : "btn-danger"}
                   disabled={busyId === review.id}
                   onClick={() => moderate(review)}
                 >

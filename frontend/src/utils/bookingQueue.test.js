@@ -125,9 +125,9 @@ test('Admin booking list supports sort, pagination, copy UUID feedback, and rese
  assert.match(c.textContent, /Hiển thị 20\/45 đơn · Trang 1\/3/);
 
  // Default sort is newest first
- const articlesPage1 = c.querySelectorAll('article');
+ const articlesPage1 = c.querySelectorAll('tbody tr');
  assert.equal(articlesPage1.length, 20);
- assert.match(articlesPage1[0].textContent, /Khách: Khách 1/);
+ assert.match(articlesPage1[0].textContent, /Khách 1/);
  assert.match(articlesPage1[0].textContent, /#booking-/);
 
  // Test pagination
@@ -138,7 +138,7 @@ test('Admin booking list supports sort, pagination, copy UUID feedback, and rese
 
  await act(async () => nextBtn.click());
  assert.match(c.textContent, /Hiển thị 20\/45 đơn · Trang 2\/3/);
- assert.match(c.querySelectorAll('article')[0].textContent, /Khách: Khách 21/);
+ assert.match(c.querySelectorAll('tbody tr')[0].textContent, /Khách 21/);
  assert.equal(prevBtn.disabled, false);
 
  await act(async () => nextBtn.click());
@@ -291,4 +291,4 @@ test('F03-R: Admin booking detail renders dd/mm/yyyy and audit HH:mm in VN timez
  client.defaults.adapter = async config => ({ config, data: rows, status: 200, statusText: 'OK', headers: {} });
 });
 
-
+

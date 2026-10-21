@@ -128,21 +128,21 @@ export default function ApiLocationsPage() {
   const loadError = categoriesRequest.error || locationsRequest.error;
   if (loading) {
     return (
-      <Page title="Địa điểm tham quan" description="Quản lý danh mục địa điểm đã lưu trong hệ thống.">
+      <Page title="Điểm du lịch" description="Quản lý danh mục địa điểm đã lưu trong hệ thống.">
         <LoadingSkeleton rows={4} />
       </Page>
     );
   }
   if (loadError) {
     return (
-      <Page title="Địa điểm tham quan" description="Quản lý danh mục địa điểm đã lưu trong hệ thống.">
+      <Page title="Điểm du lịch" description="Quản lý danh mục địa điểm đã lưu trong hệ thống.">
         <LoadFailure message={loadError} retry={reloadAll} />
       </Page>
     );
   }
 
   return (
-    <Page title="Địa điểm tham quan" description="Danh mục và tọa độ được đọc trực tiếp từ backend.">
+    <Page title="Điểm du lịch" description="Quản lý địa điểm, tọa độ và thông tin phục vụ hành trình.">
       <div className="mb-5 flex flex-wrap gap-2" role="tablist" aria-label="Nhóm dữ liệu địa điểm">
         <button
           aria-selected={activeTab === "locations"}

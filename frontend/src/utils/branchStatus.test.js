@@ -33,21 +33,21 @@ function reply(r,data){r.resolve({config:r.config,data,status:200,statusText:"OK
 function fail(r,status,message){r.reject(Object.assign(new Error(message),{config:r.config,response:{status,data:{message}}}));}
 async function loaded(c,branches=[branch],routes=[route]){await act(async()=>{reply(take("/branches"),branches);reply(take("/branch-routes"),routes);});return c;}
 function button(c,label){const b=[...c.querySelectorAll("button")].find(b=>(b.getAttribute("aria-label")||b.textContent.trim())===label);assert.ok(b,label);return b;}
-async function click(c,label,twice=false){await act(async()=>{const b=button(c,label);b.click();if(twice)b.click();});}
+async function click(c,label,twice=false,accept=true){await act(async()=>{const b=button(c,label);b.click();if(twice)b.click();});if(accept && c.querySelector('[role="dialog"]') && /^(Xóa chi nhánh|Ngừng nhận đơn)/.test(label)){await act(async()=>button(c,"Xác nhận").click());}}
 async function fill(c,name,value){const i=c.querySelector(`[name="${name}"]`);assert.ok(i);await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype,"value").set.call(i,value);i.dispatchEvent(new dom.window.Event("input",{bubbles:true}));});}
 async function submit(form){await act(async()=>{form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true}));form.dispatchEvent(new dom.window.Event("submit",{bubbles:true,cancelable:true}));});}
 
 test("branch deletion cancels without request, submits current version once and refreshes selectors",async()=>{
- const c=await loaded(await mount());window.confirm=()=>false;await click(c,"Xóa chi nhánh Đà Nẵng");assert.equal(requests.filter(r=>r.config.method==="delete").length,0);
- window.confirm=()=>true;await click(c,"Xóa chi nhánh Đà Nẵng",true);const r=take("/admin/branches/dn");assert.equal(r.config.method,"delete");assert.deepEqual(r.config.params,{expectedVersion:7});assert.equal(requests.filter(r=>r.config.method==="delete").length,1);assert.doesNotMatch(c.textContent,/Đã xóa chi nhánh/);
+ const c=await loaded(await mount());await click(c,"Xóa chi nhánh Đà Nẵng",false,false);assert.ok(c.querySelector('[role="dialog"]'));await click(c,"Hủy");assert.equal(requests.filter(r=>r.config.method==="delete").length,0);
+ await click(c,"Xóa chi nhánh Đà Nẵng",true);const r=take("/admin/branches/dn");assert.equal(r.config.method,"delete");assert.deepEqual(r.config.params,{expectedVersion:7});assert.equal(requests.filter(r=>r.config.method==="delete").length,1);assert.doesNotMatch(c.textContent,/Đã xóa chi nhánh/);
  await act(async()=>reply(r,null));await loaded(c,[],[]);assert.match(c.textContent,/Đã xóa chi nhánh/);assert.equal(c.querySelectorAll("article").length,0);assert.equal(c.querySelectorAll('select option[value="dn"]').length,0);
 });
 test("referenced branch cannot disappear or claim delete success on409",async()=>{
- const c=await loaded(await mount());window.confirm=()=>true;await click(c,"Xóa chi nhánh Đà Nẵng");await act(async()=>fail(take("/admin/branches/dn"),409,"Chi nhánh còn dữ liệu. Hãy ngừng nhận đơn mới."));
+ const c=await loaded(await mount());await click(c,"Xóa chi nhánh Đà Nẵng");await act(async()=>fail(take("/admin/branches/dn"),409,"Chi nhánh còn dữ liệu. Hãy ngừng nhận đơn mới."));
  assert.match(c.querySelector('[role="alert"]').textContent,/còn dữ liệu/);assert.equal(c.querySelectorAll("article").length,1);assert.doesNotMatch(c.textContent,/Đã xóa chi nhánh/);assert.equal(button(c,"Ngừng nhận đơn mới: Đà Nẵng").disabled,false);
 });
 test("deleting the selected branch cannot submit its stale ID in a route",async()=>{
- const remaining={id:"hn",name:"Hà Nội",address:"Fixture",status:"ACTIVE",version:1};const c=await loaded(await mount(),[branch,remaining],[]);window.confirm=()=>true;
+ const remaining={id:"hn",name:"Hà Nội",address:"Fixture",status:"ACTIVE",version:1};const c=await loaded(await mount(),[branch,remaining],[]);
  await click(c,"Xóa chi nhánh Đà Nẵng");await act(async()=>reply(take("/admin/branches/dn"),null));await loaded(c,[remaining],[]);
  const form=[...c.querySelectorAll("form")].find(f=>f.textContent.includes("Cấu hình tuyến"));await submit(form);const sent=JSON.parse(take("/admin/branch-routes").config.data);assert.equal(sent.pickupBranchId,"hn");assert.equal(sent.returnBranchId,"hn");
 });
@@ -62,11 +62,11 @@ test("close and reopen use exact version; pending duplicate guard and no prematu
  assert.equal(requests.filter(r=>r.config.method==="put").length,1);assert.doesNotMatch(c.textContent,/Đã ngừng/);assert.equal(button(c,"Chỉnh sửa").disabled,true);
  await act(async()=>reply(write,{...branch,status:"INACTIVE",version:8}));await act(async()=>reply(take("/branches"),[{...branch,status:"INACTIVE",version:8}]));
  assert.match(c.textContent,/Đã ngừng nhận đơn mới/);await click(c,"Mở nhận đơn mới: Đà Nẵng");const open=take("/admin/branches/dn/status");assert.deepEqual(JSON.parse(open.config.data),{status:"ACTIVE",expectedVersion:8});
- await act(async()=>reply(open,{...branch,version:9}));await act(async()=>reply(take("/branches"),[{...branch,version:9}]));assert.match(c.textContent,/Đã mở nhận đơn mới/);assert.match(c.textContent,/Phiên bản 9/);
+ await act(async()=>reply(open,{...branch,version:9}));await act(async()=>reply(take("/branches"),[{...branch,version:9}]));assert.match(c.textContent,/Đã mở nhận đơn mới/);assert.doesNotMatch(c.textContent,/Phiên bản/);
 });
 test("status 400 leaves server state visible and never claims success",async()=>{
  const c=await loaded(await mount());await click(c,"Ngừng nhận đơn mới: Đà Nẵng");await act(async()=>fail(take("/admin/branches/dn/status"),400,"Trạng thái không hợp lệ"));
- assert.match(c.textContent,/Trạng thái không hợp lệ/);assert.doesNotMatch(c.textContent,/Đã ngừng/);assert.equal(button(c,"Ngừng nhận đơn mới: Đà Nẵng").disabled,false);assert.match(c.textContent,/Phiên bản 7/);
+ assert.match(c.textContent,/Trạng thái không hợp lệ/);assert.doesNotMatch(c.textContent,/Đã ngừng/);assert.equal(button(c,"Ngừng nhận đơn mới: Đà Nẵng").disabled,false);assert.doesNotMatch(c.textContent,/Phiên bản/);
 });
 test("stale 409 blocks retries until fresh reload, then uses fresh version and succeeds",async()=>{
  const c=await loaded(await mount());await click(c,"Ngừng nhận đơn mới: Đà Nẵng");await act(async()=>fail(take("/admin/branches/dn/status"),409,"Version cũ"));
@@ -104,8 +104,8 @@ test("P0-4: click Chỉnh sửa tuyến fills form, scrolls/focuses, sends no mu
  assert.equal(rows.length, 2);
  assert.match(rows[0].textContent, /Đà Nẵng.*→.*Hà Nội \(Ngừng nhận đơn\)/);
  assert.match(rows[0].textContent, /Tạm không nhận đơn mới do chi nhánh ngừng hoạt động/);
- assert.match(rows[0].textContent, /Phiên bản 3/);
- assert.match(rows[1].textContent, /Phiên bản 5/);
+ assert.doesNotMatch(rows[0].textContent, /Phiên bản/);
+ assert.doesNotMatch(rows[1].textContent, /Phiên bản/);
 
  // Click "Chỉnh sửa" on row 0 (DN -> HN)
  const editBtn = rows[0].querySelector("button");
