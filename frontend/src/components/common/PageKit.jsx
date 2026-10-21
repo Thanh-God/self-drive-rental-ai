@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { cloneElement, useId } from "react";
 import { useDemo } from "../../context/DemoContext";
 import { DEMO_MODE } from "../../demo/config";
@@ -28,11 +28,13 @@ export const toUTC = (value) => new Date(`${value.length === 10 ? value + 'T00:0
 export const dateOnly = value => value ? new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeZone:'Asia/Ho_Chi_Minh'}).format(new Date(value)) : '—';
 export const bookingDate = (booking, value) => booking.policyVersion === 'calendar-2026-10-17' ? dateOnly(value) : dateTime(value);
 export function Page({ title, description, children, actions }) {
+  const { pathname } = useLocation();
+  const isAdmin = pathname === "/admin" || pathname.startsWith("/admin/");
   return (
     <div className="page-shell">
       <div className="mb-7 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="eyebrow">KDRIVE / HÀNH TRÌNH CỦA BẠN</p>
+          <p className="eyebrow">{isAdmin ? `Quản trị / ${title}` : "KDRIVE / HÀNH TRÌNH CỦA BẠN"}</p>
           <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">
             {title}
           </h1>
@@ -78,15 +80,7 @@ export function Field({ label, children, hint }) {
 export function Status({ status }) {
   return (
     <Badge
-      tone={
-        status === "COMPLETED"
-          ? "success"
-          : ["CANCELLED", "REJECTED", "EXPIRED"].includes(status)
-            ? "danger"
-            : status === "PENDING"
-              ? "warning"
-              : "brand"
-      }
+      tone={{ PENDING: "warning", CONFIRMED: "info", IN_PROGRESS: "rental", RETURNED: "returned", COMPLETED: "success", CANCELLED: "danger", REJECTED: "danger", EXPIRED: "danger" }[status] || "neutral"}
     >
       {statusLabels[status] || "Chưa xác định"}
     </Badge>

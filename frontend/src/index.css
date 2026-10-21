@@ -364,3 +364,31 @@ body {
 .admin-shell .data-table td { border-color: var(--admin-border); }
 @media (max-width: 1100px) { .admin-main { padding: 24px; } }
 @media (max-width: 700px) { .admin-workspace { grid-template-columns: 180px minmax(0, 1fr); } .admin-main { padding: 16px; } .admin-workspace > aside a { font-size: 12px; gap: 6px; padding: 10px 8px; } }
+
+.admin-report-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.05fr); gap: 24px; align-items: start; }
+.admin-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.admin-metric { min-width: 0; min-height: 166px; }
+.admin-metric h2 { font-size: 13px; color: var(--admin-muted); font-weight: 500; margin: 16px 0 8px; }
+.admin-metric p { font-size: clamp(20px, 1.8vw, 28px); font-weight: 700; overflow-wrap: anywhere; }
+.admin-metric-icon { display: inline-grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; background: var(--admin-primary-soft); color: var(--admin-primary-hover); }
+.admin-shell .admin-metric-total { background: var(--admin-sidebar); color: var(--admin-surface); border-color: var(--admin-sidebar); }
+.admin-metric-total h2 { color: var(--admin-sidebar-text); }
+.admin-metric-total .admin-metric-icon { background: var(--admin-sidebar-hover); color: var(--admin-accent); }
+.admin-report-empty { grid-column: 1 / -1; grid-row: 2; }
+.admin-report-filters .field { flex: 1; max-width: 260px; }
+.calendar-field { position: relative; display: block; min-width: 0; }
+.calendar-field > input[type="text"] { padding-right: 44px; }
+.calendar-field > button { position: absolute; right: 2px; top: 2px; width: 40px; height: 40px; display: grid; place-items: center; color: var(--admin-muted); border-radius: 8px; }
+.field .calendar-field .calendar-native { position: absolute; width: 1px; height: 1px; min-height: 0; padding: 0; border: 0; opacity: 0; pointer-events: none; right: 0; bottom: 0; }
+@media (max-width: 1200px) { .admin-report-grid { grid-template-columns: minmax(0, 1fr); } .admin-report-empty { grid-row: auto; } }
+
+.admin-booking-table { border-color: var(--admin-border); }
+.admin-booking-table table { min-width: 920px; }
+.admin-booking-table td { vertical-align: top; font-size: 13px; padding: 18px 14px; }
+.admin-booking-table th { padding: 14px; }
+.admin-booking-table td:nth-child(2) { min-width: 160px; }
+.admin-booking-table td:nth-child(3) { min-width: 135px; }
+.admin-booking-table td:nth-child(4) { min-width: 140px; }
+.admin-booking-table .btn-secondary { min-height: 36px; padding: 6px 12px; font-size: 12px; }
+.admin-copy { display: flex; align-items: center; gap: 4px; color: var(--admin-primary-hover); font-size: 11px; margin: 8px 0; text-align: left; }
+.admin-full-id { width: 160px; padding: 6px; border: 1px solid var(--admin-border); border-radius: 6px; margin-top: 6px; }

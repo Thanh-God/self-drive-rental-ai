@@ -1,3 +1,4 @@
+import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
 import BookingIdentity from "../../components/booking/BookingIdentity";
@@ -1347,7 +1348,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
       >
         {rows.length ? (
           <div className="space-y-4">
-            {pagedRows.map((booking) => (
+            {area === "admin" ? <AdminBookingTable bookings={pagedRows} onCopy={handleCopyId} copyFeedback={copyFeedback} manualCopyId={manualCopyId} /> : <>{pagedRows.map((booking) => (
               <article
                 className={`panel flex flex-wrap items-center justify-between gap-4 ${area === "user" ? "urban-booking-card" : ""}`}
                 key={booking.id}
@@ -1443,7 +1444,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                   </Link>
                 </div>
               </article>
-            ))}
+            ))}</>}
 
             {isFilterActive && totalPages > 1 ? (
               <nav aria-label="Phân trang danh sách đơn" className="mt-6 flex items-center justify-between border-t border-slate-200 pt-4">
@@ -1702,7 +1703,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
             ) : null}
             <div className="mb-5 flex items-center gap-3">
               <Status status={booking.status} />
-              {area !== "user" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}
+              {area === "staff" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}
             </div>
             {booking.status === "PENDING" && booking.expiresAt ? (
               <p className="mb-5 text-sm text-amber-800">
