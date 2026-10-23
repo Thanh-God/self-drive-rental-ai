@@ -42,7 +42,7 @@ class OperationalReportMySqlTest {
   for(String table:List.of("reviews","incident_events","incident_cases","vehicle_handover_records","invoice_items","invoices","contracts","booking_status_history","bookings"))jdbc.update("delete from "+table);
   jdbc.update("update vehicles set current_branch_id='dn',status='ACTIVE',daily_price=650000 where id='v1'");
   clock.value=Instant.parse("2026-10-20T08:00:00Z");
-  var actor=new Actor("demo-user","USER","Fixture");var old=licenses.mine(actor);licenses.save(actor,new LicenseService.View(old==null?null:old.id(),"REPORT-FIXTURE","VN_2025","B",LocalDate.of(2030,12,31),false,"PENDING",old==null?0:old.version()));
+  var actor=new Actor("demo-user","USER","Fixture");var old=licenses.mine(actor);licenses.save(actor,new LicenseService.View(old==null?null:old.id(),"REPORT-FIXTURE","VN_2025","B",LocalDate.of(2030,12,31),false,"PENDING",old==null?0:old.version()));LicensePhotoFixture.approved(licenses,actor);
   admin=token("demo-admin");user=token("demo-user");staff=token("demo-staff-dn");
  }
  ResponseEntity<Map> request(HttpMethod method,String path,Object input,String bearer){

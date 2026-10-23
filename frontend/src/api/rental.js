@@ -83,3 +83,21 @@ export async function saveLicense(input) {
   const { data } = await apiClient.put("/me/license", input);
   return data;
 }
+
+export async function saveLicensePhotos(form) {
+  const { data } = await apiClient.put("/me/license/photos", form, {
+    headers: { "Content-Type": undefined },
+  });
+  return data;
+}
+
+export async function reviewLicensePhotos(bookingId, input) {
+  const { data } = await apiClient.post(`/bookings/${encodeURIComponent(bookingId)}/license-photo-review`, input);
+  return data;
+}
+
+export async function getLicensePhoto(bookingId, side, signal) {
+  const base = bookingId ? `/bookings/${encodeURIComponent(bookingId)}/license-photos` : "/me/license/photos";
+  const { data } = await apiClient.get(`${base}/${side}`, { responseType: "blob", signal });
+  return data;
+}

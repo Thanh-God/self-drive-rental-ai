@@ -31,6 +31,7 @@ class RentalIntegrationTest {
   Instant value=Instant.now();public ZoneId getZone(){return ZoneOffset.UTC;}public Clock withZone(ZoneId z){return this;}public Instant instant(){return value;}
  }
  @TestConfiguration static class TimeConfig {@Bean @Primary MutableClock testClock(){return new MutableClock();}}
+ @Autowired com.carrental.modules.user.service.LicenseService licenses;
  @Autowired MockMvc mvc;@Autowired ObjectMapper json;@Autowired JdbcTemplate jdbc;@Autowired MutableClock clock;
  private JsonNode request(MockHttpServletRequestBuilder req,String token,Object body,int status)throws Exception{
   if(token!=null)req.header("Authorization","Bearer "+token);
@@ -51,6 +52,7 @@ class RentalIntegrationTest {
   var licNode=request(get("/api/v1/me/license"),user,null,200);
   long currentLicVer=licNode.has("version")?licNode.path("version").asLong():0L;
   request(put("/api/v1/me/license"),user,Map.of("licenseNumber","TEST-ONLY","scheme","VN_2025","licenseClass","C1","expiresOn",LocalDate.now().plusYears(1).toString(),"automaticOnly",false,"version",currentLicVer),200);
+  LicensePhotoFixture.approved(licenses,new com.carrental.security.Actor("demo-user","USER","Fixture"));
   Instant start=clock.instant().truncatedTo(java.time.temporal.ChronoUnit.SECONDS).plus(Duration.ofDays(3));
   var input=new HashMap<String,Object>();input.put("vehicleId","v1");input.put("pickupBranchId","dn");input.put("returnBranchId","hn");input.put("startAt",start.toString());input.put("endAt",start.plus(Duration.ofHours(25)).toString());
   JsonNode quote=request(post("/api/v1/bookings/quote"),user,input,200);assertEquals(2,quote.path("rentalDays").asInt());assertEquals(2800000,quote.path("total").asLong());

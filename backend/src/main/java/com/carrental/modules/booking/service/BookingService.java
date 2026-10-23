@@ -43,6 +43,18 @@ import java.util.*;
   if(a.is("STAFF"))result.put("license",licenses.forBooking(b.userId));
   return result;
  }
+ public byte[] licensePhoto(Actor a,String id,String side){return licenses.photo(photoBooking(a,id).userId,side);}
+ private Booking photoBooking(Actor a,String id){
+  Booking b=require(a,id);branches.requireStaff(a,b.pickupBranchId);
+  if(!Set.of("PENDING","CONFIRMED").contains(effective(b)))throw DomainException.conflict("Chỉ xem/kiểm tra ảnh cho đơn đang chờ xác nhận hoặc chờ giao xe.");
+  return b;
+ }
+ @Transactional public LicenseService.View reviewLicensePhotos(Actor a,String id,long version,boolean approve,String reason){
+  vehicles.lock(repo.findVehicleIdById(id).orElseThrow(DomainException::missing));
+  repo.lock(id).orElseThrow(DomainException::missing);
+  var b=photoBooking(a,id);
+  return licenses.review(b.userId,a,version,approve,reason);
+ }
  private SchedulePolicy.Slot slot(Booking b){boolean calendar=RentalTerms.CALENDAR_POLICY.equals(b.policyVersion);boolean received=calendar&&Set.of("RETURNED","COMPLETED").contains(b.status);return new SchedulePolicy.Slot(b.id,received?b.returnBranchId:b.pickupBranchId,b.returnBranchId,b.startAt,b.endAt,b.status,b.expiresAt,calendar);}
  private void schedule(Vehicle v,Booking added,String excluded){
   var existing=repo.lockScheduleByVehicleId(v.id);
@@ -71,6 +83,7 @@ import java.util.*;
  @Transactional public View quote(Actor a,Input i){return view(prepare(a,i,vehicles.lock(i.vehicleId())));}
  @Transactional public View create(Actor a,Input i){
   Booking b=prepare(a,i,vehicles.lock(i.vehicleId()));
+  licenses.requirePhotos(a.id(),false);
   if(i.expectedTotal()==null||i.expectedTotal()!=b.total)throw DomainException.conflict("Giá đã thay đổi hoặc chưa xác nhận báo giá. Vui lòng kiểm tra lại.");
   repo.saveAndFlush(b);history(b,null,a,"Tạo yêu cầu thuê");return view(b);
  }
@@ -93,7 +106,7 @@ import java.util.*;
     branches.requireStaff(a,b.pickupBranchId);
     if(!"PENDING".equals(old))throw DomainException.conflict("Đơn không còn chờ xác nhận.");
     if("REJECTED".equals(next)){reason(action.reason());schedule(vehicle,null,b.id);}
-    else {if(!"ACTIVE".equals(vehicle.status))throw DomainException.conflict("Xe không hoạt động.");licenses.eligible(b.userId,vehicle.transmission,vehicle.seats,b.endAt);schedule(vehicle,null,null);}
+    else {if(!"ACTIVE".equals(vehicle.status))throw DomainException.conflict("Xe không hoạt động.");licenses.eligible(b.userId,vehicle.transmission,vehicle.seats,b.endAt);licenses.requirePhotos(b.userId,true);schedule(vehicle,null,null);}
    }
    case "IN_PROGRESS" -> {
     branches.requireStaff(a,b.pickupBranchId);

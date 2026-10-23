@@ -107,6 +107,8 @@
 **Actor chính:** Staff
 **Tiền điều kiện:** Đơn đã được xác nhận (CONFIRMED); khách đến nhận xe; Staff thuộc chi nhánh nhận.
 
+Trước khi gửi yêu cầu thuê, khách lưu thông tin và tải đủ ảnh hai mặt GPLX. Staff chi nhánh nhận kiểm tra hồ sơ ảnh qua đơn PENDING/CONFIRMED và ghi nhận xét; chỉ xác nhận đơn khi hồ sơ ảnh đạt. Yêu cầu bổ sung được hiển thị trong hồ sơ khách. Đổi ảnh/thông tin đặt lại kết quả kiểm tra, không được dùng kết quả duyệt cũ. Xem [hồ sơ ảnh GPLX](../modules/license-photos.md) về quyền, lưu trữ và API.
+
 ### Luồng chính
 
 1. Staff mở thông tin GPLX mà khách đã khai báo trong hệ thống.

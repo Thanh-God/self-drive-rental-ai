@@ -32,6 +32,7 @@ class BookingQueueOrderTest {
  @Test void newestCreationFirstForStaffAdminAndOwnerWithoutWideningReadPermissions() throws Exception {
   var user=new Actor("demo-user","USER","Fixture");
   licenses.save(user,new LicenseService.View(null,"QUEUE-TEST","VN_2025","B",LocalDate.of(2035,12,31),false,"PENDING",0));
+        LicensePhotoFixture.approved(licenses, user);
   var old=bookings.create(user,new BookingService.Input("v1","dn","dn",Instant.parse("2026-10-20T03:00:00Z"),Instant.parse("2026-10-21T03:00:00Z"),650000L));
   clock.value=Instant.parse("2026-10-15T17:00:00Z");
   var quote=bookings.quote(user,new BookingService.Input("v1","dn","dn",Instant.parse("2026-10-22T03:00:00Z"),Instant.parse("2026-10-23T03:00:00Z"),null));

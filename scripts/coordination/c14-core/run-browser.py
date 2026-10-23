@@ -1,5 +1,5 @@
 """Exact stopped C14 fixture, real JAR/Vite, isolated linked-workflow schema."""
-import argparse, hashlib, json, os, socket, subprocess, time, urllib.request, uuid
+import argparse, hashlib, importlib.util, json, os, socket, subprocess, time, urllib.request, uuid
 from pathlib import Path
 REPO=Path(__file__).resolve().parents[3];FLAGS=subprocess.CREATE_NO_WINDOW
 
@@ -34,6 +34,11 @@ def main():
   if r.returncode:raise RuntimeError('Native failure; private output omitted')
   return r.stdout
  inspection=json.loads(run(['docker','inspect',f['name']]))[0]
+ spec=importlib.util.spec_from_file_location('mysql_fixture_guard',Path(__file__).with_name('run-mysql.py'))
+ guard=importlib.util.module_from_spec(spec);spec.loader.exec_module(guard)
+ pinned=json.loads((REPO/'.runtime/docker-fixtures/mysql-core.json').read_text())
+ assert all(pinned[k]==f[k] for k in ['id','name','volume','port']),'Browser fixture/registry identity mismatch'
+ guard.validate_reuse(f,inspection,pinned)
  assert inspection['Id']==f['id'] and not inspection['State']['Running']
  assert [m['Name'] for m in inspection['Mounts'] if m['Destination']=='/var/lib/mysql']==[f['volume']]
  out.mkdir();(out/'inputs-before.json').write_text(json.dumps(before,indent=2));procs=[];handles=[];started=False;result=None
@@ -47,8 +52,12 @@ def main():
    if r.returncode==0 and r.stdout.strip()==b'1':break
    time.sleep(1)
   else:raise RuntimeError('MySQL readiness deadline')
-  schema='kdrive_c14_browser_'+uuid.uuid4().hex[:12];run(['docker','exec','-e','MYSQL_PWD='+password,f['name'],'mysql','-uroot','-e','CREATE DATABASE '+schema]);(out/'browser-schema.txt').write_text(schema)
-  config=out/'application.private.properties';config.write_text(f'server.port=8300\nspring.datasource.url=jdbc:mysql://127.0.0.1:33676/{schema}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC\nspring.datasource.username=root\nspring.datasource.password={password}\napp.jwt-secret=c14-only-test-secret-at-least-32-bytes\napp.seed-enabled=true\napp.seed-password=BranchBookingTestOnly123!\napp.cors-origin=http://127.0.0.1:5300\n')
+  marker=(native/'marker.private.token').read_text().strip()
+  assert len(marker)==32 and all(c in '0123456789abcdef' for c in marker),'Invalid fixture marker'
+  schema='kdrive_c14_browser_'+uuid.uuid4().hex[:12]
+  run(['docker','exec','-e','MYSQL_PWD='+password,f['name'],'mysql','-uroot','-e',f"CREATE DATABASE {schema}; INSERT INTO kdrive_c14_meta.__kdrive_test_fixture_marker VALUES((SELECT COALESCE(MAX(id),0)+1 FROM (SELECT id FROM kdrive_c14_meta.__kdrive_test_fixture_marker) t),'{schema}','{marker}');"])
+  (out/'browser-schema.txt').write_text(schema)
+  config=out/'application.private.properties';config.write_text(f'server.port=8300\nspring.datasource.url=jdbc:mysql://127.0.0.1:33676/{schema}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC\nspring.datasource.username=root\nspring.datasource.password={password}\napp.jwt-secret=c14-only-test-secret-at-least-32-bytes\napp.seed-enabled=true\napp.seed-password=BranchBookingTestOnly123!\napp.cors-origin=http://127.0.0.1:5300\napp.license-photo-directory={(out/"private-license-photos").as_posix()}\n')
   spawn(['E:/Tools/Java/jdk-21.0.12.1+1/bin/java.exe','-jar',str(jar),'--spring.config.additional-location=file:'+config.as_posix()],'backend')
   (out/'api-build.log').write_bytes(run(['node','node_modules/vite/bin/vite.js','build'],REPO/'frontend'))
   spawn(['node','node_modules/vite/bin/vite.js','preview','--host','127.0.0.1','--port','5300','--strictPort'],'frontend',REPO/'frontend')

@@ -1,5 +1,7 @@
 # Thiết kế database
 
+V5 bổ sung hai tham chiếu ảnh riêng tư, trạng thái/nhận xét/người/thời điểm kiểm tra hồ sơ ảnh trên `driver_licenses`; không thêm bảng. Schema cuối có 38 FK (thêm FK người kiểm tra ảnh). Dữ liệu cũ nhận trạng thái ảnh `MISSING`, không tự tạo ảnh hay đánh dấu đạt. Chi tiết tại [hồ sơ ảnh GPLX](../modules/license-photos.md).
+
 Nguồn schema: [V1](../../backend/src/main/resources/db/migration/V1__rental_schema.sql), [V2](../../backend/src/main/resources/db/migration/V2__incident_audit_and_review_vehicle.sql), [V3](../../backend/src/main/resources/db/migration/V3__vehicle_creation_time.sql) và [V4](../../backend/src/main/resources/db/migration/V4__location_visit_metadata.sql). Flyway quản lý lịch sử migration, Hibernate validate schema. V1 định nghĩa25bảng nghiệp vụ và37FK; V3/V4 thêm cột nullable, không thêm bảng. Bảng flyway_schema_history là bảng kỹ thuật.
 
 Không sửa migration đã áp dụng trong môi trường dùng chung. Kiểm kê history/checksum/schema trước nâng cấp; MySQL DDL có thể để lại thay đổi một phần sau lỗi. Không tự clean/repair database. Review liên kết xe thông qua booking, không thêm reviews.vehicle_id trực tiếp.

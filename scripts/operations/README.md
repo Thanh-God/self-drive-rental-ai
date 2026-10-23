@@ -43,3 +43,15 @@ Keep test plans, review records, assertions and readbacks in their original loca
 `node scripts/operations/import-c10b-catalog-media.mjs --evidence .runtime/<fresh-path>` is a read-only dry-run. `--apply` is a bounded transaction for the user-approved exact container ID, sole named volume and v1/v2/v3 model mapping. It verifies17–30unique asset hashes/rights metadata, refuses changed targets or differing existing media, records before/plan/after and non-media checksums, locks vehicle rows and inserts only on an empty media table. Exact existing mapping is NOOP; no overwrite/delete/reseed/reset. Evidence stays private/ignored. A new machine cannot silently reuse this machine-specific identity; use the Admin editor or a separately reviewed target plan.
 
 Tests: `node --test scripts/operations/import-c10b-catalog-media.test.mjs`. Registry: frontend/public/media/vehicles/licenses.json; attribution page /media/vehicles/licenses.html. These are model/market-variant illustrations, not photographs of the rental unit. Each photo retains its own license; licenses do not apply to the application source as a whole.
+
+## GPLX photos — local activation and desktop verification
+
+`start-license-photos-local.py` performs a read-only preflight by default. It requires the exact local MySQL identity/volume/33385, intact V4 history, free8080/5173 and a JAR/source matching native test evidence. With `--apply`, it backs up the database privately, starts the verified JAR with seed disabled, migrates to V5 through Flyway, compares old-column row hashes, then starts the API frontend. It creates no containers and performs no sample document uploads. This is a one-time V4→V5 activation, not a restart command for an already migrated database; do not bypass its history guard.
+
+```powershell
+python scripts/operations/start-license-photos-local.py --backend-root .runtime/<run>/backend --native .runtime/<run>/mysql --evidence .runtime/<new-output>
+# Add --apply only for an authorized local activation after preflight and tests.
+python -m unittest discover -s scripts/operations -p test_start_license_photos_local.py
+```
+
+Run desktop upload/review checks only on the isolated registered fixture, through `scripts/coordination/c14-core/run-browser.py --browser-script scripts/operations/verify-license-photos.cjs`. The proof uses synthetic image files, tests missing/fake images, private access, requests for changes, approval, original-check separation and replacement invalidation. No customer document or shared-DB booking is needed. See [GPLX photo contract](../../docs/modules/license-photos.md).

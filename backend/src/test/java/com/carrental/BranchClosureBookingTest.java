@@ -78,6 +78,7 @@ class BranchClosureBookingTest {
         var old = licenses.mine(user);
         licenses.save(user, new LicenseService.View(old == null ? null : old.id(), "A2-123456", "VN_2025", "B",
             LocalDate.of(2030, 12, 31), false, "PENDING", old == null ? 0 : old.version()));
+        LicensePhotoFixture.approved(licenses, user);
         userToken = token("demo-user"); adminToken = token("demo-admin");
         dnToken = token("demo-staff-dn"); hnToken = token("demo-staff-hn");
     }

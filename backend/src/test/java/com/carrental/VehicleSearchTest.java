@@ -52,6 +52,7 @@ class VehicleSearchTest {
         jdbc.update("update vehicles set status='ACTIVE',current_branch_id='hn' where id='v2'");
         var old = licenses.mine(user);
         licenses.save(user, new LicenseService.View(old == null ? null : old.id(), "SEARCH-123", "VN_2025", "B", LocalDate.of(2030,12,31), false, "PENDING", old == null ? 0 : old.version()));
+        LicensePhotoFixture.approved(licenses, user);
     }
     VehicleSearchService.Input input(long seconds, Long budget) {
         return new VehicleSearchService.Input(start, start.plusSeconds(seconds), "dn", "hn", budget, null, null, null, null, null);

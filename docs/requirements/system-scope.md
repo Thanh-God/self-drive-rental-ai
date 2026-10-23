@@ -151,7 +151,7 @@ FR-14/16/19 dùng Gemini theo phương án gốc; ranh giới chức năng giữ
 Các mục sau phân biệt phần đã chốt và phần còn mở; không dùng lại giả định một chi nhánh cũ:
 
 1. **Quyền dùng AI của Guest:** đề xuất cho Guest xem kết quả gợi ý/hành trình nhưng chỉ User mới lưu lịch sử.
-2. **Giấy phép lái xe:** ghi nhận thông tin, tương thích xe, Staff xác minh thủ công; không ảnh, không tra cứu quốc gia. Lịch sử xác minh đầy đủ còn thiếu.
+2. **Giấy phép lái xe:** khai báo và tải đủ hai mặt ảnh trước gửi yêu cầu thuê; Staff chi nhánh nhận kiểm tra hồ sơ ảnh trước xác nhận, đối chiếu bản gốc trước giao. Ảnh không công khai, không gửi AI; không tra cứu quốc gia. Giữ ảnh đến khi khách thay ảnh; thay thông tin/ảnh phải kiểm tra lại.
 3. **Cách tính ngày thuê:** đơn mới tính chênh lệch ngày nhận/trả tại Việt Nam, tối thiểu 1 và tối đa 90 ngày. Nhận 17/10, trả 21/10 tính 4 ngày; giữ xe hết ngày 21/10 và lịch tiếp theo từ 22/10, kể cả trả sớm. VND nguyên đồng. Đơn cũ giữ giá và chính sách block 24 giờ đã lưu.
 4. **Giữ xe khi chờ xác nhận:** PENDING chiếm lịch đến min(createdAt + 2 giờ, startAt).
 5. **Hợp đồng/hóa đơn:** phát hành lúc xác nhận/hoàn tất, giữ snapshot. Sửa/phát hành lại và phụ phí còn mở; hóa đơn không xác nhận thanh toán.

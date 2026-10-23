@@ -18,4 +18,10 @@ public class DriverLicense {
     public String status;
     public String checkedBy;
     public Instant checkedAt;
+    public String frontPhoto;
+    public String backPhoto;
+    public String photoReviewStatus = "MISSING";
+    public String photoReviewReason;
+    public String photoReviewedBy;
+    public Instant photoReviewedAt;
 }

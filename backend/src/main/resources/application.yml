@@ -4,6 +4,10 @@ server:
     include-message: never
     include-stacktrace: never
 spring:
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 11MB
   datasource:
     url: ${DB_URL:jdbc:mysql://127.0.0.1:3306/kdrive?connectionTimeZone=UTC}
     username: ${DB_USER:kdrive}
@@ -22,6 +26,7 @@ spring:
   jackson:
     time-zone: UTC
 app:
+  license-photo-directory: ${LICENSE_PHOTO_DIRECTORY:../.runtime/private-license-photos}
   jwt-secret: ${JWT_SECRET:}
   token-minutes: ${TOKEN_MINUTES:30}
   cors-origin: ${FRONTEND_ORIGIN:http://127.0.0.1:5173}

@@ -18,6 +18,8 @@ USER có thể mở [hành trình một ngày](../modules/ai-itinerary.md) từ 
 
 Hồ sơ sửa họ tên, số điện thoại và GPLX; email chỉ đọc. Điện thoại 7–15 chữ số, có thể bắt đầu bằng +; đây là kiểm tra định dạng, không xác minh sở hữu số. GPLX theo hệ/hạng/hộp số, còn hạn đến hết thuê; Staff đối chiếu bản gốc trước giao.
 
+Hồ sơ API có khu vực tải hai mặt ảnh GPLX sau khi lưu thông tin bằng. Thiếu ảnh không gửi được yêu cầu thuê; báo giá vẫn kiểm tra tương thích như trước. Khách xem lại ảnh riêng tư và nhận xét yêu cầu bổ sung. Staff chi nhánh nhận kiểm tra ảnh qua chi tiết đơn trước xác nhận; kết quả này không thay đối chiếu bản gốc. Thay ảnh/thông tin đặt lại kết quả kiểm tra. Xem [quy tắc ảnh GPLX](../modules/license-photos.md).
+
 Đổi mật khẩu cần mật khẩu hiện tại, mật khẩu mới và xác nhận. Thành công mới xóa phiên local, thu hồi token cũ và yêu cầu đăng nhập lại. Đăng xuất xóa phiên thiết bị ngay, đồng thời gọi API thu hồi; lỗi mạng phải cảnh báo chưa xác nhận thu hồi phía server. Đăng nhập tiếp theo chờ request đăng xuất cũ kết thúc. Không tự gửi lại thao tác ghi khi timeout; tải lại thông tin để kiểm tra kết quả. Email verification/OTP/SMS/Google OAuth chưa tích hợp.
 
 ## Danh mục và thương hiệu

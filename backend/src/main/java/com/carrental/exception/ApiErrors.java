@@ -7,6 +7,10 @@ import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import java.util.Map;
 @RestControllerAdvice
 public class ApiErrors {
+ @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+ ResponseEntity<?> uploadTooLarge(Exception e){return ResponseEntity.status(413).body(Map.of("message","Mỗi ảnh GPLX tối đa 5 MB."));}
+ @ExceptionHandler(org.springframework.web.multipart.support.MissingServletRequestPartException.class)
+ ResponseEntity<?> missingPart(Exception e){return ResponseEntity.badRequest().body(Map.of("message","Cần chọn đủ hai mặt ảnh GPLX."));}
  @ExceptionHandler(org.springframework.web.HttpRequestMethodNotSupportedException.class)
  ResponseEntity<?> unsupportedMethod(Exception e){return ResponseEntity.status(405).body(Map.of("message","Phương thức không được hỗ trợ."));}
  @ExceptionHandler(DomainException.class) ResponseEntity<?> domain(DomainException e){return ResponseEntity.status(e.status).body(Map.of("message",e.getMessage()));}

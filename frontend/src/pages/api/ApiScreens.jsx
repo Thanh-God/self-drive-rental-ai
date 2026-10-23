@@ -1,3 +1,4 @@
+import LicensePhotos from "../../components/user/LicensePhotos";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
@@ -1864,6 +1865,9 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     </p>
                   </section>
                 ) : null}
+                {isStaff && license && assignedBranchIds.has(booking.pickupBranchId) && ["PENDING", "CONFIRMED"].includes(booking.status) ? (
+                  <div className="panel"><LicensePhotos key={`${booking.id}-${license.version}`} license={license} bookingId={booking.id} onSaved={request.reload} /></div>
+                ) : null}
                 {availableActions.length ? (
                   <form
                     className="panel h-fit space-y-4"
@@ -2228,7 +2232,7 @@ export function ApiProfilePage() {
       });
       if (getStoredToken() !== token) return;
       setMessage(
-        "Đã lưu thông tin GPLX để nhân viên xác minh. Không tải/lưu ảnh GPLX.",
+        "Đã lưu thông tin GPLX. Hãy tải đủ hai mặt ảnh để nhân viên kiểm tra trước; khi sửa thông tin, kết quả kiểm tra được đặt lại.",
       );
       licenseRequest.reload();
     } catch (requestError) {
@@ -2305,8 +2309,7 @@ export function ApiProfilePage() {
               Thông tin giấy phép lái xe
             </h2>
             <p className="text-sm text-slate-600">
-              Không tải ảnh GPLX. Nhân viên sẽ kiểm tra bản gốc trước khi giao
-              xe.
+              Khai báo thông tin và tải hai mặt GPLX bên dưới trước khi gửi yêu cầu thuê. Nhân viên vẫn đối chiếu bản gốc khi giao xe.
             </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field label="Số giấy phép">
@@ -2372,6 +2375,7 @@ export function ApiProfilePage() {
               Lưu thông tin GPLX
             </button>
           </form>
+          <div className="panel lg:col-span-2"><LicensePhotos key={license?.version ?? "new"} license={license} onSaved={licenseRequest.reload} /></div>
         </div>
       </RequestState>
     </Page>

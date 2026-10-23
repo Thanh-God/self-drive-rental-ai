@@ -105,6 +105,7 @@ class ConcurrencyAndRaceTest {
             existingLicense != null ? existingLicense.id() : null,
             "29A-123456", "VN_2025", "B", LocalDate.now().plusYears(2), false, "PENDING", licenseVer
         ));
+        LicensePhotoFixture.approved(licenseService, user);
     }
 
     @Test
