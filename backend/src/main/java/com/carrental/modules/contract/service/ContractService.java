@@ -1,5 +1,6 @@
 package com.carrental.modules.contract.service;
 import com.carrental.modules.booking.entity.Booking;
+import com.carrental.modules.booking.service.DepositPolicy;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -16,12 +17,13 @@ import java.util.*;
   }catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
  }
  public Object get(String bookingId){return jdbc.queryForList("select id,issued_at,snapshot,terms_version from contracts where booking_id=?",bookingId);}
- public void issueDeposit(com.carrental.modules.booking.service.BookingService.View b){
-  var snapshot=new LinkedHashMap<String,Object>();
-  snapshot.put("customer",b.customerName());snapshot.put("vehicle",b.vehicleName());snapshot.put("pickup",b.pickupName());snapshot.put("return",b.returnName());
-  snapshot.put("startAt",b.startAt());snapshot.put("endAt",b.endAt());snapshot.put("rentalTotal",b.rentalTotal());snapshot.put("oneWayFee",b.oneWayFee());snapshot.put("total",b.total());
-  snapshot.put("terms",TERMS);snapshot.put("policyVersion",b.policyVersion());snapshot.put("rentalDays",b.rentalDays());snapshot.put("deposit",b.deposit());
-  try{jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),b.id(),java.sql.Timestamp.from(clock.instant()),json.writeValueAsString(snapshot),"sandbox-deposit-30-v1");}
-  catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
- }
+public void issueDeposit(com.carrental.modules.booking.service.BookingService.View b){
+    var snapshot=new LinkedHashMap<String,Object>();
+    snapshot.put("customer",b.customerName());snapshot.put("vehicle",b.vehicleName());snapshot.put("pickup",b.pickupName());snapshot.put("return",b.returnName());
+    snapshot.put("startAt",b.startAt());snapshot.put("endAt",b.endAt());snapshot.put("rentalTotal",b.rentalTotal());snapshot.put("oneWayFee",b.oneWayFee());snapshot.put("total",b.total());
+    snapshot.put("terms",TERMS);snapshot.put("policyVersion",b.policyVersion());snapshot.put("rentalDays",b.rentalDays());snapshot.put("deposit",b.deposit());
+    String termsVersion = DepositPolicy.isDemoQrMethod(b.deposit().method()) ? DepositPolicy.QR_VERSION : DepositPolicy.VNPAY_VERSION;
+    try{jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),b.id(),java.sql.Timestamp.from(clock.instant()),json.writeValueAsString(snapshot),termsVersion);}
+    catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
+  }
 }

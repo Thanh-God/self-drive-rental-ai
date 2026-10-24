@@ -37,4 +37,11 @@ public class Booking {
     public Long depositLicenseVersion;
     public String depositTxnRef;
     public String cancellationKind;
+    public String depositMethod;
+    public String depositMode;
+    public Instant originalHoldUntil;
+    public Instant paymentDueAt;
+    public Instant reviewDueAt;
+    public Instant reportedAt;
+    public String depositReceiverSnapshot;
 }
