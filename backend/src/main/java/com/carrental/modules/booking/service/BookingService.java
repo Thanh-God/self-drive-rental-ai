@@ -23,7 +23,7 @@ public class BookingService {
     private final VehicleService vehicles;
     private final BranchService branches;
     @org.springframework.beans.factory.annotation.Value("${app.deposit-enabled:false}") private boolean depositEnabled;
-    @org.springframework.beans.factory.annotation.Value("${app.deposit-method:VNPAY_SANDBOX}") private String depositMethod;
+    @org.springframework.beans.factory.annotation.Value("${app.deposit.method:VNPAY_SANDBOX}") private String depositMethod;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final LicenseService licenses;
     private final AccountService accounts;
@@ -154,13 +154,13 @@ public class BookingService {
         return licenses.review(b.userId, a, version, approve, reason);
     }
 
-    private SchedulePolicy.Slot slot(Booking b) {
+    public SchedulePolicy.Slot slot(Booking b) {
         boolean calendar = RentalTerms.CALENDAR_POLICY.equals(b.policyVersion);
         boolean received = calendar && Set.of("RETURNED", "COMPLETED").contains(b.status);
         return new SchedulePolicy.Slot(b.id, received ? b.returnBranchId : b.pickupBranchId, b.returnBranchId, b.startAt, b.endAt, b.status, b.expiresAt, calendar);
     }
 
-    private void schedule(Vehicle v, Booking added, String excluded) {
+    public void schedule(Vehicle v, Booking added, String excluded) {
         var existing = repo.lockScheduleByVehicleId(v.id);
         var rows = new ArrayList<>(existing.stream().filter(b -> !b.id.equals(excluded)).map(this::slot).toList());
         if (added != null) rows.add(slot(added));
@@ -318,7 +318,7 @@ public class BookingService {
         return b;
     }
 
-    private Booking lockDepositBooking(String id) {
+    public Booking lockDepositBooking(String id) {
         vehicles.lock(repo.findVehicleIdById(id).orElseThrow(DomainException::missing));
         var b = repo.lock(id).orElseThrow(DomainException::missing);
         entityManager.refresh(b, jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);
@@ -597,7 +597,7 @@ public class BookingService {
             throw DomainException.bad("Cần nội dung/lý do không rỗng, tối đa 2000 ký tự.");
     }
 
-    private void history(Booking b, String old, Actor a, String reason) {
+    public void history(Booking b, String old, Actor a, String reason) {
         jdbc.update("insert into booking_status_history(id,booking_id,previous_status,next_status,actor_id,occurred_at,reason) values(?,?,?,?,?,?,?)",
             UUID.randomUUID().toString(), b.id, old, b.status, a == null ? null : a.id(), java.sql.Timestamp.from(clock.instant()), reason);
     }

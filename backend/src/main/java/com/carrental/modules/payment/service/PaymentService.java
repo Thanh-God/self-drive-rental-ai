@@ -9,6 +9,7 @@ import com.carrental.security.Actor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.*;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.*;
 
 @Service
@@ -214,9 +215,21 @@ public class PaymentService {
         if (!"APPROVED".equals(r.status())) throw DomainException.conflict("Chỉ xử lý khoản đã duyệt.");
         repo.refundStatus(refundId, "PROCESSING", null, VnpayGateway.date(clock.instant()));
         repo.event(p.bookingId(), p.id(), "REFUND_PROCESSING", "Admin đang xử lý hoàn tiền thủ công (QR DEMO)", admin.id(), clock.instant(), null);
+    }
+
+    @Transactional
+    public void completeManualRefund(Actor admin, String refundId, String recipientAccount, String reference, Instant transferTime) {
+        admin.require("ADMIN");
+        var r = repo.lockRefund(refundId);
+        var p = repo.lockPayment(r.paymentId());
+        var b = bookings.view(bookings.require(admin, p.bookingId()));
+        if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) throw DomainException.conflict("Chỉ áp dụng cho QR DEMO.");
+        if (!"PROCESSING".equals(r.status())) throw DomainException.conflict("Chỉ hoàn thành khoản đang xử lý.");
+        if (recipientAccount == null || recipientAccount.isBlank()) throw DomainException.bad("Thiếu tài khoản nhận.");
+        if (reference == null || reference.isBlank()) throw DomainException.bad("Thiếu mã tham chiếu hoàn tiền.");
+        if (transferTime == null || transferTime.isAfter(clock.instant())) throw DomainException.bad("Thời điểm hoàn không hợp lệ.");
         
-        // For manual refund, we directly mark as succeeded since no external gateway
-        repo.refundStatus(refundId, "SUCCEEDED", null, VnpayGateway.date(clock.instant()));
-        repo.event(p.bookingId(), p.id(), "REFUND_SUCCEEDED", "Admin ghi nhận đã hoàn tiền thủ công (QR DEMO)", admin.id(), clock.instant(), null);
+        repo.refundStatus(refundId, "SUCCEEDED", reference, transferTime.toString());
+        repo.event(p.bookingId(), p.id(), "REFUND_SUCCEEDED", "Admin ghi nhận đã hoàn tiền thủ công (QR DEMO) - Tài khoản: " + recipientAccount + ", Tham chiếu: " + reference, admin.id(), clock.instant(), null);
     }
 }

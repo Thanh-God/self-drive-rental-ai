@@ -13,7 +13,7 @@ public class PaymentSettings {
                            @Value("${app.vnpay-tmn-code:}") String merchant,
                            @Value("${app.vnpay-hash-secret:}") String secret,
                            @Value("${app.vnpay-return-url:http://localhost:5173/user/payment-return}") String returnUrl,
-                           @Value("${app.deposit-method:VNPAY_SANDBOX}") String depositMethod) {
+                           @Value("${app.deposit.method:VNPAY_SANDBOX}") String depositMethod) {
         this.enabled=enabled;this.merchant=merchant;this.secret=secret;this.returnUrl=returnUrl;this.depositMethod=depositMethod;
         var uri=java.net.URI.create(returnUrl);
         if (!java.util.Set.of("http","https").contains(uri.getScheme()) || uri.getHost()==null || uri.getUserInfo()!=null || uri.getFragment()!=null)

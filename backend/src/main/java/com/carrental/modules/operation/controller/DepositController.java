@@ -39,6 +39,7 @@ public class DepositController {
     public record VerifyInput(String transactionRef, long amountVnd, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion) {}
     public record ManualRefundInput(String paymentId, long amount, String reason) {}
     public record ManualRefundDecideInput(long expectedVersion, long amount, String reason) {}
+    public record ManualRefundCompleteInput(String recipientAccount, String reference, java.time.Instant transferTime) {}
 
     @GetMapping("/bookings/{id}/deposit")
     public Object summary(@AuthenticationPrincipal Actor actor, @PathVariable String id) {
@@ -146,6 +147,11 @@ public class DepositController {
     @PostMapping("/admin/refunds/{id}/process-manual")
     public void processManualRefund(@AuthenticationPrincipal Actor actor, @PathVariable String id) {
         payments.processManualRefund(actor, id);
+    }
+
+    @PostMapping("/admin/refunds/{id}/complete-manual")
+    public void completeManualRefund(@AuthenticationPrincipal Actor actor, @PathVariable String id, @RequestBody ManualRefundCompleteInput input) {
+        payments.completeManualRefund(actor, id, input.recipientAccount(), input.reference(), input.transferTime());
     }
 
     @GetMapping("/payments/vnpay/ipn")

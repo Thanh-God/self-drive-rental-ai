@@ -20,7 +20,7 @@ public class PaymentRepository {
 
     public record Refund(String id, String paymentId, String bookingId, long amount, String status, String kind,
                          String reason, String approvedBy, Instant approvedAt, Instant createdAt,
-                         String providerTransaction, String requestDate, long version) {}
+                         String providerTransaction, String requestDate, long version, String depositMethod) {}
 
     private static Instant instant(java.sql.ResultSet r, String name) throws java.sql.SQLException {
         var t = r.getTimestamp(name); return t == null ? null : t.toInstant();
@@ -40,7 +40,8 @@ public class PaymentRepository {
         r.getString("id"), r.getString("payment_id"), r.getString("booking_id"), r.getLong("amount"),
         r.getString("status"), r.getString("kind"), r.getString("reason"), r.getString("approved_by"),
         instant(r, "approved_at"), instant(r, "created_at"), r.getString("provider_transaction"),
-        r.getString("request_date"), r.getLong("version")
+        r.getString("request_date"), r.getLong("version"),
+        r.getString("deposit_method")
     );
 
     public Optional<Payment> payment(String id) {
@@ -95,16 +96,31 @@ public class PaymentRepository {
     }
 
     public Optional<Refund> refundForPayment(String id) {
-        return jdbc.query("select * from payment_refunds where payment_id=?", refund, id).stream().findFirst();
+        return jdbc.query("""
+            select pr.*, b.deposit_method
+            from payment_refunds pr
+            left join bookings b on pr.booking_id = b.id
+            where pr.payment_id=?
+            """, refund, id).stream().findFirst();
     }
 
     public Refund refund(String id) {
-        return jdbc.query("select * from payment_refunds where id=?", refund, id)
+        return jdbc.query("""
+            select pr.*, b.deposit_method
+            from payment_refunds pr
+            left join bookings b on pr.booking_id = b.id
+            where pr.id=?
+            """, refund, id)
             .stream().findFirst().orElseThrow(DomainException::missing);
     }
 
     public Refund lockRefund(String id) {
-        return jdbc.query("select * from payment_refunds where id=? for update", refund, id)
+        return jdbc.query("""
+            select pr.*, b.deposit_method
+            from payment_refunds pr
+            left join bookings b on pr.booking_id = b.id
+            where pr.id=? for update
+            """, refund, id)
             .stream().findFirst().orElseThrow(DomainException::missing);
     }
 
@@ -130,11 +146,22 @@ public class PaymentRepository {
     }
 
     public List<Refund> refunds(String booking) {
-        return jdbc.query("select * from payment_refunds where booking_id=? order by created_at,id", refund, booking);
+        return jdbc.query("""
+            select pr.*, b.deposit_method
+            from payment_refunds pr
+            left join bookings b on pr.booking_id = b.id
+            where pr.booking_id=?
+            order by pr.created_at, pr.id
+            """, refund, booking);
     }
 
     public List<Refund> adminRefunds() {
-        return jdbc.query("select * from payment_refunds order by created_at desc,id limit 200", refund);
+        return jdbc.query("""
+            select pr.*, b.deposit_method
+            from payment_refunds pr
+            left join bookings b on pr.booking_id = b.id
+            order by pr.created_at desc, pr.id limit 200
+            """, refund);
     }
 
     public List<Payment> unresolvedPayments() {
