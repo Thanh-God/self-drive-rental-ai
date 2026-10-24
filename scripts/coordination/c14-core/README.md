@@ -10,6 +10,15 @@ agents working sequentially. Missing registry or identity/image/mount/marker
 drift is a refusal, never an implicit new container. Containers are stopped
 afterwards and their volumes are retained; there is no automatic deletion.
 
+For sandbox deposit logic, select `--suites DepositHttpTest MySqlMigrationTest`.
+The migration suite includes V5→V6 preservation and six test methods. With matching
+native evidence, the desktop proof uses `--synthetic-deposit --browser-script
+scripts/operations/verify-booking-deposit.cjs` on `run-browser.py`. This explicit
+mode configures synthetic merchant values, delays scheduled provider calls, and
+the browser intercepts checkout navigation. Its signed local IPN proves internal
+protocol handling only; it is never evidence of a real VNPAY payment/refund.
+Real merchant, HTTPS callback, QueryDR and Refund must be accepted separately.
+
 For vehicle administration, select `--suites VehicleAdminHttpServerTest MySqlMigrationTest`
 in `run-mysql.py`. The migration suite covers fresh, V1 upgrade, V2 upgrade and
 the historical partial-migration refusal (three test methods). With that native

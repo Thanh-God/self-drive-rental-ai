@@ -8,7 +8,7 @@ Không sửa migration đã áp dụng trong môi trường dùng chung. Kiểm 
 
 ## 1. Danh sách bảng và trạng thái sử dụng
 
-Tổng số bảng: **25 bảng nghiệp vụ** + **1 bảng kỹ thuật** (`flyway_schema_history`) = 26 bảng.
+Baseline V1–V5: **25 bảng nghiệp vụ** + **1 bảng kỹ thuật** (`flyway_schema_history`) = 26 bảng. V6 mở rộng cọc sandbox lên **28 bảng nghiệp vụ + history = 29 bảng**; chi tiết ở cuối tài liệu.
 Trong đó:
 - **15 bảng** có code nghiệp vụ đọc/ghi (Implementation thực tế qua Entity hoặc Sql qua JdbcTemplate).
 - **2 bảng** chỉ dùng để seed/đọc catalog.
@@ -142,3 +142,7 @@ Chú giải: `||` = đúng một cha; `o|` = 0 hoặc 1 cha (FK nullable); `o{` 
 
 
 V2 bổ sung các trường trạng thái và căn cứ đánh giá vào incident_events. Review tham chiếu booking; xe được suy ra từ booking, không có FK reviews.vehicle_id trực tiếp.
+
+## Mở rộng V6 — cọc sandbox
+
+V1–V5 có 25 bảng nghiệp vụ và Flyway history. V6 thêm ba bảng payment_transactions, payment_refunds, payment_events: tổng 28 bảng nghiệp vụ + history =29; 46 khóa ngoại. Thêm snapshot cọc vào bookings, mặc định deposit_required=false cho đơn cũ. Dùng migration mới, không tính lại giá hay truy thu đơn cũ. Xem [chính sách](../modules/booking-deposit.md).

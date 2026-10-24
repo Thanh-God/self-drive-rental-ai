@@ -19,10 +19,13 @@ export default function BookingProgress({ booking, history = [], role, actions =
   const contract = ["CONFIRMED", "IN_PROGRESS", "RETURNED", "COMPLETED"].includes(booking.status) || events.some(event => event.next_status === "CONFIRMED");
   const invoice = booking.status === "COMPLETED" || events.some(event => event.next_status === "COMPLETED");
   const label = status => bookingStageLabels[status] || "Trạng thái chưa xác định";
+  const depositPending = booking.status === 'PENDING' && booking.deposit?.required;
+  const currentLabel = depositPending ? (booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ') : label(booking.status);
+  const explanation = depositPending ? (booking.deposit.approvedAt ? 'Hồ sơ đã được duyệt. Thanh toán cọc trong thời hạn hiển thị; hệ thống xác nhận đơn sau khi xác minh khoản cọc.' : 'Nhân viên chi nhánh nhận kiểm tra hồ sơ trước khi mở bước đóng cọc.') : explanations[booking.status];
   return <section className="panel" aria-label="Tiến trình đơn thuê">
     <h2 className="text-lg font-semibold">Tiến trình đơn thuê</h2>
-    <p className="mt-3 font-semibold" aria-live="polite">Hiện tại: {label(booking.status)}</p>
-    <p className="mt-2 text-sm leading-6">{explanations[booking.status] || "Tải lại đơn để kiểm tra trạng thái hiện tại."}</p>
+    <p className="mt-3 font-semibold" aria-live="polite">Hiện tại: {currentLabel}</p>
+    <p className="mt-2 text-sm leading-6">{explanation || "Tải lại đơn để kiểm tra trạng thái hiện tại."}</p>
     {role === "STAFF" ? <p className="mt-2 text-sm">Nhận/xác nhận và giao xe thuộc chi nhánh nhận; nhận trả và hoàn tất thuộc chi nhánh trả. {actions.length ? "Chỉ sử dụng các thao tác được phép bên dưới." : "Hiện không có thao tác khả dụng theo phân công, trạng thái hoặc thời gian thuê."}</p> : null}
     {role === "ADMIN" ? <p className="mt-2 text-sm">Quản trị viên không thực hiện giao hoặc nhận trả xe. Theo dõi đơn và các thao tác được phép bên dưới.</p> : null}
     {role === "USER" && ["PENDING", "CONFIRMED"].includes(booking.status) ? <p className="mt-2 text-sm">{actions.includes("CANCELLED") ? "Có thể yêu cầu hủy tại phần thao tác bên dưới, kèm lý do." : "Nếu cần hủy sát giờ nhận, hãy liên hệ nhân viên chi nhánh nhận."} <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p> : null}

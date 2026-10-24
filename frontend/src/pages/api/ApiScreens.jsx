@@ -1,4 +1,5 @@
 import LicensePhotos from "../../components/user/LicensePhotos";
+import BookingDeposit from "../../components/user/BookingDeposit";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
 import { visibleBookings, workStatusLabels, vietnamDay, bookingSortLabels, adminDateFormat, adminBookingDate } from "../../utils/bookingQueue";
@@ -1396,6 +1397,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                       </span>
                     )}
                     <Status status={booking.status} />
+                    {booking.status === 'PENDING' && booking.deposit?.required ? <span className="text-sm">{booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
                   </div>
                   {area === "admin" ? (
                     <div className="mb-1">
@@ -1582,6 +1584,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
   const branchAssignmentsRequest = useApiData("/me/branches", isStaff);
   const [next, setNext] = useState("");
   const [reason, setReason] = useState("");
+  const [cancellationKind, setCancellationKind] = useState('');
   const [condition, setCondition] = useState("");
   const [licenseChecked, setLicenseChecked] = useState(false);
   const [maintenance, setMaintenance] = useState(false);
@@ -1608,6 +1611,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
     prevBookingId.current = booking?.id;
     setNext("");
     setReason("");
+    setCancellationKind('');
     setCondition("");
     setLicenseChecked(false);
     setMaintenance(false);
@@ -1636,10 +1640,12 @@ export function ApiBookingDetailPage({ area = "user" }) {
         condition: condition || null,
         licenseChecked,
         maintenance,
+        cancellationKind: booking.deposit?.required && next === 'CANCELLED' ? cancellationKind : null,
       });
       setNotice(next === "IN_PROGRESS" ? "Đã bàn giao xe thành công — đơn chuyển sang Đang thuê." : "Đã cập nhật trạng thái đơn.");
       setNext("");
       setReason("");
+      setCancellationKind('');
       setCondition("");
       request.reload();
     } catch (actionError) {
@@ -1704,6 +1710,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
             ) : null}
             <div className="mb-5 flex items-center gap-3">
               <Status status={booking.status} />
+              {booking.status === 'PENDING' && booking.deposit?.required ? <span>{booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
               {area === "staff" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}
             </div>
             {booking.status === "PENDING" && booking.expiresAt ? (
@@ -1712,6 +1719,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
               </p>
             ) : null}
             {error ? <Notice error>{error}</Notice> : null}
+            {booking.deposit?.required ? <BookingDeposit key={booking.id} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
             <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
               <div className="space-y-5">
                 <section className="panel">
@@ -1901,6 +1909,13 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       />
                     </Field>
                   ) : null}
+                  {booking.deposit?.required && next === 'CANCELLED' && area !== 'user' ? <Field label="Nguyên nhân hủy và chính sách hoàn cọc">
+                    <select required value={cancellationKind} onChange={event => setCancellationKind(event.target.value)}>
+                      <option value="">Chọn nguyên nhân</option>
+                      <option value="BUSINESS">Doanh nghiệp không cung cấp xe — hoàn toàn bộ</option>
+                      <option value="LATE_CUSTOMER">Khách hủy — Admin quyết định hoàn cọc</option>
+                    </select>
+                  </Field> : null}
                   {["IN_PROGRESS", "RETURNED"].includes(next) ? (
                     <Field label="Tình trạng xe / ghi chú">
                       <textarea

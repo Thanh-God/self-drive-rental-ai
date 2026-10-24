@@ -14,13 +14,16 @@ import java.time.*;
 import java.util.*;
 @Service public class BookingService {
  private final BookingRepository repo;private final VehicleService vehicles;private final BranchService branches;
+ @org.springframework.beans.factory.annotation.Value("${app.deposit-enabled:false}") private boolean depositEnabled;
+ @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
  private final LicenseService licenses;private final AccountService accounts;private final JdbcTemplate jdbc;private final Clock clock;
  public BookingService(BookingRepository r,VehicleService v,BranchService b,LicenseService l,AccountService a,JdbcTemplate j,Clock c){repo=r;vehicles=v;branches=b;licenses=l;accounts=a;jdbc=j;clock=c;}
  public record Input(String vehicleId,String pickupBranchId,String returnBranchId,Instant startAt,Instant endAt,Long expectedTotal,LocalDate pickupDate,LocalDate returnDate){
   public Input(String vehicleId,String pickupBranchId,String returnBranchId,Instant startAt,Instant endAt,Long expectedTotal){this(vehicleId,pickupBranchId,returnBranchId,startAt,endAt,expectedTotal,null,null);}
  }
- public record View(String id,String userId,String vehicleId,String customerName,String vehicleName,String pickupBranchId,String returnBranchId,String pickupName,String returnName,String actualReturnBranchId,Instant startAt,Instant endAt,Instant expiresAt,String status,long dailyPrice,int rentalDays,long rentalTotal,long oneWayFee,long total,long version,Instant createdAt,String policyVersion){}
- public View view(Booking b){return new View(b.id,b.userId,b.vehicleId,b.customerName,b.vehicleName,b.pickupBranchId,b.returnBranchId,b.pickupName,b.returnName,b.actualReturnBranchId,b.startAt,b.endAt,b.expiresAt,effective(b),b.dailyPrice,b.rentalDays,b.rentalTotal,b.oneWayFee,b.total,b.version,b.createdAt,b.policyVersion);}
+ public record View(String id,String userId,String vehicleId,String customerName,String vehicleName,String pickupBranchId,String returnBranchId,String pickupName,String returnName,String actualReturnBranchId,Instant startAt,Instant endAt,Instant expiresAt,String status,long dailyPrice,int rentalDays,long rentalTotal,long oneWayFee,long total,long version,Instant createdAt,String policyVersion,Deposit deposit){}
+ public record Deposit(boolean required,long amount,String policy,Instant approvedAt,Instant dueAt,String txnRef,String cancellationKind){}
+ public View view(Booking b){return new View(b.id,b.userId,b.vehicleId,b.customerName,b.vehicleName,b.pickupBranchId,b.returnBranchId,b.pickupName,b.returnName,b.actualReturnBranchId,b.startAt,b.endAt,b.expiresAt,effective(b),b.dailyPrice,b.rentalDays,b.rentalTotal,b.oneWayFee,b.total,b.version,b.createdAt,b.policyVersion,new Deposit(b.depositRequired,b.depositAmount,b.depositPolicy,b.depositApprovedAt,b.depositApprovedAt==null?null:b.expiresAt,b.depositTxnRef,b.cancellationKind));}
  public String effective(Booking b){return "PENDING".equals(b.status)&&!b.expiresAt.isAfter(clock.instant())?"EXPIRED":b.status;}
  public record Report(long total,Map<String,Long> byStatus,long completed){}
  public Report report(Instant from,Instant to,Instant asOf){
@@ -78,6 +81,8 @@ import java.util.*;
   b.rentalDays=rentalDays;b.dailyPrice=v.dailyPrice;
   b.rentalTotal=RentalTerms.rent(b.dailyPrice,b.rentalDays);b.total=RentalTerms.total(b.rentalTotal,b.oneWayFee);
   b.customerName=accounts.profile(a.id()).fullName();b.vehicleName=v.name;b.status="PENDING";b.policyVersion=calendar?RentalTerms.CALENDAR_POLICY:"rental-2026-09-28";
+  if(depositEnabled){b.depositRequired=true;b.depositAmount=DepositPolicy.amount(b.rentalTotal);b.depositPolicy=DepositPolicy.VERSION;
+   if(b.depositAmount<5000)throw DomainException.bad("Tiền cọc dưới mức tối thiểu 5.000 đ của VNPAY; chưa thể đặt online xe này.");}
   schedule(v,b,null);return b;
  }
  @Transactional public View quote(Actor a,Input i){return view(prepare(a,i,vehicles.lock(i.vehicleId())));}
@@ -87,7 +92,9 @@ import java.util.*;
   if(i.expectedTotal()==null||i.expectedTotal()!=b.total)throw DomainException.conflict("Giá đã thay đổi hoặc chưa xác nhận báo giá. Vui lòng kiểm tra lại.");
   repo.saveAndFlush(b);history(b,null,a,"Tạo yêu cầu thuê");return view(b);
  }
- public record Action(String next,long version,String reason,String condition,boolean licenseChecked,boolean maintenance){}
+ public record Action(String next,long version,String reason,String condition,boolean licenseChecked,boolean maintenance,String cancellationKind){
+  public Action(String next,long version,String reason,String condition,boolean licenseChecked,boolean maintenance){this(next,version,reason,condition,licenseChecked,maintenance,null);}
+ }
  @Transactional public Booking change(Actor a,String id,Action action){
   String vehicleId=repo.findVehicleIdById(id).orElseThrow(DomainException::missing);
   Vehicle vehicle=vehicles.lock(vehicleId);
@@ -100,12 +107,20 @@ import java.util.*;
    case "CANCELLED" -> {
     if(!Set.of("PENDING","CONFIRMED").contains(old))throw DomainException.conflict("Không thể hủy ở trạng thái này.");
     if(a.is("USER")&&Duration.between(clock.instant(),b.startAt).compareTo(Duration.ofHours(24))<0)throw DomainException.bad("Cần liên hệ Staff khi còn dưới 24 giờ.");
-    reason(action.reason());schedule(vehicle,null,b.id);
+    reason(action.reason());
+    if(b.depositRequired){
+     b.cancellationKind=a.is("USER")?"EARLY_USER":action.cancellationKind();
+     if(!Set.of("EARLY_USER","BUSINESS","LATE_CUSTOMER").contains(b.cancellationKind==null?"":b.cancellationKind))throw DomainException.bad("Chọn doanh nghiệp hủy hoặc khách hủy sát giờ để xử lý cọc.");
+     if(!a.is("USER")&&"EARLY_USER".equals(b.cancellationKind))throw DomainException.bad("Chọn đúng nguyên nhân khách hủy; hệ thống tự kiểm tra mốc 24 giờ.");
+     if("LATE_CUSTOMER".equals(b.cancellationKind)&&DepositPolicy.early(clock.instant(),b.startAt))b.cancellationKind="EARLY_USER";
+    }
+    schedule(vehicle,null,b.id);
    }
    case "CONFIRMED","REJECTED" -> {
     branches.requireStaff(a,b.pickupBranchId);
     if(!"PENDING".equals(old))throw DomainException.conflict("Đơn không còn chờ xác nhận.");
-    if("REJECTED".equals(next)){reason(action.reason());schedule(vehicle,null,b.id);}
+    if("CONFIRMED".equals(next)&&b.depositRequired)throw DomainException.bad("Đơn có cọc phải duyệt hồ sơ và đóng cọc; không xác nhận thủ công.");
+    if("REJECTED".equals(next)){b.cancellationKind="BUSINESS";reason(action.reason());schedule(vehicle,null,b.id);}
     else {if(!"ACTIVE".equals(vehicle.status))throw DomainException.conflict("Xe không hoạt động.");licenses.eligible(b.userId,vehicle.transmission,vehicle.seats,b.endAt);licenses.requirePhotos(b.userId,true);schedule(vehicle,null,null);}
    }
    case "IN_PROGRESS" -> {
@@ -114,6 +129,7 @@ import java.util.*;
     if(RentalTerms.CALENDAR_POLICY.equals(b.policyVersion)&&!clock.instant().atZone(RentalTerms.VIETNAM).toLocalDate().equals(b.startAt.atZone(RentalTerms.VIETNAM).toLocalDate()))throw DomainException.conflict("Chỉ xác nhận giao xe trong ngày nhận đã đặt.");
     if(!"ACTIVE".equals(vehicle.status)||!vehicle.currentBranchId.equals(b.pickupBranchId))throw DomainException.conflict("Xe không sẵn sàng tại chi nhánh nhận.");
     if(repo.lockScheduleByVehicleId(vehicle.id).stream().anyMatch(x->!x.id.equals(b.id)&&"IN_PROGRESS".equals(x.status)))throw DomainException.conflict("Xe còn đang được thuê.");
+    if(b.depositRequired&&b.depositTxnRef==null)throw DomainException.bad("Đơn chưa có cọc đã đối soát.");
     if(!action.licenseChecked())throw DomainException.bad("Staff phải kiểm tra GPLX thực tế trước giao.");
     reason(action.condition());licenses.verify(b.userId,a,vehicle.transmission,vehicle.seats,b.endAt);
    }
@@ -129,8 +145,46 @@ import java.util.*;
   }
   b.status=next;repo.flush();history(b,old,a,action.reason()!=null?action.reason():action.condition());return b;
  }
+
+ private Booking lockDepositBooking(String id){
+  vehicles.lock(repo.findVehicleIdById(id).orElseThrow(DomainException::missing));
+  var b=repo.lock(id).orElseThrow(DomainException::missing);entityManager.refresh(b,jakarta.persistence.LockModeType.PESSIMISTIC_WRITE);return b;
+ }
+ @Transactional(propagation=Propagation.MANDATORY) public View depositLock(String id){return view(lockDepositBooking(id));}
+ @Transactional public View approveDeposit(Actor staff,String id,long expectedVersion){
+  var b=lockDepositBooking(id);branches.requireStaff(staff,b.pickupBranchId);
+  if(b.version!=expectedVersion)throw DomainException.conflict("Đơn đã thay đổi. Vui lòng tải lại.");
+  if(!b.depositRequired||!"PENDING".equals(effective(b)))throw DomainException.conflict("Đơn không còn chờ duyệt đóng cọc.");
+  var v=vehicles.lock(b.vehicleId);licenses.eligible(b.userId,v.transmission,v.seats,b.endAt);licenses.requirePhotos(b.userId,true);schedule(v,null,null);
+  if(b.depositApprovedAt==null){b.depositApprovedAt=clock.instant();b.expiresAt=DepositPolicy.deadline(clock.instant(),b.expiresAt);}
+  b.depositApprovedBy=staff.id();b.depositLicenseVersion=licenses.forBooking(b.userId).version();repo.flush();return view(b);
+ }
+ @Transactional(propagation=Propagation.MANDATORY) public View requirePayable(Actor user,String id){
+  user.require("USER");var b=lockDepositBooking(id);if(!b.userId.equals(user.id()))throw DomainException.missing();
+  validateDeposit(b);return view(b);
+ }
+ private void validateDeposit(Booking b){
+  if(!b.depositRequired||b.depositApprovedAt==null||!"PENDING".equals(effective(b)))throw DomainException.conflict("Đơn chưa được duyệt đóng cọc hoặc đã hết hạn.");
+  var v=vehicles.lock(b.vehicleId);if(!"ACTIVE".equals(v.status))throw DomainException.conflict("Xe không còn sẵn sàng.");
+  licenses.eligible(b.userId,v.transmission,v.seats,b.endAt);licenses.requirePhotos(b.userId,true);
+  if(!Objects.equals(b.depositLicenseVersion,licenses.forBooking(b.userId).version()))throw DomainException.conflict("GPLX đã thay đổi sau duyệt. Cần nhân viên kiểm tra lại; hạn cọc không được kéo dài.");
+  schedule(v,null,null);
+ }
+ @Transactional(propagation=Propagation.MANDATORY) public View confirmPaidDeposit(String id,String ref){
+  var b=lockDepositBooking(id);
+  if(ref.equals(b.depositTxnRef))return view(b);
+  if(b.depositTxnRef!=null)throw DomainException.conflict("Đơn đã nhận cọc từ giao dịch khác.");
+  validateDeposit(b);b.depositTxnRef=ref;b.status="CONFIRMED";repo.flush();history(b,"PENDING",null,"VNPAY Sandbox xác minh cọc: "+ref);return view(b);
+ }
+ @Transactional public View noShow(Actor staff,String id,long expectedVersion,boolean contacted,boolean notDelivered,String note){
+  var b=lockDepositBooking(id);branches.requireStaff(staff,b.pickupBranchId);reason(note);
+  if(b.version!=expectedVersion)throw DomainException.conflict("Đơn đã thay đổi.");
+  if(!contacted||!notDelivered||!"CONFIRMED".equals(b.status)||!clock.instant().atZone(RentalTerms.VIETNAM).toLocalDate().isAfter(b.startAt.atZone(RentalTerms.VIETNAM).toLocalDate()))throw DomainException.bad("Chỉ ghi nhận sau hết ngày nhận; cần xác nhận đã liên hệ và chưa giao xe.");
+  if(jdbc.queryForObject("select count(*) from vehicle_handover_records where booking_id=? and kind='HANDOVER'",Long.class,id)>0)throw DomainException.conflict("Đã có biên bản giao xe; không xử lý no-show.");
+  schedule(vehicles.lock(b.vehicleId),null,b.id);b.cancellationKind="NO_SHOW";b.status="CANCELLED";repo.flush();history(b,"CONFIRMED",staff,"Khách không đến nhận: "+note);return view(b);
+ }
  private void reason(String text){if(text==null||text.isBlank()||text.length()>2000)throw DomainException.bad("Cần nội dung/lý do không rỗng, tối đa 2000 ký tự.");}
  private void history(Booking b,String old,Actor a,String reason){
-  jdbc.update("insert into booking_status_history(id,booking_id,previous_status,next_status,actor_id,occurred_at,reason) values(?,?,?,?,?,?,?)",UUID.randomUUID().toString(),b.id,old,b.status,a.id(),java.sql.Timestamp.from(clock.instant()),reason);
+  jdbc.update("insert into booking_status_history(id,booking_id,previous_status,next_status,actor_id,occurred_at,reason) values(?,?,?,?,?,?,?)",UUID.randomUUID().toString(),b.id,old,b.status,a==null?null:a.id(),java.sql.Timestamp.from(clock.instant()),reason);
  }
 }

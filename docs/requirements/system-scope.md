@@ -41,7 +41,7 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 2. Xem, tìm kiếm, lọc và xem chi tiết xe; hiển thị hình ảnh, giá, số chỗ, loại xe và tiện nghi.
 3. Kiểm tra lịch khả dụng, tạo đơn thuê, xem đơn và hủy theo chính sách.
 4. Staff xác nhận/từ chối đơn, ghi nhận bàn giao/nhận xe và hoàn tất đơn.
-5. Tra cứu hợp đồng và hóa đơn gắn với đơn; chưa cần thanh toán online.
+5. Tra cứu hợp đồng và hóa đơn gắn với đơn; cọc giữ chỗ chỉ thử nghiệm VNPAY Sandbox theo [chính sách cọc](../modules/booking-deposit.md).
 6. User gửi rating/nội dung sau khi đơn hoàn thành; Admin kiểm duyệt trạng thái hiển thị.
 7. Recommendation: hard-filter xe bằng backend, chấm điểm/xếp hạng, AI hỗ trợ phân tích free text hoặc giải thích; công nghệ cuối cùng còn mở.
 8. Itinerary: lấy candidate location và ước tính tuyến bằng Map API, AI lập lịch từ dữ liệu được cấp, backend kiểm tra và lưu kế hoạch.
@@ -60,7 +60,7 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 
 ### 4.3 Ngoài phạm vi bắt buộc
 
-- Cổng thanh toán trực tuyến, hoàn tiền tự động.
+- Thanh toán thật, thu phần tiền thuê còn lại và cọc bảo đảm thiệt hại; cọc giữ chỗ VNPAY Sandbox là phần mở rộng riêng.
 - Thuê xe có tài xế.
 - Bảo hiểm tự động, GPS/IoT, quản lý bảo dưỡng nâng cao.
 - Huấn luyện LLM lớn từ đầu hoặc recommendation học từ dữ liệu lớn. Mô hình nhỏ tự train sẽ được đánh giá sau backend, chưa mặc định thuộc phần đã triển khai.
@@ -133,7 +133,7 @@ FR-14/16/19 dùng Gemini theo phương án gốc; ranh giới chức năng giữ
 ### Hủy, giao nhận và đánh giá
 
 - User chỉ hủy đơn của mình và chỉ khi thỏa chính sách hủy.
-- User hủy trước giờ nhận tối thiểu 24 giờ khi đơn PENDING/CONFIRMED; sát giờ Staff/Admin xử lý theo quyền và lý do. Chưa có công thức phí hủy/cọc.
+- User hủy trước giờ nhận tối thiểu 24 giờ khi đơn PENDING/CONFIRMED; sát giờ Staff/Admin xử lý theo quyền và lý do. Cọc giữ chỗ sandbox áp dụng chính sách riêng; không tự khấu trừ thiệt hại.
 - Staff ghi nhận giao/nhận xe; đơn chỉ hoàn tất sau khi xe được trả và được xử lý theo quy trình.
 - Chỉ User có đơn hoàn tất được đánh giá xe tương ứng; mỗi đơn tối đa một đánh giá; rating từ 1 đến 5.
 - Admin có thể ẩn đánh giá vi phạm nhưng không xóa lịch sử kiểm duyệt nếu sau này bật audit.

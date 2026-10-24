@@ -13,9 +13,10 @@ Package gốc: `com.carrental`. Một module là một phần mã nghiệp vụ,
 | `branch` | Chi nhánh, tuyến/phí, phân công Staff | `user` service kiểm tra Staff; không đọc users trực tiếp, không gộp catalog tham quan |
 | `location` | Catalog tham quan, tọa độ, phân loại, tham chiếu nhà cung cấp nếu có | Map adapter khi cần xác thực tọa độ |
 | `booking` | Đơn, khoảng thuê, availability, giá snapshot, hủy và state transition | `user`, `vehicle`, `branch` |
-| `operation` | Biên bản, sự cố/vi phạm, điều phối giao nhận/phát hành | `booking`, `vehicle`, `user`, `contract`, `invoice`, `branch` qua API nội bộ có kiểu |
+| `operation` | Biên bản, sự cố/vi phạm, điều phối giao nhận/phát hành và cọc | `booking`, `vehicle`, `user`, `contract`, `invoice`, `branch`, `payment` qua API nội bộ có kiểu |
+| `payment` | Giao dịch, hoàn tiền, chữ ký VNPAY Sandbox và audit tiền | `booking` qua DTO/service, không phụ thuộc operation |
 | `contract` | Hồ sơ hợp đồng và snapshot | `booking` để kiểm tra/trích xuất dữ liệu cần thiết |
-| `invoice` | Hồ sơ hóa đơn và snapshot, không thanh toán online | `booking` để kiểm tra/trích xuất dữ liệu cần thiết |
+| `invoice` | Hồ sơ hóa đơn và snapshot, không xác nhận tiền đã thu | `booking` để kiểm tra/trích xuất dữ liệu cần thiết |
 | `review` | Đánh giá và trạng thái kiểm duyệt | `booking` kiểm tra chủ đơn, xe và điều kiện hoàn tất |
 | `ai/recommendation` | Criteria, hard-filter, điểm và giải thích | `vehicle`, `booking`, Qwen adapter cục bộ |
 | `ai/itinerary` | Kế hoạch cá nhân và các mục lịch trình | `location`, Qwen adapter cục bộ, Map adapter |
@@ -82,3 +83,7 @@ Module vehicle quản lý đọc/tạo/cập nhật hãng, loại xe và tiện 
 Public GET /api/v1/vehicles và /vehicles/{id} thêm amenities:[{id,name}], giữ trường xe cũ. List dùng bulk links và bulk names; không có links trả[]. Admin GET/PUT /api/v1/admin/vehicles/{id}/amenities, GET/PUT DTO {amenities,revision}; PUT input {amenityIds,expectedRevision}. ADMIN200,anonymous401,USER/STAFF403;unknownvehicle404;missing/null/badrevision hoặc IDs null/blank/duplicate/unknown400;stale409/no-write. [] xóa links riêng xe, không xóa master amenities. Hai state-changing updates cùng revision có một200/một409.
 
 Service khóa Vehicle trong transaction, validate tất cả IDs trước mutation và so current revision. Revision SHA256 vehicleID + NUL + sorted IDs, không phụ thuộc name; label catalog đổi thì link/revision giữ nguyên. Same-ID-set kể cả đảo thứ tự là no-op200/0DML; digest không là audit/version tăng dần hoặc phát hiện ABA. Replace links atomic; vehicle fields/version và historical snapshots không đổi do thao tác tiện nghi. PUT thông tin xe cũ thiếu amenities không xóa links; không thêm migration/bảng. Controller/service/repository tách HTTP/business/SQL.
+
+## Cọc sandbox
+
+`payment` giữ giao dịch, yêu cầu hoàn, chữ ký VNPAY và nhật ký tiền. `operation` điều phối payment → booking → contract trong transaction nội bộ, gọi mạng ngoài transaction. booking không phụ thuộc payment service; công thức cọc thuần và snapshot được ghi lúc tạo. Không dùng entity mutable mới để điều phối cọc. Xem [contract cọc](../modules/booking-deposit.md).

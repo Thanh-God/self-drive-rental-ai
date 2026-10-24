@@ -61,22 +61,22 @@ class MySqlMigrationTest {
   String suffix=UUID.randomUUID().toString().replace("-","");String fresh="phase5_f_"+suffix,upgrade="phase5_u_"+suffix;
   var admin=jdbc("mysql");assertTrue(admin.queryForObject("select version()",String.class).startsWith("8.4."));
   for(String schema:List.of(fresh,upgrade))admin.execute("create database `"+schema+"` character set utf8mb4 collate utf8mb4_0900_ai_ci");
-  var f=flyway(fresh,null);assertEquals(5,f.migrate().migrationsExecuted);f.validate();
+  var f=flyway(fresh,null);assertEquals(6,f.migrate().migrationsExecuted);f.validate();
   var v1=flyway(upgrade,"1");assertEquals(1,v1.migrate().migrationsExecuted);
   var u=jdbc(upgrade);try(var connection=u.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}
   var before=data(u);assertFalse(before.isEmpty());
-  var v2=flyway(upgrade,null);assertEquals(4,v2.migrate().migrationsExecuted);v2.validate();
+  var v2=flyway(upgrade,null);assertEquals(5,v2.migrate().migrationsExecuted);v2.validate();
   // All original columns/rows must remain exactly equal; only new nullable event fields differ.
   var after=data(u);stripPhotoColumns(after);for(var row:after){if("incident_events".equals(row.get("_table")))for(String c:List.of("previous_status","next_status","assessed_damage","third_party_coverage","requested_amount","responsibility_basis")){assertNull(row.remove(c));}if("vehicles".equals(row.get("_table")))assertNull(row.remove("created_at"));}
   for(var row:after)if("locations".equals(row.get("_table")))assertNull(row.remove("visit_metadata"));
   assertEquals(before,after);
   assertEquals(structure(jdbc(fresh)),structure(u));
-  assertEquals(26,u.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
-  assertEquals(38,u.queryForObject("select count(*) from information_schema.referential_constraints where constraint_schema=database()",Integer.class));
+  assertEquals(29,u.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
+  assertEquals(46,u.queryForObject("select count(*) from information_schema.referential_constraints where constraint_schema=database()",Integer.class));
   assertEquals(0,u.queryForObject("select count(*) from information_schema.columns where table_schema=database() and table_name='reviews' and column_name='vehicle_id'",Integer.class));
   assertEquals("bigint",u.queryForObject("select data_type from information_schema.columns where table_schema=database() and table_name='incident_events' and column_name='requested_amount'",String.class));
   assertEquals(0,v2.migrate().migrationsExecuted);
-  for(String schema:List.of(fresh,upgrade))assertEquals(5,jdbc(schema).queryForObject("select count(*) from flyway_schema_history where success=1",Integer.class));
+  for(String schema:List.of(fresh,upgrade))assertEquals(6,jdbc(schema).queryForObject("select count(*) from flyway_schema_history where success=1",Integer.class));
   String output=System.getenv("KDRIVE_MIGRATION_ARTIFACT_DIR");if(output!=null){Path dir=Path.of(output);Files.createDirectories(dir);Files.writeString(dir.resolve("migration-schema.txt"),"fresh="+fresh+"\nupgrade="+upgrade+"\n"+structure(u));Files.writeString(dir.resolve("upgrade-preservation.txt"),"before="+before+"\nafter="+after+"\nequal="+before.equals(after));Files.writeString(dir.resolve("flyway-history.txt"),u.queryForList("select * from flyway_schema_history order by installed_rank").toString());}
  }
  @Test void v2UpgradePreservesVehicleRowsAndAddsUnknownCreationDate(){
@@ -85,12 +85,12 @@ class MySqlMigrationTest {
   flyway(schema,"2").migrate();var j=jdbc(schema);
   try(var connection=j.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}catch(Exception e){throw new RuntimeException(e);}
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2') order by version");
-  var finalFlyway=flyway(schema,null);assertEquals(3,finalFlyway.migrate().migrationsExecuted);finalFlyway.validate();
+  var finalFlyway=flyway(schema,null);assertEquals(4,finalFlyway.migrate().migrationsExecuted);finalFlyway.validate();
   var after=data(j);stripPhotoColumns(after);for(var row:after){if("vehicles".equals(row.get("_table")))assertNull(row.remove("created_at"));if("locations".equals(row.get("_table")))assertNull(row.remove("visit_metadata"));}assertEquals(before,after);
   assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2') order by version"));
   assertEquals(1,j.queryForObject("select count(*) from flyway_schema_history where version='3' and success=1",Integer.class));
-  assertEquals(26,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
-  assertEquals(38,j.queryForObject("select count(*) from information_schema.referential_constraints where constraint_schema=database()",Integer.class));
+  assertEquals(29,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
+  assertEquals(46,j.queryForObject("select count(*) from information_schema.referential_constraints where constraint_schema=database()",Integer.class));
  }
  @Test void v3UpgradeKeepsAllRowsAndHistoryAndAddsUnknownVisitMetadata()throws Exception{
   String schema="phase5_v3_"+UUID.randomUUID().toString().replace("-","");
@@ -100,14 +100,15 @@ class MySqlMigrationTest {
   j.update("insert into location_categories(id,name) values('legacy-lc','Legacy category')");
   j.update("insert into locations(id,category_id,name,latitude,longitude,status) values('legacy-location','legacy-lc','Legacy location',16.0611,108.2232,'ACTIVE')");
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by version");
-  var upgrade=flyway(schema,null);assertEquals(2,upgrade.migrate().migrationsExecuted);upgrade.validate();
+  var upgrade=flyway(schema,null);assertEquals(3,upgrade.migrate().migrationsExecuted);upgrade.validate();
   var after=data(j);stripPhotoColumns(after);for(var row:after)if("locations".equals(row.get("_table")))assertNull(row.remove("visit_metadata"));
   assertEquals(before,after);assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2','3') order by version"));
-  assertEquals(26,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
+  assertEquals(29,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
   assertNull(j.queryForObject("select visit_metadata from locations where id='legacy-location'",String.class));
   assertEquals(0,upgrade.migrate().migrationsExecuted);
  }
  private void stripPhotoColumns(List<Map<String,Object>> rows){
+  stripDepositColumns(rows);
   for(var row:rows)if("driver_licenses".equals(row.get("_table"))){
    assertEquals("MISSING",row.remove("photo_review_status"));
    for(String column:List.of("front_photo","back_photo","photo_review_reason","photo_reviewed_by","photo_reviewed_at"))assertNull(row.remove(column));
@@ -121,11 +122,31 @@ class MySqlMigrationTest {
   String userId=j.queryForObject("select id from users order by id limit 1",String.class);
   j.update("insert into driver_licenses(id,user_id,license_number,scheme,license_class,expires_on,automatic_only,status,version) values('upgrade-license',?,'SYNTHETIC-UPGRADE','VN_2025','B','2030-12-31',false,'VERIFIED',7)",userId);
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by version");
-  var upgrade=flyway(schema,null);assertEquals(1,upgrade.migrate().migrationsExecuted);upgrade.validate();
+  var upgrade=flyway(schema,null);assertEquals(2,upgrade.migrate().migrationsExecuted);upgrade.validate();
   var after=data(j);stripPhotoColumns(after);assertEquals(before,after);
   assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2','3','4') order by version"));
-  assertEquals(26,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
-  assertEquals(38,j.queryForObject("select count(*) from information_schema.referential_constraints where constraint_schema=database()",Integer.class));
+  assertEquals(29,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
+  assertEquals(46,j.queryForObject("select count(*) from information_schema.referential_constraints where constraint_schema=database()",Integer.class));
+ }
+
+ private void stripDepositColumns(List<Map<String,Object>> rows){
+  for(var row:rows)if("bookings".equals(row.get("_table"))){
+   assertEquals(false,row.remove("deposit_required"));assertEquals(0L,row.remove("deposit_amount"));
+   for(String column:List.of("deposit_policy","deposit_approved_at","deposit_approved_by","deposit_license_version","deposit_txn_ref","cancellation_kind"))assertNull(row.remove(column));
+  }
+ }
+ @Test void v5UpgradePreservesAllRowsAndLegacyDepositExemption()throws Exception{
+  String schema="phase5_v5_"+UUID.randomUUID().toString().replace("-","");
+  jdbc("mysql").execute("create database `"+schema+"` character set utf8mb4 collate utf8mb4_0900_ai_ci");
+  flyway(schema,"5").migrate();var j=jdbc(schema);
+  try(var connection=j.getDataSource().getConnection()){ScriptUtils.executeSqlScript(connection,new ClassPathResource("db/fixture/phase5-v1-data.sql"));}
+  var before=data(j);assertFalse(before.isEmpty());var history=j.queryForList("select version,checksum,success from flyway_schema_history order by version");
+  var upgrade=flyway(schema,null);assertEquals(1,upgrade.migrate().migrationsExecuted);upgrade.validate();
+  var after=data(j);stripDepositColumns(after);assertEquals(before,after);
+  assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where version in ('1','2','3','4','5') order by version"));
+  assertEquals(29,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
+  assertEquals(46,j.queryForObject("select count(*) from information_schema.referential_constraints where constraint_schema=database()",Integer.class));
+  assertEquals(0,upgrade.migrate().migrationsExecuted);
  }
 
 }

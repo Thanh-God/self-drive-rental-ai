@@ -29,4 +29,12 @@ public class Booking {
     public String pickupName;
     public String returnName;
     public String policyVersion;
+    public boolean depositRequired;
+    public long depositAmount;
+    public String depositPolicy;
+    public Instant depositApprovedAt;
+    public String depositApprovedBy;
+    public Long depositLicenseVersion;
+    public String depositTxnRef;
+    public String cancellationKind;
 }

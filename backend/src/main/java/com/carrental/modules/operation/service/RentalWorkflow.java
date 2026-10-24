@@ -11,9 +11,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.UUID;
 @Service public class RentalWorkflow {
  private final BookingService bookings;private final ContractService contracts;private final InvoiceService invoices;private final LicenseService licenses;private final JdbcTemplate jdbc;private final ObjectMapper json;private final java.time.Clock clock;
+ @org.springframework.beans.factory.annotation.Autowired private com.carrental.modules.payment.service.PaymentService payments;
  public RentalWorkflow(BookingService b,ContractService c,InvoiceService i,LicenseService l,JdbcTemplate j,ObjectMapper m,java.time.Clock clk){bookings=b;contracts=c;invoices=i;licenses=l;jdbc=j;json=m;clock=clk;}
  @Transactional public Object apply(Actor a,String id,BookingService.Action action){
   var b=bookings.change(a,id,action);
+  if(b.depositRequired&&java.util.Set.of("CANCELLED","REJECTED").contains(b.status))payments.cancellation(bookings.view(b));
   if("CONFIRMED".equals(b.status))contracts.issue(b);
   if("COMPLETED".equals(b.status))invoices.issue(b);
   if("IN_PROGRESS".equals(b.status)||"RETURNED".equals(b.status)){

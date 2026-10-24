@@ -15,7 +15,7 @@ export function getBookingActions(
     const assignedReturn = assignedBranchIds.has(booking.returnBranchId);
 
     if (status === "PENDING" && assignedPickup) {
-      return ["CONFIRMED", "REJECTED", "CANCELLED"];
+      return booking.deposit?.required ? ["REJECTED", "CANCELLED"] : ["CONFIRMED", "REJECTED", "CANCELLED"];
     }
     if (
       status === "CONFIRMED" &&

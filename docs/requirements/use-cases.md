@@ -280,3 +280,7 @@ Tên rút gọn không bỏ nghiệp vụ đã có: U04 vẫn có chi tiết đ�
 | U09 | Báo sự cố thuộc thời gian giữ xe thực tế; xem tiến trình, phản hồi yêu cầu bồi thường theo vòng đời đã duyệt | Sai chủ sở hữu/thời điểm/trạng thái; không tự kết luận trách nhiệm hoặc trừ cọc |
 
 Các UC cần User có phiên hợp lệ; backend kiểm tra quyền và sở hữu ở mọi thao tác. Hết phiên/đăng xuất phải chặn response cũ tái lập phiên. Đặc tả này không duyệt thêm cọc, phụ phí, no-show, retention hoặc provider. Quy tắc giao diện hiện hành xem [giao diện khách hàng](../ui/customer-experience.md). Kế hoạch và bằng chứng nghiệm thu được giữ riêng trong tài liệu nội bộ.
+
+## Mở rộng cọc giữ chỗ sandbox
+
+Phần mở rộng được duyệt sau MVP: Staff chi nhánh nhận kiểm ảnh và duyệt cọc; USER mở phiên thanh toán; backend xác minh IPN/truy vấn rồi mới xác nhận đơn/phát hành hợp đồng. No-show sau hết ngày nhận do Staff ghi nhận có lý do và xác nhận chưa giao; Admin quyết định khoản hoàn muộn. Hủy đơn không đồng nghĩa đã hoàn tiền. [Contract chi tiết](../modules/booking-deposit.md) thay các giới hạn cọc/no-show còn mở ở đặc tả MVP; không cho phép thu tiền thật hoặc tự khấu trừ thiệt hại.

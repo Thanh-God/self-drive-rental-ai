@@ -2,6 +2,10 @@
 
 Các quy tắc dưới đây định hướng triển khai và vận hành. Phần còn mở cần được quyết định trước khi thực hiện tính năng phụ thuộc.
 
+## Mở rộng cọc giữ chỗ sandbox
+
+Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép VNPAY Sandbox, cọc 30% tiền thuê không gồm phí tuyến; Staff duyệt hồ sơ trước, backend xác nhận khi nhận đủ cọc trong hạn. Đơn cũ giữ quy trình cũ. Không thu tiền thật, cọc thiệt hại hoặc thu phần còn lại. Chính sách hủy/no-show/hoàn và cấu hình tại [cọc giữ chỗ](../modules/booking-deposit.md). Tích hợp thực cần merchant sandbox và nghiệm thu riêng; mặc định tắt.
+
 ## Kiến trúc
 
 | ID | Quyết định | Lý do và tác động |

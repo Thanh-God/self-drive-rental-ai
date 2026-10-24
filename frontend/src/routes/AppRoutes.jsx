@@ -1,6 +1,8 @@
 import RentalGuidePage from "../pages/guest/RentalGuidePage";
+import { PaymentReturnPage } from "../components/user/BookingDeposit";
 import ApiVehicleFavoritesPage from "../pages/api/ApiVehicleFavoritesPage";
 import ApiDashboardPage from "../pages/api/ApiDashboardPage";
+import ApiPaymentsPage from "../pages/api/ApiPaymentsPage";
 import ApiVehicleComparePage from "../pages/api/ApiVehicleComparePage";
 import ApiVehicleCatalogPage from "../pages/api/ApiVehicleCatalogPage";
 import { Navigate, Route, Routes } from "react-router-dom";
@@ -115,6 +117,7 @@ export default function AppRoutes() {
         }
       >
         <Route index element={<Navigate to="bookings" replace />} />
+        {!DEMO_MODE && <Route path="payment-return" element={<PaymentReturnPage />} />}
         <Route
           path="bookings"
           element={screen(
@@ -261,6 +264,7 @@ export default function AppRoutes() {
           element={screen(<LocationsPage />, <ApiLocationsPage />)}
         />
         {!DEMO_MODE && <Route path="branches" element={<ApiBranchesPage />} />}
+        {!DEMO_MODE && <Route path="payments" element={<ApiPaymentsPage />} />}
         <Route
           path="reviews"
           element={screen(<ReviewsModerationPage />, <ApiReviewsAdminPage />)}

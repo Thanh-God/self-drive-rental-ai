@@ -12,7 +12,7 @@ import java.util.List;
  @Bean SecurityFilterChain security(HttpSecurity http,TokenFilter filter)throws Exception{
   return http.csrf(c->c.disable()).cors(c->{}).sessionManagement(s->s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
    .authorizeHttpRequests(a->a.requestMatchers("/api/v1/auth/login","/api/v1/auth/register","/api/v1/health").permitAll()
-    .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/v1/vehicles/**","/api/v1/branches","/api/v1/branch-routes").permitAll()
+    .requestMatchers(org.springframework.http.HttpMethod.GET,"/api/v1/vehicles/**","/api/v1/branches","/api/v1/branch-routes","/api/v1/payments/vnpay/ipn").permitAll()
     .requestMatchers("/api/v1/admin/**").hasRole("ADMIN").anyRequest().authenticated())
    .exceptionHandling(e->e.authenticationEntryPoint((q,r,x)->{r.setStatus(401);r.setContentType("application/json;charset=UTF-8");r.getWriter().write("{\"message\":\"Vui lòng đăng nhập.\"}");})
     .accessDeniedHandler((q,r,x)->{r.setStatus(403);r.setContentType("application/json;charset=UTF-8");r.getWriter().write("{\"message\":\"Không có quyền truy cập.\"}");}))
