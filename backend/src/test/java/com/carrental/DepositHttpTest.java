@@ -133,4 +133,28 @@ class DepositHttpTest {
         org.mockito.Mockito.doAnswer(i->{assertFalse(org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive());return new VnpayGateway.RefundReply(true,false,"20015");}).when(gateway).refund(org.mockito.ArgumentMatchers.any(),org.mockito.ArgumentMatchers.anyString(),org.mockito.ArgumentMatchers.anyLong(),org.mockito.ArgumentMatchers.anyString());
         workflow.processRefund(admin,r.id());assertEquals("SUCCEEDED",repo.refund(r.id()).status());assertEquals("EXPIRED",bookings.list(user).getFirst().status());assertThrows(RuntimeException.class,()->workflow.processRefund(admin,r.id()));
     }
+    @Test void cancellationRacingReceiptHasOnlySerializableMoneyOutcomes()throws Exception{
+        var b=create();var approved=approve(b.id(),b.version());var p=payments.start(user,b.id(),"127.0.0.1");
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);var ready=new java.util.concurrent.CountDownLatch(2);var start=new java.util.concurrent.CountDownLatch(1);
+        boolean cancelled;
+        try{
+            var money=pool.submit(()->{ready.countDown();try{assertTrue(start.await(5,java.util.concurrent.TimeUnit.SECONDS));}catch(InterruptedException e){throw new RuntimeException(e);}receipt(p.transactionId(),390000,"10016");});
+            var cancel=pool.submit(()->{ready.countDown();assertTrue(start.await(5,java.util.concurrent.TimeUnit.SECONDS));try{rental.apply(user,b.id(),new BookingService.Action("CANCELLED",approved.version(),"Synthetic cancellation race",null,false,false));return true;}catch(com.carrental.exception.DomainException e){assertEquals(409,e.status.value());return false;}});
+            assertTrue(ready.await(5,java.util.concurrent.TimeUnit.SECONDS));start.countDown();money.get(15,java.util.concurrent.TimeUnit.SECONDS);cancelled=cancel.get(15,java.util.concurrent.TimeUnit.SECONDS);
+        }finally{start.countDown();pool.shutdownNow();assertTrue(pool.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS));}
+        var finalBooking=bookings.list(user).getFirst();var payment=repo.payment(p.transactionId()).orElseThrow();assertEquals("SUCCEEDED",payment.status());
+        if(cancelled){
+            assertEquals("CANCELLED",finalBooking.status());assertFalse(payment.applied());assertEquals(390000,repo.refundForPayment(p.transactionId()).orElseThrow().amount());assertEquals(0,jdbc.queryForObject("select count(*) from contracts",Integer.class));
+        }else{
+            assertEquals("CONFIRMED",finalBooking.status());assertTrue(payment.applied());assertTrue(repo.refundForPayment(p.transactionId()).isEmpty());assertEquals(1,jdbc.queryForObject("select count(*) from contracts",Integer.class));
+        }
+    }
+    @Test void nonterminalSignedNotificationCannotOpenReplacementPayment(){
+        var b=create();approve(b.id(),b.version());var p=payments.start(user,b.id(),"127.0.0.1");
+        var fields=new TreeMap<String,String>();fields.put("vnp_TmnCode","TESTONLY");fields.put("vnp_TxnRef",p.transactionId());fields.put("vnp_Amount","39000000");fields.put("vnp_ResponseCode","00");fields.put("vnp_TransactionStatus","01");fields.put("vnp_SecureHash",gateway.sign(VnpayGateway.canonical(fields)));
+        workflow.notification(fields);assertEquals("UNKNOWN",repo.payment(p.transactionId()).orElseThrow().status());
+        assertThrows(com.carrental.exception.DomainException.class,()->payments.start(user,b.id(),"127.0.0.1"));assertEquals(1,jdbc.queryForObject("select count(*) from payment_transactions",Integer.class));
+        receipt(p.transactionId(),390000,"10017");assertEquals("CONFIRMED",bookings.list(user).getFirst().status());assertEquals(1,jdbc.queryForObject("select count(*) from contracts",Integer.class));
+        workflow.notification(fields);assertEquals("SUCCEEDED",repo.payment(p.transactionId()).orElseThrow().status());
+    }
 }

@@ -7,13 +7,14 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import { MemoryRouter } from 'react-router-dom';
 import { getBookingActions } from '../../api/bookingActions.js';
 
-let server, Deposit, ReturnPage, Progress;
+let server, Deposit, ReturnPage, Progress, Refund;
 before(async () => {
   const root = fileURLToPath(new URL('../../..', import.meta.url));
   server = await createServer({ root, configFile: `${root}/vite.config.js`, appType: 'custom', logLevel: 'error', optimizeDeps: { noDiscovery: true }, server: { middlewareMode: true } });
   const module = await server.ssrLoadModule('/src/components/user/BookingDeposit.jsx');
   Deposit = module.default; ReturnPage = module.PaymentReturnPage;
   ({ default: Progress } = await server.ssrLoadModule('/src/components/booking/BookingProgress.jsx'));
+  ({ RefundRow: Refund } = await server.ssrLoadModule('/src/pages/api/ApiPaymentsPage.jsx'));
 });
 after(async () => { await server?.close(); });
 const booking = { id: 'synthetic', status: 'PENDING', total: 2500000, pickupBranchId: 'dn', deposit: { required: true, amount: 600000 } };
@@ -51,4 +52,9 @@ test('expired booking never asks customer to keep paying', () => {
   const expired = { ...booking, status: 'EXPIRED', deposit: { ...booking.deposit, approvedAt: '2026-10-24T03:00:00Z', dueAt: '2026-10-24T03:30:00Z' } };
   const text = renderToStaticMarkup(React.createElement(Deposit, { booking: expired, role: 'USER', reload() {} }));
   assert.match(text, /Đơn không còn chờ đóng cọc/);assert.doesNotMatch(text, /Thanh toán cọc thử nghiệm/);
+});
+test('Admin refund row exposes decision and provider reference without implying completion', () => {
+  const item = { id: 'refund-fixture', paymentId: 'payment-fixture', bookingId: 'booking-fixture', status: 'UNKNOWN', amount: 195000, reason: 'Fixture partial decision', approvedBy: 'admin-fixture', approvedAt: '2026-10-24T03:00:00Z' };
+  const text = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Refund, { item, run() {}, busy: false })));
+  assert.match(text, /admin-fixture/);assert.match(text, /payment-fixture/);assert.match(text, /Chưa có kết quả xác minh/);assert.match(text, /Cần đối soát/);assert.doesNotMatch(text, /Đã hoàn/);
 });

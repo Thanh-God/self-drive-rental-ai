@@ -54,6 +54,23 @@ async function main() {
     await customer.goto(base + '/user/bookings/' + id);await customer.getByText('Đã ghi nhận cọc cho đơn', { exact: true }).waitFor();check('Backend confirmed', (await req(user, '/bookings/' + id)).body.booking.status, 'CONFIRMED');check('One contract', sql('select count(*) from contracts'), '1');
     await customer.screenshot({ path: path.join(out, 'customer-confirmed-deposit.png'), fullPage: true });
     await manager.goto(base + '/admin/payments');await manager.getByRole('heading', { name: 'Cọc và hoàn tiền · Sandbox' }).waitFor();await manager.getByText('Chưa có giao dịch cần xử lý.', { exact: true }).waitFor();
+    await manager.goto(base + '/admin/bookings/' + id);await manager.getByText('Lịch sử xử lý cọc', { exact: true }).click();
+    check('Admin sees deposit audit trail', await manager.getByText(/Xác nhận đơn từ cọc/).count(), 1);
+    // Isolated fixture only: simulate that the booked pickup day has elapsed without delivery.
+    // No application date-edit operation or provider payment is implied by this setup.
+    sql(`update bookings set start_at=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 3 DAY),end_at=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 1 DAY) where id='${id}'`);
+    await operator.goto(base + '/staff/bookings/' + id);
+    await operator.getByLabel('Đã liên hệ khách', { exact: true }).check();await operator.getByLabel('Xe chưa thực sự được giao', { exact: true }).check();
+    const noShow = operator.locator('form').filter({ hasText: 'Khách không đến nhận:' });await noShow.getByLabel('Lý do', { exact: true }).fill('Fixture elapsed pickup, contacted, vehicle not delivered.');
+    wait = operator.waitForResponse(r => r.url().endsWith('/no-show'));await operator.getByRole('button', { name: 'Ghi nhận khách không đến nhận', exact: true }).click();check('No-show UI', (await wait).status(), 200);
+    check('No-show cancels without claiming returned', (await req(user, '/bookings/' + id)).body.booking.status, 'CANCELLED');
+    await manager.goto(base + '/admin/payments');await manager.getByText('Chờ Admin quyết định', { exact: false }).first().waitFor();
+    await manager.getByLabel('Số tiền hoàn (VND)', { exact: true }).fill('195000');await manager.getByLabel('Lý do quyết định', { exact: true }).fill('Fixture Admin approves half of the sandbox deposit.');
+    wait = manager.waitForResponse(r => r.url().endsWith('/decide'));await manager.getByRole('button', { name: 'Duyệt khoản hoàn', exact: true }).click();check('Partial refund decision UI', (await wait).status(), 200);
+    await manager.getByRole('button', { name: 'Gửi hoàn VNPAY Sandbox', exact: true }).waitFor();
+    check('Approval is not refunded', sql('select concat(status,\":\",amount) from payment_refunds'), 'APPROVED:195000');
+    await manager.getByText('Thông tin đối soát', { exact: true }).click();await manager.getByText('demo-admin', { exact: true }).waitFor();
+    await manager.screenshot({ path: path.join(out, 'admin-partial-refund-approved.png'), fullPage: true });
     check('Desktop viewport', await customer.evaluate(() => [innerWidth, innerHeight]), [1440, 900]);check('Browser runtime errors', errors, []);
     fs.writeFileSync(path.join(out, 'LIMITATIONS.txt'), 'INTERNAL PROTOCOL ONLY. Checkout intercepted; IPN uses synthetic key. Live merchant, QueryDR and Refund acceptance BLOCKED. No real provider request.');
   } finally { await browser.close(); }

@@ -5,12 +5,20 @@ import { useApiData } from '../../hooks/useApiData';
 import { Page, Notice, money } from '../../components/common/PageKit';
 import { refundLabels, paymentLabels } from '../../components/user/BookingDeposit';
 import { getErrorMessage } from '../../utils/roles';
+import { adminDateFormat } from '../../utils/bookingQueue';
 
-function RefundRow({ item, run, busy }) {
+export function RefundRow({ item, run, busy }) {
   const [amount, setAmount] = useState(String(item.amount)), [reason, setReason] = useState('');
   return <section className="panel space-y-3">
     <Link to={`/admin/bookings/${item.bookingId}`}>Đơn {item.bookingId.slice(0, 8)}</Link>
     <p>{refundLabels[item.status] || 'Cần kiểm tra'} · {money(item.amount)} · {item.reason}</p>
+    <details className="text-sm"><summary>Thông tin đối soát</summary><dl className="mt-2 space-y-2 break-all">
+      <div><dt>Mã yêu cầu hoàn</dt><dd>{item.id}</dd></div>
+      <div><dt>Tham chiếu thanh toán</dt><dd>{item.paymentId}</dd></div>
+      <div><dt>Tham chiếu VNPAY</dt><dd>{item.providerTransaction || 'Chưa có kết quả xác minh'}</dd></div>
+      <div><dt>Người duyệt (mã tài khoản)</dt><dd>{item.approvedBy || (item.status === 'REQUESTED' ? 'Chưa quyết định' : 'Theo chính sách tự động')}</dd></div>
+      <div><dt>Thời điểm duyệt</dt><dd>{item.approvedAt ? adminDateFormat(item.approvedAt, { withTime: true }) : '—'}</dd></div>
+    </dl></details>
     {item.status === 'REQUESTED' ? <form className="space-y-2" onSubmit={e => { e.preventDefault(); run(`/admin/refunds/${item.id}/decide`, { expectedVersion: item.version, amount: Number(amount), reason }); }}>
       <label className="block">Số tiền hoàn (VND)<input type="number" min="0" step="1" required value={amount} onChange={e => setAmount(e.target.value)} /></label>
       <label className="block">Lý do quyết định<textarea required maxLength={1000} value={reason} onChange={e => setReason(e.target.value)} /></label>

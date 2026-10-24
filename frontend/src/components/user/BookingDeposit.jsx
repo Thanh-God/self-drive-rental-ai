@@ -8,6 +8,7 @@ import { vietnamDay } from '../../utils/bookingQueue';
 
 export const paymentLabels = { PENDING: 'Đang xác minh', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã nhận', FAILED: 'Thất bại' };
 export const refundLabels = { REQUESTED: 'Chờ Admin quyết định', APPROVED: 'Đã duyệt hoàn', PROCESSING: 'Đang xử lý', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã hoàn', FAILED: 'Hoàn thất bại', DECLINED: 'Không hoàn' };
+const eventLabels = { PAYMENT_CREATED: 'Tạo phiên thanh toán', DEPOSIT_APPROVED: 'Duyệt hồ sơ, yêu cầu cọc', PAYMENT_RECEIVED: 'Xác minh đã nhận cọc', PAYMENT_FAILED: 'Thanh toán thất bại', PAYMENT_UNKNOWN: 'Thanh toán cần đối soát', DEPOSIT_APPLIED: 'Xác nhận đơn từ cọc', REFUND_REQUESTED: 'Tạo yêu cầu hoàn', REFUND_DECIDED: 'Duyệt khoản hoàn', REFUND_RECONCILED: 'Đối soát khoản hoàn' };
 const date = value => value ? new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value)) : '—';
 
 export default function BookingDeposit({ booking, role, assignedPickup, reload, now }) {
@@ -45,6 +46,10 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     </form> : null}
     {data?.payments?.map(p => <p key={p.id} className="mt-2">Giao dịch {p.id.slice(0, 8)} · {money(p.amount)} · {paymentLabels[p.status] || 'Cần kiểm tra'}</p>)}
     {data?.refunds?.map(r => <p key={r.id} className="mt-2">Hoàn {money(r.amount)} · {refundLabels[r.status] || 'Cần kiểm tra'} · {r.reason}</p>)}
+    {role === 'ADMIN' && data?.events?.length ? <details className="mt-3"><summary>Lịch sử xử lý cọc</summary><ol className="mt-2 space-y-2 text-sm">{data.events.map((e, i) => <li key={`${e.created_at}-${i}`}>
+      <p>{eventLabels[e.kind] || (e.kind.startsWith('REFUND_') ? `Hoàn tiền: ${refundLabels[e.kind.slice(7)] || 'Cần kiểm tra'}` : 'Cập nhật đối soát')} · {date(e.created_at)}</p>
+      <p>{e.note} · {e.actor_id ? `Mã người thực hiện: ${e.actor_id}` : 'Hệ thống tự động'}</p>
+    </li>)}</ol></details> : null}
   </section>;
 }
 

@@ -49,6 +49,9 @@ public class PaymentService {
             if(r.success()&&!Objects.equals(p.providerTransaction(),r.transaction()))throw DomainException.conflict("Tham chiếu thanh toán không nhất quán.");
             return p;
         }
+        if(!r.success()&&!r.definitiveFailure()){
+            repo.unknown(p.id());repo.event(p.bookingId(),p.id(),"PAYMENT_UNKNOWN","VNPAY chưa trả kết quả kết thúc; cần đối soát trước khi tạo giao dịch thay thế",null,clock.instant(),null);return repo.payment(p.id()).orElseThrow();
+        }
         repo.receipt(p.id(),r.success()?"SUCCEEDED":"FAILED",r.transaction(),r.payDate());
         repo.event(p.bookingId(),p.id(),r.success()?"PAYMENT_RECEIVED":"PAYMENT_FAILED",r.success()?"VNPAY Sandbox xác minh đã nhận tiền":"VNPAY Sandbox trả kết quả thất bại",null,clock.instant(),"receipt:"+p.id()+":"+r.success());
         return repo.payment(p.id()).orElseThrow();

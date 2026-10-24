@@ -39,7 +39,9 @@ public class VnpayGateway {
         String query=canonical(p);return CHECKOUT+"?"+query+"&vnp_SecureHash="+sign(query);
     }
     private TreeMap<String,String> base(String command){var p=new TreeMap<String,String>();p.put("vnp_Version","2.1.0");p.put("vnp_Command",command);p.put("vnp_TmnCode",settings.merchant);return p;}
-    public record Receipt(String ref,long amount,String transaction,String payDate,boolean success){}
+    public record Receipt(String ref,long amount,String transaction,String payDate,boolean success,boolean definitiveFailure){
+        public Receipt(String ref,long amount,String transaction,String payDate,boolean success){this(ref,amount,transaction,payDate,success,!success);}
+    }
     public Receipt notification(Map<String,String> fields){
         settings.requireConfigured();if(!matches(canonical(fields),fields.get("vnp_SecureHash")))throw DomainException.bad("Chữ ký VNPAY không hợp lệ.");
         return receipt(fields);
@@ -51,7 +53,7 @@ public class VnpayGateway {
             boolean success="00".equals(p.get("vnp_ResponseCode"))&&"00".equals(p.get("vnp_TransactionStatus"));
             String number=p.get("vnp_TransactionNo"),paid=p.get("vnp_PayDate");
             if(success&&(number==null||!number.matches("[0-9]{1,30}")||paid==null||!paid.matches("[0-9]{14}")))throw new NumberFormatException();
-            return new Receipt(p.get("vnp_TxnRef"),encoded/100,success?number:null,success?paid:null,success);
+            return new Receipt(p.get("vnp_TxnRef"),encoded/100,success?number:null,success?paid:null,success,"02".equals(p.get("vnp_TransactionStatus")));
         }catch(NumberFormatException e){throw DomainException.bad("Số tiền hoặc dữ liệu giao dịch VNPAY không hợp lệ.");}
     }
     private String joined(Map<String,String> p,String...fields){return Arrays.stream(fields).map(f->p.getOrDefault(f,"")).collect(java.util.stream.Collectors.joining("|"));}
