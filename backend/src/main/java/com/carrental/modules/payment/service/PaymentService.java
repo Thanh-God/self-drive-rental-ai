@@ -38,6 +38,8 @@ public class PaymentService {
         var b = bookings.view(bookings.require(actor, bookingId));
         if (DepositPolicy.isVnpayMethod(b.deposit().method())) {
             settings.requireNew();
+            // For VNPAY, require deposit to be approved first (validates GPLX, schedule, etc.)
+            bookings.requirePayable(actor, bookingId);
             for (var p : repo.forBooking(bookingId)) {
                 if (p.applied() || "SUCCEEDED".equals(p.status())) throw DomainException.conflict("Đang ghi nhận khoản cọc; vui lòng tải lại đơn.");
                 if ("UNKNOWN".equals(p.status()) || ("PENDING".equals(p.status()) && !p.expiresAt().isAfter(clock.instant())))
@@ -50,6 +52,9 @@ public class PaymentService {
             repo.event(bookingId, ref, "PAYMENT_CREATED", "Tạo phiên VNPAY Sandbox", actor.id(), clock.instant(), "created:" + ref);
             return new Session(ref, gateway.checkout(p, ip), p.expiresAt());
         }
+        if (DepositPolicy.isDemoQrMethod(b.deposit().method())) {
+            throw DomainException.conflict("Phương thức QR DEMO không tạo phiên thanh toán trực tuyến; hãy dùng mã QR và báo chuyển khoản.");
+        }
         throw DomainException.conflict("Phương thức cọc không hỗ trợ tạo phiên thanh toán trực tuyến.");
     }
 
@@ -57,7 +62,7 @@ public class PaymentService {
         var b = bookings.view(bookings.require(actor, bookingId));
         return Map.of(
             "sandbox", true,
-            "acceptingNew", settings.enabled && settings.configured(),
+            "acceptingNew", settings.acceptingNew(),
             "deposit", b.deposit(),
             "payments", repo.forBooking(bookingId),
             "refunds", repo.refunds(bookingId),
@@ -92,23 +97,54 @@ public class PaymentService {
         var found = repo.payment(paymentId).orElseThrow(DomainException::missing);
         bookings.depositLock(found.bookingId());
         var p = repo.lockPayment(paymentId);
-        if (p.applied() || !"SUCCEEDED".equals(p.status())) return;
-        queue(p, true, "UNAPPLIED", "Tiền đến sau hạn/hủy hoặc đơn không thể xác nhận; hoàn toàn bộ.");
+        if (p.appliedAmount() >= p.amount() || !"SUCCEEDED".equals(p.status())) return;
+        queue(p, true, p.amount(), "UNAPPLIED", "APPROVED", "Tiền đến sau hạn/hủy hoặc đơn không thể xác nhận; hoàn toàn bộ.");
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
     public void cancellation(BookingService.View b) {
         for (var p : repo.forBooking(b.id())) if ("SUCCEEDED".equals(p.status())) {
-            boolean full = !p.applied() || Set.of("BUSINESS", "EARLY_USER").contains(Objects.toString(b.deposit().cancellationKind(), ""));
-            queue(p, full, Objects.toString(b.deposit().cancellationKind(), "CANCELLED"),
-                full ? "Đủ điều kiện hoàn toàn bộ cọc" : "Admin quyết định hoàn cọc; bắt buộc lý do.");
+            long unapplied = p.amount() - p.appliedAmount();
+            String kind = Objects.toString(b.deposit().cancellationKind(), "CANCELLED");
+            boolean isBusinessOrEarlyUser = Set.of("BUSINESS", "EARLY_USER").contains(kind);
+            boolean isNoShowOrLate = Set.of("NO_SHOW", "LATE_CUSTOMER").contains(kind);
+            
+            boolean full;
+            long amount;
+            String status;
+            
+            if (isBusinessOrEarlyUser) {
+                // Business cancels or user cancels early: full refund auto-approved
+                full = true;
+                amount = p.amount();
+                status = "APPROVED";
+            } else if (isNoShowOrLate) {
+                // No-show or late cancellation: Admin decides 0-100%, full amount requested
+                full = true;
+                amount = p.amount();
+                status = "REQUESTED";
+            } else {
+                // Other cases: refund only unapplied amount
+                full = unapplied > 0;
+                amount = unapplied;
+                status = full ? "APPROVED" : "REQUESTED";
+            }
+            
+            if (amount > 0) {
+                queue(p, full, amount, kind, status,
+                    full ? "Đủ điều kiện hoàn toàn bộ cọc" : "Admin quyết định hoàn cọc; bắt buộc lý do.");
+            }
         }
     }
 
-    private void queue(Payment p, boolean full, String kind, String reason) {
-        if (repo.refundForPayment(p.id()).isPresent()) return;
-        repo.createRefund(id(), p, full ? p.amount() : 0, full ? "APPROVED" : "REQUESTED", kind, reason, clock.instant());
-        repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, null, clock.instant(), "refund:" + p.id());
+    private void queue(Payment p, boolean full, long amount, String kind, String status, String reason) {
+        // Allow multiple refunds for same payment with different kinds/reasons
+        var existing = repo.refunds(p.bookingId()).stream()
+            .filter(r -> r.paymentId().equals(p.id()) && r.kind().equals(kind))
+            .findFirst();
+        if (existing.isPresent()) return;
+        repo.createRefund(id(), p, amount, status, kind, reason, clock.instant());
+        repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, null, clock.instant(), "refund:" + p.id() + ":" + kind);
     }
 
     @Transactional
@@ -141,12 +177,31 @@ public class PaymentService {
         var b = bookings.view(bookings.require(admin, p.bookingId()));
         if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) throw DomainException.conflict("Chỉ áp dụng cho QR DEMO.");
         if (!"SUCCEEDED".equals(p.status())) throw DomainException.conflict("Chỉ tạo hoàn cho giao dịch đã nhận tiền.");
-        if (amount <= 0 || amount > p.amount() - p.appliedAmount() - repo.reserved(p.id(), null))
+        long available = p.amount() - p.appliedAmount() - repo.reserved(p.id(), null);
+        if (amount <= 0 || amount > available)
             throw DomainException.bad("Số tiền hoàn vượt tiền có sẵn.");
         String refundId = id();
-        repo.createRefund(refundId, p, amount, "APPROVED", "MANUAL_EXCESS", reason, clock.instant());
+        repo.createRefund(refundId, p, amount, "REQUESTED", "MANUAL_EXCESS", reason, clock.instant());
         repo.event(p.bookingId(), p.id(), "REFUND_REQUESTED", reason, admin.id(), clock.instant(), "refund:" + refundId);
         return repo.refund(refundId);
+    }
+
+    @Transactional
+    public Object decideManualRefund(Actor admin, String refundId, long version, long amount, String reason) {
+        admin.require("ADMIN");
+        if (reason == null || reason.isBlank() || reason.length() > 1000)
+            throw DomainException.bad("Cần lý do hoàn tiền, tối đa 1000 ký tự.");
+        var r = repo.lockRefund(refundId);
+        var p = repo.lockPayment(r.paymentId());
+        var b = bookings.view(bookings.require(admin, p.bookingId()));
+        if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) throw DomainException.conflict("Chỉ áp dụng cho QR DEMO.");
+        if (!"REQUESTED".equals(r.status())) throw DomainException.conflict("Chỉ duyệt khoản đang chờ duyệt.");
+        if (r.version() != version) throw DomainException.conflict("Khoản hoàn đã thay đổi; tải lại.");
+        long available = p.amount() - p.appliedAmount() - repo.reserved(p.id(), r.id());
+        if (amount <= 0 || amount > available) throw DomainException.bad("Số tiền hoàn vượt tiền có sẵn.");
+        repo.decide(r.id(), version, amount, reason, admin.id(), clock.instant());
+        repo.event(p.bookingId(), p.id(), "REFUND_DECIDED", reason, admin.id(), clock.instant(), null);
+        return repo.refund(r.id());
     }
 
     @Transactional
@@ -157,6 +212,10 @@ public class PaymentService {
         var b = bookings.view(bookings.require(admin, p.bookingId()));
         if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) throw DomainException.conflict("Chỉ áp dụng cho QR DEMO.");
         if (!"APPROVED".equals(r.status())) throw DomainException.conflict("Chỉ xử lý khoản đã duyệt.");
+        repo.refundStatus(refundId, "PROCESSING", null, VnpayGateway.date(clock.instant()));
+        repo.event(p.bookingId(), p.id(), "REFUND_PROCESSING", "Admin đang xử lý hoàn tiền thủ công (QR DEMO)", admin.id(), clock.instant(), null);
+        
+        // For manual refund, we directly mark as succeeded since no external gateway
         repo.refundStatus(refundId, "SUCCEEDED", null, VnpayGateway.date(clock.instant()));
         repo.event(p.bookingId(), p.id(), "REFUND_SUCCEEDED", "Admin ghi nhận đã hoàn tiền thủ công (QR DEMO)", admin.id(), clock.instant(), null);
     }

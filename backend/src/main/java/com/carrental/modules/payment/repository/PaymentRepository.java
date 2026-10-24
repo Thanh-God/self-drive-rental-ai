@@ -16,7 +16,7 @@ public class PaymentRepository {
     public record Payment(String id, String bookingId, long amount, String status, Instant createdAt, Instant expiresAt,
                           String providerTransaction, String providerPayDate, boolean applied, long version,
                           String verifierId, Instant verifiedAt, Instant transferTime, String transferNote,
-                          String sourceAccount, long appliedAmount, String idempotencyKey) {}
+                          String sourceAccount, long appliedAmount, String idempotencyKey, String depositMethod) {}
 
     public record Refund(String id, String paymentId, String bookingId, long amount, String status, String kind,
                          String reason, String approvedBy, Instant approvedAt, Instant createdAt,
@@ -32,7 +32,8 @@ public class PaymentRepository {
         r.getString("provider_pay_date"), r.getBoolean("applied"), r.getLong("version"),
         r.getString("verifier_id"), instant(r, "verified_at"), instant(r, "transfer_time"),
         r.getString("transfer_note"), r.getString("source_account"), r.getLong("applied_amount"),
-        r.getString("idempotency_key")
+        r.getString("idempotency_key"),
+        r.getString("deposit_method")
     );
 
     private final RowMapper<Refund> refund = (r, n) -> new Refund(
@@ -43,16 +44,32 @@ public class PaymentRepository {
     );
 
     public Optional<Payment> payment(String id) {
-        return jdbc.query("select * from payment_transactions where id=?", payment, id).stream().findFirst();
+        return jdbc.query("""
+            select pt.*, b.deposit_method
+            from payment_transactions pt
+            left join bookings b on pt.booking_id = b.id
+            where pt.id=?
+            """, payment, id).stream().findFirst();
     }
 
     public Payment lockPayment(String id) {
-        return jdbc.query("select * from payment_transactions where id=? for update", payment, id)
+        return jdbc.query("""
+            select pt.*, b.deposit_method
+            from payment_transactions pt
+            left join bookings b on pt.booking_id = b.id
+            where pt.id=? for update
+            """, payment, id)
             .stream().findFirst().orElseThrow(DomainException::missing);
     }
 
     public List<Payment> forBooking(String id) {
-        return jdbc.query("select * from payment_transactions where booking_id=? order by created_at,id", payment, id);
+        return jdbc.query("""
+            select pt.*, b.deposit_method
+            from payment_transactions pt
+            left join bookings b on pt.booking_id = b.id
+            where pt.booking_id=?
+            order by pt.created_at, pt.id
+            """, payment, id);
     }
 
     public void createPayment(String id, String booking, long amount, Instant now, Instant expiry) {
@@ -70,7 +87,7 @@ public class PaymentRepository {
     }
 
     public void applied(String id) {
-        jdbc.update("update payment_transactions set applied=true,version=version+1 where id=? and applied=false", id);
+        jdbc.update("update payment_transactions set applied=true, applied_amount=amount, version=version+1 where id=? and applied=false", id);
     }
 
     public void updateAppliedAmount(String id, long appliedAmount) {
@@ -121,7 +138,13 @@ public class PaymentRepository {
     }
 
     public List<Payment> unresolvedPayments() {
-        return jdbc.query("select * from payment_transactions p where status in ('PENDING','UNKNOWN') or (status='SUCCEEDED' and applied_amount < amount and not exists(select 1 from payment_refunds r where r.payment_id=p.id)) order by created_at,id limit 50", payment);
+        return jdbc.query("""
+            select pt.*, b.deposit_method
+            from payment_transactions pt
+            left join bookings b on pt.booking_id = b.id
+            where pt.status in ('PENDING','UNKNOWN') or (pt.status='SUCCEEDED' and pt.applied_amount < pt.amount and not exists(select 1 from payment_refunds r where r.payment_id=pt.id))
+            order by pt.created_at, pt.id limit 50
+            """, payment);
     }
 
     public List<Refund> readyRefunds() {
@@ -129,7 +152,13 @@ public class PaymentRepository {
     }
 
     public List<Payment> unknownPayments() {
-        return jdbc.query("select * from payment_transactions where status='UNKNOWN' order by created_at desc,id limit 100", payment);
+        return jdbc.query("""
+            select pt.*, b.deposit_method
+            from payment_transactions pt
+            left join bookings b on pt.booking_id = b.id
+            where pt.status='UNKNOWN'
+            order by pt.created_at desc, pt.id limit 100
+            """, payment);
     }
 
     public void event(String booking, String paymentId, String kind, String note, String actor, Instant now, String key) {

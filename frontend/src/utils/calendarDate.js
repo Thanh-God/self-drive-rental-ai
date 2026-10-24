@@ -7,3 +7,13 @@ export function parseCalendarDate(text) {
   const date = new Date(iso + "T00:00:00Z");
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === iso ? iso : "";
 }
+
+const VIETNAM_OFFSET = 7 * 60 * 60 * 1000;
+export function toVietnamInstant(datetimeLocal) {
+  if (!datetimeLocal) return null;
+  const [datePart, timePart] = datetimeLocal.split("T");
+  if (!datePart || !timePart) return null;
+  const localDate = new Date(`${datePart}T${timePart}`);
+  if (Number.isNaN(localDate.getTime())) return null;
+  return new Date(localDate.getTime() - VIETNAM_OFFSET).toISOString();
+}

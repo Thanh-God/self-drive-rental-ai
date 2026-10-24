@@ -26,9 +26,20 @@ ALTER TABLE payment_transactions ADD CONSTRAINT ck_payment_applied_amount CHECK 
 -- Unique index for idempotency (H2 doesn't support WHERE clause in CREATE INDEX)
 CREATE UNIQUE INDEX uq_payment_receiver_ref ON payment_transactions (booking_id, idempotency_key);
 
+-- Backfill deposit_method for existing VNPAY bookings
+UPDATE bookings SET deposit_method = 'VNPAY_SANDBOX' WHERE deposit_required = true AND deposit_method IS NULL;
+
+-- Backfill applied_amount for existing VNPAY payments: if applied=true then applied_amount = amount else 0
+UPDATE payment_transactions SET applied_amount = CASE WHEN applied = true THEN amount ELSE 0 END WHERE applied_amount = 0;
+
 -- Payment refunds: replace unique(payment_id) with business key
--- MySQL: constraint name is typically payment_refunds_payment_id_key
--- H2: constraint name is auto-generated (e.g., UK_<hash>)
--- Drop old constraint if it exists (MySQL), ignore error in H2
--- We add the new business key constraint which works on both
+-- Drop old unique constraint on payment_id (MySQL constraint name, H2 will ignore if not exists)
+-- MySQL: ALTER TABLE payment_refunds DROP INDEX payment_refunds_payment_id_key;
+-- H2: constraint name is auto-generated, need different approach
+-- We'll try both - MySQL drops index, H2 drops constraint by name if exists
+ALTER TABLE payment_refunds DROP CONSTRAINT IF EXISTS payment_refunds_payment_id_key;
+ALTER TABLE payment_refunds DROP INDEX IF EXISTS payment_refunds_payment_id_key;
+
+-- Add new business key constraint for refunds
+-- payment_id + kind + reason + request_date ensures one refund per payment per reason per request date
 ALTER TABLE payment_refunds ADD CONSTRAINT uq_refund_business_key UNIQUE (payment_id, kind, reason, request_date);

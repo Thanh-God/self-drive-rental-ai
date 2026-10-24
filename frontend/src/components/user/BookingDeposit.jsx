@@ -5,6 +5,7 @@ import { useApiData } from '../../hooks/useApiData';
 import { money, Notice, Page } from '../common/PageKit';
 import { getErrorMessage } from '../../utils/roles';
 import { vietnamDay } from '../../utils/bookingQueue';
+import { toVietnamInstant } from '../../utils/calendarDate';
 
 export const paymentLabels = { PENDING: 'Đang xác minh', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã nhận', FAILED: 'Thất bại' };
 export const refundLabels = { REQUESTED: 'Chờ Admin quyết định', APPROVED: 'Đã duyệt hoàn', PROCESSING: 'Đang xử lý', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã hoàn', FAILED: 'Hoàn thất bại', DECLINED: 'Không hoàn' };
@@ -47,7 +48,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     try {
       await apiClient.post(`/bookings/${encodeURIComponent(booking.id)}/deposit/report`, {
         transactionRef: reportForm.transactionRef,
-        transferTime: reportForm.transferTime,
+        transferTime: toVietnamInstant(reportForm.transferTime),
         transferNote: reportForm.transferNote,
         sourceAccount: reportForm.sourceAccount,
         idempotencyKey: `report-${booking.id}-${reportForm.transactionRef}-${reportForm.transferTime}`
@@ -67,7 +68,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       await apiClient.post(`/bookings/${encodeURIComponent(booking.id)}/deposit/verify`, {
         transactionRef: verifyForm.transactionRef,
         amountVnd: Number(verifyForm.amountVnd),
-        transferTime: verifyForm.transferTime,
+        transferTime: toVietnamInstant(verifyForm.transferTime),
         transferNote: verifyForm.transferNote,
         sourceAccount: verifyForm.sourceAccount,
         idempotencyKey: verifyForm.idempotencyKey,
@@ -104,6 +105,10 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
 
     {booking.status === 'PENDING' && data && !data.acceptingNew && isVnpay ?
       <p>Đang tạm dừng tạo thanh toán mới. Giao dịch đã tạo vẫn được hệ thống đối soát.</p> : null}
+
+    {isVnpay && depositApproved && role === 'USER' && booking.status === 'PENDING' && data?.acceptingNew && (
+      <button className="btn mt-3" disabled={busy} onClick={() => action('deposit/session')}>Thanh toán cọc thử nghiệm</button>
+    )}
 
     {request.loading ? <p>Đang tải tình trạng thu/hoàn…</p> : null}
     {request.error ? <Notice error>{request.error}<button className="btn-secondary" onClick={request.reload}>Tải lại</button></Notice> : null}
@@ -158,8 +163,10 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       </div>
     )}
 
-    {role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && data?.acceptingNew && isVnpay && (
-      <button className="btn mt-3" disabled={busy} onClick={() => action('deposit/approve', { expectedVersion: booking.version })}>Duyệt hồ sơ và yêu cầu đóng cọc</button>
+    {role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && data?.acceptingNew && deposit?.required && !depositApproved && (
+      <button className="btn mt-3" disabled={busy} onClick={() => action('deposit/approve', { expectedVersion: booking.version })}>
+        {isQr ? 'Duyệt hồ sơ và tạo mã QR cọc' : 'Duyệt hồ sơ và yêu cầu đóng cọc'}
+      </button>
     )}
 
     {role === 'STAFF' && assignedPickup && booking.status === 'CONFIRMED' && vietnamDay(now) > vietnamDay(booking.startAt) && (

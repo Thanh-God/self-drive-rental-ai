@@ -38,6 +38,7 @@ public class DepositController {
     public record ReportInput(String transactionRef, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey) {}
     public record VerifyInput(String transactionRef, long amountVnd, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion) {}
     public record ManualRefundInput(String paymentId, long amount, String reason) {}
+    public record ManualRefundDecideInput(long expectedVersion, long amount, String reason) {}
 
     @GetMapping("/bookings/{id}/deposit")
     public Object summary(@AuthenticationPrincipal Actor actor, @PathVariable String id) {
@@ -135,6 +136,11 @@ public class DepositController {
     @PostMapping("/admin/refunds/create-manual")
     public Object createManualRefund(@AuthenticationPrincipal Actor actor, @RequestBody ManualRefundInput input) {
         return payments.createManualRefund(actor, input.paymentId(), input.amount(), input.reason());
+    }
+
+    @PostMapping("/admin/refunds/{id}/decide-manual")
+    public Object decideManualRefund(@AuthenticationPrincipal Actor actor, @PathVariable String id, @RequestBody ManualRefundDecideInput input) {
+        return payments.decideManualRefund(actor, id, input.expectedVersion(), input.amount(), input.reason());
     }
 
     @PostMapping("/admin/refunds/{id}/process-manual")
