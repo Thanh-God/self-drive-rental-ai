@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
@@ -18,7 +18,11 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const [contacted, setContacted] = useState(false), [notDelivered, setNotDelivered] = useState(false), [reason, setReason] = useState('');
   const [showQr, setShowQr] = useState(false);
   const [qrData, setQrData] = useState(null);
-  const [reportForm, setReportForm] = useState({ transactionRef: '', transferTime: '', transferNote: '', sourceAccount: '' });
+  const [qrUrl,setQrUrl]=useState('');
+  const objectUrl=useRef(null);
+  const verifyKey=useRef(null);
+  const [verified,setVerified]=useState(false);
+  useEffect(() => () => { if(objectUrl.current) window.URL.revokeObjectURL(objectUrl.current); }, []);
   const [verifyForm, setVerifyForm] = useState({ transactionRef: '', amountVnd: '', transferTime: '', transferNote: '', sourceAccount: '', idempotencyKey: '' });
   const data = request.data;
 
@@ -36,6 +40,9 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   async function loadQr() {
     try {
       const res = await apiClient.get(`/bookings/${encodeURIComponent(booking.id)}/deposit/qr-payload`);
+      const png=await apiClient.get(`/bookings/${encodeURIComponent(booking.id)}/deposit/qr`,{responseType:'blob'});
+      if(objectUrl.current) window.URL.revokeObjectURL(objectUrl.current);
+      objectUrl.current=window.URL.createObjectURL(png.data);setQrUrl(objectUrl.current);
       setQrData(res.data);
       setShowQr(true);
     } catch (e) { setError(getErrorMessage(e, 'Không tải được mã QR.')); }
@@ -43,15 +50,10 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
 
   async function handleReport() {
     if (busy) return;
-    if (!reportForm.transactionRef || !reportForm.transferTime) { setError('Thiếu mã tham chiếu hoặc thời điểm chuyển.'); return; }
     setBusy(true); setError('');
     try {
       await apiClient.post(`/bookings/${encodeURIComponent(booking.id)}/deposit/report`, {
-        transactionRef: reportForm.transactionRef,
-        transferTime: toVietnamInstant(reportForm.transferTime),
-        transferNote: reportForm.transferNote,
-        sourceAccount: reportForm.sourceAccount,
-        idempotencyKey: `report-${booking.id}-${reportForm.transactionRef}-${reportForm.transferTime}`
+        idempotencyKey: `report-${booking.id}`
       });
       request.reload(); reload(); setShowQr(false);
     } catch (e) { setError(getErrorMessage(e, 'Không thể gửi báo chuyển khoản.')); }
@@ -60,21 +62,23 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
 
   async function handleVerify() {
     if (busy) return;
-    if (!verifyForm.transactionRef || !verifyForm.amountVnd || !verifyForm.transferTime || !verifyForm.idempotencyKey) {
-      setError('Thiếu thông tin bắt buộc (tham chiếu, số tiền, thời điểm, khóa idempotency).'); return;
+    if (!verifyForm.transactionRef || !verifyForm.amountVnd || !verifyForm.transferTime || !verified) {
+      setError('Thiếu thông tin bắt buộc (tham chiếu, số tiền, thời điểm, xác nhận đối chiếu).'); return;
     }
+    if(!window.confirm(`Ghi nhận khoản DEMO ${money(Number(verifyForm.amountVnd))} cho đơn này sau khi đã đối chiếu?`)) return;
+    verifyKey.current ??= window.crypto.randomUUID();
     setBusy(true); setError('');
     try {
       await apiClient.post(`/bookings/${encodeURIComponent(booking.id)}/deposit/verify`, {
         transactionRef: verifyForm.transactionRef,
         amountVnd: Number(verifyForm.amountVnd),
         transferTime: toVietnamInstant(verifyForm.transferTime),
-        transferNote: verifyForm.transferNote,
+        transferNote: `KD${booking.id.replaceAll('-','').toUpperCase()}`,
         sourceAccount: verifyForm.sourceAccount,
-        idempotencyKey: verifyForm.idempotencyKey,
+        idempotencyKey: verifyKey.current, verified,
         expectedVersion: booking.version
       });
-      request.reload(); reload(); setShowQr(false);
+      request.reload(); reload(); setShowQr(false); verifyKey.current=null; setVerified(false);
     } catch (e) { setError(getErrorMessage(e, 'Không thể xác minh khoản cọc.')); }
     finally { setBusy(false); }
   }
@@ -106,7 +110,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     {booking.status === 'PENDING' && data && !data.acceptingNew && isVnpay ?
       <p>Đang tạm dừng tạo thanh toán mới. Giao dịch đã tạo vẫn được hệ thống đối soát.</p> : null}
 
-    {isVnpay && depositApproved && role === 'USER' && booking.status === 'PENDING' && data?.acceptingNew && (
+    {isVnpay && depositApproved && role === 'USER' && booking.status === 'PENDING' && (
       <button className="btn mt-3" disabled={busy} onClick={() => action('deposit/session')}>Thanh toán cọc thử nghiệm</button>
     )}
 
@@ -114,18 +118,19 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     {request.error ? <Notice error>{request.error}<button className="btn-secondary" onClick={request.reload}>Tải lại</button></Notice> : null}
     {error ? <Notice error>{error}</Notice> : null}
 
-    {isQr && depositApproved && role === 'USER' && booking.status === 'PENDING' && data?.acceptingNew && (
+    {isQr && depositApproved && role === 'USER' && booking.status === 'PENDING' && (
       <div className="mt-4 space-y-3">
-        <button className="btn" disabled={busy} onClick={loadQr}>
+        <button className="btn" disabled={busy} onClick={()=>showQr?setShowQr(false):loadQr()}>
           {showQr ? 'Ẩn mã QR' : 'Hiển thị mã QR cọc'}
         </button>
         {showQr && qrData && (
           <div className="space-y-3 border-t pt-3">
             <p className="text-sm text-amber-700"><strong>Mã yêu cầu:</strong> {qrData.requestCode}</p>
+            <button className="btn-secondary" onClick={()=>navigator.clipboard.writeText(`${qrData.amount} ${qrData.requestCode}`)}>Sao chép số tiền và nội dung</button>
             <p className="text-sm text-amber-700"><strong>Số tiền:</strong> {money(qrData.amount)}</p>
             <p className="text-sm text-amber-700"><strong>Hạn thanh toán:</strong> {date(qrData.paymentDueAt)}</p>
             <p className="text-sm text-amber-700"><strong>Hạn đối soát:</strong> {date(qrData.reviewDueAt)}</p>
-            <img src={`/api/v1/bookings/${encodeURIComponent(booking.id)}/deposit/qr`} alt="Mã QR cọc giả lập" style={{maxWidth: '200px'}} />
+            <img src={qrUrl} alt="Mã QR cọc giả lập" style={{maxWidth: '200px'}} />
             <p className="text-xs text-red-600"><strong>{qrData.warning}</strong></p>
             <details className="text-sm">
               <summary>Thông tin tài khoản nhận (giả lập)</summary>
@@ -133,37 +138,32 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
             </details>
             <hr />
             <p className="font-medium">Tôi đã chuyển khoản (báo cho nhân viên đối soát)</p>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <label className="block"><span className="text-sm">Mã tham chiếu giao dịch</span><input type="text" className="input" required value={reportForm.transactionRef} onChange={e => setReportForm({...reportForm, transactionRef: e.target.value})} /></label>
-              <label className="block"><span className="text-sm">Thời điểm chuyển (giờ VN)</span><input type="datetime-local" className="input" required value={reportForm.transferTime} onChange={e => setReportForm({...reportForm, transferTime: e.target.value})} /></label>
-            </div>
-            <label className="block"><span className="text-sm">Nội dung chuyển khoản</span><input type="text" className="input" value={reportForm.transferNote} onChange={e => setReportForm({...reportForm, transferNote: e.target.value})} /></label>
-            <label className="block"><span className="text-sm">Tài khoản nguồn (giả lập)</span><input type="text" className="input" value={reportForm.sourceAccount} onChange={e => setReportForm({...reportForm, sourceAccount: e.target.value})} /></label>
-            <button className="btn mt-2" disabled={busy} onClick={handleReport}>Gửi báo đã chuyển khoản</button>
+            {!reportedAt ? <button className="btn mt-2" disabled={busy} onClick={handleReport}>Gửi báo đã chuyển khoản</button> : <p>Đã gửi báo; chưa xác nhận tiền cho đến khi nhân viên đối soát.</p>}
           </div>
         )}
       </div>
     )}
 
-    {isQr && depositApproved && role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && data?.acceptingNew && (
+    {isQr && depositApproved && role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && (
       <div className="mt-4 space-y-3 border-t pt-3">
         <p className="font-medium">Xác minh khoản cọc (Staff chi nhánh nhận)</p>
-        <p className="text-sm text-slate-600">Nhập thông tin khoản tiền đã kiểm tra thực tế. Mỗi khoản cần khóa idempotency duy nhất.</p>
+        <p className="text-sm text-slate-600">Nhập thông tin khoản tiền đã kiểm tra thực tế. Mỗi khoản cần xác nhận đối chiếu duy nhất.</p>
         <div className="grid gap-2 sm:grid-cols-2">
           <label className="block"><span className="text-sm">Mã tham chiếu giao dịch</span><input type="text" className="input" required value={verifyForm.transactionRef} onChange={e => setVerifyForm({...verifyForm, transactionRef: e.target.value})} /></label>
           <label className="block"><span className="text-sm">Số tiền thực nhận (VND)</span><input type="number" className="input" min="1" step="1" required value={verifyForm.amountVnd} onChange={e => setVerifyForm({...verifyForm, amountVnd: e.target.value})} /></label>
         </div>
         <div className="grid gap-2 sm:grid-cols-2">
-          <label className="block"><span className="text-sm">Thời điểm chuyển (giờ VN)</span><input type="datetime-local" className="input" required value={verifyForm.transferTime} onChange={e => setVerifyForm({...verifyForm, transferTime: e.target.value})} /></label>
-          <label className="block"><span className="text-sm">Khóa idempotency (duy nhất)</span><input type="text" className="input" required value={verifyForm.idempotencyKey} onChange={e => setVerifyForm({...verifyForm, idempotencyKey: e.target.value})} placeholder="VD: verify-bookingId-ref-time" /></label>
+          <label className="block"><span className="text-sm">Thời điểm chuyển (giờ VN)</span><input type="datetime-local" step="1" className="input" required value={verifyForm.transferTime} onChange={e => setVerifyForm({...verifyForm, transferTime: e.target.value})} /></label>
+
         </div>
-        <label className="block"><span className="text-sm">Nội dung chuyển khoản</span><input type="text" className="input" value={verifyForm.transferNote} onChange={e => setVerifyForm({...verifyForm, transferNote: e.target.value})} /></label>
+
         <label className="block"><span className="text-sm">Tài khoản nguồn (giả lập)</span><input type="text" className="input" value={verifyForm.sourceAccount} onChange={e => setVerifyForm({...verifyForm, sourceAccount: e.target.value})} /></label>
-        <button className="btn mt-2" disabled={busy} onClick={handleVerify}>Xác minh và ghi nhận</button>
+        <label className="block"><input type="checkbox" checked={verified} onChange={e=>setVerified(e.target.checked)} /> Đã đối chiếu đúng đơn, nội dung, bên nhận DEMO và số tiền</label>
+        <button className="btn mt-2" disabled={busy || !verified} onClick={handleVerify}>Xác minh và ghi nhận</button>
       </div>
     )}
 
-    {role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && data?.acceptingNew && deposit?.required && !depositApproved && (
+    {role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && deposit?.required && !depositApproved && (
       <button className="btn mt-3" disabled={busy} onClick={() => action('deposit/approve', { expectedVersion: booking.version })}>
         {isQr ? 'Duyệt hồ sơ và tạo mã QR cọc' : 'Duyệt hồ sơ và yêu cầu đóng cọc'}
       </button>

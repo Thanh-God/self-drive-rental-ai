@@ -1,17 +1,11 @@
 package com.carrental.modules.operation.service;
 
 import com.carrental.exception.DomainException;
-import com.carrental.modules.booking.entity.Booking;
-import com.carrental.modules.booking.repository.BookingRepository;
 import com.carrental.modules.booking.service.BookingService;
 import com.carrental.modules.booking.service.DepositPolicy;
-import com.carrental.modules.booking.service.SchedulePolicy;
-import com.carrental.modules.branch.service.BranchService;
 import com.carrental.modules.contract.service.ContractService;
 import com.carrental.modules.payment.repository.PaymentRepository;
 import com.carrental.modules.payment.service.*;
-import com.carrental.modules.user.service.LicenseService;
-import com.carrental.modules.vehicle.service.VehicleService;
 import com.carrental.security.Actor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -28,7 +22,6 @@ import java.util.Objects;
 @Service
 public class DepositWorkflow {
     private final BookingService bookings;
-    private final BookingRepository bookingRepo;
     private final ContractService contracts;
     private final PaymentRepository repo;
     private final PaymentService payments;
@@ -36,19 +29,13 @@ public class DepositWorkflow {
     private final PaymentSettings settings;
     private final TransactionTemplate tx;
     private final Clock clock;
-    private final LicenseService licenses;
-    private final VehicleService vehicles;
-    private final BranchService branches;
-    private final JdbcTemplate jdbc;
 
-    public DepositWorkflow(BookingService bookings, BookingRepository bookingRepo, ContractService contracts, PaymentRepository repo,
+    public DepositWorkflow(BookingService bookings, ContractService contracts, PaymentRepository repo,
                            PaymentService payments, VnpayGateway gateway, PaymentSettings settings,
-                           PlatformTransactionManager manager, Clock clock,
-                           LicenseService licenses, VehicleService vehicles, BranchService branches, JdbcTemplate jdbc) {
-        this.bookings = bookings; this.bookingRepo = bookingRepo; this.contracts = contracts; this.repo = repo;
+                           PlatformTransactionManager manager, Clock clock) {
+        this.bookings = bookings; this.contracts = contracts; this.repo = repo;
         this.payments = payments; this.gateway = gateway; this.settings = settings;
         this.tx = new TransactionTemplate(manager); this.clock = clock;
-        this.licenses = licenses; this.vehicles = vehicles; this.branches = branches; this.jdbc = jdbc;
     }
 
     public Object approve(Actor staff, String id, long version) {
@@ -175,143 +162,43 @@ public class DepositWorkflow {
         });
     }
 
-    /**
-     * QR DEMO verification: persist money first, then try to apply and confirm.
-     * Money is persisted with applied_amount=0; if confirmation succeeds, applied_amount is updated.
-     * If confirmation fails, money remains recorded and refund is queued for unapplied amount.
-     */
     public Object verifyQrDeposit(Actor staff, String bookingId, BookingService.VerifyInput input) {
-        return tx.execute(s -> {
-            var b = bookings.lockDepositBooking(bookingId);
-            branches.requireStaff(staff, b.pickupBranchId);
-            if (b.version != input.expectedVersion()) throw DomainException.conflict("Đơn đã thay đổi. Vui lòng tải lại.");
-            if (!b.depositRequired) throw DomainException.conflict("Đơn không yêu cầu cọc.");
-            if (!DepositPolicy.isDemoQrMethod(b.depositMethod)) throw DomainException.conflict("Đơn không dùng phương thức QR giả lập.");
-            if (input.amountVnd() <= 0) throw DomainException.bad("Số tiền thực nhận phải lớn hơn 0.");
-            if (input.transferTime().isAfter(clock.instant())) throw DomainException.bad("Thời điểm chuyển không được ở tương lai.");
-            if (input.idempotencyKey() == null || input.idempotencyKey().isBlank()) throw DomainException.bad("Thiếu khóa idempotency.");
-            if (input.transactionRef() == null || input.transactionRef().isBlank()) throw DomainException.bad("Thiếu mã tham chiếu giao dịch.");
-            if (input.transferNote() == null || input.transferNote().isBlank()) throw DomainException.bad("Thiếu nội dung chuyển khoản.");
-            if (input.sourceAccount() == null || input.sourceAccount().isBlank()) throw DomainException.bad("Thiếu tài khoản nguồn.");
-
-            boolean isLate = input.transferTime().isAfter(b.paymentDueAt);
-            boolean isExpired = !"PENDING".equals(bookings.effective(b));
-
-            // Check idempotency
-            boolean exists = jdbc.queryForObject(
-                "select count(*) > 0 from payment_transactions where booking_id=? and idempotency_key=?",
-                Boolean.class, b.id, input.idempotencyKey()
-            );
-            if (Boolean.TRUE.equals(exists)) throw DomainException.conflict("Khoản này đã được ghi nhận (trùng idempotency key).");
-
-            Instant now = clock.instant();
-            String paymentId = UUID.randomUUID().toString().replace("-", "");
-            Instant transferTime = input.transferTime() != null ? input.transferTime() : now;
-            String providerPayDate = VnpayGateway.date(transferTime);
-
-            // Step 1: Persist money with applied_amount=0 (separate from confirmation)
-            jdbc.update("""
-                insert into payment_transactions(id, booking_id, amount, status, created_at, expires_at,
-                    provider_transaction, provider_pay_date, applied, version,
-                    verifier_id, verified_at, transfer_time, transfer_note, source_account, applied_amount, idempotency_key)
-                values(?,?,?,'SUCCEEDED',?,?,?,?,false,0,?,?,?,?,?,?,?)
-                """,
-                paymentId, b.id, input.amountVnd(),
-                java.sql.Timestamp.from(now), java.sql.Timestamp.from(b.paymentDueAt),
-                input.transactionRef(), VnpayGateway.date(transferTime),
-                staff.id(), java.sql.Timestamp.from(now), java.sql.Timestamp.from(transferTime),
-                input.transferNote(), input.sourceAccount(), 0L, input.idempotencyKey()
-            );
-
-            // Step 2: If late or expired, create refund for unapplied amount immediately
-            if (isExpired || isLate) {
-                String refundId = UUID.randomUUID().toString().replace("-", "");
-                String kind = isExpired ? "UNAPPLIED_EXPIRED" : "UNAPPLIED_LATE";
-                String reason = isExpired
-                    ? "Đơn đã hết hạn tại thời điểm xác minh; hoàn toàn bộ tiền đã nhận."
-                    : "Chuyển khoản sau hạn thanh toán; hoàn toàn bộ tiền đã nhận.";
-                jdbc.update("""
-                    insert into payment_refunds(id, payment_id, booking_id, amount, status, kind, reason, created_at)
-                    values(?,?,?,?,?,?,?,?)
-                    """,
-                    refundId, paymentId, b.id, input.amountVnd(),
-                    "APPROVED", kind, reason, java.sql.Timestamp.from(now)
-                );
-                repo.event(b.id, paymentId, "REFUND_REQUESTED", reason, staff.id(), now, "refund:" + refundId);
-                repo.event(b.id, paymentId, "REFUND_DECIDED", reason, staff.id(), now, null);
-                return bookings.view(b);
-            }
-
-            // Step 3: Try to apply and confirm (FIFO allocation)
-            return applyAndConfirmQr(b, paymentId, staff.id(), now);
-        });
+        var payment = payments.recordQr(staff,bookingId,input); // Commits before applying or issuing a contract.
+        settleQr(bookingId,payment.id());
+        return bookings.view(bookings.require(staff,bookingId));
     }
 
-    private Object applyAndConfirmQr(Booking b, String newPaymentId, String verifierId, Instant now) {
-        // FIFO allocation: apply to oldest payments first
-        var payments = jdbc.query("""
-            select id, amount, applied_amount from payment_transactions
-            where booking_id=? and status='SUCCEEDED'
-            order by transfer_time, id
-            """, (rs, rowNum) -> new PaymentRow(rs.getString("id"), rs.getLong("amount"), rs.getLong("applied_amount")), b.id);
-
-        long depositAmount = b.depositAmount;
-        long totalAlreadyApplied = payments.stream().mapToLong(p -> p.appliedAmount).sum();
-        long remainingToApply = depositAmount - totalAlreadyApplied;
-        if (remainingToApply < 0) remainingToApply = 0;
-
-        for (PaymentRow p : payments) {
-            if (remainingToApply <= 0) break;
-            long canApply = Math.min(p.amount - p.appliedAmount, remainingToApply);
-            if (canApply > 0) {
-                jdbc.update("update payment_transactions set applied_amount=applied_amount+?, version=version+1 where id=?",
-                    canApply, p.id);
-                remainingToApply -= canApply;
-            }
-        }
-
-        long totalApplied = depositAmount - remainingToApply;
-        if (totalApplied >= depositAmount) {
-            // Check GPLX, schedule, license before confirming
-            if (!Objects.equals(b.depositLicenseVersion, licenses.forBooking(b.userId).version()))
-                throw DomainException.conflict("GPLX đã thay đổi sau duyệt. Cần nhân viên kiểm tra lại; hạn cọc không được kéo dài.");
-            var v = vehicles.lock(b.vehicleId);
-            if (!"ACTIVE".equals(v.status)) throw DomainException.conflict("Xe không còn sẵn sàng.");
-            licenses.eligible(b.userId, v.transmission, v.seats, b.endAt);
-            licenses.requirePhotos(b.userId, true);
-            // Schedule validation
-            var existing = bookingRepo.lockScheduleByVehicleId(v.id);
-            var rows = new ArrayList<>(existing.stream().filter(x -> !x.id.equals(b.id)).map(bookings::slot).toList());
-            rows.add(bookings.slot(b));
-            SchedulePolicy.validate(v.currentBranchId, rows, clock.instant());
-
-            b.depositTxnRef = newPaymentId;
-            b.status = "CONFIRMED";
-            b.depositMode = "FULL";
-            // No repo.flush() needed - using direct JDBC
-            bookings.history(b, "PENDING", null, "QR DEMO xác minh đủ cọc: " + newPaymentId);
-
-            // Update applied_amount for the new payment
-            long appliedThisPayment = depositAmount - totalAlreadyApplied;
-            jdbc.update("update payment_transactions set applied_amount=applied_amount+?, version=version+1 where id=?",
-                appliedThisPayment, newPaymentId);
-
-            // Issue contract and record event
-            var view = bookings.view(b);
-            contracts.issueDeposit(view);
-            jdbc.update("insert into payment_events(id,booking_id,payment_id,kind,note,actor_id,created_at,event_key) values(?,?,?,?,?,?,?,?)",
-                UUID.randomUUID().toString(), b.id, newPaymentId, "DEPOSIT_APPLIED",
-                "Đã xác nhận đơn và phát hành hợp đồng từ QR DEMO", null, java.sql.Timestamp.from(clock.instant()), "applied:" + newPaymentId);
-
-            return bookings.view(b);
-        } else {
-            // Partial - update mode and expiry
-            b.depositMode = "PARTIAL";
-            b.expiresAt = b.reviewDueAt;
-            // No repo.flush() needed
-            return bookings.view(b);
+    public void settleQr(String bookingId,String paymentId) {
+        try {
+            tx.executeWithoutResult(s -> {
+                var b=bookings.depositLock(bookingId);
+                if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) return;
+                if (!"PENDING".equals(b.status())) {
+                    payments.qrRefund(bookingId,"CONFIRMED".equals(b.status()) ? "EXCESS" : "UNAPPLIED",!"CONFIRMED".equals(b.status()));
+                    return;
+                }
+                var eligible=repo.forBooking(bookingId).stream().filter(p -> "SUCCEEDED".equals(p.status()) &&
+                    p.transferTime()!=null && p.transferTime().isBefore(b.deposit().paymentDueAt()) &&
+                    p.verifiedAt().isBefore(b.deposit().reviewDueAt()) && repo.refunds(bookingId).stream().noneMatch(r -> r.paymentId().equals(p.id())))
+                    .sorted(Comparator.comparing(PaymentRepository.Payment::transferTime).thenComparing(PaymentRepository.Payment::id)).toList();
+                long received=eligible.stream().mapToLong(PaymentRepository.Payment::amount).reduce(0,Math::addExact);
+                if(received < b.deposit().amount()) {
+                    // Any ineligible receipt is refundable; partial timely money continues to hold until reviewDueAt.
+                    for(var p:repo.forBooking(bookingId)) if(eligible.stream().noneMatch(e -> e.id().equals(p.id()))) payments.qrRefund(bookingId,"LATE",false);
+                    return;
+                }
+                long remaining=b.deposit().amount();
+                for(var p:eligible) { long amount=Math.min(p.amount(),remaining);repo.updateAppliedAmount(p.id(),amount);remaining-=amount; }
+                var confirmed=bookings.confirmQrDeposit(bookingId,paymentId);
+                contracts.issueDeposit(confirmed);
+                repo.event(bookingId,paymentId,"DEPOSIT_APPLIED","Đủ cọc, xác nhận đơn và phát hành hợp đồng",null,clock.instant(),"applied-booking:"+bookingId);
+                payments.qrRefund(bookingId,"EXCESS",false);
+            });
+        } catch(DomainException e) {
+            payments.qrRefund(bookingId,"UNAPPLIED",true);
+        } catch(RuntimeException e) {
+            // Persisted receipts stay visible and retryable after infrastructure/contract failure.
+            tx.executeWithoutResult(s -> repo.event(bookingId,paymentId,"DEPOSIT_RETRY","Chưa thể áp dụng cọc; cần đối soát trước khi thử lại",null,clock.instant(),null));
         }
     }
-
-    private record PaymentRow(String id, long amount, long appliedAmount) {}
 }

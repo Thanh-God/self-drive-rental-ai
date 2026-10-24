@@ -36,10 +36,10 @@ public class DepositController {
     public record NoShow(long expectedVersion, boolean contacted, boolean notDelivered, String reason) {}
     public record Decision(long expectedVersion, long amount, String reason) {}
     public record ReportInput(String transactionRef, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey) {}
-    public record VerifyInput(String transactionRef, long amountVnd, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion) {}
+    public record VerifyInput(String transactionRef, long amountVnd, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion, boolean verified) {}
     public record ManualRefundInput(String paymentId, long amount, String reason) {}
     public record ManualRefundDecideInput(long expectedVersion, long amount, String reason) {}
-    public record ManualRefundCompleteInput(String recipientAccount, String reference, java.time.Instant transferTime) {}
+    public record ManualRefundCompleteInput(String recipientAccount, String reference, java.time.Instant transferTime, long expectedVersion) {}
 
     @GetMapping("/bookings/{id}/deposit")
     public Object summary(@AuthenticationPrincipal Actor actor, @PathVariable String id) {
@@ -53,7 +53,7 @@ public class DepositController {
         if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) throw DomainException.conflict("Đơn không dùng phương thức QR giả lập.");
         if (b.deposit().approvedAt() == null) throw DomainException.conflict("Đơn chưa được duyệt hồ sơ.");
 
-        String payload = QrGenerator.buildDemoPayload(b.id(), b.deposit().amount());
+        String payload = QrGenerator.buildDemoPayload(BookingService.requestCode(b.id()), b.deposit().amount());
         byte[] png = qrGenerator.generatePng(payload, 300);
         return ResponseEntity.ok()
             .contentType(MediaType.IMAGE_PNG)
@@ -68,8 +68,8 @@ public class DepositController {
         if (b.deposit().approvedAt() == null) throw DomainException.conflict("Đơn chưa được duyệt hồ sơ.");
 
         return Map.of(
-            "payload", QrGenerator.buildDemoPayload(b.id(), b.deposit().amount()),
-            "requestCode", b.id(),
+            "payload", QrGenerator.buildDemoPayload(BookingService.requestCode(b.id()), b.deposit().amount()),
+            "requestCode", BookingService.requestCode(b.id()),
             "amount", b.deposit().amount(),
             "receiverSnapshot", b.deposit().receiverSnapshot(),
             "paymentDueAt", b.deposit().paymentDueAt(),
@@ -98,9 +98,9 @@ public class DepositController {
 
     @PostMapping("/bookings/{id}/deposit/verify")
     public Object verifyDeposit(@AuthenticationPrincipal Actor actor, @PathVariable String id, @RequestBody VerifyInput input) {
-        return bookings.verifyDeposit(actor, id, new BookingService.VerifyInput(
+        return workflow.verifyQrDeposit(actor, id, new BookingService.VerifyInput(
             input.transactionRef(), input.amountVnd(), input.transferTime(), input.transferNote(),
-            input.sourceAccount(), input.idempotencyKey(), input.expectedVersion()
+            input.sourceAccount(), input.idempotencyKey(), input.expectedVersion(), input.verified()
         ));
     }
 
@@ -151,7 +151,7 @@ public class DepositController {
 
     @PostMapping("/admin/refunds/{id}/complete-manual")
     public void completeManualRefund(@AuthenticationPrincipal Actor actor, @PathVariable String id, @RequestBody ManualRefundCompleteInput input) {
-        payments.completeManualRefund(actor, id, input.recipientAccount(), input.reference(), input.transferTime());
+        payments.completeManualRefund(actor, id, input.recipientAccount(), input.reference(), input.transferTime(), input.expectedVersion());
     }
 
     @GetMapping("/payments/vnpay/ipn")

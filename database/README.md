@@ -29,3 +29,5 @@ Không duy trì `schema.sql` chỉnh tay song song. Nếu cần xuất schema ch
 ## Ngân sách bảng
 
 Tối đa 30 bảng tính cả kỹ thuật. V1 có 25 bảng nghiệp vụ; cộng flyway_schema_history là 26. Danh sách/quan hệ/phần chỉ có schema tại [thiết kế database](../docs/database/database-design.md). Không tạo bảng AI huấn luyện khi chưa chốt mô hình và dữ liệu. Quyết định nghiệp vụ chỉ duy trì tại [sổ quyết định](../docs/architecture/decisions.md).
+
+Cọc QR: SQL V7/V8 trong resources/db/migration và Java V9 trong backend/src/main/java/db/migration cùng được Flyway đọc tại classpath:db/migration. Java V9 chỉ gỡ unique legacy theo metadata khác tên trên MySQL/H2; không có schema.sql hoặc DDL vận hành song song. Kiểm history/checksum trước nâng; không repair/clean.

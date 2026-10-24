@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 
 /** QR DEMO HTTP tests - internal signed-protocol proof, not live merchant acceptance. */
-@SpringBootTest(properties={"app.jwt-secret=qr-demo-test-only-secret-at-least-32-bytes", "app.seed-enabled=true", "app.seed-password=QRDemoTestOnly123!", "app.deposit-enabled=true", "app.deposit.method=DEMO_QR_MANUAL", "app.payment-reconcile-ms=86400000", "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"})
+@SpringBootTest(properties={"app.jwt-secret=qr-demo-test-only-secret-at-least-32-bytes", "app.seed-enabled=true", "app.seed-password=QRDemoTestOnly123!", "app.deposit-enabled=true", "app.deposit-method=DEMO_QR_MANUAL", "app.payment-reconcile-ms=86400000", "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"})
 @AutoConfigureMockMvc
 @Import(QrDemoHttpTest.TimeConfig.class)
 class QrDemoHttpTest {
@@ -42,129 +42,130 @@ class QrDemoHttpTest {
     @Autowired TokenService tokens;@Autowired AccountService accounts;
     @Autowired com.carrental.modules.operation.service.RentalWorkflow rental;
     final Actor user=new Actor("demo-user","USER","Synthetic"),staff=new Actor("demo-staff-dn","STAFF","Synthetic"),admin=new Actor("demo-admin","ADMIN","Synthetic");
+    @org.springframework.boot.test.mock.mockito.SpyBean com.carrental.modules.contract.service.ContractService contracts;
     @BeforeEach void setup(){
+        org.mockito.Mockito.reset(contracts);
         CancelBoundaryTest.verifySafeIsolatedDatabase(jdbc);
         for(String t:List.of("payment_events","payment_refunds","payment_transactions","reviews","incident_events","incident_cases","vehicle_handover_records","invoice_items","invoices","contracts","booking_status_history","bookings"))jdbc.update("delete from "+t);
         jdbc.update("update vehicles set current_branch_id='dn',status='ACTIVE' where id='v1'");clock.value=Instant.parse("2026-10-23T03:00:00Z");
         var old=licenses.mine(user);licenses.save(user,new LicenseService.View(null,"SYNTHETIC-QR-DEMO-NOT-REAL","VN_2025","B",LocalDate.of(2035,12,31),false,"PENDING",old==null?0:old.version()));LicensePhotoFixture.approved(licenses,user);
     }
     BookingService.View create(){return bookings.create(user,new BookingService.Input("v1","dn","dn",null,null,1300000L,LocalDate.of(2026,10,26),LocalDate.of(2026,10,28)));}
-    BookingService.View approve(String id,long version){return (BookingService.View)workflow.approve(staff,id,version);}
-    String postJson(String url, Object body){try{return mvc.perform(post("/api/v1"+url).contentType("application/json").content(json.writeValueAsString(body))).andReturn().getResponse().getContentAsString();}catch(Exception e){throw new RuntimeException(e);}}
-    <T> T postJson(String url, Object body, Class<T> clazz){try{return json.readValue(postJson(url,body),clazz);}catch(Exception e){throw new RuntimeException(e);}}
-    String getJson(String url){try{return mvc.perform(get("/api/v1"+url)).andReturn().getResponse().getContentAsString();}catch(Exception e){throw new RuntimeException(e);}}
-    void postForm(String url, Object body){try{mvc.perform(post("/api/v1"+url).contentType("application/json").content(json.writeValueAsString(body))).andReturn();}catch(Exception e){throw new RuntimeException(e);}}
-    com.fasterxml.jackson.databind.JsonNode readTree(String jsonString){try{return json.readTree(jsonString);}catch(Exception e){throw new RuntimeException(e);}}
-    void verifyQr(String bookingId, String transactionRef, long amountVnd, String transferTime, String idempotencyKey){
-        var fields=new TreeMap<String,String>();fields.put("transactionRef",transactionRef);fields.put("amountVnd",Long.toString(amountVnd));fields.put("transferTime",transferTime);fields.put("transferNote","Test note");fields.put("sourceAccount","0000000000");fields.put("idempotencyKey",idempotencyKey);fields.put("expectedVersion",Long.toString(bookings.view(bookings.require(staff,bookingId)).version()));
-        postForm("/bookings/"+bookingId+"/deposit/verify", fields);
+    BookingService.View current(String id){return bookings.view(bookings.require(user,id));}
+    BookingService.View approve(){var b=create();return (BookingService.View)workflow.approve(staff,b.id(),b.version());}
+    org.springframework.mock.web.MockHttpServletResponse post(Actor actor,String url,Object body)throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post("/api/v1"+url).header("Authorization","Bearer "+tokens.issue(accounts.require(actor.id()))).contentType("application/json").content(json.writeValueAsString(body))).andReturn().getResponse();
     }
-    @Test void qrFullFlow_userBooks_staffApproves_userReports_staffVerifies_confirmedAndContract(){
-        var b=create();assertTrue(b.deposit().required());assertEquals("DEMO_QR_MANUAL",b.deposit().method());assertEquals(390000,b.deposit().amount());
-        var approved=approve(b.id(),b.version());assertEquals("DEMO_QR_MANUAL",approved.deposit().method());assertEquals("FULL",approved.deposit().mode());
-        // USER: GET QR payload
-        var qrUrl="/bookings/"+b.id()+"/deposit/qr-payload";
-        var qrData = readTree(getJson(qrUrl));
-        assertEquals("KDRIVE_DEMO|"+b.id()+"|390000", qrData.path("payload").asText());
-        assertEquals("Mô phỏng — Không chuyển tiền thật", qrData.path("warning").asText());
-        // USER: report deposit
-        var reportUrl="/bookings/"+b.id()+"/deposit/report";
-        var reportFields=Map.of("transactionRef","TXN123","transferTime","2026-10-23T03:15:00","transferNote","Test","sourceAccount","0000000001","idempotencyKey","report-"+b.id()+"-TXN123-2026-10-23T03:15:00");
-        postForm(reportUrl, reportFields);
-        // Report again (idempotent) - should not error
-        postForm(reportUrl, reportFields);
-        // STAFF: verify deposit (partial 200k)
-        verifyQr(b.id(),"TXN123",200000,"2026-10-23T03:15:00","verify-"+b.id()+"-TXN123-2026-10-23T03:15:00");
-        var partial=bookings.view(bookings.require(user,b.id()));assertEquals("PARTIAL",partial.deposit().mode());assertEquals(200000,partial.deposit().appliedAmount());assertEquals(190000,partial.deposit().missingAmount());
-        // STAFF: verify deposit (remaining 190k)
-        verifyQr(b.id(),"TXN124",190000,"2026-10-23T03:20:00","verify-"+b.id()+"-TXN124-2026-10-23T03:20:00");
-        var confirmed=bookings.view(bookings.require(user,b.id()));assertEquals("CONFIRMED",confirmed.status());assertEquals("FULL",confirmed.deposit().mode());assertEquals(390000,confirmed.deposit().appliedAmount());
-        // Contract issued
-        assertEquals(1,jdbc.queryForObject("select count(*) from contracts where booking_id=?",Integer.class,b.id()));
+    org.springframework.mock.web.MockHttpServletResponse get(Actor actor,String url)throws Exception {
+        return mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1"+url).header("Authorization","Bearer "+tokens.issue(accounts.require(actor.id())))).andReturn().getResponse();
     }
-    @Test void qrPartialThenExpired_createsRefundForUnapplied(){
-        var b=create();approve(b.id(),b.version());
-        // STAFF verifies partial 200k
-        verifyQr(b.id(),"TXN200",200000,"2026-10-23T03:15:00","verify-"+b.id()+"-TXN200-2026-10-23T03:15:00");
-        var partial=bookings.view(bookings.require(user,b.id()));assertEquals("PARTIAL",partial.deposit().mode());
-        // Advance clock past reviewDueAt
-        clock.value=clock.value.plusSeconds(4000); // past reviewDueAt
-        var expired=bookings.view(bookings.require(user,b.id()));assertEquals("EXPIRED",expired.status());
-        // Refund created for unapplied 190k
-        var refund=repo.refundForPayment(repo.forBooking(b.id()).get(0).id()).orElseThrow();
-        assertEquals("APPROVED",refund.status());assertEquals(190000,refund.amount());assertEquals("UNAPPLIED_EXPIRED",refund.kind());
-        assertEquals(0,jdbc.queryForObject("select count(*) from contracts where booking_id=?",Integer.class,b.id()));
+    Map<String,Object> input(String id,String ref,long amount,Instant time){return new LinkedHashMap<>(Map.of("transactionRef",ref,"amountVnd",amount,"transferTime",time.toString(),"transferNote",BookingService.requestCode(id),"sourceAccount","DEMO-PAYER","idempotencyKey","key-"+ref,"expectedVersion",current(id).version(),"verified",true));}
+    void verify(String id,String ref,long amount)throws Exception {
+        var response=post(staff,"/bookings/"+id+"/deposit/verify",input(id,ref,amount,clock.instant()));
+        assertEquals(200,response.getStatus(),response.getContentAsString());
     }
-    @Test void qrLatePayment_recordedButNotApplied_createsRefund(){
-        var b=create();approve(b.id(),b.version());
-        // STAFF verifies payment AFTER paymentDueAt (late)
-        var lateTime = clock.value.plusSeconds(2000).toString(); // paymentDueAt + 30min
-        verifyQr(b.id(),"TXN_LATE",390000,lateTime,"verify-"+b.id()+"-TXN_LATE-"+lateTime);
-        // Payment recorded but not applied, refund created
-        var refund=repo.refundForPayment(repo.forBooking(b.id()).get(0).id()).orElseThrow();
-        assertEquals("APPROVED",refund.status());assertEquals(390000,refund.amount());assertEquals("UNAPPLIED_LATE",refund.kind());
-        var expired=bookings.view(bookings.require(user,b.id()));assertEquals("PENDING",expired.status()); // still pending, not confirmed
-        assertEquals(0,jdbc.queryForObject("select count(*) from contracts where booking_id=?",Integer.class,b.id()));
+    void report(String id)throws Exception {assertEquals(200,post(user,"/bookings/"+id+"/deposit/report",Map.of("idempotencyKey","report-"+id)).getStatus());}
+    long count(String table,String id){return jdbc.queryForObject("select count(*) from "+table+" where booking_id=?",Long.class,id);}
+    @Test void authenticatedFullFlowAndOneContract()throws Exception {
+        var b=approve();assertEquals("DEMO_QR_MANUAL",b.deposit().method());assertEquals(390000,b.deposit().amount());
+        var payload=get(user,"/bookings/"+b.id()+"/deposit/qr-payload");assertEquals(200,payload.getStatus());
+        assertEquals("KDRIVE_DEMO|"+BookingService.requestCode(b.id())+"|390000",json.readTree(payload.getContentAsString()).path("payload").asText());
+        report(b.id());verify(b.id(),"A",390000);verify(b.id(),"A",390000);
+        assertEquals("CONFIRMED",current(b.id()).status());assertEquals(390000,current(b.id()).deposit().appliedAmount());assertEquals(1,count("contracts",b.id()));assertEquals(1,count("payment_transactions",b.id()));
     }
-    @Test void qrExcessPayment_appliedFIFO_createsExcessRefund(){
-        var b=create();approve(b.id(),b.version());
-        // First payment 500k (excess 110k)
-        verifyQr(b.id(),"TXN_EXCESS1",500000,"2026-10-23T03:15:00","verify-"+b.id()+"-TXN_EXCESS1-2026-10-23T03:15:00");
-        var confirmed=bookings.view(bookings.require(user,b.id()));assertEquals("CONFIRMED",confirmed.status());assertEquals("EXCESS",confirmed.deposit().mode());assertEquals(110000,confirmed.deposit().excessAmount());
-        // Excess refund created
-        var paymentsList=repo.forBooking(b.id());assertEquals(1,paymentsList.size());
-        var refund=repo.refundForPayment(paymentsList.get(0).id()).orElseThrow();
-        assertEquals("APPROVED",refund.status());assertEquals(110000,refund.amount());assertEquals("MANUAL_EXCESS",refund.kind());
+    @Test void partialReceiptsAccumulateWithoutDoubleAllocation()throws Exception {
+        var b=approve();verify(b.id(),"A",200000);assertEquals("PENDING",current(b.id()).status());assertEquals(190000,current(b.id()).deposit().missingAmount());
+        verify(b.id(),"B",190000);assertEquals("CONFIRMED",current(b.id()).status());assertEquals(390000,current(b.id()).deposit().appliedAmount());assertEquals(1,count("contracts",b.id()));
     }
-    @Test void qrAdminManualRefund_createDecideProcess(){
-        var b=create();approve(b.id(),b.version());
-        verifyQr(b.id(),"TXN_ADMIN",500000,"2026-10-23T03:15:00","verify-"+b.id()+"-TXN_ADMIN-2026-10-23T03:15:00");
-        // Admin creates manual refund for excess 110k
-        var createFields=Map.of("paymentId",repo.forBooking(b.id()).get(0).id(),"amount",110000,"reason","Excess refund");
-        var createResp = postJson("/admin/refunds/create-manual", createFields);
-        var createNode = readTree(createResp);
-        assertEquals("REQUESTED",createNode.path("status").asText());
-        assertEquals(110000,createNode.path("amount").asLong());
-        // Admin decides
-        var refundId = createNode.path("id").asText();
-        var refundVersion = createNode.path("version").asLong();
-        var decideFields=Map.of("expectedVersion",refundVersion,"amount",110000,"reason","Approved");
-        var decideResp = postJson("/admin/refunds/"+refundId+"/decide-manual", decideFields);
-        var decideNode = readTree(decideResp);
-        assertEquals("APPROVED",decideNode.path("status").asText());
-        // Admin processes
-        postForm("/admin/refunds/"+refundId+"/process-manual", Map.of());
-        var processed=repo.refund(refundId);assertEquals("SUCCEEDED",processed.status());
+    @Test void excessRefundThenEarlyCancellationNeverExceedsReceived()throws Exception {
+        var b=approve();verify(b.id(),"A",500000);var p=repo.forBooking(b.id()).getFirst();assertEquals(390000,p.appliedAmount());assertEquals(110000,current(b.id()).deposit().excessAmount());
+        var r=repo.refundForPayment(p.id()).orElseThrow();assertEquals(110000,r.amount());payments.processManualRefund(admin,r.id());
+        var processing=repo.refund(r.id());payments.completeManualRefund(admin,r.id(),"DEMO-PAYER","REF1",clock.instant(),processing.version());
+        var c=current(b.id());rental.apply(user,b.id(),new BookingService.Action("CANCELLED",c.version(),"Early test",null,false,false));
+        assertEquals(500000,repo.reserved(p.id(),null));assertEquals(2,repo.refunds(b.id()).size());
     }
-    @Test void qrReportIdempotent_sameIdempotencyKeyReturnsSameResult(){
-        var b=create();approve(b.id(),b.version());
-        var fields=Map.of("transactionRef","TXN_IDEM","transferTime","2026-10-23T03:15:00","transferNote","Test","sourceAccount","0000000001","idempotencyKey","idem-"+b.id()+"-TXN_IDEM-2026-10-23T03:15:00");
-        var url="/bookings/"+b.id()+"/deposit/report";
-        postForm(url, fields);
-        postForm(url, fields);
-        postForm(url, fields);
-        // Only one report recorded
-        assertEquals(1, jdbc.queryForObject("select count(*) from payment_transactions where booking_id=? and idempotency_key like 'idem-%'", Integer.class, b.id()));
+    @Test void partialExpiryRefundsActualReceivedNotMissingBalance()throws Exception {
+        var b=approve();verify(b.id(),"A",200000);clock.value=b.deposit().reviewDueAt();workflow.settleQr(b.id(),null);
+        assertEquals("EXPIRED",current(b.id()).status());assertEquals(200000,repo.refunds(b.id()).getFirst().amount());assertEquals(0,count("contracts",b.id()));
     }
-    @Test void qrHandoverChecksAppliedAmount_notTxnRef(){
-        var b=create();approve(b.id(),b.version());
-        verifyQr(b.id(),"TXN_HO",390000,"2026-10-23T03:15:00","verify-"+b.id()+"-TXN_HO-2026-10-23T03:15:00");
-        var confirmed=bookings.view(bookings.require(user,b.id()));assertEquals("CONFIRMED",confirmed.status());
-        // Handover should succeed (appliedAmount >= depositAmount)
-        clock.value=Instant.parse("2026-10-26T03:00:00Z");
-        var handover = assertDoesNotThrow(()-> (BookingService.View)rental.apply(staff,b.id(),new BookingService.Action("IN_PROGRESS",confirmed.version(),null,"Handover",true,false)));
-        assertEquals("IN_PROGRESS",handover.status());
+    @Test void transferAtPaymentDeadlineIsLateEvenWithReviewExtension()throws Exception {
+        var b=approve();report(b.id());clock.value=b.deposit().paymentDueAt();verify(b.id(),"A",390000);
+        assertEquals("PENDING",current(b.id()).status());assertEquals(0,current(b.id()).deposit().appliedAmount());assertEquals(390000,repo.refunds(b.id()).getFirst().amount());
     }
-    @Test void qrDecodePayload_containsCorrectData(){
-        var b=create();approve(b.id(),b.version());
-        var qrUrl="/bookings/"+b.id()+"/deposit/qr-payload";
-        var qrData = readTree(getJson(qrUrl));
-        assertEquals("KDRIVE_DEMO|"+b.id()+"|390000", qrData.path("payload").asText());
-        assertEquals(b.id(), qrData.path("requestCode").asText());
-        assertEquals(390000, qrData.path("amount").asLong());
-        assertTrue(qrData.path("receiverSnapshot").asText().contains("Mô phỏng — Không chuyển tiền thật"));
-        assertNotNull(qrData.path("paymentDueAt").asText());
-        assertNotNull(qrData.path("reviewDueAt").asText());
-        assertNotNull(qrData.path("originalHoldUntil").asText());
+    @Test void timelyReceiptVerifiedDuringReviewSucceeds()throws Exception {
+        var b=approve();report(b.id());var request=input(b.id(),"A",390000,clock.instant());clock.value=b.deposit().paymentDueAt().plusSeconds(1);
+        assertEquals(200,post(staff,"/bookings/"+b.id()+"/deposit/verify",request).getStatus());assertEquals("CONFIRMED",current(b.id()).status());
     }
+    @Test void reviewDeadlineDoesNotReclaimSlot()throws Exception {
+        var b=approve();report(b.id());var request=input(b.id(),"A",390000,clock.instant());clock.value=current(b.id()).deposit().reviewDueAt();
+        assertEquals(200,post(staff,"/bookings/"+b.id()+"/deposit/verify",request).getStatus());assertEquals("EXPIRED",current(b.id()).status());assertEquals(390000,repo.refunds(b.id()).getFirst().amount());
+    }
+    @Test void repeatedReportsAndApprovalNeverExtendDeadline()throws Exception {
+        var b=approve();report(b.id());var first=current(b.id());report(b.id());clock.value=clock.value.plusSeconds(30);
+        workflow.approve(staff,b.id(),current(b.id()).version());assertEquals(first.expiresAt(),current(b.id()).expiresAt());assertEquals(1,jdbc.queryForObject("select count(*) from payment_events where booking_id=? and kind='TRANSFER_REPORTED'",Integer.class,b.id()));
+    }
+    @Test void reportAtDeadlineRejectedAndDoesNotChangeHold()throws Exception {
+        var b=approve();clock.value=b.deposit().paymentDueAt();assertEquals(409,post(user,"/bookings/"+b.id()+"/deposit/report",Map.of()).getStatus());assertNull(current(b.id()).deposit().reportedAt());
+    }
+    @Test void invalidLicenseKeepsReceiptAndQueuesRefund()throws Exception {
+        var b=approve();var l=licenses.mine(user);licenses.save(user,new LicenseService.View(null,"SYNTHETIC-CHANGED","VN_2025","B",l.expiresOn(),false,"PENDING",l.version()));
+        verify(b.id(),"A",390000);assertEquals(1,count("payment_transactions",b.id()));assertEquals("PENDING",current(b.id()).status());assertEquals(390000,repo.refunds(b.id()).getFirst().amount());assertEquals(0,count("contracts",b.id()));
+    }
+    @Test void contractFailureRetainsMoneyAndRecoveryIssuesOnce()throws Exception {
+        var b=approve();org.mockito.Mockito.doThrow(new IllegalStateException("Synthetic contract failure")).when(contracts).issueDeposit(org.mockito.ArgumentMatchers.any());
+        verify(b.id(),"A",390000);assertEquals(1,count("payment_transactions",b.id()));assertEquals("PENDING",current(b.id()).status());assertEquals(0,current(b.id()).deposit().appliedAmount());assertEquals(0,count("contracts",b.id()));
+        org.mockito.Mockito.doCallRealMethod().when(contracts).issueDeposit(org.mockito.ArgumentMatchers.any());workflow.settleQr(b.id(),repo.forBooking(b.id()).getFirst().id());assertEquals("CONFIRMED",current(b.id()).status());assertEquals(1,count("contracts",b.id()));
+    }
+    @Test void wrongActorBranchMemoAndMalformedReceiptRejected()throws Exception {
+        var b=approve();var req=input(b.id(),"A",390000,clock.instant());
+        assertEquals(403,post(user,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());assertEquals(403,post(admin,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());
+        req.put("transferNote","WRONG");assertEquals(400,post(staff,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());req.put("transferTime",null);assertEquals(400,post(staff,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());assertEquals(0,count("payment_transactions",b.id()));
+    }
+    @Test void idempotencyRejectsChangedPayloadAndDuplicateBankReference()throws Exception {
+        var b=approve();verify(b.id(),"A",100000);var req=input(b.id(),"A",200000,clock.instant());assertEquals(409,post(staff,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());req.put("idempotencyKey","new-key");assertEquals(409,post(staff,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());assertEquals(1,count("payment_transactions",b.id()));
+    }
+    @Test void refundRequiresSeparateVerifiedCompletion()throws Exception {
+        var b=approve();verify(b.id(),"A",500000);var r=repo.refunds(b.id()).getFirst();payments.processManualRefund(admin,r.id());var processing=repo.refund(r.id());assertEquals("PROCESSING",processing.status());
+        assertThrows(com.carrental.exception.DomainException.class,()->payments.completeManualRefund(admin,r.id(),"WRONG","REF",clock.instant(),processing.version()));
+        payments.completeManualRefund(admin,r.id(),"DEMO-PAYER","REF",clock.instant(),processing.version());assertEquals("SUCCEEDED",repo.refund(r.id()).status());payments.completeManualRefund(admin,r.id(),"DEMO-PAYER","REF",clock.instant(),processing.version());
+    }
+    @Test void qrPngDecodesAndIsProtected()throws Exception {
+        var b=approve();var response=get(user,"/bookings/"+b.id()+"/deposit/qr");assertEquals(200,response.getStatus());
+        var image=javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(response.getContentAsByteArray()));
+        var bitmap=new com.google.zxing.BinaryBitmap(new com.google.zxing.common.HybridBinarizer(new com.google.zxing.client.j2se.BufferedImageLuminanceSource(image)));
+        assertEquals("KDRIVE_DEMO|"+BookingService.requestCode(b.id())+"|390000",new com.google.zxing.MultiFormatReader().decode(bitmap).getText());
+        assertEquals(401,mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/api/v1/bookings/"+b.id()+"/deposit/qr")).andReturn().getResponse().getStatus());
+    }
+    @Test void twoStaffReceiptsAreSerializedAndOnlyOneContract()throws Exception {
+        var b=approve();var request1=new BookingService.VerifyInput("A",390000,clock.instant(),BookingService.requestCode(b.id()),"DEMO-PAYER","A",b.version(),true);
+        var request2=new BookingService.VerifyInput("B",390000,clock.instant(),BookingService.requestCode(b.id()),"DEMO-PAYER","B",b.version(),true);
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);var start=new java.util.concurrent.CountDownLatch(1);
+        try {var futures=List.of(request1,request2).stream().map(r->pool.submit(()->{start.await();try{workflow.verifyQrDeposit(staff,b.id(),r);}catch(com.carrental.exception.DomainException e){assertEquals(409,e.status.value());}return true;})).toList();start.countDown();for(var f:futures)assertTrue(f.get(20,java.util.concurrent.TimeUnit.SECONDS));}
+        finally {pool.shutdownNow();assertTrue(pool.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS));}
+        assertEquals(1,count("contracts",b.id()));assertEquals(390000,current(b.id()).deposit().appliedAmount());
+        long received=repo.forBooking(b.id()).stream().mapToLong(PaymentRepository.Payment::amount).sum();assertEquals(received-390000,repo.refunds(b.id()).stream().mapToLong(PaymentRepository.Refund::amount).sum());
+    }
+    @Test void cancellationRacingQrReceiptKeepsMoneyAndScheduleConsistent()throws Exception {
+        var b=approve();var input=new BookingService.VerifyInput("RACE",390000,clock.instant(),BookingService.requestCode(b.id()),"DEMO-PAYER","RACE",b.version(),true);
+        var pool=java.util.concurrent.Executors.newFixedThreadPool(2);var start=new java.util.concurrent.CountDownLatch(1);
+        try {
+            var money=pool.submit(()->{start.await();try{workflow.verifyQrDeposit(staff,b.id(),input);}catch(com.carrental.exception.DomainException e){assertEquals(409,e.status.value());}return true;});
+            var cancel=pool.submit(()->{start.await();try{rental.apply(user,b.id(),new BookingService.Action("CANCELLED",b.version(),"QR fixture cancellation",null,false,false));}catch(com.carrental.exception.DomainException e){assertEquals(409,e.status.value());}return true;});
+            start.countDown();assertTrue(money.get(20,java.util.concurrent.TimeUnit.SECONDS));assertTrue(cancel.get(20,java.util.concurrent.TimeUnit.SECONDS));
+        }finally{pool.shutdownNow();assertTrue(pool.awaitTermination(5,java.util.concurrent.TimeUnit.SECONDS));}
+        var result=current(b.id());assertTrue(Set.of("CANCELLED","CONFIRMED").contains(result.status()));
+        if("CANCELLED".equals(result.status())) {assertEquals(0,count("contracts",b.id()));for(var p:repo.forBooking(b.id()))assertEquals(p.amount(),repo.reserved(p.id(),null));}
+        else assertEquals(1,count("contracts",b.id()));
+    }
+    @Test void wrongPickupAndNoShowAfterDeliveryAreRejected()throws Exception {
+        var b=approve();var wrong=new Actor("demo-staff-hn","STAFF","Other");assertEquals(403,post(wrong,"/bookings/"+b.id()+"/deposit/verify",input(b.id(),"A",390000,clock.instant())).getStatus());
+        verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-26T03:00:00Z");
+        rental.apply(staff,b.id(),new BookingService.Action("IN_PROGRESS",current(b.id()).version(),null,"Fixture handover",true,false));
+        clock.value=Instant.parse("2026-10-27T03:00:00Z");assertThrows(com.carrental.exception.DomainException.class,()->workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Must not cancel delivered car"));assertEquals("IN_PROGRESS",current(b.id()).status());
+    }
+    @Test void noShowRefundRemainsAdminDecisionIncludingZero()throws Exception {
+        var b=approve();verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Contacted, not delivered");
+        var refund=repo.refunds(b.id()).getFirst();assertEquals("REQUESTED",refund.status());payments.decide(admin,refund.id(),refund.version(),0,"Admin decision, no refund");assertEquals("DECLINED",repo.refund(refund.id()).status());
+    }
+
 }

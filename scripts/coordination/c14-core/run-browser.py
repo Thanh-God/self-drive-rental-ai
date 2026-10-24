@@ -9,7 +9,7 @@ def resolve_proof(value):
  return proof
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);p.add_argument('--browser-script');p.add_argument('--synthetic-deposit',action='store_true',help='Internal protocol only; never merchant acceptance');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);p.add_argument('--browser-script');p.add_argument('--synthetic-deposit',action='store_true',help='Internal protocol only; never merchant acceptance');p.add_argument('--qr-manual',action='store_true');a=p.parse_args()
  native=Path(a.backend_evidence).resolve();build=Path(a.backend_root).resolve();out=Path(a.evidence).resolve()
  assert all(x.is_relative_to(REPO/'.runtime') for x in [native,build,out]) and not out.exists()
  f=json.loads((native/'fixture.json').read_text());assert f['name'].startswith('kltn-c14-core-') and f['port']==33676
@@ -20,6 +20,8 @@ def main():
  files=[x for root in ['backend/src','frontend/src','scripts/coordination/c14-core'] for x in (REPO/root).rglob('*') if x.is_file() and '__pycache__' not in x.parts]
  files += [REPO/'frontend'/n for n in ['package.json','package-lock.json','vite.config.js']]
  proof=resolve_proof(a.browser_script)
+ assert not(a.synthetic_deposit and a.qr_manual),'Choose one payment proof'
+ if a.qr_manual:assert proof.name=='verify-qr-deposit.cjs','QR mode requires bounded DEMO proof'
  if a.synthetic_deposit:assert proof.name=='verify-booking-deposit.cjs','Synthetic payment requires the bounded deposit proof'
  files.append(proof)
  before={x.relative_to(REPO).as_posix():hashlib.sha256(x.read_bytes()).hexdigest() for x in files}
@@ -59,6 +61,8 @@ def main():
   run(['docker','exec','-e','MYSQL_PWD='+password,f['name'],'mysql','-uroot','-e',f"CREATE DATABASE {schema}; INSERT INTO kdrive_c14_meta.__kdrive_test_fixture_marker VALUES((SELECT COALESCE(MAX(id),0)+1 FROM (SELECT id FROM kdrive_c14_meta.__kdrive_test_fixture_marker) t),'{schema}','{marker}');"])
   (out/'browser-schema.txt').write_text(schema)
   config=out/'application.private.properties';config.write_text(f'server.port=8300\nspring.datasource.url=jdbc:mysql://127.0.0.1:33676/{schema}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC\nspring.datasource.username=root\nspring.datasource.password={password}\napp.jwt-secret=c14-only-test-secret-at-least-32-bytes\napp.seed-enabled=true\napp.seed-password=BranchBookingTestOnly123!\napp.cors-origin=http://127.0.0.1:5300\napp.license-photo-directory={(out/"private-license-photos").as_posix()}\n')
+  if a.qr_manual:
+   with config.open('a') as h:h.write('app.deposit-enabled=true\napp.deposit-method=DEMO_QR_MANUAL\napp.payment-reconcile-ms=86400000\n')
   if a.synthetic_deposit:
    with config.open('a') as h:h.write('app.deposit-enabled=true\napp.vnpay-tmn-code=TESTONLY\napp.vnpay-hash-secret=synthetic-secret-not-real-merchant\napp.payment-reconcile-ms=86400000\napp.vnpay-return-url=http://127.0.0.1:5300/user/payment-return\n')
   spawn(['E:/Tools/Java/jdk-21.0.12.1+1/bin/java.exe','-jar',str(jar),'--spring.config.additional-location=file:'+config.as_posix()],'backend')

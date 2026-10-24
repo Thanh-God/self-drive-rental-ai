@@ -146,3 +146,6 @@ V2 bổ sung các trường trạng thái và căn cứ đánh giá vào inciden
 ## Mở rộng V6 — cọc sandbox
 
 V1–V5 có 25 bảng nghiệp vụ và Flyway history. V6 thêm ba bảng payment_transactions, payment_refunds, payment_events: tổng 28 bảng nghiệp vụ + history =29; 46 khóa ngoại. Thêm snapshot cọc vào bookings, mặc định deposit_required=false cho đơn cũ. Dùng migration mới, không tính lại giá hay truy thu đơn cũ. Xem [chính sách](../modules/booking-deposit.md).
+
+### Ledger cọc QR
+V7–V9 mở rộng các bảng payment hiện có, không thêm bảng;29 bảng gồm Flyway history,47 FK. applied_amount không vượt amount; business_key hoàn duy nhất theo khoản/nguyên nhân. V9 Java Flyway xử lý tên unique tự sinh trên payment_id theo metadata, không sửa history hoặc chạy DDL ngoài Flyway. Xem [quy tắc cọc](../modules/booking-deposit.md).

@@ -1221,6 +1221,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
     mode === "handover" ? (params.get("group") === "delivered" ? "IN_PROGRESS" : "CONFIRMED") : mode === "return" ? "IN_PROGRESS" : "",
   );
   const [queue, setQueue] = useState("all");
+  const [depositPhase,setDepositPhase]=useState("");
   const [queueDate, setQueueDate] = useState(() => vietnamDay(Date.now()));
   const [sort, setSort] = useState("createdAt_desc");
   const [page, setPage] = useState(1);
@@ -1237,13 +1238,14 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
     mode,
     now,
     sort: isFilterActive ? sort : "createdAt_desc",
+    depositPhase,
   });
 
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const activePage = Math.min(Math.max(1, page), totalPages);
 
-  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}`;
+  const filterKey = `${query}|${status}|${queue}|${queueDate}|${sort}|${depositPhase}`;
   const [prevFilterKey, setPrevFilterKey] = useState(filterKey);
 
   if (filterKey !== prevFilterKey) {
@@ -1296,6 +1298,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
             onChange={(event) => setQuery(event.target.value)}
           />
         </Field>
+
         <Field label="Trạng thái">
           <select
             value={status}
@@ -1321,6 +1324,9 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
           </Field>
         ) : null}
         </div>
+        {area === 'staff' && mode === 'all' ? <Field label="Giai đoạn cọc"><select value={depositPhase} onChange={e=>setDepositPhase(e.target.value)}>
+          <option value="">Tất cả giai đoạn</option><option value="profile">Chờ kiểm tra hồ sơ</option><option value="payment">Chờ đóng cọc</option><option value="review">Khách đã báo · Chờ đối soát</option>
+        </select></Field> : null}
         {isFilterActive ? (
           <Field label="Sắp xếp">
             <select value={sort} onChange={(event) => setSort(event.target.value)}>
@@ -1341,7 +1347,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
             ? "Chưa tải được danh sách"
             : isFilterActive
               ? `Hiển thị ${pagedRows.length}/${rows.length} đơn · Trang ${activePage}/${totalPages} · ${bookingSortLabels[sort] || "Mới tạo trước"}`
-              : `${rows.length} đơn phù hợp · Mới tạo trước`}
+              : `${rows.length} đơn phù hợp · ${depositPhase === "review" ? "Hạn đối soát gần trước" : "Mới tạo trước"}`}
       </p>
       <RequestState
         loading={request.loading}
@@ -1397,7 +1403,7 @@ export function ApiBookingListPage({ area = "user", mode = "all" }) {
                       </span>
                     )}
                     <Status status={booking.status} />
-                    {booking.status === 'PENDING' && booking.deposit?.required ? <span className="text-sm">{booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
+                    {booking.status === 'PENDING' && booking.deposit?.required ? <span className="text-sm">{booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
                   </div>
                   {area === "admin" ? (
                     <div className="mb-1">
@@ -1710,7 +1716,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
             ) : null}
             <div className="mb-5 flex items-center gap-3">
               <Status status={booking.status} />
-              {booking.status === 'PENDING' && booking.deposit?.required ? <span>{booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
+              {booking.status === 'PENDING' && booking.deposit?.required ? <span>{booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
               {area === "staff" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}
             </div>
             {booking.status === "PENDING" && booking.expiresAt ? (

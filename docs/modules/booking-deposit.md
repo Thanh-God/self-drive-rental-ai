@@ -1,6 +1,6 @@
-# Cọc giữ chỗ — VNPAY Sandbox
+# Cọc giữ chỗ — QR DEMO thủ công và VNPAY Sandbox
 
-Chỉ thử nghiệm sandbox, không thu tiền thật. Chưa có merchant giữ `DEPOSIT_ENABLED=false`. URL VNPAY cố định ở sandbox, không tự chuyển production.
+Chỉ thử nghiệm, không thu tiền thật. Mặc định `DEPOSIT_ENABLED=false`. QR DEMO không cần merchant; VNPAY Sandbox cần merchant riêng. URL VNPAY cố định ở sandbox, không tự chuyển production.
 
 ## Quy tắc
 
@@ -27,3 +27,17 @@ V6 thêm payment_transactions, payment_refunds, payment_events; tổng 29 bảng
 Tắt nhận thanh toán mới vẫn xử lý IPN/đối soát/hoàn cũ. HTTPS tunnel chỉ chuyển endpoint IPN, không mở DB/Admin. Chưa có merchant không nghiệm thu tích hợp sandbox thật; kiểm thử giao thức nội bộ không thay thế kiểm thử nhà cung cấp.
 
 Nguồn: [thanh toán](https://sandbox.vnpayment.vn/apis/docs/thanh-toan-pay/pay.html), [truy vấn/hoàn](https://sandbox.vnpayment.vn/apis/docs/truy-van-hoan-tien/querydr%26refund.html), [FAQ](https://sandbox.vnpayment.vn/apis/docs/faqs/).
+
+## QR DEMO thủ công
+
+Cấu hình backend `DEPOSIT_METHOD=DEMO_QR_MANUAL`, `DEPOSIT_ENABLED=true` chỉ trong môi trường thử được phép. Mã QR cục bộ có payload `KDRIVE_DEMO|mã yêu cầu|số tiền`, không phải QR chuyển khoản ngân hàng. Bên nhận là dữ liệu giả lập chung; không chuyển tiền thật. Phương thức/giá/chính sách lưu theo đơn; đổi cấu hình không đổi đơn cũ.
+
+Staff pickup duyệt hồ sơ → USER xem QR và báo đã chuyển → Staff đối chiếu đúng mã yêu cầu/bên nhận/số tiền/nguồn tiền giả lập, ghi từng khoản. Báo của USER không phải tiền đã nhận. Hạn đóng cọc là min(duyệt+30 phút, hạn giữ gốc). Báo lần đầu trước hạn cho thêm tối đa30 phút đối soát, vẫn cap hạn giữ gốc; báo/duyệt lặp không gia hạn. Khoản chuyển tại/sau hạn không áp dụng, kể cả còn thời gian đối soát.
+
+Cho cộng dồn khoản thiếu; backend áp dụng FIFO theo thời điểm chuyển/ID khi đủ, xác nhận đơn và phát hành đúng một hợp đồng. Lưu khoản nhận bền trước bước này. Lỗi hợp đồng/hạ tầng để lại khoản cần đối soát; GPLX/lịch không còn hợp lệ hoặc quá hạn không giành lại lịch, tạo hoàn phần không áp dụng. Tiền dư và khoản thiếu khi hết giữ lịch được đưa vào hoàn. Tham chiếu giao dịch và khóa yêu cầu chống ghi trùng; không sửa/xóa khoản đã ghi nhận qua thao tác thường.
+
+Admin bắt đầu xử lý khoản đã duyệt rồi ghi kết quả hoàn DEMO ở bước riêng: tài khoản nhận phải khớp nguồn tiền, có tham chiếu, thời điểm và version. Không coi bắt đầu xử lý là đã hoàn. Một khoản nhận có thể hoàn nhiều phần theo nguyên nhân; tổng đã hoàn/đang xử lý không vượt tiền thực nhận. Hủy muộn/no-show luôn cần quyết định Admin, kể cả quyết định0đ. Tắt cờ nhận mới không chặn xử lý khoản đã có.
+
+API bổ sung: GET `/bookings/{id}/deposit/qr`, `/qr-payload`; POST `/deposit/report`, `/deposit/verify`; Admin `/refunds/{id}/process-manual`, `/complete-manual`. verify yêu cầu `verified=true`, tham chiếu, VND, Instant UTC, mã yêu cầu đúng, tài khoản nguồn giả lập, expectedVersion/idempotencyKey. complete-manual yêu cầu recipientAccount/reference/transferTime/expectedVersion. UI nhập giờ Việt Nam và chuyển +07:00 tường minh; ảnh QR tải có Bearer, không đưa token vào URL.
+
+Migration V7/V8 bổ sung trường và guard trong ba bảng payment hiện có. V9 là migration Java Flyway nhỏ trong `backend/src/main/java/db/migration/`, chỉ xử lý tên UNIQUE(payment_id) do từng DB tự sinh, giữ FK và index tra cứu; tất cả dùng chung namespace `classpath:db/migration` và history Flyway, không có DDL chạy riêng. Tổng vẫn29 bảng gồm history; không đổi V1–V6. Không dùng V7 thử nghiệm cũ để nâng DB đã áp dụng checksum khác; cần kiểm kê history trước. Java migration có checksum tường minh và được kiểm thử MySQL/H2.

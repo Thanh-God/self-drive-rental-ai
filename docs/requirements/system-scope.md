@@ -169,3 +169,5 @@ Kiến trúc tiếp nối đã được duyệt tại [Giai đoạn 2](../archit
 - Có business rules đủ để làm cơ sở thiết kế database/workflow.
 - Các giả định chưa chốt được liệt kê, không bị coi nhầm là quyết định cuối cùng.
 - Không có yêu cầu AI cho phép Gemini thay backend quyết định dữ liệu hoặc nghiệp vụ.
+
+Cọc giữ chỗ được mở rộng bằng QR DEMO thủ công: không chuyển tiền thật; Staff xác minh, backend áp dụng cọc và phát hành hợp đồng, Admin ghi kết quả hoàn. Xem docs/modules/booking-deposit.md; không bao gồm thu phần còn lại hoặc cọc hư hỏng.

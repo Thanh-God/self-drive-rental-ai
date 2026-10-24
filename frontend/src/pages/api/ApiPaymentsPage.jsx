@@ -5,9 +5,11 @@ import { useApiData } from '../../hooks/useApiData';
 import { Page, Notice, money } from '../../components/common/PageKit';
 import { refundLabels, paymentLabels } from '../../components/user/BookingDeposit';
 import { getErrorMessage } from '../../utils/roles';
+import { toVietnamInstant } from '../../utils/calendarDate';
 import { adminDateFormat } from '../../utils/bookingQueue';
 
 export function RefundRow({ item, run, busy, depositMethod }) {
+  const [reference,setReference]=useState(''),[recipient,setRecipient]=useState(''),[transferTime,setTransferTime]=useState('');
   const [amount, setAmount] = useState(String(item.amount)), [reason, setReason] = useState('');
   const isQr = depositMethod === 'DEMO_QR_MANUAL';
   return <section className="panel space-y-3">
@@ -31,14 +33,20 @@ export function RefundRow({ item, run, busy, depositMethod }) {
     </form> : null}
     {isQr && item.status === 'APPROVED' ? (
       <button className="btn-secondary" disabled={busy} onClick={() => run(`/admin/refunds/${item.id}/process-manual`)}>
-        Ghi nhận đã hoàn thủ công (QR DEMO)
+        Bắt đầu xử lý hoàn (QR DEMO)
       </button>
     ) : item.status === 'APPROVED' ? (
       <button className="btn-secondary" disabled={busy} onClick={() => run(`/admin/refunds/${item.id}/process`)}>Gửi hoàn VNPAY Sandbox</button>
     ) : null}
     {['PROCESSING', 'UNKNOWN'].includes(item.status) ? <p>Cần kiểm tra kết quả. Không gửi lại yêu cầu hoàn khi chưa rõ kết quả.</p> : null}
     {['PROCESSING', 'UNKNOWN'].includes(item.status) && !isQr ? <button className="btn-secondary" disabled={busy} onClick={() => run(`/admin/refunds/${item.id}/reconcile`)}>Truy vấn kết quả hoàn</button> : null}
-    {isQr && ['PROCESSING', 'UNKNOWN'].includes(item.status) ? <p>Khoản QR DEMO: Admin ghi nhận thủ công khi đã hoàn tiền.</p> : null}
+    {isQr && item.status === 'PROCESSING' ? <form onSubmit={e=>{e.preventDefault();run(`/admin/refunds/${item.id}/complete-manual`,{recipientAccount:recipient,reference,transferTime:toVietnamInstant(transferTime),expectedVersion:item.version});}}>
+      <p>Chỉ ghi nhận kết quả hoàn DEMO đã kiểm tra; tài khoản nhận phải khớp khoản chuyển ban đầu.</p>
+      <label className="block">Tài khoản nhận hoàn<input required value={recipient} onChange={e=>setRecipient(e.target.value)} /></label>
+      <label className="block">Tham chiếu hoàn<input required maxLength={30} value={reference} onChange={e=>setReference(e.target.value)} /></label>
+      <label className="block">Thời điểm hoàn (giờ Việt Nam)<input required type="datetime-local" step="1" value={transferTime} onChange={e=>setTransferTime(e.target.value)} /></label>
+      <button className="btn" disabled={busy}>Xác nhận đã hoàn DEMO</button>
+    </form> : null}
   </section>;
 }
 

@@ -6,8 +6,6 @@ import com.carrental.modules.vehicle.service.VehicleService;
 import com.carrental.modules.vehicle.entity.Vehicle;
 import com.carrental.modules.branch.service.BranchService;
 import com.carrental.modules.user.service.*;
-import com.carrental.modules.payment.service.VnpayGateway;
-import com.carrental.modules.contract.service.ContractService;
 import com.carrental.security.Actor;
 import com.carrental.exception.DomainException;
 import org.springframework.stereotype.Service;
@@ -23,16 +21,15 @@ public class BookingService {
     private final VehicleService vehicles;
     private final BranchService branches;
     @org.springframework.beans.factory.annotation.Value("${app.deposit-enabled:false}") private boolean depositEnabled;
-    @org.springframework.beans.factory.annotation.Value("${app.deposit.method:VNPAY_SANDBOX}") private String depositMethod;
+    @org.springframework.beans.factory.annotation.Value("${app.deposit-method:VNPAY_SANDBOX}") private String depositMethod;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final LicenseService licenses;
     private final AccountService accounts;
     private final JdbcTemplate jdbc;
     private final Clock clock;
-    private final ContractService contracts;
 
-    public BookingService(BookingRepository r, VehicleService v, BranchService b, LicenseService l, AccountService a, JdbcTemplate j, Clock c, ContractService contracts) {
-        repo = r; vehicles = v; branches = b; licenses = l; accounts = a; jdbc = j; clock = c; this.contracts = contracts;
+    public BookingService(BookingRepository r, VehicleService v, BranchService b, LicenseService l, AccountService a, JdbcTemplate j, Clock c) {
+        repo = r; vehicles = v; branches = b; licenses = l; accounts = a; jdbc = j; clock = c;
     }
 
     public record Input(String vehicleId, String pickupBranchId, String returnBranchId, Instant startAt, Instant endAt, Long expectedTotal, LocalDate pickupDate, LocalDate returnDate) {
@@ -61,14 +58,9 @@ public class BookingService {
             "select coalesce(sum(applied_amount),0) from payment_transactions where booking_id=? and status='SUCCEEDED'",
             Long.class, b.id
         );
-        long missing = Math.max(0, b.depositAmount - applied);
-        long excess = Math.max(0, applied - b.depositAmount);
-        String mode = b.depositMode;
-        if (mode == null) {
-            if (applied >= b.depositAmount) mode = "FULL";
-            else if (applied > 0) mode = "PARTIAL";
-            else mode = "FULL";
-        }
+        long missing = Math.max(0, b.depositAmount - received);
+        long excess = Math.max(0, received - b.depositAmount);
+        String mode = received > b.depositAmount ? "EXCESS" : received >= b.depositAmount ? "FULL" : "PARTIAL";
         return new View(
             b.id, b.userId, b.vehicleId, b.customerName, b.vehicleName,
             b.pickupBranchId, b.returnBranchId, b.pickupName, b.returnName,
@@ -96,7 +88,7 @@ public class BookingService {
             counts.put(status, 0L);
         }
         jdbc.query("select case when status='PENDING' and expires_at<=? then 'EXPIRED' else status end as report_status,count(*) as amount from bookings where created_at>=? and created_at<? group by report_status",
-            (java.sql.ResultSet rs) -> counts.put(rs.getString("report_status"), rs.getLong("amount")),
+            (java.sql.ResultSet rs) -> { counts.put(rs.getString("report_status"), rs.getLong("amount")); },
             java.sql.Timestamp.from(asOf), java.sql.Timestamp.from(from), java.sql.Timestamp.from(to));
         long completed = jdbc.queryForObject(
             "select count(*) from (select booking_id,min(occurred_at) as completed_at from booking_status_history where next_status='COMPLETED' group by booking_id) first_completion where completed_at>=? and completed_at<?",
@@ -205,7 +197,7 @@ public class BookingService {
             b.depositAmount = DepositPolicy.amount(b.rentalTotal);
             b.depositPolicy = "VNPAY_SANDBOX".equals(depositMethod) ? DepositPolicy.VNPAY_VERSION : DepositPolicy.QR_VERSION;
             b.depositMethod = "VNPAY_SANDBOX".equals(depositMethod) ? "VNPAY_SANDBOX" : "DEMO_QR_MANUAL";
-            if (b.depositAmount < DepositPolicy.DEPOSIT_MIN_AMOUNT)
+            if (DepositPolicy.isVnpayMethod(b.depositMethod) && b.depositAmount < DepositPolicy.DEPOSIT_MIN_AMOUNT)
                 throw DomainException.bad("Tiền cọc dưới mức tối thiểu " + DepositPolicy.DEPOSIT_MIN_AMOUNT + " đ; chưa thể đặt xe này.");
         }
         schedule(v, b, null);
@@ -326,6 +318,11 @@ public class BookingService {
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
+    public View requireDepositStaff(Actor staff,String id) {
+        var b=lockDepositBooking(id);branches.requireStaff(staff,b.pickupBranchId);return view(b);
+    }
+
+    @Transactional(propagation = Propagation.MANDATORY)
     public View depositLock(String id) {
         return view(lockDepositBooking(id));
     }
@@ -349,7 +346,7 @@ public class BookingService {
             b.paymentDueAt = DepositPolicy.paymentDueAt(now, b.originalHoldUntil);
             b.reviewDueAt = b.paymentDueAt;
             if (DepositPolicy.isDemoQrMethod(b.depositMethod)) {
-                b.depositMode = "FULL";
+                b.depositMode = "PARTIAL";
                 b.depositReceiverSnapshot = buildReceiverSnapshot(b);
             }
             b.expiresAt = b.paymentDueAt;
@@ -362,7 +359,7 @@ public class BookingService {
 
     private String buildReceiverSnapshot(Booking b) {
         return """
-            Tài khoản nhận cọc giả lập (DEMO) — Không chuyển tiền thật
+            Mô phỏng — Không chuyển tiền thật
             Mã yêu cầu: %s
             Số tiền: %d VND
             Chi nhánh nhận: %s
@@ -370,7 +367,7 @@ public class BookingService {
             Ngân hàng: DEMO BANK
             Số tài khoản: 0000000000
             Nội dung chuyển khoản: %s %s
-            """.formatted(b.id, b.depositAmount, b.pickupName, b.id, b.customerName).trim();
+            """.formatted(requestCode(b.id), b.depositAmount, b.pickupName, requestCode(b.id), b.customerName).trim();
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -396,168 +393,41 @@ public class BookingService {
 
     public record ReportInput(String transactionRef, Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey) {}
 
+    public static String requestCode(String id) { return "KD" + id.replace("-", "").toUpperCase(java.util.Locale.ROOT); }
+
     @Transactional
     public View reportDeposit(Actor user, String id, ReportInput input) {
         user.require("USER");
         var b = lockDepositBooking(id);
         if (!b.userId.equals(user.id())) throw DomainException.missing();
-        if (!DepositPolicy.isDemoQrMethod(b.depositMethod)) throw DomainException.conflict("Đơn không dùng phương thức QR giả lập.");
-        if (!"PENDING".equals(effective(b))) throw DomainException.conflict("Đơn không còn ở trạng thái chờ cọc.");
-        if (input.transferTime().isAfter(clock.instant())) throw DomainException.bad("Thời điểm chuyển không được ở tương lai.");
-
-        // Idempotent: check if same report already exists
-        boolean exists = jdbc.queryForObject(
-            "select count(*) > 0 from payment_transactions where booking_id=? and idempotency_key=?",
-            Boolean.class, b.id, input.idempotencyKey()
-        );
-        if (Boolean.TRUE.equals(exists)) {
-            // Already reported, return current view
-            return view(b);
-        }
-
-        if (b.reportedAt == null) {
-            b.reportedAt = clock.instant();
-            Instant newReviewDue = DepositPolicy.reviewDueAt(b.paymentDueAt, b.originalHoldUntil);
-            if (newReviewDue.isAfter(b.reviewDueAt)) {
-                b.reviewDueAt = newReviewDue;
-                if (b.expiresAt.isBefore(b.reviewDueAt)) {
-                    b.expiresAt = b.reviewDueAt;
-                }
-            }
-        }
+        if (!DepositPolicy.isDemoQrMethod(b.depositMethod) || b.depositApprovedAt == null)
+            throw DomainException.conflict("Đơn chưa được duyệt cọc QR.");
+        if (b.reportedAt != null) return view(b); // Repeated reports cannot extend the original extension.
+        if (!"PENDING".equals(effective(b)) || !clock.instant().isBefore(b.paymentDueAt))
+            throw DomainException.conflict("Đã hết hạn báo chuyển khoản.");
+        b.reportedAt = clock.instant();
+        b.reviewDueAt = DepositPolicy.reviewDueAt(b.paymentDueAt, b.originalHoldUntil);
+        b.expiresAt = b.reviewDueAt;
+        jdbc.update("insert into payment_events(id,booking_id,kind,note,actor_id,created_at,event_key) values(?,?,?,?,?,?,?)",
+            UUID.randomUUID().toString(), id, "TRANSFER_REPORTED", "Khách báo đã chuyển; chưa xác minh nhận tiền", user.id(),
+            java.sql.Timestamp.from(clock.instant()), "report:" + id);
         repo.flush();
         return view(b);
     }
 
-    public record VerifyInput(String transactionRef, long amountVnd, Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion) {}
+    public record VerifyInput(String transactionRef, long amountVnd, Instant transferTime, String transferNote,
+                              String sourceAccount, String idempotencyKey, long expectedVersion, boolean verified) {}
 
-    @Transactional
-    public View verifyDeposit(Actor staff, String id, VerifyInput input) {
+    @Transactional(propagation = Propagation.MANDATORY)
+    public View confirmQrDeposit(String id, String ref) {
         var b = lockDepositBooking(id);
-        branches.requireStaff(staff, b.pickupBranchId);
-        if (b.version != input.expectedVersion()) throw DomainException.conflict("Đơn đã thay đổi. Vui lòng tải lại.");
-        if (!b.depositRequired) throw DomainException.conflict("Đơn không yêu cầu cọc.");
-        if (!DepositPolicy.isDemoQrMethod(b.depositMethod)) throw DomainException.conflict("Đơn không dùng phương thức QR giả lập.");
-        if (input.amountVnd() <= 0) throw DomainException.bad("Số tiền thực nhận phải lớn hơn 0.");
-        if (input.transferTime().isAfter(clock.instant())) throw DomainException.bad("Thời điểm chuyển không được ở tương lai.");
-        if (input.idempotencyKey() == null || input.idempotencyKey().isBlank()) throw DomainException.bad("Thiếu khóa idempotency.");
-        if (input.transactionRef() == null || input.transactionRef().isBlank()) throw DomainException.bad("Thiếu mã tham chiếu giao dịch.");
-        if (input.transferNote() == null || input.transferNote().isBlank()) throw DomainException.bad("Thiếu nội dung chuyển khoản.");
-        if (input.sourceAccount() == null || input.sourceAccount().isBlank()) throw DomainException.bad("Thiếu tài khoản nguồn.");
-
-        boolean isLate = input.transferTime().isAfter(b.paymentDueAt);
-        boolean isExpired = !"PENDING".equals(effective(b));
-
-        boolean exists = jdbc.queryForObject(
-            "select count(*) > 0 from payment_transactions where booking_id=? and idempotency_key=?",
-            Boolean.class, b.id, input.idempotencyKey()
-        );
-        if (Boolean.TRUE.equals(exists)) throw DomainException.conflict("Khoản này đã được ghi nhận (trùng idempotency key).");
-
-        Instant now = clock.instant();
-        String paymentId = UUID.randomUUID().toString().replace("-", "");
-        Instant transferTime = input.transferTime() != null ? input.transferTime() : now;
-        String providerPayDate = VnpayGateway.date(transferTime);
-        String status = isLate || isExpired ? "SUCCEEDED" : "SUCCEEDED";
-        jdbc.update("""
-            insert into payment_transactions(id, booking_id, amount, status, created_at, expires_at,
-                provider_transaction, provider_pay_date, applied, version,
-                verifier_id, verified_at, transfer_time, transfer_note, source_account, applied_amount, idempotency_key)
-            values(?,?,?,'SUCCEEDED',?,?,?,?,false,0,?,?,?,?,?,?,?)
-            """,
-            paymentId, b.id, input.amountVnd(),
-            java.sql.Timestamp.from(now), java.sql.Timestamp.from(b.paymentDueAt),
-            input.transactionRef(), providerPayDate,
-            staff.id(), java.sql.Timestamp.from(now), java.sql.Timestamp.from(transferTime),
-            input.transferNote(), input.sourceAccount(), 0L, input.idempotencyKey()
-        );
-
-        // Nếu đơn hết hạn hoặc chuyển khoản muộn, không áp dụng tiền, tạo refund tự động
-        if (isExpired || isLate) {
-            String refundId = UUID.randomUUID().toString().replace("-", "");
-            String kind = isExpired ? "UNAPPLIED_EXPIRED" : "UNAPPLIED_LATE";
-            String reason = isExpired 
-                ? "Đơn đã hết hạn tại thời điểm xác minh; hoàn toàn bộ tiền đã nhận."
-                : "Chuyển khoản sau hạn thanh toán; hoàn toàn bộ tiền đã nhận.";
-            jdbc.update("""
-                insert into payment_refunds(id, payment_id, booking_id, amount, status, kind, reason, created_at)
-                values(?,?,?,?,?,?,?,?)
-                """,
-                refundId, paymentId, b.id, input.amountVnd(),
-                "APPROVED", kind, reason, java.sql.Timestamp.from(now)
-            );
-            jdbc.update("""
-                insert into payment_events(id, booking_id, payment_id, kind, note, actor_id, created_at, event_key)
-                values(?,?,?,?,?,?,?,?)
-                """,
-                UUID.randomUUID().toString(), b.id, paymentId, "REFUND_REQUESTED", reason, staff.id(), java.sql.Timestamp.from(now), "refund:" + refundId
-            );
-            jdbc.update("""
-                insert into payment_events(id, booking_id, payment_id, kind, note, actor_id, created_at, event_key)
-                values(?,?,?,?,?,?,?,?)
-                """,
-                UUID.randomUUID().toString(), b.id, paymentId, "REFUND_DECIDED", reason, staff.id(), java.sql.Timestamp.from(now), null
-            );
-            return view(b);
-        }
-
-        return applyAndConfirmIfComplete(b, paymentId);
-    }
-
-    private View applyAndConfirmIfComplete(Booking b, String newPaymentId) {
-        var payments = jdbc.query("""
-            select id, amount, applied_amount from payment_transactions
-            where booking_id=? and status='SUCCEEDED'
-            order by transfer_time, id
-            """, (rs, rowNum) -> new PaymentRow(rs.getString("id"), rs.getLong("amount"), rs.getLong("applied_amount")), b.id);
-
-        long depositAmount = b.depositAmount;
-        long totalAlreadyApplied = payments.stream().mapToLong(p -> p.appliedAmount).sum();
-        long remainingToApply = depositAmount - totalAlreadyApplied;
-        if (remainingToApply < 0) remainingToApply = 0;
-        
-        for (PaymentRow p : payments) {
-            if (remainingToApply <= 0) break;
-            long canApply = Math.min(p.amount - p.appliedAmount, remainingToApply);
-            if (canApply > 0) {
-                jdbc.update("update payment_transactions set applied_amount=applied_amount+?, version=version+1 where id=?",
-                    canApply, p.id);
-                remainingToApply -= canApply;
-            }
-        }
-
-        long totalApplied = depositAmount - remainingToApply;
-        if (totalApplied >= depositAmount) {
-            if (!Objects.equals(b.depositLicenseVersion, licenses.forBooking(b.userId).version()))
-                throw DomainException.conflict("GPLX đã thay đổi sau duyệt. Cần nhân viên kiểm tra lại; hạn cọc không được kéo dài.");
-            var v = vehicles.lock(b.vehicleId);
-            if (!"ACTIVE".equals(v.status)) throw DomainException.conflict("Xe không còn sẵn sàng.");
-            licenses.eligible(b.userId, v.transmission, v.seats, b.endAt);
-            licenses.requirePhotos(b.userId, true);
-            schedule(v, null, null);
-
-            b.depositTxnRef = newPaymentId;
-            b.status = "CONFIRMED";
-            b.depositMode = "FULL";
-            repo.flush();
-            history(b, "PENDING", null, "QR DEMO xác minh đủ cọc: " + newPaymentId);
-            
-            // Phát hành hợp đồng cho QR DEMO
-            var view = view(b);
-            contracts.issueDeposit(view);
-            
-            // Ghi sự kiện DEPOSIT_APPLIED
-            jdbc.update("insert into payment_events(id,booking_id,payment_id,kind,note,actor_id,created_at,event_key) values(?,?,?,?,?,?,?,?)",
-                UUID.randomUUID().toString(), b.id, newPaymentId, "DEPOSIT_APPLIED",
-                "Đã xác nhận đơn và phát hành hợp đồng từ QR DEMO", null, java.sql.Timestamp.from(clock.instant()), "applied:" + newPaymentId);
-            
-            return view;
-        } else {
-            b.depositMode = "PARTIAL";
-            b.expiresAt = b.reviewDueAt;
-            repo.flush();
-            return view(b);
-        }
+        if ("CONFIRMED".equals(b.status)) return view(b);
+        validateDeposit(b);
+        b.depositTxnRef = ref;
+        b.status = "CONFIRMED";
+        repo.flush();
+        history(b, "PENDING", null, "Staff xác minh đủ cọc QR DEMO");
+        return view(b);
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
@@ -602,5 +472,4 @@ public class BookingService {
             UUID.randomUUID().toString(), b.id, old, b.status, a == null ? null : a.id(), java.sql.Timestamp.from(clock.instant()), reason);
     }
 
-    private record PaymentRow(String id, long amount, long appliedAmount) {}
 }

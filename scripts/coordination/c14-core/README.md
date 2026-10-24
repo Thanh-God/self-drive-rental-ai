@@ -88,3 +88,5 @@ and Staff at each branch, then verifies brand/search filtering, vehicle details
 and the correct booking-form target. It creates no additional bookings and
 compares business records before and after the reads. Omit `--browser-script`
 to check document permissions without starting Vite.
+
+QR DEMO proof: select `--suites QrDemoHttpTest DepositHttpTest MySqlMigrationTest` for native tests. With matching evidence/JAR, use `--qr-manual --browser-script scripts/operations/verify-qr-deposit.cjs` for desktop. QR mode never configures a merchant or contacts a bank. MySqlMigrationTest has seven methods, including V6 ledger preservation and multiple partial refunds. QR schema versions end at V9; SQL and the metadata-only Java Flyway migration share the same history.

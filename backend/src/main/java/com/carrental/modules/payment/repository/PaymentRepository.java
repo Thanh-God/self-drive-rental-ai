@@ -125,8 +125,8 @@ public class PaymentRepository {
     }
 
     public void createRefund(String id, Payment p, long amount, String status, String kind, String reason, Instant now) {
-        jdbc.update("insert into payment_refunds(id,payment_id,booking_id,amount,status,kind,reason,created_at) values(?,?,?,?,?,?,?,?)",
-            id, p.id(), p.bookingId(), amount, status, kind, reason, Timestamp.from(now));
+        jdbc.update("insert into payment_refunds(id,payment_id,booking_id,amount,status,kind,reason,created_at,business_key) values(?,?,?,?,?,?,?,?,?)",
+            id, p.id(), p.bookingId(), amount, status, kind, reason, Timestamp.from(now), p.id()+":"+kind);
     }
 
     public void decide(String id, long version, long amount, String reason, String actor, Instant now) {
@@ -141,8 +141,8 @@ public class PaymentRepository {
     }
 
     public long reserved(String paymentId, String excluded) {
-        return jdbc.queryForObject("select coalesce(sum(amount),0) from payment_refunds where payment_id=? and id<>? and status in ('APPROVED','PROCESSING','SUCCEEDED','UNKNOWN')",
-            Long.class, paymentId, excluded);
+        return jdbc.queryForObject("select coalesce(sum(amount),0) from payment_refunds where payment_id=? and (? is null or id<>?) and status in ('APPROVED','PROCESSING','SUCCEEDED','UNKNOWN')",
+            Long.class, paymentId, excluded, excluded);
     }
 
     public List<Refund> refunds(String booking) {
@@ -175,7 +175,7 @@ public class PaymentRepository {
     }
 
     public List<Refund> readyRefunds() {
-        return jdbc.query("select * from payment_refunds where status='APPROVED' order by created_at,id limit 20", refund);
+        return jdbc.query("select pr.*,b.deposit_method from payment_refunds pr join bookings b on b.id=pr.booking_id where pr.status='APPROVED' order by pr.created_at,pr.id limit 20", refund);
     }
 
     public List<Payment> unknownPayments() {
@@ -192,6 +192,10 @@ public class PaymentRepository {
         if (key != null && jdbc.queryForObject("select count(*) from payment_events where event_key=?", Long.class, key) > 0) return;
         jdbc.update("insert into payment_events(id,booking_id,payment_id,kind,note,actor_id,created_at,event_key) values(?,?,?,?,?,?,?,?)",
             UUID.randomUUID().toString(), booking, paymentId, kind, note, actor, Timestamp.from(now), key);
+    }
+
+    public List<String> qrBookingIds() {
+        return jdbc.queryForList("select distinct b.id from bookings b join payment_transactions p on p.booking_id=b.id where b.deposit_method='DEMO_QR_MANUAL' and b.status='PENDING' and p.status='SUCCEEDED'", String.class);
     }
 
     public Object events(String booking) {

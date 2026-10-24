@@ -13,6 +13,7 @@ public class DepositReconciliation {
     @Scheduled(fixedDelayString="${app.payment-reconcile-ms:60000}",initialDelayString="${app.payment-reconcile-ms:60000}")
     public void run(){
         // Disabling new checkout must not disable recovery of existing money.
+        for(String id:repo.qrBookingIds())try{workflow.settleQr(id,null);}catch(RuntimeException e){/* Visible for reconciliation. */}
         if(!settings.configured())return;
         for(var p:repo.unresolvedPayments())try{workflow.reconcile(p.id());}catch(RuntimeException e){/* Uncertainty remains visible to Admin. */}
         for(var r:repo.readyRefunds())try{workflow.processRefund(r.id());}catch(RuntimeException e){/* PROCESSING/UNKNOWN is never resent. */}

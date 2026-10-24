@@ -13,16 +13,15 @@ public class PaymentSettings {
                            @Value("${app.vnpay-tmn-code:}") String merchant,
                            @Value("${app.vnpay-hash-secret:}") String secret,
                            @Value("${app.vnpay-return-url:http://localhost:5173/user/payment-return}") String returnUrl,
-                           @Value("${app.deposit.method:VNPAY_SANDBOX}") String depositMethod) {
+                           @Value("${app.deposit-method:VNPAY_SANDBOX}") String depositMethod) {
         this.enabled=enabled;this.merchant=merchant;this.secret=secret;this.returnUrl=returnUrl;this.depositMethod=depositMethod;
         var uri=java.net.URI.create(returnUrl);
         if (!java.util.Set.of("http","https").contains(uri.getScheme()) || uri.getHost()==null || uri.getUserInfo()!=null || uri.getFragment()!=null)
             throw new IllegalStateException("VNPAY return URL không hợp lệ.");
         if (enabled && "VNPAY_SANDBOX".equals(depositMethod) && !configured())
             throw new IllegalStateException("Chưa cấu hình merchant VNPAY Sandbox; không thể bật tiền cọc VNPAY.");
-        if (enabled && "DEMO_QR_MANUAL".equals(depositMethod) && (merchant.isEmpty() || secret.isEmpty())) {
-            // QR DEMO doesn't need VNPAY merchant, but config can be empty
-        }
+        if (!java.util.Set.of("DEMO_QR_MANUAL", "VNPAY_SANDBOX").contains(depositMethod))
+            throw new IllegalStateException("Phương thức cọc không hợp lệ.");
     }
     public boolean configured(){return merchant.matches("[A-Za-z0-9]{8}") && secret.length()>=16;}
     public boolean isQrMethod(){return "DEMO_QR_MANUAL".equals(depositMethod);}
