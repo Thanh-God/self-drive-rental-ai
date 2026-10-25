@@ -123,6 +123,53 @@ class QrDemoHttpTest {
     }
     @Test void idempotencyRejectsChangedPayloadAndDuplicateBankReference()throws Exception {
         var b=approve();verify(b.id(),"A",100000);var req=input(b.id(),"A",200000,clock.instant());assertEquals(409,post(staff,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());req.put("idempotencyKey","new-key");assertEquals(409,post(staff,"/bookings/"+b.id()+"/deposit/verify",req).getStatus());assertEquals(1,count("payment_transactions",b.id()));
+        var other=bookings.create(user,new BookingService.Input("v1","dn","dn",null,null,1300000L,LocalDate.of(2026,11,2),LocalDate.of(2026,11,4)));
+        workflow.approve(staff,other.id(),other.version());
+        var otherReceipt=input(other.id(),"A",100000,clock.instant());otherReceipt.put("idempotencyKey","other-booking-key");
+        assertEquals(409,post(staff,"/bookings/"+other.id()+"/deposit/verify",otherReceipt).getStatus());
+        assertEquals(0,count("payment_transactions",other.id()));assertEquals(100000,current(b.id()).deposit().receivedAmount());
+    }
+    @Test void receiptValidationRejectsMalformedAndNonIntegerAmounts()throws Exception {
+        var b=approve();String endpoint="/bookings/"+b.id()+"/deposit/verify";
+        for(var invalid:List.of(
+            Map.entry("transactionRef", " "), Map.entry("transactionRef", "X".repeat(31)),
+            Map.entry("sourceAccount", " "), Map.entry("sourceAccount", "X".repeat(101)),
+            Map.entry("idempotencyKey", " "), Map.entry("idempotencyKey", "X".repeat(65)),
+            Map.entry("verified", false), Map.entry("amountVnd", 0), Map.entry("amountVnd", -1),
+            Map.entry("amountVnd", new java.math.BigDecimal("1.5")),
+            Map.entry("amountVnd", "100000"),
+            Map.entry("amountVnd", new java.math.BigInteger("9223372036854775808")),
+            Map.entry("transferTime", clock.instant().plusSeconds(1).toString()),
+            Map.entry("transferTime", clock.instant().minusSeconds(1).toString()))) {
+            var req=input(b.id(),"VALIDATION",100000,clock.instant());req.put(invalid.getKey(),invalid.getValue());
+            assertEquals(400,post(staff,endpoint,req).getStatus(),invalid.getKey()+" invalid: "+invalid.getValue());
+            assertEquals(0,count("payment_transactions",b.id()));assertEquals(0,count("contracts",b.id()));
+        }
+    }
+    @Test void exactReplayWithOldVersionKeepsSingleReceiptAndSummaryCorrelation()throws Exception {
+        var b=approve();var first=input(b.id(),"PARTIAL",100000,clock.instant());
+        assertEquals(200,post(staff,"/bookings/"+b.id()+"/deposit/verify",first).getStatus());
+        assertEquals(200,post(staff,"/bookings/"+b.id()+"/deposit/verify",first).getStatus());
+        assertEquals(1,count("payment_transactions",b.id()));assertEquals(0,count("contracts",b.id()));
+        var last=input(b.id(),"FULL",290000,clock.instant());
+        var response=post(staff,"/bookings/"+b.id()+"/deposit/verify",last);assertEquals(200,response.getStatus());
+        var body=json.readTree(response.getContentAsString());assertEquals(b.id(),body.get("id").asText());assertFalse(body.has("booking"));assertFalse(body.has("payments"));
+        assertEquals(200,post(staff,"/bookings/"+b.id()+"/deposit/verify",last).getStatus());
+        assertEquals(2,count("payment_transactions",b.id()));assertEquals(1,count("contracts",b.id()));
+        assertEquals(2,jdbc.queryForObject("select count(*) from payment_events where booking_id=? and kind='PAYMENT_RECEIVED'",Integer.class,b.id()));
+        var summary=get(staff,"/bookings/"+b.id()+"/deposit");assertEquals(200,summary.getStatus());
+        var entries=json.readTree(summary.getContentAsString()).get("payments");assertEquals(2,entries.size());
+        assertTrue(java.util.stream.StreamSupport.stream(entries.spliterator(),false).anyMatch(p->p.get("providerTransaction").asText().equals("FULL")&&p.get("idempotencyKey").asText().equals("key-FULL")&&p.get("amount").asLong()==290000));
+        assertEquals(390000,current(b.id()).deposit().appliedAmount());
+    }
+    @Test void ledgerReadAndStaleReceiptRespectOwnerAndPickupRights()throws Exception {
+        var b=approve();String endpoint="/bookings/"+b.id()+"/deposit";
+        assertEquals(200,get(user,endpoint).getStatus());assertEquals(200,get(staff,endpoint).getStatus());assertEquals(200,get(admin,endpoint).getStatus());
+        assertEquals(404,get(new Actor("demo-staff-hn","STAFF","Wrong branch"),endpoint).getStatus());
+        jdbc.update("insert into users(id,email,password_hash,full_name,role,status,token_version,version) select 'qr-other-user','qr-other@example.test',password_hash,'Other fixture','USER','ACTIVE',0,0 from users where id='demo-user' and not exists(select 1 from users where id='qr-other-user')");
+        assertEquals(404,get(new Actor("qr-other-user","USER","Other fixture"),endpoint).getStatus());
+        var req=input(b.id(),"STALE",100000,clock.instant());req.put("expectedVersion",-1);
+        assertEquals(409,post(staff,endpoint+"/verify",req).getStatus());assertEquals(0,count("payment_transactions",b.id()));
     }
     @Test void refundRequiresSeparateVerifiedCompletion()throws Exception {
         var b=approve();verify(b.id(),"A",500000);var r=repo.refunds(b.id()).getFirst();payments.processManualRefund(admin,r.id());var processing=repo.refund(r.id());assertEquals("PROCESSING",processing.status());

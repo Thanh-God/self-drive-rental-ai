@@ -36,7 +36,18 @@ public class DepositController {
     public record NoShow(long expectedVersion, boolean contacted, boolean notDelivered, String reason) {}
     public record Decision(long expectedVersion, long amount, String reason) {}
     public record ReportInput(String transactionRef, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey) {}
-    public record VerifyInput(String transactionRef, long amountVnd, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion, boolean verified) {}
+    public record VerifyInput(String transactionRef,
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amountVnd,
+        java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion, boolean verified) {}
+    public static class WholeVnd extends com.fasterxml.jackson.databind.JsonDeserializer<Long> {
+        @Override public Long deserialize(com.fasterxml.jackson.core.JsonParser parser,
+                com.fasterxml.jackson.databind.DeserializationContext context) throws java.io.IOException {
+            if (!parser.hasToken(com.fasterxml.jackson.core.JsonToken.VALUE_NUMBER_INT))
+                throw com.fasterxml.jackson.databind.exc.InvalidFormatException.from(parser,
+                    "Số tiền VND phải là số nguyên JSON.", parser.getText(), Long.class);
+            return parser.getLongValue();
+        }
+    }
     public record ManualRefundInput(String paymentId, long amount, String reason) {}
     public record ManualRefundDecideInput(long expectedVersion, long amount, String reason) {}
     public record ManualRefundCompleteInput(String recipientAccount, String reference, java.time.Instant transferTime, long expectedVersion) {}

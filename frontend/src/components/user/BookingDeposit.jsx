@@ -5,7 +5,7 @@ import { useApiData } from '../../hooks/useApiData';
 import { money, Notice, Page } from '../common/PageKit';
 import { getErrorMessage } from '../../utils/roles';
 import { vietnamDay } from '../../utils/bookingQueue';
-import { toVietnamInstant } from '../../utils/calendarDate';
+import QrReceiptForm from './QrReceiptForm';
 
 export const paymentLabels = { PENDING: 'Đang xác minh', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã nhận', FAILED: 'Thất bại' };
 export const refundLabels = { REQUESTED: 'Chờ Admin quyết định', APPROVED: 'Đã duyệt hoàn', PROCESSING: 'Đang xử lý', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã hoàn', FAILED: 'Hoàn thất bại', DECLINED: 'Không hoàn' };
@@ -20,10 +20,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const [qrData, setQrData] = useState(null);
   const [qrUrl,setQrUrl]=useState('');
   const objectUrl=useRef(null);
-  const verifyKey=useRef(null);
-  const [verified,setVerified]=useState(false);
   useEffect(() => () => { if(objectUrl.current) window.URL.revokeObjectURL(objectUrl.current); }, []);
-  const [verifyForm, setVerifyForm] = useState({ transactionRef: '', amountVnd: '', transferTime: '', transferNote: '', sourceAccount: '', idempotencyKey: '' });
   const data = request.data;
 
   async function action(path, body = {}) {
@@ -57,29 +54,6 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
       });
       request.reload(); reload(); setShowQr(false);
     } catch (e) { setError(getErrorMessage(e, 'Không thể gửi báo chuyển khoản.')); }
-    finally { setBusy(false); }
-  }
-
-  async function handleVerify() {
-    if (busy) return;
-    if (!verifyForm.transactionRef || !verifyForm.amountVnd || !verifyForm.transferTime || !verified) {
-      setError('Thiếu thông tin bắt buộc (tham chiếu, số tiền, thời điểm, xác nhận đối chiếu).'); return;
-    }
-    if(!window.confirm(`Ghi nhận khoản DEMO ${money(Number(verifyForm.amountVnd))} cho đơn này sau khi đã đối chiếu?`)) return;
-    verifyKey.current ??= window.crypto.randomUUID();
-    setBusy(true); setError('');
-    try {
-      await apiClient.post(`/bookings/${encodeURIComponent(booking.id)}/deposit/verify`, {
-        transactionRef: verifyForm.transactionRef,
-        amountVnd: Number(verifyForm.amountVnd),
-        transferTime: toVietnamInstant(verifyForm.transferTime),
-        transferNote: `KD${booking.id.replaceAll('-','').toUpperCase()}`,
-        sourceAccount: verifyForm.sourceAccount,
-        idempotencyKey: verifyKey.current, verified,
-        expectedVersion: booking.version
-      });
-      request.reload(); reload(); setShowQr(false); verifyKey.current=null; setVerified(false);
-    } catch (e) { setError(getErrorMessage(e, 'Không thể xác minh khoản cọc.')); }
     finally { setBusy(false); }
   }
 
@@ -145,22 +119,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     )}
 
     {isQr && depositApproved && role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && (
-      <div className="mt-4 space-y-3 border-t pt-3">
-        <p className="font-medium">Xác minh khoản cọc (Staff chi nhánh nhận)</p>
-        <p className="text-sm text-slate-600">Nhập thông tin khoản tiền đã kiểm tra thực tế. Mỗi khoản cần xác nhận đối chiếu duy nhất.</p>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="block"><span className="text-sm">Mã tham chiếu giao dịch</span><input type="text" className="input" required value={verifyForm.transactionRef} onChange={e => setVerifyForm({...verifyForm, transactionRef: e.target.value})} /></label>
-          <label className="block"><span className="text-sm">Số tiền thực nhận (VND)</span><input type="number" className="input" min="1" step="1" required value={verifyForm.amountVnd} onChange={e => setVerifyForm({...verifyForm, amountVnd: e.target.value})} /></label>
-        </div>
-        <div className="grid gap-2 sm:grid-cols-2">
-          <label className="block"><span className="text-sm">Thời điểm chuyển (giờ VN)</span><input type="datetime-local" step="1" className="input" required value={verifyForm.transferTime} onChange={e => setVerifyForm({...verifyForm, transferTime: e.target.value})} /></label>
-
-        </div>
-
-        <label className="block"><span className="text-sm">Tài khoản nguồn (giả lập)</span><input type="text" className="input" value={verifyForm.sourceAccount} onChange={e => setVerifyForm({...verifyForm, sourceAccount: e.target.value})} /></label>
-        <label className="block"><input type="checkbox" checked={verified} onChange={e=>setVerified(e.target.checked)} /> Đã đối chiếu đúng đơn, nội dung, bên nhận DEMO và số tiền</label>
-        <button className="btn mt-2" disabled={busy || !verified} onClick={handleVerify}>Xác minh và ghi nhận</button>
-      </div>
+      <QrReceiptForm key={booking.id} booking={booking} onRefresh={() => { request.reload(); reload(); }} />
     )}
 
     {role === 'STAFF' && assignedPickup && booking.status === 'PENDING' && deposit?.required && !depositApproved && (
@@ -182,6 +141,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     {data?.payments?.map(p => <div key={p.id} className="mt-2 panel">
       <p className="font-medium">Giao dịch {p.id.slice(0, 8)} · {money(p.amount)} · {paymentLabels[p.status] || 'Cần kiểm tra'}</p>
       {p.appliedAmount !== undefined && <p className="text-sm">Đã áp dụng: {money(p.appliedAmount)} / {money(p.amount)}</p>}
+      {p.providerTransaction && <p className="text-sm">Tham chiếu: {p.providerTransaction}</p>}
       {p.transferTime && <p className="text-sm">Thời điểm chuyển: {date(p.transferTime)}</p>}
       {p.transferNote && <p className="text-sm">Nội dung: {p.transferNote}</p>}
       {p.sourceAccount && <p className="text-sm">Tài khoản nguồn: {p.sourceAccount}</p>}
