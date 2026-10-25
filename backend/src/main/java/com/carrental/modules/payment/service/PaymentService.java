@@ -185,9 +185,19 @@ public class PaymentService {
         return repo.refund(r.id());
     }
 
+    @Transactional(readOnly = true)
     public Object admin(Actor actor) {
         actor.require("ADMIN");
-        return Map.of("refunds", repo.adminRefunds(), "unresolved", repo.unresolvedPayments(), "payments", repo.unresolvedPayments(), "sandbox", true);
+        var history = repo.adminPayments();
+        var reserved = repo.reservedAmounts();
+        var refunds = repo.adminRefunds();
+        Map<String, Long> refundable = new HashMap<>();
+        for (var p : history) refundable.put(p.id(), "SUCCEEDED".equals(p.status())
+            ? Math.max(0, p.amount() - p.appliedAmount() - reserved.getOrDefault(p.id(), 0L)) : 0L);
+        return Map.of("refunds", refunds, "refundPayments", repo.paymentsForRefunds(refunds),
+            "unresolved", repo.unresolvedPayments(), "payments", history,
+            "refundableAmounts", refundable, "manualRefundPaymentIds", repo.manualRefundPaymentIds(),
+            "historyLimit", 200, "sandbox", true);
     }
 
     @Transactional
@@ -237,7 +247,11 @@ public class PaymentService {
         var p = repo.lockPayment(r.paymentId());
         var b = bookings.view(bookings.require(admin, p.bookingId()));
         if (!DepositPolicy.isDemoQrMethod(b.deposit().method())) throw DomainException.conflict("Chỉ áp dụng cho QR DEMO.");
-        if ("SUCCEEDED".equals(r.status()) && Objects.equals(r.providerTransaction(), reference)) return;
+        if ("SUCCEEDED".equals(r.status())) {
+            if (Objects.equals(r.providerTransaction(), reference) && Objects.equals(recipientAccount, p.sourceAccount())
+                    && transferTime != null && Objects.equals(r.requestDate(), VnpayGateway.date(transferTime))) return;
+            throw DomainException.conflict("Khoản hoàn đã hoàn thành với dữ liệu khác; cần đối soát.");
+        }
         if (r.version()!=expectedVersion) throw DomainException.conflict("Khoản hoàn đã thay đổi; tải lại.");
         if (!Objects.equals(recipientAccount,p.sourceAccount())) throw DomainException.bad("Tài khoản nhận phải khớp nguồn tiền đã xác minh.");
         if(r.amount()>p.amount()-repo.reserved(p.id(),r.id())) throw DomainException.conflict("Vượt tiền còn được hoàn.");

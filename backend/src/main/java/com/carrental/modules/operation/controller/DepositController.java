@@ -34,12 +34,22 @@ public class DepositController {
 
     public record Approval(long expectedVersion) {}
     public record NoShow(long expectedVersion, boolean contacted, boolean notDelivered, String reason) {}
-    public record Decision(long expectedVersion, long amount, String reason) {}
+    public record Decision(long expectedVersion,
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason) {}
     public record ReportInput(String transactionRef, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey) {}
     public record VerifyInput(String transactionRef,
         @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amountVnd,
         java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey, long expectedVersion, boolean verified) {}
     public static class WholeVnd extends com.fasterxml.jackson.databind.JsonDeserializer<Long> {
+        @Override public Long getNullValue(com.fasterxml.jackson.databind.DeserializationContext context)
+                throws com.fasterxml.jackson.databind.JsonMappingException {
+            throw com.fasterxml.jackson.databind.exc.InvalidFormatException.from(context.getParser(),
+                "Cần cung cấp số tiền VND nguyên.", null, Long.class);
+        }
+        @Override public Object getAbsentValue(com.fasterxml.jackson.databind.DeserializationContext context)
+                throws com.fasterxml.jackson.databind.JsonMappingException {
+            return getNullValue(context);
+        }
         @Override public Long deserialize(com.fasterxml.jackson.core.JsonParser parser,
                 com.fasterxml.jackson.databind.DeserializationContext context) throws java.io.IOException {
             if (!parser.hasToken(com.fasterxml.jackson.core.JsonToken.VALUE_NUMBER_INT))
@@ -48,8 +58,10 @@ public class DepositController {
             return parser.getLongValue();
         }
     }
-    public record ManualRefundInput(String paymentId, long amount, String reason) {}
-    public record ManualRefundDecideInput(long expectedVersion, long amount, String reason) {}
+    public record ManualRefundInput(String paymentId,
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason) {}
+    public record ManualRefundDecideInput(long expectedVersion,
+        @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason) {}
     public record ManualRefundCompleteInput(String recipientAccount, String reference, java.time.Instant transferTime, long expectedVersion) {}
 
     @GetMapping("/bookings/{id}/deposit")

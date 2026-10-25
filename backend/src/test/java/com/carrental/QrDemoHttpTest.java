@@ -171,6 +171,69 @@ class QrDemoHttpTest {
         var req=input(b.id(),"STALE",100000,clock.instant());req.put("expectedVersion",-1);
         assertEquals(409,post(staff,endpoint+"/verify",req).getStatus());assertEquals(0,count("payment_transactions",b.id()));
     }
+    @Test void adminHistoryIncludesSettledReceiptsAndReservedRefundBalance()throws Exception {
+        var b=approve();verify(b.id(),"HISTORY-FULL",390000);
+        var history=json.readTree(get(admin,"/admin/payments").getContentAsString());
+        assertEquals(1,history.get("payments").size());assertEquals(0,history.get("unresolved").size());
+        String applied=history.get("payments").get(0).get("id").asText();
+        assertEquals(0,history.get("refundableAmounts").get(applied).asLong());assertEquals(200,history.get("historyLimit").asInt());
+        assertEquals(403,get(user,"/admin/payments").getStatus());assertEquals(403,get(staff,"/admin/payments").getStatus());
+        var other=bookings.create(user,new BookingService.Input("v1","dn","dn",null,null,1300000L,LocalDate.of(2026,11,2),LocalDate.of(2026,11,4)));
+        workflow.approve(staff,other.id(),other.version());verify(other.id(),"HISTORY-PARTIAL",100000);
+        String payment=repo.forBooking(other.id()).getFirst().id();
+        var created=post(admin,"/admin/refunds/create-manual",Map.of("paymentId",payment,"amount",25000,"reason","Synthetic G3 partial refund"));assertEquals(200,created.getStatus());
+        String refund=json.readTree(created.getContentAsString()).get("id").asText();
+        assertEquals(200,post(admin,"/admin/refunds/"+refund+"/decide",Map.of("expectedVersion",0,"amount",20000,"reason","Synthetic G3 reviewed")).getStatus());
+        var reserved=json.readTree(get(admin,"/admin/payments").getContentAsString());assertEquals(80000,reserved.get("refundableAmounts").get(payment).asLong());
+        assertEquals(1,reserved.get("refundPayments").size());assertEquals("DEMO-PAYER",reserved.get("refundPayments").get(0).get("sourceAccount").asText());
+        assertEquals("PENDING",current(other.id()).status());assertEquals(0,count("contracts",other.id()));
+    }
+    @Test void manualRefundLifecycleRejectsInvalidDataAndChangedReplay()throws Exception {
+        var b=approve();verify(b.id(),"G3-PARTIAL",100000);var payment=repo.forBooking(b.id()).getFirst();
+        var create=Map.of("paymentId",payment.id(),"amount",50000,"reason","Synthetic G3 request");
+        assertEquals(403,post(user,"/admin/refunds/create-manual",create).getStatus());assertEquals(403,post(staff,"/admin/refunds/create-manual",create).getStatus());
+        var response=post(admin,"/admin/refunds/create-manual",create);assertEquals(200,response.getStatus());
+        String id=json.readTree(response.getContentAsString()).get("id").asText(),base="/admin/refunds/"+id;
+        assertEquals(409,post(admin,base+"/process-manual",Map.of()).getStatus());
+        var missingAmount=new LinkedHashMap<String,Object>(Map.of("expectedVersion",0,"reason","Synthetic missing amount"));
+        assertEquals(400,post(admin,base+"/decide",missingAmount).getStatus());
+        missingAmount.put("amount",null);assertEquals(400,post(admin,base+"/decide",missingAmount).getStatus());
+        assertEquals("REQUESTED",repo.refund(id).status());
+        for(Object amount:List.of(new java.math.BigDecimal("1.5"),"10000",-1,100001)) {
+            assertEquals(400,post(admin,base+"/decide",Map.of("expectedVersion",0,"amount",amount,"reason","Synthetic invalid")).getStatus());
+            assertEquals("REQUESTED",repo.refund(id).status());
+        }
+        assertEquals(409,post(admin,base+"/decide",Map.of("expectedVersion",99,"amount",40000,"reason","Synthetic stale")).getStatus());
+        assertEquals(200,post(admin,base+"/decide",Map.of("expectedVersion",0,"amount",40000,"reason","Synthetic approved")).getStatus());
+        assertEquals("APPROVED",repo.refund(id).status());assertNull(repo.refund(id).providerTransaction());
+        assertEquals(200,post(admin,base+"/process-manual",Map.of()).getStatus());var processing=repo.refund(id);assertEquals("PROCESSING",processing.status());
+        var completion=new LinkedHashMap<String,Object>(Map.of("recipientAccount","DEMO-PAYER","reference","G3-REFUND","transferTime",clock.instant().toString(),"expectedVersion",processing.version()));
+        assertEquals(403,post(user,base+"/complete-manual",completion).getStatus());assertEquals(403,post(staff,base+"/complete-manual",completion).getStatus());
+        completion.put("recipientAccount","WRONG");assertEquals(400,post(admin,base+"/complete-manual",completion).getStatus());completion.put("recipientAccount","DEMO-PAYER");
+        completion.put("transferTime",clock.instant().plusSeconds(1).toString());assertEquals(400,post(admin,base+"/complete-manual",completion).getStatus());completion.put("transferTime",clock.instant().toString());
+        assertEquals(200,post(admin,base+"/complete-manual",completion).getStatus());assertEquals("SUCCEEDED",repo.refund(id).status());
+        assertEquals(200,post(admin,base+"/complete-manual",completion).getStatus());
+        for(var change:List.of(Map.entry("recipientAccount","WRONG"),Map.entry("reference","OTHER"),Map.entry("transferTime",clock.instant().minusSeconds(1).toString()))) {
+            var changed=new LinkedHashMap<>(completion);changed.put(change.getKey(),change.getValue());assertEquals(409,post(admin,base+"/complete-manual",changed).getStatus());
+        }
+        assertEquals(1,count("payment_refunds",b.id()));assertEquals(1,jdbc.queryForObject("select count(*) from payment_events where booking_id=? and kind='REFUND_SUCCEEDED'",Integer.class,b.id()));
+        assertEquals(400,post(admin,"/admin/refunds/create-manual",Map.of("paymentId",payment.id(),"amount",60001,"reason","Synthetic over reserved")).getStatus());
+        assertEquals(40000,repo.reserved(payment.id(),null));assertEquals("PENDING",current(b.id()).status());assertEquals(0,count("contracts",b.id()));
+    }
+    @Test void refundZeroDecisionAndOldReceiptContextRemainAuditable()throws Exception {
+        var b=approve();verify(b.id(),"G3-OLD",100000);var payment=repo.forBooking(b.id()).getFirst();
+        var response=post(admin,"/admin/refunds/create-manual",Map.of("paymentId",payment.id(),"amount",10000,"reason","Synthetic zero decision"));
+        String id=json.readTree(response.getContentAsString()).get("id").asText();
+        assertEquals(400,post(admin,"/admin/refunds/"+id+"/decide",Map.of("expectedVersion",0,"amount",0,"reason"," ")).getStatus());
+        assertEquals(200,post(admin,"/admin/refunds/"+id+"/decide",Map.of("expectedVersion",0,"amount",0,"reason","Synthetic no refund")).getStatus());
+        assertEquals("DECLINED",repo.refund(id).status());assertEquals(0,repo.reserved(payment.id(),null));
+        assertEquals(409,post(admin,"/admin/refunds/"+id+"/process-manual",Map.of()).getStatus());
+        jdbc.update("update payment_transactions set created_at=? where id=?",java.sql.Timestamp.from(clock.instant().minusSeconds(86400)),payment.id());
+        for(int n=0;n<201;n++)repo.createPayment("g3-history-"+n,b.id(),1,clock.instant(),clock.instant().plusSeconds(60));
+        var history=json.readTree(get(admin,"/admin/payments").getContentAsString());assertEquals(200,history.get("payments").size());
+        assertTrue(java.util.stream.StreamSupport.stream(history.get("payments").spliterator(),false).noneMatch(p->p.get("id").asText().equals(payment.id())));
+        assertEquals(payment.id(),history.get("refundPayments").get(0).get("id").asText());assertEquals("DEMO-PAYER",history.get("refundPayments").get(0).get("sourceAccount").asText());
+    }
     @Test void refundRequiresSeparateVerifiedCompletion()throws Exception {
         var b=approve();verify(b.id(),"A",500000);var r=repo.refunds(b.id()).getFirst();payments.processManualRefund(admin,r.id());var processing=repo.refund(r.id());assertEquals("PROCESSING",processing.status());
         assertThrows(com.carrental.exception.DomainException.class,()->payments.completeManualRefund(admin,r.id(),"WRONG","REF",clock.instant(),processing.version()));

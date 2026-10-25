@@ -164,6 +164,37 @@ public class PaymentRepository {
             """, refund);
     }
 
+    public List<Payment> adminPayments() {
+        return jdbc.query("""
+            select pt.*, b.deposit_method
+            from payment_transactions pt
+            left join bookings b on pt.booking_id = b.id
+            order by pt.created_at desc, pt.id limit 200
+            """, payment);
+    }
+
+    public Map<String, Long> reservedAmounts() {
+        Map<String, Long> amounts = new HashMap<>();
+        jdbc.query("""
+            select payment_id, sum(amount) from payment_refunds
+            where status in ('APPROVED','PROCESSING','SUCCEEDED','UNKNOWN') group by payment_id
+            """, (r, n) -> Map.entry(r.getString(1), r.getLong(2)))
+            .forEach(entry -> amounts.put(entry.getKey(), entry.getValue()));
+        return amounts;
+    }
+
+    public List<Payment> paymentsForRefunds(List<Refund> refunds) {
+        var ids = refunds.stream().map(Refund::paymentId).distinct().toList();
+        if (ids.isEmpty()) return List.of();
+        return jdbc.query("select pt.*, b.deposit_method from payment_transactions pt " +
+            "left join bookings b on pt.booking_id=b.id where pt.id in (" +
+            String.join(",", Collections.nCopies(ids.size(), "?")) + ")", payment, ids.toArray());
+    }
+
+    public List<String> manualRefundPaymentIds() {
+        return jdbc.queryForList("select distinct payment_id from payment_refunds where kind='MANUAL_EXCESS'", String.class);
+    }
+
     public List<Payment> unresolvedPayments() {
         return jdbc.query("""
             select pt.*, b.deposit_method
