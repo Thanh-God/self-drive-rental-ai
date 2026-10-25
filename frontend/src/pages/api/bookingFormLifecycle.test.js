@@ -17,6 +17,8 @@ const routes = [
 ];
 const vehicle = { id: 'v1', name: 'Fixture', currentBranchId: 'dn', status: 'ACTIVE', seats: 5, transmission: 'AUTO', dailyPrice: 1000000 };
 const quote = { id: 'quote', vehicleId: 'v1', rentalDays: 2, dailyPrice: 1000000, rentalTotal: 2000000, oneWayFee: 500000, total: 2500000, pickupName: 'DN', returnName: 'HN', deposit: { required: true, amount: 600000, method: 'DEMO_QR_MANUAL' } };
+const returnPolicy = { version: 'same-branch-return-v1', terms: { dailyPriceVnd: 1000000, text: 'Chính sách fixture: trả sớm giữ giá; trả muộn theo ngày Việt Nam.' }, acceptedAt: null };
+function checkbox(text) { return [...container.querySelectorAll('label')].find(e => e.textContent.includes(text))?.querySelector('input[type="checkbox"]'); }
 
 before(async () => {
   process.env.VITE_DATA_MODE = 'api';
@@ -82,6 +84,32 @@ async function change(text, value) {
   });
 }
 function button(text) { return [...container.querySelectorAll('button')].find(e => e.textContent.trim() === text); }
+test('return policy is separate required consent; re-quote and input change clear it', async () => {
+ await mount('', c => c.url === '/bookings/quote' ? { ...quote, returnPolicy } : defaults(c));
+ await getQuote(); assert.match(container.textContent, /Chính sách fixture/);
+ await act(async () => checkbox('Tôi xác nhận thời gian').click());
+ assert.equal(button('Gửi yêu cầu thuê').disabled, true);
+ await act(async () => checkbox('Tôi đã đọc chính sách').click());
+ assert.equal(button('Gửi yêu cầu thuê').disabled, false);
+ await getQuote(); assert.equal(checkbox('Tôi đã đọc chính sách').checked, false); assert.equal(checkbox('Tôi xác nhận thời gian').checked, false);
+ await act(async () => { checkbox('Tôi đã đọc chính sách').click(); checkbox('Tôi xác nhận thời gian').click(); });
+ await change('Ngày trả (giờ Việt Nam)', '2026-11-09');
+ assert.equal(checkbox('Tôi đã đọc chính sách'), undefined); await getQuote(); assert.equal(checkbox('Tôi đã đọc chính sách').checked, false);
+ assert.equal(requests.some(c => c.url === '/bookings'), false);
+});
+test('create sends policy version and consent, never authoritative policy price or timestamp', async () => {
+ await mount('', c => c.url === '/bookings/quote' ? { ...quote, returnPolicy } : defaults(c)); await getQuote();
+ await act(async () => { checkbox('Tôi đã đọc chính sách').click(); checkbox('Tôi xác nhận thời gian').click(); });
+ await act(async () => button('Gửi yêu cầu thuê').click());
+ const sent=JSON.parse(requests.find(c => c.url === '/bookings').data);
+ assert.equal(sent.returnPolicyVersion, 'same-branch-return-v1'); assert.equal(sent.returnPolicyAccepted, true); assert.equal(sent.returnPolicy, undefined); assert.equal(sent.returnPolicyAcceptedAt, undefined);
+});
+test('policy refusal clears consent and requires a new quote without demo fallback', async () => {
+ await mount('', c => { if(c.url === '/bookings/quote') return { ...quote, returnPolicy }; if(c.url === '/bookings') throw { response: { status: 409, data: { message: 'Chính sách đã thay đổi' } } }; return defaults(c); });
+ await getQuote(); await act(async () => { checkbox('Tôi đã đọc chính sách').click(); checkbox('Tôi xác nhận thời gian').click(); }); await act(async () => button('Gửi yêu cầu thuê').click());
+ assert.match(container.textContent, /Chính sách đã thay đổi/); assert.equal(button('Gửi yêu cầu thuê'), undefined);
+ await getQuote(); assert.equal(checkbox('Tôi đã đọc chính sách').checked, false); assert.equal(requests.filter(c => c.url === '/bookings').length, 1);
+});
 async function getQuote() {
   await act(async () => container.querySelector('form').dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })));
 }

@@ -29,6 +29,9 @@ public class Booking {
     public String pickupName;
     public String returnName;
     public String policyVersion;
+    public String returnPolicyVersion;
+    @Column(columnDefinition = "TEXT") public String returnPolicySnapshot;
+    public Instant returnPolicyAcceptedAt;
     public boolean depositRequired;
     public long depositAmount;
     public String depositPolicy;

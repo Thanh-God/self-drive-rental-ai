@@ -22,17 +22,22 @@ public class BookingService {
     private final BranchService branches;
     @org.springframework.beans.factory.annotation.Value("${app.deposit-enabled:false}") private boolean depositEnabled;
     @org.springframework.beans.factory.annotation.Value("${app.deposit-method:VNPAY_SANDBOX}") private String depositMethod;
+    @org.springframework.beans.factory.annotation.Value("${app.return-policy-enabled:false}") private boolean returnPolicyEnabled;
+    private final ReturnPolicy returnPolicies;
     @jakarta.persistence.PersistenceContext private jakarta.persistence.EntityManager entityManager;
     private final LicenseService licenses;
     private final AccountService accounts;
     private final JdbcTemplate jdbc;
     private final Clock clock;
 
-    public BookingService(BookingRepository r, VehicleService v, BranchService b, LicenseService l, AccountService a, JdbcTemplate j, Clock c) {
-        repo = r; vehicles = v; branches = b; licenses = l; accounts = a; jdbc = j; clock = c;
+    public BookingService(BookingRepository r, VehicleService v, BranchService b, LicenseService l, AccountService a, JdbcTemplate j, Clock c, ReturnPolicy returnPolicies) {
+        repo = r; vehicles = v; branches = b; licenses = l; accounts = a; jdbc = j; clock = c; this.returnPolicies = returnPolicies;
     }
 
-    public record Input(String vehicleId, String pickupBranchId, String returnBranchId, Instant startAt, Instant endAt, Long expectedTotal, LocalDate pickupDate, LocalDate returnDate) {
+    public record Input(String vehicleId, String pickupBranchId, String returnBranchId, Instant startAt, Instant endAt, Long expectedTotal, LocalDate pickupDate, LocalDate returnDate, String returnPolicyVersion, Boolean returnPolicyAccepted) {
+        public Input(String vehicleId, String pickupBranchId, String returnBranchId, Instant startAt, Instant endAt, Long expectedTotal, LocalDate pickupDate, LocalDate returnDate) {
+            this(vehicleId, pickupBranchId, returnBranchId, startAt, endAt, expectedTotal, pickupDate, returnDate, null, null);
+        }
         public Input(String vehicleId, String pickupBranchId, String returnBranchId, Instant startAt, Instant endAt, Long expectedTotal) {
             this(vehicleId, pickupBranchId, returnBranchId, startAt, endAt, expectedTotal, null, null);
         }
@@ -42,7 +47,7 @@ public class BookingService {
                        String pickupBranchId, String returnBranchId, String pickupName, String returnName,
                        String actualReturnBranchId, Instant startAt, Instant endAt, Instant expiresAt,
                        String status, long dailyPrice, int rentalDays, long rentalTotal, long oneWayFee,
-                       long total, long version, Instant createdAt, String policyVersion, Deposit deposit) {}
+                       long total, long version, Instant createdAt, String policyVersion, Deposit deposit, ReturnPolicy.View returnPolicy) {}
 
     public record Deposit(boolean required, long amount, String policy, String method, String mode,
                           Instant approvedAt, Instant paymentDueAt, Instant reviewDueAt, Instant originalHoldUntil,
@@ -72,7 +77,7 @@ public class BookingService {
                 b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.originalHoldUntil,
                 b.reportedAt, b.depositReceiverSnapshot, b.depositTxnRef, b.cancellationKind,
                 applied, received, missing, excess
-            )
+            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt)
         );
     }
 
@@ -192,6 +197,10 @@ public class BookingService {
         b.vehicleName = v.name;
         b.status = "PENDING";
         b.policyVersion = calendar ? RentalTerms.CALENDAR_POLICY : "rental-2026-09-28";
+        if (returnPolicyEnabled && calendar && b.pickupBranchId.equals(b.returnBranchId)) {
+            b.returnPolicyVersion = ReturnPolicy.VERSION;
+            b.returnPolicySnapshot = returnPolicies.snapshot(b.dailyPrice);
+        }
         if (depositEnabled) {
             b.depositRequired = true;
             b.depositAmount = DepositPolicy.amount(b.rentalTotal);
@@ -215,6 +224,15 @@ public class BookingService {
         licenses.requirePhotos(a.id(), false);
         if (i.expectedTotal() == null || i.expectedTotal() != b.total)
             throw DomainException.conflict("Giá đã thay đổi hoặc chưa xác nhận báo giá. Vui lòng kiểm tra lại.");
+        if (!Objects.equals(i.returnPolicyVersion(), b.returnPolicyVersion))
+            throw DomainException.conflict("Chính sách trả xe đã thay đổi. Vui lòng kiểm tra lại báo giá.");
+        if (b.returnPolicyVersion != null) {
+            if (!Boolean.TRUE.equals(i.returnPolicyAccepted()))
+                throw DomainException.bad("Cần xác nhận đã đọc chính sách trả xe sớm/muộn.");
+            b.returnPolicyAcceptedAt = clock.instant();
+        } else if (Boolean.TRUE.equals(i.returnPolicyAccepted())) {
+            throw DomainException.conflict("Chính sách trả xe không áp dụng. Vui lòng kiểm tra lại báo giá.");
+        }
         repo.saveAndFlush(b);
         history(b, null, a, "Tạo yêu cầu thuê");
         return view(b);

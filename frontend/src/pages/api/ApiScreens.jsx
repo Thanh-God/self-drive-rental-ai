@@ -1,3 +1,4 @@
+import ReturnPolicySummary from '../../components/booking/ReturnPolicySummary';
 import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
@@ -894,6 +895,7 @@ export function ApiNewBookingPage() {
   const [quoteInput, setQuoteInput] = useState(null);
   const [error, setError] = useState("");
   const [accepted, setAccepted] = useState(false);
+  const [returnPolicyAccepted, setReturnPolicyAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -943,6 +945,7 @@ export function ApiNewBookingPage() {
     setQuote(null);
     setQuoteInput(null);
     setAccepted(false);
+    setReturnPolicyAccepted(false);
     setError("");
     setBusy(false);
     setter(value);
@@ -956,6 +959,7 @@ export function ApiNewBookingPage() {
     }
     setError("");
     setAccepted(false);
+    setReturnPolicyAccepted(false);
     setBusy(true);
 
     const input = getCurrentInput();
@@ -995,12 +999,13 @@ export function ApiNewBookingPage() {
   }
 
   async function submitBooking() {
-    if (!quote || !accepted || busy) return;
+    if (!quote || !accepted || busy || (quote.returnPolicy && !returnPolicyAccepted)) return;
     if (inputChanged(getCurrentInput())) {
       setError("Thông tin đã thay đổi. Vui lòng kiểm tra lại báo giá.");
       setQuote(null);
       setQuoteInput(null);
       setAccepted(false);
+      setReturnPolicyAccepted(false);
       return;
     }
     setError("");
@@ -1011,6 +1016,7 @@ export function ApiNewBookingPage() {
       const booking = await createBooking({
         ...currentInput,
         expectedTotal: quote.total,
+        ...(quote.returnPolicy ? { returnPolicyVersion: quote.returnPolicy.version, returnPolicyAccepted } : {}),
       });
       navigate(`/user/bookings/${booking.id}`, {
         replace: true,
@@ -1020,6 +1026,7 @@ export function ApiNewBookingPage() {
       setQuote(null);
       setQuoteInput(null);
       setAccepted(false);
+      setReturnPolicyAccepted(false);
       setError(getErrorMessage(requestError, "Không thể tạo yêu cầu thuê."));
     } finally {
       setBusy(false);
@@ -1193,6 +1200,11 @@ export function ApiNewBookingPage() {
                   <p className="booking-quote-warning">
                     Báo giá không giữ chỗ và không xác nhận đã thanh toán. Giá, lịch xe và chính sách cọc được kiểm tra lại khi gửi yêu cầu.
                   </p>
+                  <ReturnPolicySummary policy={quote.returnPolicy} />
+                  {quote.returnPolicy && <label className="flex items-start gap-3 text-sm">
+                    <input type="checkbox" checked={returnPolicyAccepted} onChange={event => setReturnPolicyAccepted(event.target.checked)} />
+                    Tôi đã đọc chính sách trả xe sớm/muộn.
+                  </label>}
                   <h2 className="rental-send-heading text-lg font-semibold"><span className="rental-step">3</span>Gửi yêu cầu</h2>
                   <label className="flex items-start gap-3 text-sm">
                     <input
@@ -1205,7 +1217,7 @@ export function ApiNewBookingPage() {
                   <p className="text-sm text-muted">Xác nhận báo giá không phải ký hợp đồng. Hợp đồng được phát hành khi yêu cầu được xác nhận.</p>
                   <button
                     className="btn"
-                    disabled={!accepted || busy}
+                    disabled={!accepted || busy || Boolean(quote.returnPolicy && !returnPolicyAccepted)}
                     onClick={submitBooking}
                   >
                     {busy ? "Đang gửi..." : "Gửi yêu cầu thuê"}
@@ -1739,6 +1751,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
               </p>
             ) : null}
             {error ? <Notice error>{error}</Notice> : null}
+            <ReturnPolicySummary policy={booking.returnPolicy} />
             {booking.deposit?.required ? <BookingDeposit key={booking.id} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
             <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
               <div className="space-y-5">
@@ -2109,6 +2122,7 @@ export function ApiDocumentPage({ kind, area }) {
                 );
               })}
             </dl>
+            <ReturnPolicySummary policy={doc.returnPolicy} />
             {kind === "contract" && doc.terms ? (
               <div className="mt-6 border-t pt-4">
                 <h3 className="font-semibold mb-2">Điều khoản</h3>

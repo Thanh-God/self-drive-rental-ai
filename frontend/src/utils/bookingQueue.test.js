@@ -297,19 +297,21 @@ test('documents render one escaped terms section and preserve calendar/legacy sn
  const { Routes, Route } = await vite.ssrLoadModule('react-router-dom');
  try {
   for (const area of ['user', 'staff', 'admin']) for (const calendar of [true, false]) for (const kind of ['contract', 'invoice']) {
-   const snapshot = { customer: 'Khách thử', vehicle: 'Xe thử', startAt: '2026-10-24T17:00:00Z', endAt: '2026-10-26T17:00:00Z', policyVersion: calendar ? 'calendar-2026-10-17' : 'legacy', terms: '<script>Điều khoản mẫu</script>', total: 1200000 };
+   const snapshot = { customer: 'Khách thử', vehicle: 'Xe thử', startAt: '2026-10-24T17:00:00Z', endAt: '2026-10-26T17:00:00Z', policyVersion: calendar ? 'calendar-2026-10-17' : 'legacy', terms: '<script>Điều khoản mẫu</script>', total: 1200000, returnPolicy: calendar ? { version: 'same-branch-return-v1', terms: { dailyPriceVnd: 600000, text: 'Chính sách từ snapshot <không thực thi>' }, acceptedAt: '2026-10-20T02:00:00Z' } : null };
    const serialized = JSON.stringify(snapshot);
    client.defaults.adapter = async config => ({ config, data: { id: 'contract-test', snapshot: serialized }, status: 200, statusText: 'OK', headers: {} });
    const c = document.createElement('div'); document.body.append(c);
    const root = createRoot(c); roots.push(root);
    await act(async () => root.render(h(Router, { initialEntries: [`/${area}/bookings/doc-test/${kind}`] }, h(Routes, null, h(Route, { path: '/:area/bookings/:bookingId/:kind', element: h(Document, { kind, area }) })))));
-   assert.equal(c.querySelectorAll('h3').length, kind === 'contract' ? 1 : 0);
-   if (kind === 'contract') assert.equal(c.querySelector('h3').textContent, 'Điều khoản');
+   assert.equal(c.querySelectorAll('h3').length, (kind === 'contract' ? 1 : 0) + Number(calendar));
+   assert.equal(Boolean(c.querySelector('[aria-label="Chính sách trả xe đã lưu"]')), calendar);
+   if(calendar){ assert.match(c.textContent, /Chính sách từ snapshot <không thực thi>/); assert.match(c.textContent, /600\.000/); assert.match(c.textContent, /09:00 20\/10\/2026/); }
+   if (kind === 'contract') assert.ok([...c.querySelectorAll('h3')].some(el => el.textContent === 'Điều khoản'));
    assert.equal((c.textContent.match(/Điều khoản mẫu/g) || []).length, kind === 'contract' ? 1 : 0);
    assert.equal(c.querySelectorAll('script').length, 0);
    assert.match(c.textContent, /25\/10\/2026/);
    assert.match(c.textContent, calendar ? /Ngày nhận/ : /Thời gian nhận/);
-   if (calendar) assert.doesNotMatch(c.textContent, /00:00/);
+   if (calendar) assert.doesNotMatch(c.textContent, /00:00 25\/10\/2026/);
    else assert.match(c.textContent, /00:00 25\/10\/2026/);
    assert.equal(JSON.stringify(snapshot), serialized);
   }
