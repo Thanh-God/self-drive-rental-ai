@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import apiClient from '../../api/client';
 import { useApiData } from '../../hooks/useApiData';
-import { money, Notice, Page } from '../common/PageKit';
+import { money, Notice, Page, dateTime } from '../common/PageKit';
 import { getErrorMessage } from '../../utils/roles';
 import { vietnamDay } from '../../utils/bookingQueue';
 import QrReceiptForm from './QrReceiptForm';
@@ -10,7 +10,7 @@ import QrReceiptForm from './QrReceiptForm';
 export const paymentLabels = { PENDING: 'Đang xác minh', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã nhận', FAILED: 'Thất bại' };
 export const refundLabels = { REQUESTED: 'Chờ Admin quyết định', APPROVED: 'Đã duyệt hoàn', PROCESSING: 'Đang xử lý', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã hoàn', FAILED: 'Hoàn thất bại', DECLINED: 'Không hoàn' };
 const eventLabels = { PAYMENT_CREATED: 'Tạo phiên thanh toán', DEPOSIT_APPROVED: 'Duyệt hồ sơ, yêu cầu cọc', DEPOSIT_APPROVED_QR: 'Duyệt hồ sơ, tạo mã QR cọc', PAYMENT_RECEIVED: 'Xác minh đã nhận cọc', PAYMENT_FAILED: 'Thanh toán thất bại', PAYMENT_UNKNOWN: 'Thanh toán cần đối soát', DEPOSIT_APPLIED: 'Xác nhận đơn từ cọc', REFUND_REQUESTED: 'Tạo yêu cầu hoàn', REFUND_DECIDED: 'Duyệt khoản hoàn', REFUND_RECONCILED: 'Đối soát khoản hoàn' };
-const date = value => value ? new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Ho_Chi_Minh' }).format(new Date(value)) : '—';
+const date = dateTime;
 
 export default function BookingDeposit({ booking, role, assignedPickup, reload, now }) {
   const request = useApiData(`/bookings/${encodeURIComponent(booking.id)}/deposit`);
@@ -62,8 +62,6 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
   const isVnpay = deposit?.method === 'VNPAY_SANDBOX';
   const depositApproved = deposit?.approvedAt;
   const depositDue = deposit?.paymentDueAt;
-  const reviewDue = deposit?.reviewDueAt;
-  const originalHold = deposit?.originalHoldUntil;
   const reportedAt = deposit?.reportedAt;
   const appliedAmount = deposit?.appliedAmount ?? 0;
   const receivedAmount = deposit?.receivedAmount ?? 0;
@@ -78,8 +76,16 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
     {isQr && <p className="text-amber-700 font-medium">Mô phỏng — Không chuyển tiền thật. Chỉ nhân viên đối soát thủ công.</p>}
     <p>Cọc: <strong>{money(deposit?.amount)}</strong> · Còn lại: {money(booking.total - deposit?.amount)}</p>
     <p>{deposit?.txnRef ? 'Đã ghi nhận cọc cho đơn' : booking.status !== 'PENDING' ? 'Đơn không còn chờ đóng cọc. Xem tình trạng thu/hoàn bên dưới.' :
-      depositApproved ? `Chờ đóng cọc · Hạn thanh toán ${date(depositDue)} · Hạn đối soát ${date(reviewDue)}` : 'Chờ kiểm tra hồ sơ'}</p>
-    {depositApproved && originalHold && <p className="text-sm text-slate-600">Hạn giữ lịch gốc: {date(originalHold)}</p>}
+      reportedAt ? 'Khách đã báo · Chờ đối soát' : depositApproved ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</p>
+    <dl className="mt-3 grid gap-2 text-sm" aria-label="Các mốc thời hạn cọc">
+      {!depositApproved ? <div><dt>Hạn chờ kiểm tra hồ sơ</dt><dd>{date(booking.expiresAt)}</dd></div> : <>
+        <div><dt>Hạn đóng cọc</dt><dd>{date(depositDue)}</dd></div>
+        <div><dt>Hạn nhân viên đối soát</dt><dd>{date(deposit.reviewDueAt)}</dd></div>
+        <div><dt>Hạn giữ lịch gốc</dt><dd>{date(deposit.originalHoldUntil)}</dd></div>
+      </>}
+    </dl>
+    {depositApproved && booking.status === 'PENDING' && <p className="mt-2 text-sm text-slate-600">Chuyển khoản trước hạn đóng cọc. Hạn đối soát dành cho nhân viên kiểm tra, không gia hạn thời gian chuyển khoản. Báo đã chuyển khoản chưa xác nhận đã nhận tiền.</p>}
+    <p className="mt-2 text-xs text-muted">Các mốc theo giờ Việt Nam, do hệ thống cung cấp.</p>
 
     {booking.status === 'PENDING' && data && !data.acceptingNew && isVnpay ?
       <p>Đang tạm dừng tạo thanh toán mới. Giao dịch đã tạo vẫn được hệ thống đối soát.</p> : null}

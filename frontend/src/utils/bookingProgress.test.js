@@ -27,7 +27,7 @@ test("all main and terminal statuses explain actual state without inventing hist
 });
 test("history uses actual Vietnamese timestamps/reasons, escaped content and API expiry distinct from recorded pending", () => {
   const html = render("EXPIRED", { history: [{ previous_status: null, next_status: "PENDING", occurred_at: "2026-10-15T03:04:00Z", reason: "<script>bad</script>" }] });
-  assert.match(html, /10:04/);assert.match(html, /15 thg 10, 2026/);
+  assert.match(html, /10:04/);assert.match(html, /15\/10\/2026/);
   assert.match(html, /Tạo yêu cầu.*Chờ xác nhận/);assert.match(html, /&lt;script&gt;/);assert.doesNotMatch(html, /<script>/);
   assert.equal((html.match(/<li /g) || []).length, 1);
 });

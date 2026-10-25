@@ -1,3 +1,4 @@
+import { formatVietnamDate } from '../../utils/calendarDate';
 import AdminAreaContext from "../../context/AdminAreaContext";
 import { Link } from "react-router-dom";
 import { cloneElement, useId, useState, useContext, useEffect } from "react";
@@ -13,20 +14,13 @@ export const money = (value) =>
     currency: "VND",
     maximumFractionDigits: 0,
   }).format(value);
-export const dateTime = (value) =>
-  value
-    ? new Intl.DateTimeFormat("vi-VN", {
-        dateStyle: "medium",
-        timeStyle: "short",
-        timeZone: "Asia/Ho_Chi_Minh",
-      }).format(new Date(value))
-    : "—";
+export const dateTime = value => formatVietnamDate(value, { withTime: true });
 export const localInput = (days = 3) =>
   new Date(Date.now() + days * 86400000 + 7 * 3600000)
     .toISOString()
     .slice(0, 16);
 export const toUTC = (value) => new Date(`${value.length === 10 ? value + 'T00:00' : value}:00+07:00`).toISOString();
-export const dateOnly = value => value ? new Intl.DateTimeFormat('vi-VN',{dateStyle:'medium',timeZone:'Asia/Ho_Chi_Minh'}).format(new Date(value)) : '—';
+export const dateOnly = formatVietnamDate;
 export const bookingDate = (booking, value) => booking.policyVersion === 'calendar-2026-10-17' ? dateOnly(value) : dateTime(value);
 export function Page({ title, description, children, actions }) {
   const isAdmin = useContext(AdminAreaContext);

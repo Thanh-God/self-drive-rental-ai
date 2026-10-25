@@ -1,3 +1,5 @@
+import { formatVietnamDate } from './calendarDate.js';
+
 export function vietnamDay(value) {
   const date = new Date(value);
   if (!value || !Number.isFinite(date.getTime())) return '';
@@ -14,29 +16,7 @@ export const bookingSortLabels = {
   startAt_asc: 'Ngày nhận gần trước',
 };
 
-export function adminDateFormat(value, { withTime = false } = {}) {
-  const date = new Date(value);
-  if (!value || !Number.isFinite(date.getTime())) return '—';
-  const parts = new Intl.DateTimeFormat('en-GB', {
-    timeZone: 'Asia/Ho_Chi_Minh',
-    day: '2-digit',
-    month: '2-digit',
-    year: 'numeric',
-    hour: withTime ? '2-digit' : undefined,
-    minute: withTime ? '2-digit' : undefined,
-    hour12: false,
-  }).formatToParts(date);
-  const day = parts.find(p => p.type === 'day')?.value;
-  const month = parts.find(p => p.type === 'month')?.value;
-  const year = parts.find(p => p.type === 'year')?.value;
-  const dateStr = `${day}/${month}/${year}`;
-  if (withTime) {
-    const hour = parts.find(p => p.type === 'hour')?.value;
-    const minute = parts.find(p => p.type === 'minute')?.value;
-    return `${hour}:${minute} ${dateStr}`;
-  }
-  return dateStr;
-}
+export const adminDateFormat = formatVietnamDate;
 
 export function adminBookingDate(booking, value) {
   if (booking?.policyVersion === 'calendar-2026-10-17') {

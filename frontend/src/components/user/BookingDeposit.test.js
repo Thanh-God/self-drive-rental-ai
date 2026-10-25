@@ -18,6 +18,31 @@ before(async () => {
 });
 after(async () => { await server?.close(); });
 
+test('deadline presentation distinguishes approval/reporting for every role without changing API values', () => {
+  for (const role of ['USER', 'STAFF', 'ADMIN']) {
+    const booking = { ...baseBooking, expiresAt: '2026-10-24T05:00:00Z', deposit: { ...baseBooking.deposit, method: 'DEMO_QR_MANUAL' } };
+    const render = () => renderToStaticMarkup(React.createElement(Deposit, { booking, role, reload() {} }));
+    assert.match(render(), /Hạn chờ kiểm tra hồ sơ/);
+    assert.match(render(), /12:00 24\/10\/2026/);
+    assert.doesNotMatch(render(), /Hạn đóng cọc/);
+    Object.assign(booking.deposit, { approvedAt: '2026-10-24T03:00:00Z', paymentDueAt: '2026-10-24T03:30:00Z', reviewDueAt: '2026-10-24T04:00:00Z', originalHoldUntil: booking.expiresAt, reportedAt: '2026-10-24T03:10:00Z' });
+    const before = JSON.stringify(booking);
+    const html = render();
+    assert.match(html, /Hạn đóng cọc<\/dt><dd>10:30 24\/10\/2026/);
+    assert.match(html, /Hạn nhân viên đối soát<\/dt><dd>11:00 24\/10\/2026/);
+    assert.match(html, /Hạn giữ lịch gốc<\/dt><dd>12:00 24\/10\/2026/);
+    assert.match(html, /Khách đã báo · Chờ đối soát/);
+    assert.match(html, /không gia hạn thời gian chuyển khoản/);
+    assert.doesNotMatch(html, /Đã ghi nhận cọc cho đơn/);
+    assert.equal(JSON.stringify(booking), before);
+    const progress = renderToStaticMarkup(React.createElement(MemoryRouter, null, React.createElement(Progress, { booking, role })));
+    assert.match(progress, /Hiện tại: Khách đã báo · Chờ đối soát/);
+    booking.status = 'CANCELLED';
+    assert.match(render(), /Đơn không còn chờ đóng cọc/);
+    assert.doesNotMatch(render(), /Chuyển khoản trước hạn đóng cọc/);
+  }
+});
+
 const baseBooking = {
   id: 'synthetic',
   status: 'PENDING',

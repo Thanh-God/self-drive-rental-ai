@@ -13,3 +13,17 @@ export function toVietnamInstant(value) {
   const date=new Date(`${value}+07:00`);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
+// Display only: never use a formatted value to calculate a booking deadline.
+export function formatVietnamDate(value, { withTime = false } = {}) {
+  if (value == null || value === '') return '—';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '—';
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Ho_Chi_Minh', day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: withTime ? '2-digit' : undefined, minute: withTime ? '2-digit' : undefined,
+    hourCycle: 'h23',
+  }).formatToParts(date);
+  const part = type => parts.find(p => p.type === type)?.value;
+  const day = `${part('day')}/${part('month')}/${part('year')}`;
+  return withTime ? `${part('hour')}:${part('minute')} ${day}` : day;
+}

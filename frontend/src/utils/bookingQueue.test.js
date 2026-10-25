@@ -284,9 +284,34 @@ test('F03-R: Admin booking detail renders dd/mm/yyyy and audit HH:mm in VN timez
   );
  });
 
- // User date preserves medium Vietnamese date format (thg 10)
- assert.match(cUser.textContent, /thg 10/);
+ // User shares numeric Vietnamese dates with Admin.
+ assert.match(cUser.textContent, /20\/10\/2026/);
+ assert.doesNotMatch(cUser.textContent, /thg 10/);
 
  // Restore default rows adapter
  client.defaults.adapter = async config => ({ config, data: rows, status: 200, statusText: 'OK', headers: {} });
+});
+
+test('documents render one escaped terms section and preserve calendar/legacy snapshot dates for all roles', async () => {
+ const { ApiDocumentPage: Document } = await vite.ssrLoadModule('/src/pages/api/ApiScreens.jsx');
+ const { Routes, Route } = await vite.ssrLoadModule('react-router-dom');
+ try {
+  for (const area of ['user', 'staff', 'admin']) for (const calendar of [true, false]) for (const kind of ['contract', 'invoice']) {
+   const snapshot = { customer: 'Khách thử', vehicle: 'Xe thử', startAt: '2026-10-24T17:00:00Z', endAt: '2026-10-26T17:00:00Z', policyVersion: calendar ? 'calendar-2026-10-17' : 'legacy', terms: '<script>Điều khoản mẫu</script>', total: 1200000 };
+   const serialized = JSON.stringify(snapshot);
+   client.defaults.adapter = async config => ({ config, data: { id: 'contract-test', snapshot: serialized }, status: 200, statusText: 'OK', headers: {} });
+   const c = document.createElement('div'); document.body.append(c);
+   const root = createRoot(c); roots.push(root);
+   await act(async () => root.render(h(Router, { initialEntries: [`/${area}/bookings/doc-test/${kind}`] }, h(Routes, null, h(Route, { path: '/:area/bookings/:bookingId/:kind', element: h(Document, { kind, area }) })))));
+   assert.equal(c.querySelectorAll('h3').length, kind === 'contract' ? 1 : 0);
+   if (kind === 'contract') assert.equal(c.querySelector('h3').textContent, 'Điều khoản');
+   assert.equal((c.textContent.match(/Điều khoản mẫu/g) || []).length, kind === 'contract' ? 1 : 0);
+   assert.equal(c.querySelectorAll('script').length, 0);
+   assert.match(c.textContent, /25\/10\/2026/);
+   assert.match(c.textContent, calendar ? /Ngày nhận/ : /Thời gian nhận/);
+   if (calendar) assert.doesNotMatch(c.textContent, /00:00/);
+   else assert.match(c.textContent, /00:00 25\/10\/2026/);
+   assert.equal(JSON.stringify(snapshot), serialized);
+  }
+ } finally { client.defaults.adapter = async config => ({ config, data: rows, status: 200, statusText: 'OK', headers: {} }); }
 });

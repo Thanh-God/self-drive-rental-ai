@@ -1733,7 +1733,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
               {booking.status === 'PENDING' && booking.deposit?.required ? <span>{booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ'}</span> : null}
               {area === "staff" ? <span className="text-sm text-slate-500">Phiên bản {booking.version}</span> : null}
             </div>
-            {booking.status === "PENDING" && booking.expiresAt ? (
+            {booking.status === "PENDING" && booking.expiresAt && !booking.deposit?.required ? (
               <p className="mb-5 text-sm text-amber-800">
                 Yêu cầu giữ lịch đến {area === "admin" ? adminDateFormat(booking.expiresAt, { withTime: true }) : dateTime(booking.expiresAt)}.
               </p>
@@ -1871,7 +1871,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       <div>
                         <dt className="text-slate-500">Hạn dùng</dt>
                         <dd className="mt-1 font-semibold">
-                          {dateTime(license.expiresOn)}
+                          {dateOnly(license.expiresOn)}
                         </dd>
                       </div>
                       <div>
@@ -2038,12 +2038,11 @@ export function ApiDocumentPage({ kind, area }) {
     vehicle: "Xe",
     pickup: "Chi nhánh nhận",
     return: "Chi nhánh trả",
-    startAt: "Thời gian nhận",
-    endAt: "Thời gian trả",
+    startAt: doc?.policyVersion === "calendar-2026-10-17" ? "Ngày nhận" : "Thời gian nhận",
+    endAt: doc?.policyVersion === "calendar-2026-10-17" ? "Ngày trả" : "Thời gian trả",
     rentalTotal: "Tiền thuê xe",
     oneWayFee: "Phí tuyến một chiều",
     total: "Tổng tiền",
-    terms: "Điều khoản",
   };
 
   const invoiceLabels = {
@@ -2051,8 +2050,8 @@ export function ApiDocumentPage({ kind, area }) {
     vehicle: "Xe",
     pickup: "Chi nhánh nhận",
     return: "Chi nhánh trả",
-    startAt: "Thời gian nhận",
-    endAt: "Thời gian trả",
+    startAt: doc?.policyVersion === "calendar-2026-10-17" ? "Ngày nhận" : "Thời gian nhận",
+    endAt: doc?.policyVersion === "calendar-2026-10-17" ? "Ngày trả" : "Thời gian trả",
     note: "Ghi chú",
   };
 

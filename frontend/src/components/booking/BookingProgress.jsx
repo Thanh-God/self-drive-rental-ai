@@ -20,8 +20,8 @@ export default function BookingProgress({ booking, history = [], role, actions =
   const invoice = booking.status === "COMPLETED" || events.some(event => event.next_status === "COMPLETED");
   const label = status => bookingStageLabels[status] || "Trạng thái chưa xác định";
   const depositPending = booking.status === 'PENDING' && booking.deposit?.required;
-  const currentLabel = depositPending ? (booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ') : label(booking.status);
-  const explanation = depositPending ? (booking.deposit.approvedAt ? 'Hồ sơ đã được duyệt. Thanh toán cọc trong thời hạn hiển thị; hệ thống xác nhận đơn sau khi xác minh khoản cọc.' : 'Nhân viên chi nhánh nhận kiểm tra hồ sơ trước khi mở bước đóng cọc.') : explanations[booking.status];
+  const currentLabel = depositPending ? (booking.deposit.reportedAt ? 'Khách đã báo · Chờ đối soát' : booking.deposit.approvedAt ? 'Chờ đóng cọc' : 'Chờ kiểm tra hồ sơ') : label(booking.status);
+  const explanation = depositPending ? (booking.deposit.reportedAt ? 'Khách đã báo chuyển khoản. Đơn vẫn chờ xử lý; chỉ xác nhận sau khi nhân viên đối soát đủ cọc. Xem hạn đối soát trong phần cọc giữ chỗ.' : booking.deposit.approvedAt ? 'Hồ sơ đã được duyệt. Thanh toán cọc trong thời hạn hiển thị; hệ thống xác nhận đơn sau khi xác minh khoản cọc.' : 'Nhân viên chi nhánh nhận kiểm tra hồ sơ trước khi mở bước đóng cọc.') : explanations[booking.status];
   return <section className="panel" aria-label="Tiến trình đơn thuê">
     <h2 className="text-lg font-semibold">Tiến trình đơn thuê</h2>
     <p className="mt-3 font-semibold" aria-live="polite">Hiện tại: {currentLabel}</p>
