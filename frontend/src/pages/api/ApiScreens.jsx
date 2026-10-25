@@ -887,8 +887,9 @@ export function ApiNewBookingPage() {
     () => (params.get("start") || toVietnamInput(3)).slice(0,10),
   );
   const [end, setEnd] = useState(() => (params.get("end") || toVietnamInput(4)).slice(0,10));
-  const [pickup, setPickup] = useState(() => params.get("pickupBranchId") || "");
-  const [dropoff, setDropoff] = useState(() => params.get("returnBranchId") || "");
+  const [pickupChoice, setPickup] = useState(() => params.get("pickupBranchId"));
+  // null follows pickup; an explicit empty value requires the customer to choose.
+  const [dropoffChoice, setDropoff] = useState(() => params.get("returnBranchId"));
   const [quoteValue, setQuote] = useState(null);
   const [quoteInput, setQuoteInput] = useState(null);
   const [error, setError] = useState("");
@@ -900,34 +901,21 @@ export function ApiNewBookingPage() {
   const branches = (branchesRequest.data || []).filter(
     (branch) => branch.status === "ACTIVE",
   );
-  const routes = (routesRequest.data || []).filter(
-    (route) => route.enabled && route.pickupBranchId === pickup,
-  );
   const normalized = vehicleRequest.data
     ? normalizeVehicle(vehicleRequest.data, null)
     : null;
-  const pickupInitialized = useRef(false);
-  const dropoffInitialized = useRef(false);
-
-  useEffect(() => {
-    if (pickupInitialized.current || pickup || !branches.length) return;
-    pickupInitialized.current = true;
-    setPickup(branches[0].id);
-  }, [branches, pickup]);
-  useEffect(() => {
-    if (
-      dropoffInitialized.current ||
-      dropoff ||
-      !routes.length ||
-      routes.some((route) => route.returnBranchId === dropoff)
-    )
-      return;
-    dropoffInitialized.current = true;
-    setDropoff(routes[0].returnBranchId);
-  }, [routes, dropoff]);
+  const defaultPickup = vehicleRequest.data?.currentBranchId;
+  const requestedPickup = pickupChoice ?? defaultPickup;
+  const pickup = branches.some((branch) => branch.id === requestedPickup) ? requestedPickup : "";
+  const routes = (routesRequest.data || []).filter(
+    (route) => route.enabled && route.pickupBranchId === pickup &&
+      branches.some((branch) => branch.id === route.returnBranchId),
+  );
+  const requestedDropoff = dropoffChoice ?? pickup;
+  const dropoff = routes.some((route) => route.returnBranchId === requestedDropoff) ? requestedDropoff : "";
   useLayoutEffect(() => {
     quoteRequestGeneration.invalidate();
-  }, [quoteRequestGeneration, vehicleId]);
+  }, [quoteRequestGeneration, vehicleId, pickup, dropoff, start, end]);
 
   function getCurrentInput() {
     return {
@@ -940,6 +928,8 @@ export function ApiNewBookingPage() {
   }
 
   const quote =
+    !vehicleRequest.loading && !branchesRequest.loading && !routesRequest.loading &&
+    !vehicleRequest.error && !branchesRequest.error && !routesRequest.error &&
     quoteInput && sameBookingInput(getCurrentInput(), quoteInput)
       ? quoteValue
       : null;
@@ -960,6 +950,10 @@ export function ApiNewBookingPage() {
 
   async function checkQuote(event) {
     event.preventDefault();
+    if (!pickup || !dropoff) {
+      setError("Hãy chọn chi nhánh nhận và tuyến trả xe đang mở.");
+      return;
+    }
     setError("");
     setAccepted(false);
     setBusy(true);
@@ -1094,6 +1088,12 @@ export function ApiNewBookingPage() {
                       disabled={submitting}
                       value={pickup}
                       onChange={(event) => {
+                        const nextPickup = event.target.value;
+                        const followsPickup = dropoffChoice === null || dropoffChoice === pickup;
+                        const stillValid = (routesRequest.data || []).some((route) =>
+                          route.enabled && route.pickupBranchId === nextPickup && route.returnBranchId === dropoff &&
+                          branches.some((branch) => branch.id === dropoff));
+                        setDropoff(followsPickup ? null : stillValid ? dropoffChoice : "");
                         updateQuoteField(
                           "pickup",
                           setPickup,
@@ -1101,6 +1101,7 @@ export function ApiNewBookingPage() {
                         );
                       }}
                     >
+                      <option value="">Chọn chi nhánh nhận xe</option>
                       {branches.map((branch) => (
                         <option key={branch.id} value={branch.id}>
                           {branch.name} · {branch.address}
@@ -1121,6 +1122,7 @@ export function ApiNewBookingPage() {
                         );
                       }}
                     >
+                      <option value="">Chọn chi nhánh trả xe</option>
                       {routes.map((route) => {
                         const branch = branches.find(
                           (item) => item.id === route.returnBranchId,
@@ -1134,6 +1136,9 @@ export function ApiNewBookingPage() {
                     </select>
                   </Field>
                 </div>
+                {pickup && !dropoff && routes.length ? (
+                  <Notice>Chưa có điểm trả hợp lệ được chọn. Vui lòng chủ động chọn chi nhánh trả; hệ thống không tự chọn tuyến có phí.</Notice>
+                ) : null}
                 <p className="text-sm text-muted">Cần giấy phép lái xe phù hợp và còn hạn đến hết chuyến. <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p>
                 {!routes.length ? (
                   <Notice error>
@@ -1147,7 +1152,7 @@ export function ApiNewBookingPage() {
                     Cập nhật giấy phép lái xe
                   </Link>
                 ) : null}
-                <button className="btn" disabled={busy || !routes.length}>
+                <button className="btn" disabled={busy || !pickup || !dropoff}>
                   {busy ? "Đang kiểm tra..." : "Kiểm tra lịch & báo giá"}
                 </button>
               </form>
@@ -1170,14 +1175,23 @@ export function ApiNewBookingPage() {
                       <dd>{money(quote.total)}</dd>
                     </div>
                   </dl>
+                  {quote.deposit?.required ? (
+                    <div className="space-y-2 text-sm" aria-label="Cọc giữ chỗ dự kiến">
+                      <dl className="space-y-2">
+                        <div className="flex justify-between gap-4"><dt>Cọc giữ chỗ dự kiến (đã gồm trong tổng)</dt><dd>{money(quote.deposit.amount)}</dd></div>
+                        <div className="flex justify-between gap-4"><dt>Còn lại sau khi đóng cọc</dt><dd>{money(Math.max(0, quote.total - quote.deposit.amount))}</dd></div>
+                      </dl>
+                      <p>Cọc được tính vào tiền thuê xe, không phải cọc bảo đảm hư hỏng. Chỉ đóng cọc sau khi nhân viên kiểm tra hồ sơ và mở yêu cầu thanh toán.</p>
+                      {quote.deposit.method === "DEMO_QR_MANUAL" ? <p className="booking-quote-warning">QR DEMO · Mô phỏng — Không chuyển tiền thật.</p> : <p>Thanh toán cọc qua VNPAY Sandbox · Chỉ thử nghiệm.</p>}
+                    </div>
+                  ) : <p className="text-sm text-muted">Không yêu cầu cọc giữ chỗ theo báo giá hiện tại.</p>}
                   <p className="text-sm text-slate-600">
                     {quote.pickupName} → {quote.returnName}. Giá và khả dụng
                     được kiểm tra lại khi gửi; yêu cầu chỉ được tạo nếu báo giá
                     còn khớp.
                   </p>
                   <p className="booking-quote-warning">
-                    Báo giá không giữ chỗ. Tiền cọc hoặc khoản chưa được cấu hình không nằm trong báo
-                    giá này. Tổng báo giá không xác nhận thanh toán.
+                    Báo giá không giữ chỗ và không xác nhận đã thanh toán. Giá, lịch xe và chính sách cọc được kiểm tra lại khi gửi yêu cầu.
                   </p>
                   <h2 className="rental-send-heading text-lg font-semibold"><span className="rental-step">3</span>Gửi yêu cầu</h2>
                   <label className="flex items-start gap-3 text-sm">

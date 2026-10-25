@@ -37,3 +37,9 @@ Form có label/focus rõ, thao tác bàn phím và thông báo dễ hiểu. Ch�
 Danh sách đơn sắp theo thời điểm tạo mới nhất trước; API trả `createdAt` theo UTC, giao diện hiển thị giờ Việt Nam. Bộ lọc trạng thái dùng nhãn tiếng Việt và giữ nguyên mã gửi/nhận qua API.
 
 Bộ lọc **Hàng đợi** mặc định **Tất cả** để không bỏ sót đơn cũ chưa xử lý. **Hôm nay** tính theo ngày tạo đơn ở hàng chờ duyệt, ngày nhận xe ở trang bàn giao và ngày trả xe ở trang nhận trả, trong múi giờ `Asia/Ho_Chi_Minh`. **Tất cả** chỉ bỏ giới hạn ngày; trạng thái và từ khóa vẫn được áp dụng. Dùng **Tải lại danh sách** để lấy dữ liệu mới, không cam kết cập nhật thời gian thực. Bộ lọc không thay đổi quyền xem hoặc thao tác theo chi nhánh.
+
+## Báo giá và cọc giữ chỗ trước gửi yêu cầu
+
+Ở chế độ API, form đặt xe chưa có lựa chọn chuyến mặc định dùng chi nhánh hiện tại đang hoạt động của xe. Điểm trả theo điểm nhận khi có tuyến cùng chi nhánh đang mở. Nếu không có tuyến phù hợp, khách phải chọn điểm trả; hệ thống không tự chọn tuyến khác có phí. Lựa chọn trả khác trong chuyến tìm kiếm được giữ nếu còn hợp lệ; khi đổi điểm nhận làm tuyến đó không hợp lệ, form yêu cầu chọn lại.
+
+Báo giá hiển thị tiền thuê, phí tuyến và tổng. Nếu backend yêu cầu cọc, form hiển thị số cọc từ báo giá và số còn lại bằng tổng trừ cọc; cọc đã nằm trong tổng, không cộng thêm lần nữa. Cọc chỉ được yêu cầu thanh toán sau khi nhân viên kiểm tra hồ sơ. QR DEMO ghi rõ không chuyển tiền thật. Khi báo giá không yêu cầu cọc, giao diện nói rõ điều đó. Báo giá không giữ chỗ hoặc chứng minh đã thanh toán; thay ngày/xe/nhánh làm mất hiệu lực báo giá và xác nhận trước đó.
