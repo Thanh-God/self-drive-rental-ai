@@ -11,7 +11,8 @@ drift is a refusal, never an implicit new container. Containers are stopped
 afterwards and their volumes are retained; there is no automatic deletion.
 
 For sandbox deposit logic, select `--suites DepositHttpTest MySqlMigrationTest`.
-The migration suite includes V5→V6 preservation and six test methods. With matching
+The migration suite covers fresh V11, preserved upgrades through V10→V11 and
+the historical partial-migration refusal (nine test methods). With matching
 native evidence, the desktop proof uses `--synthetic-deposit --browser-script
 scripts/operations/verify-booking-deposit.cjs` on `run-browser.py`. This explicit
 mode configures synthetic merchant values, delays scheduled provider calls, and
@@ -20,8 +21,8 @@ protocol handling only; it is never evidence of a real VNPAY payment/refund.
 Real merchant, HTTPS callback, QueryDR and Refund must be accepted separately.
 
 For vehicle administration, select `--suites VehicleAdminHttpServerTest MySqlMigrationTest`
-in `run-mysql.py`. The migration suite covers fresh, V1 upgrade, V2 upgrade and
-the historical partial-migration refusal (three test methods). With that native
+in `run-mysql.py`. The same migration suite checks fresh and upgrade schemas,
+preserved data and the historical partial-migration refusal. With that native
 evidence and the matching JAR, run `run-browser.py` with
 `--browser-script scripts/operations/verify-vehicle-admin.cjs`. This proof uses
 native desktop controls for create/edit/delete/cancel/history conflict and action
