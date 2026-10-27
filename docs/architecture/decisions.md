@@ -101,3 +101,6 @@ AI4 MVP chỉ USER: hành trình một ngày, 2–4 điểm trong vùng graph hi
 
 ## Cọc QR DEMO thủ công
 Cho phép luồng giả lập QR cục bộ, Staff pickup xác minh khoản nhận và backend tự xác nhận khi đủ30% tiền thuê; Admin hoàn thủ công có tham chiếu. Không thu tiền thật. Quy tắc hạn/đối soát, snapshot và hoàn theo [booking-deposit](../modules/booking-deposit.md). VNPAY cũ giữ tương thích và không nhận bản ghi QR.
+
+### Xử lý khoản vượt hạn cùng chi nhánh
+Staff đúng chi nhánh trả ghi thu thủ công từng phần; Admin miễn/giảm hoặc đảo toàn bộ ghi nhận sai trước hoàn tất, có lý do/audit. Nhật ký thuộc booking, tách cọc; không tự khấu trừ/hoàn cọc. Số dư vượt hạn bằng0 mới cho Staff hoàn tất, hóa đơn lưu khoản ròng và snapshot giải thích. Ghi nhận DEMO mặc định; chưa rollout chính sách trả muộn cho môi trường sử dụng hoặc giải quyết đơn kế tiếp. Chi tiết [return-policy](../modules/return-policy.md).

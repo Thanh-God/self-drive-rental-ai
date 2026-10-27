@@ -87,3 +87,5 @@ Service khóa Vehicle trong transaction, validate tất cả IDs trước mutati
 ## Cọc sandbox
 
 `payment` giữ giao dịch, yêu cầu hoàn, chữ ký VNPAY và nhật ký tiền. `operation` điều phối payment → booking → contract trong transaction nội bộ, gọi mạng ngoài transaction. booking không phụ thuộc payment service; công thức cọc thuần và snapshot được ghi lúc tạo. Không dùng entity mutable mới để điều phối cọc. Xem [contract cọc](../modules/booking-deposit.md).
+
+Khoản vượt hạn cùng chi nhánh: booking sở hữu ReturnSettlementService/ReturnSettlementRepository và bảng booking_return_settlements cùng assessment đơn. Đây là nhật ký thu thủ công/miễn/đảo riêng, không tái sử dụng payment_transactions của cọc. Invoice đọc summary có kiểu từ booking để snapshot và phát hành qua operation; không có phụ thuộc ngược booking→operation/payment.

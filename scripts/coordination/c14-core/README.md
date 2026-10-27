@@ -11,8 +11,8 @@ drift is a refusal, never an implicit new container. Containers are stopped
 afterwards and their volumes are retained; there is no automatic deletion.
 
 For sandbox deposit logic, select `--suites DepositHttpTest MySqlMigrationTest`.
-The migration suite covers fresh V11, preserved upgrades through V10→V11 and
-the historical partial-migration refusal (nine test methods). With matching
+The migration suite covers fresh V12, preserved upgrades through V11→V12 and
+the historical partial-migration refusal (ten test methods). With matching
 native evidence, the desktop proof uses `--synthetic-deposit --browser-script
 scripts/operations/verify-booking-deposit.cjs` on `run-browser.py`. This explicit
 mode configures synthetic merchant values, delays scheduled provider calls, and
@@ -91,3 +91,5 @@ compares business records before and after the reads. Omit `--browser-script`
 to check document permissions without starting Vite.
 
 QR DEMO proof: select `--suites QrDemoHttpTest DepositHttpTest MySqlMigrationTest` for native tests. With matching evidence/JAR, use `--qr-manual --browser-script scripts/operations/verify-qr-deposit.cjs` for desktop. QR mode never configures a merchant or contacts a bank. MySqlMigrationTest has seven methods, including V6 ledger preservation and multiple partial refunds. QR schema versions end at V9; SQL and the metadata-only Java Flyway migration share the same history.
+
+Return settlement: select `ReturnSettlementHttpTest ReturnReceiptHttpTest ReturnPolicyHttpTest QrDemoHttpTest MySqlMigrationTest VehicleAdminHttpServerTest`. Settlement uses a separate ledger; tests must prove duplicate/race/rollback and preserve deposit data.
