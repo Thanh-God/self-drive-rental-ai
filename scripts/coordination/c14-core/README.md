@@ -98,3 +98,12 @@ QR DEMO proof: select `--suites QrDemoHttpTest DepositHttpTest MySqlMigrationTes
 Return settlement: select `ReturnSettlementHttpTest ReturnReceiptHttpTest ReturnPolicyHttpTest QrDemoHttpTest MySqlMigrationTest VehicleAdminHttpServerTest`. Settlement uses a separate ledger; tests must prove duplicate/race/rollback and preserve deposit data.
 
 Schedule protection/warnings: select `ScheduleProtectionHttpTest ScheduleWarningHttpTest ReturnReceiptHttpTest QrDemoHttpTest ConcurrencyAndRaceTest`. The two schedule suites use guarded native schemas when `KDRIVE_TEST_DB_URL` is supplied, otherwise isolated H2. Protection asserts native database identity and exercises return/create and return/handover races with database readback; warnings check role visibility and read-only behavior. Keep UI/browser acceptance separate from this native proof.
+
+For desktop schedule warnings, use `run-browser.py` with the matching native evidence/JAR
+and `--browser-script scripts/operations/verify-schedule-warnings.cjs` (no payment flags).
+The proof creates four synthetic same-branch calendar bookings in the runner's fresh
+marked schema, logs in through the UI at 1440×900, checks Staff/Admin filters and
+related links, USER isolation, wrong-branch denial, actual UI return/readback and a
+deliberate failed API request. Screenshots and console evidence stay in the new
+output directory. This does not enable return policy on the website DB or exercise
+the full settlement workflow; native and settlement proofs remain separate.
