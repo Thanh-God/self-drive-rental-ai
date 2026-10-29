@@ -36,7 +36,7 @@ def validate_reuse(fixture, inspection, pinned=None):
     mounts=inspection['Mounts']
     assert len(mounts)==1 and mounts[0]['Type']=='volume' and mounts[0]['Name']==fixture['volume'] and mounts[0]['Destination']=='/var/lib/mysql', 'Fixture mount drift'
     if pinned:assert inspection['Image']==pinned['imageId'], 'Pinned fixture image drift'
-SUITES = ['VehicleSearchTest','ConcurrencyAndRaceTest','BranchClosureBookingTest','BranchStatusHttpServerTest',
+SUITES = ['ScheduleProtectionHttpTest','ScheduleWarningHttpTest','VehicleSearchTest','ConcurrencyAndRaceTest','BranchClosureBookingTest','BranchStatusHttpServerTest',
           'OperationalReportIntegrationTest','OperationalReportMySqlTest','RentalIntegrationTest',
           'CancelBoundaryTest','MySqlMigrationTest','LocationCategoryIntegrationTest','LocationIntegrationTest',
           'VehicleCatalogHttpServerTest','VehicleAmenityHttpServerTest','VehicleImageHttpServerTest',

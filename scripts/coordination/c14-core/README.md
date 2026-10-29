@@ -35,6 +35,9 @@ runner for the machine being used. Run from the repository root.
 
 Create a new directory under `.runtime/`, with an exact copy of `backend/src`,
 `backend/.mvn`, `backend/pom.xml` and both Maven wrappers in `evidence/backend-copy`.
+Also copy `scripts/ai/locations-pilot.json` to `scripts/ai/locations-pilot.json`
+beside the backend-copy directory (for example `evidence/scripts/ai/locations-pilot.json`),
+preserving its hash: the dataset regression suite resolves it relative to the backend.
 Run `verify` on that copy before running native suites. Put the genuine historical
 V1/V2 migration snapshot in `evidence/historical-migration` for the failed partial
 migration probe. Retrieve it from the appropriate repository revision; do not
@@ -93,3 +96,5 @@ to check document permissions without starting Vite.
 QR DEMO proof: select `--suites QrDemoHttpTest DepositHttpTest MySqlMigrationTest` for native tests. With matching evidence/JAR, use `--qr-manual --browser-script scripts/operations/verify-qr-deposit.cjs` for desktop. QR mode never configures a merchant or contacts a bank. MySqlMigrationTest has seven methods, including V6 ledger preservation and multiple partial refunds. QR schema versions end at V9; SQL and the metadata-only Java Flyway migration share the same history.
 
 Return settlement: select `ReturnSettlementHttpTest ReturnReceiptHttpTest ReturnPolicyHttpTest QrDemoHttpTest MySqlMigrationTest VehicleAdminHttpServerTest`. Settlement uses a separate ledger; tests must prove duplicate/race/rollback and preserve deposit data.
+
+Schedule protection/warnings: select `ScheduleProtectionHttpTest ScheduleWarningHttpTest ReturnReceiptHttpTest QrDemoHttpTest ConcurrencyAndRaceTest`. The two schedule suites use guarded native schemas when `KDRIVE_TEST_DB_URL` is supplied, otherwise isolated H2. Protection asserts native database identity and exercises return/create and return/handover races with database readback; warnings check role visibility and read-only behavior. Keep UI/browser acceptance separate from this native proof.
