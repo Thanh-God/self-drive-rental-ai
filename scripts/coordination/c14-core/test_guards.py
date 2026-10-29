@@ -9,6 +9,24 @@ def load(name):
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
 class RunnerGuards(unittest.TestCase):
+    def test_return_policy_mode_is_explicit_and_bounded(self):
+        module=load('run-browser'); proof=ROOT/'scripts/operations/verify-return-policy.cjs'
+        self.assertEqual(module.proof_settings(proof,qr=True,return_policy=True),'app.return-policy-enabled=true\napp.return-settlement-demo=true\n')
+        self.assertEqual(module.proof_settings(Path('verify-browser.cjs')),'app.return-policy-enabled=false\napp.return-settlement-demo=true\n')
+        self.assertIn('enabled=false',module.proof_settings(Path('verify-qr-deposit.cjs'),qr=True))
+        for kwargs in [{},{'return_policy':True},{'qr':True},{'qr':True,'synthetic':True,'return_policy':True}]:
+            with self.assertRaises(AssertionError):module.proof_settings(proof,**kwargs)
+        with self.assertRaisesRegex(AssertionError,'bounded QR DEMO'):
+            module.proof_settings(Path('verify-qr-deposit.cjs'),qr=True,return_policy=True)
+
+    def test_return_mode_refused_before_output_or_native(self):
+        module=load('run-browser')
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            out=Path(directory)/'new'
+            with self.assertRaisesRegex(AssertionError,'bounded QR DEMO'):
+                self.invoke(module,['--backend-evidence',directory,'--backend-root',directory,'--evidence',str(out),'--return-policy'])
+            self.assertFalse(out.exists())
+
     def test_browser_proof_accepts_repository_script_and_refuses_external_or_missing(self):
         module=load('run-browser')
         proof=ROOT/'scripts/operations/verify-vehicle-admin.cjs'

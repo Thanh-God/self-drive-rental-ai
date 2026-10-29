@@ -8,8 +8,19 @@ def resolve_proof(value):
  assert proof.is_relative_to(REPO/'scripts') and proof.is_file(),'Repository browser proof required'
  return proof
 
+def proof_settings(proof, qr=False, synthetic=False, return_policy=False):
+ assert not(qr and synthetic),'Choose one payment proof'
+ if return_policy:
+  assert qr and not synthetic and proof.name=='verify-return-policy.cjs','Return policy requires bounded QR DEMO return proof'
+ elif qr:assert proof.name=='verify-qr-deposit.cjs','QR mode requires bounded DEMO proof'
+ if proof.name=='verify-return-policy.cjs':assert return_policy,'Return proof requires explicit policy mode'
+ if synthetic:assert proof.name=='verify-booking-deposit.cjs','Synthetic payment requires the bounded deposit proof'
+ return 'app.return-policy-enabled='+str(return_policy).lower()+'\napp.return-settlement-demo=true\n'
+
 def main():
- p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);p.add_argument('--browser-script');p.add_argument('--synthetic-deposit',action='store_true',help='Internal protocol only; never merchant acceptance');p.add_argument('--qr-manual',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);p.add_argument('--browser-script');p.add_argument('--synthetic-deposit',action='store_true',help='Internal protocol only; never merchant acceptance');p.add_argument('--qr-manual',action='store_true');p.add_argument('--return-policy',action='store_true');a=p.parse_args()
+ proof=resolve_proof(a.browser_script)
+ settings=proof_settings(proof,a.qr_manual,a.synthetic_deposit,a.return_policy)
  native=Path(a.backend_evidence).resolve();build=Path(a.backend_root).resolve();out=Path(a.evidence).resolve()
  assert all(x.is_relative_to(REPO/'.runtime') for x in [native,build,out]) and not out.exists()
  f=json.loads((native/'fixture.json').read_text());assert f['name'].startswith('kltn-c14-core-') and f['port']==33676
@@ -19,10 +30,6 @@ def main():
  for rel,sha in json.loads((native/'inputs-before.json').read_text()).items():assert hashlib.sha256((REPO/rel).read_bytes()).hexdigest()==sha,rel
  files=[x for root in ['backend/src','frontend/src','scripts/coordination/c14-core'] for x in (REPO/root).rglob('*') if x.is_file() and '__pycache__' not in x.parts]
  files += [REPO/'frontend'/n for n in ['package.json','package-lock.json','vite.config.js']]
- proof=resolve_proof(a.browser_script)
- assert not(a.synthetic_deposit and a.qr_manual),'Choose one payment proof'
- if a.qr_manual:assert proof.name=='verify-qr-deposit.cjs','QR mode requires bounded DEMO proof'
- if a.synthetic_deposit:assert proof.name=='verify-booking-deposit.cjs','Synthetic payment requires the bounded deposit proof'
  files.append(proof)
  before={x.relative_to(REPO).as_posix():hashlib.sha256(x.read_bytes()).hexdigest() for x in files}
  for port in [33676,8300,5300]:
@@ -61,6 +68,7 @@ def main():
   run(['docker','exec','-e','MYSQL_PWD='+password,f['name'],'mysql','-uroot','-e',f"CREATE DATABASE {schema}; INSERT INTO kdrive_c14_meta.__kdrive_test_fixture_marker VALUES((SELECT COALESCE(MAX(id),0)+1 FROM (SELECT id FROM kdrive_c14_meta.__kdrive_test_fixture_marker) t),'{schema}','{marker}');"])
   (out/'browser-schema.txt').write_text(schema)
   config=out/'application.private.properties';config.write_text(f'server.port=8300\nspring.datasource.url=jdbc:mysql://127.0.0.1:33676/{schema}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC\nspring.datasource.username=root\nspring.datasource.password={password}\napp.jwt-secret=c14-only-test-secret-at-least-32-bytes\napp.seed-enabled=true\napp.seed-password=BranchBookingTestOnly123!\napp.cors-origin=http://127.0.0.1:5300\napp.license-photo-directory={(out/"private-license-photos").as_posix()}\n')
+  with config.open('a') as h:h.write(settings)
   if a.qr_manual:
    with config.open('a') as h:h.write('app.deposit-enabled=true\napp.deposit-method=DEMO_QR_MANUAL\napp.payment-reconcile-ms=86400000\n')
   if a.synthetic_deposit:

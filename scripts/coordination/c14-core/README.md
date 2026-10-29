@@ -107,3 +107,13 @@ related links, USER isolation, wrong-branch denial, actual UI return/readback an
 deliberate failed API request. Screenshots and console evidence stay in the new
 output directory. This does not enable return policy on the website DB or exercise
 the full settlement workflow; native and settlement proofs remain separate.
+
+For same-branch early/on-time return acceptance, use the verified backend copy and
+native evidence with `run-browser.py --qr-manual --return-policy --browser-script
+scripts/operations/verify-return-policy.cjs` and a new runtime evidence directory.
+This explicit mode is restricted to that proof and forces return policy on and
+settlement DEMO on in the isolated schema; other proofs keep return policy off.
+The early case creates the booking, QR DEMO receipt and handover through UI.
+The on-time case uses a labelled past-dated SQL fixture (policy, contract and
+handover), then real UI receipt/completion. It does not claim a past UI booking,
+change the production clock, enable the website DB, or transfer real money.
