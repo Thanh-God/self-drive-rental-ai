@@ -117,3 +117,12 @@ The early case creates the booking, QR DEMO receipt and handover through UI.
 The on-time case uses a labelled past-dated SQL fixture (policy, contract and
 handover), then real UI receipt/completion. It does not claim a past UI booking,
 change the production clock, enable the website DB, or transfer real money.
+
+Late-return desktop acceptance uses the same explicit `--qr-manual --return-policy`
+mode with `--browser-script scripts/operations/verify-return-late.cjs`. It prepares
+labelled past-dated same-branch A/B pairs using policy terms from a real quote,
+then exercises UI return, partial DEMO receipt, Admin waiver, completion/invoice,
+and B handover before/after return; a separate pair proves maintenance still
+blocks handover. These dated fixtures have no deposit requirement; no deposit
+receipt or bank transfer is claimed. Native settlement tests cover server-side
+negative inputs, idempotency, rollback and races separately.

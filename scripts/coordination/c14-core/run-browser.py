@@ -9,11 +9,12 @@ def resolve_proof(value):
  return proof
 
 def proof_settings(proof, qr=False, synthetic=False, return_policy=False):
+ return_proofs={'verify-return-policy.cjs','verify-return-late.cjs'}
  assert not(qr and synthetic),'Choose one payment proof'
  if return_policy:
-  assert qr and not synthetic and proof.name=='verify-return-policy.cjs','Return policy requires bounded QR DEMO return proof'
+  assert qr and not synthetic and proof.name in return_proofs,'Return policy requires bounded QR DEMO return proof'
  elif qr:assert proof.name=='verify-qr-deposit.cjs','QR mode requires bounded DEMO proof'
- if proof.name=='verify-return-policy.cjs':assert return_policy,'Return proof requires explicit policy mode'
+ if proof.name in return_proofs:assert return_policy,'Return proof requires explicit policy mode'
  if synthetic:assert proof.name=='verify-booking-deposit.cjs','Synthetic payment requires the bounded deposit proof'
  return 'app.return-policy-enabled='+str(return_policy).lower()+'\napp.return-settlement-demo=true\n'
 

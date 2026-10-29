@@ -14,6 +14,10 @@ class RunnerGuards(unittest.TestCase):
         self.assertEqual(module.proof_settings(proof,qr=True,return_policy=True),'app.return-policy-enabled=true\napp.return-settlement-demo=true\n')
         self.assertEqual(module.proof_settings(Path('verify-browser.cjs')),'app.return-policy-enabled=false\napp.return-settlement-demo=true\n')
         self.assertIn('enabled=false',module.proof_settings(Path('verify-qr-deposit.cjs'),qr=True))
+        self.assertIn('enabled=true',module.proof_settings(Path('verify-return-late.cjs'),qr=True,return_policy=True))
+        for kwargs in [{},{'qr':True},{'return_policy':True}]:
+            with self.assertRaises(AssertionError):module.proof_settings(Path('verify-return-late.cjs'),**kwargs)
+        with self.assertRaises(AssertionError):module.proof_settings(Path('unbounded.cjs'),qr=True,return_policy=True)
         for kwargs in [{},{'return_policy':True},{'qr':True},{'qr':True,'synthetic':True,'return_policy':True}]:
             with self.assertRaises(AssertionError):module.proof_settings(proof,**kwargs)
         with self.assertRaisesRegex(AssertionError,'bounded QR DEMO'):
