@@ -126,3 +126,20 @@ and B handover before/after return; a separate pair proves maintenance still
 blocks handover. These dated fixtures have no deposit requirement; no deposit
 receipt or bank transfer is claimed. Native settlement tests cover server-side
 negative inputs, idempotency, rollback and races separately.
+
+For a logical recovery rehearsal of a completed synthetic late-return dataset:
+
+```powershell
+python scripts/coordination/c14-core/test_return_restore.py
+python scripts/coordination/c14-core/verify-return-restore.py --linked-evidence .runtime/<run>/browser-a --backend-root .runtime/<verified>/backend-copy --evidence .runtime/<new>/restore-a
+```
+
+The restore runner requires the registered stopped pool, exact image/mount/port
+and source marker. It dumps only the marked browser schema, copies its synthetic
+license photos, restores into a new marked schema, compares every table and photo,
+and starts the matching backend with seed and new return-policy creation disabled.
+It checks health and unchanged data after startup, then stops its own backend/pool.
+Dump, private configuration and photos remain ignored runtime artifacts; never
+publish them. All schemas and volumes are retained. This is a fixture recovery
+proof, not permission to replace the website database, downgrade migrations or
+turn off settlement handling for existing policy snapshots.
