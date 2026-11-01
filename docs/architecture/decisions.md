@@ -12,7 +12,7 @@ Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép 
 |---|---|---|
 | AD-01 | React/Vite, Spring Boot, MySQL, JPA/Hibernate, Security/JWT; tích hợp AI/Map qua backend | Giữ stack cốt lõi; chọn Qwen3 chạy cục bộ qua Ollama (model hiện có8B, cấu hình cho phép4B/8B) cho trích xuất nhu cầu, thay phương án Gemini; giá/lịch/quyền vẫn do backend kiểm tra |
 | AD-02 | Modular monolith, một backend/một database | Vừa sức ba tháng, transaction đơn giản; giữ ranh giới module rõ ràng |
-| AD-03 | Đúng bốn actor; Guest không là role tài khoản | Role USER/STAFF/ADMIN; Gemini/Map là hệ thống ngoài |
+| AD-03 | Đúng bốn actor; Guest không là role tài khoản | Role USER/STAFF/ADMIN; Qwen qua Ollama và OSRM là dịch vụ cục bộ được backend gọi, không là role tài khoản |
 | AD-04 | Backend kiểm soát giá, availability, ID, score và trạng thái | AI giải thích/lập phương án trên dữ liệu cấp sẵn; cần validate output |
 | AD-05 | Backend chia theo nghiệp vụ, bỏ module giữ chỗ staff/admin | Tránh trùng logic theo role; giữ đầy đủ chức năng và pages frontend |
 | AD-06 | Hỗ trợ đa chi nhánh nhận/trả và tuyến xe | Cho phép nhận/trả khác chi nhánh (qua `branch_routes`), theo dõi `current_branch_id` của xe; Staff phân quyền theo chi nhánh trực thuộc |
@@ -35,13 +35,13 @@ Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép 
 
 | ID | Nội dung | Phương án và giới hạn | Chốt trước |
 |---|---|---|---|
-| OP-01 | Quyền dùng AI | AI1 gợi ý xe theo quy tắc chỉ USER; Guest chưa được truy cập. Quyền Guest cho AI parser/hành trình tiếp tục mở | API/UX AI |
+| OP-01 | Quyền dùng AI | MVP gợi ý xe, parser, catalog/tuyến và hành trình chỉ USER; Guest không được truy cập, STAFF/ADMIN không dùng các API dành cho USER. Mở quyền Guest là quyết định tương lai riêng | API/UX AI |
 | OP-02 | Giấy phép lái xe — chốt một phần | Tương thích xe, hệ cũ/mới, còn hiệu lực đến hết thuê, Ảnh JPEG/PNG hai mặt bắt buộc trước gửi yêu cầu thuê; Staff chi nhánh nhận kiểm tra hồ sơ trước xác nhận và vẫn đối chiếu bản gốc khi giao. Ảnh riêng tư, không gửi AI; giữ đến khi khách thay ảnh, xóa bản cũ sau lưu thành công. Thay ảnh/thông tin đặt lại kết quả kiểm tra. Không tra cứu cơ sở dữ liệu quốc gia | Hoàn thiện GPLX/giao nhận |
 | OP-03 | Ngày thuê/giá/cọc — chốt một phần | Đơn mới chọn ngày nhận/trả, tính chênh lệch ngày Việt Nam (17/10 → 21/10 = 4 ngày); được trả hết ngày trả, lịch tiếp theo từ ngày kế tiếp kể cả trả sớm. Đơn cũ giữ giá/quy tắc block 24 giờ đã lưu. VND nguyên đồng, UTC lưu; cọc còn mở | Schema snapshot và booking |
 | OP-04 | PENDING/state machine — chốt một phần | Giữ lịch tối đa 2 giờ; đơn theo ngày không vượt hết ngày nhận, đơn cũ không vượt giờ nhận. Đơn theo ngày chỉ bàn giao trong ngày nhận. Luồng PENDING → CONFIRMED → IN_PROGRESS → RETURNED → COMPLETED; đã có cảnh báo và kiểm tra bảo vệ lịch/đơn kế tiếp khi xe cùng chi nhánh quá hạn chưa trả; chưa hỗ trợ gia hạn, đổi xe hoặc dời lịch đơn kế tiếp. Đơn cùng chi nhánh có snapshot chính sách được xem trước/ghi nhận trả thực tế và khoản vượt hạn Chưa thu; chặn hoàn tất khi chưa xử lý khoản này. Cờ tạo chính sách mới mặc định tắt, xem [chính sách trả xe](../modules/return-policy.md) | ERD và transaction booking |
 | OP-05 | Hợp đồng/hóa đơn — chốt một phần | Đã duyệt hợp đồng khi xác nhận, hóa đơn khi hoàn tất, lưu snapshot; chính sách sửa/phát hành lại và danh mục phụ phí còn mở | Schema và luồng phát hành |
 | OP-06 | Hủy và Admin can thiệp — chốt một phần | User tự hủy trước mốc nhận ít nhất 24 giờ (đơn theo ngày lấy đầu ngày nhận làm mốc), sát giờ Staff xử lý và ghi lý do; Admin can thiệp hủy, không mặc định giao/nhận; điều kiện ngoại lệ chi tiết còn mở | Ma trận quyền chi tiết/state machine |
-| OP-07 | Map provider | Chọn OSRM cục bộ với dữ liệu OpenStreetMap cho định tuyến lái xe; basemap, geocoding và metadata tham quan vẫn cần quyết định riêng; giữ attribution/ODbL và provenance graph | Adapter Map |
+| OP-07 | Map provider | Chọn OSRM cục bộ với dữ liệu OpenStreetMap cho định tuyến lái xe vùng Đà Nẵng–Hội An. Metadata tham quan do Admin quản lý theo [contract](../modules/location-visit-metadata.md); basemap, geocoding và mở rộng coverage cần quyết định riêng. Giữ attribution/ODbL và provenance graph | Adapter Map |
 | OP-08 | JWT/khóa tài khoản — chốt một phần | Đã duyệt access token ngắn hạn, không refresh, kiểm tra trạng thái và token_version, đăng xuất mọi phiên. Source dùng TTL mặc định 30 phút (cấu hình 1–120), localStorage; đây là cấu hình hiện tại, cần đánh giá bảo mật client trước phát hành | Phát hành auth |
 | OP-09 | Fallback itinerary — đã chốt MVP | Không đủ dữ liệu kiểm chứng thì dừng/thử lại; không lưu bản thiếu tuyến, chưa triển khai trình chỉnh sửa thủ công đầy đủ | UI/API itinerary |
 | OP-10 | Môi trường và migration | JDK21, Maven Wrapper, Spring Boot, MySQL8.4; H2 dành cho test riêng. Kiểm kê history/checksum/schema của database dùng chung trước nâng cấp; không tự clean/repair | Nâng cấp môi trường |
@@ -58,7 +58,7 @@ Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép 
 - Hồ sơ sự cố/vi phạm độc lập vòng đời đơn, có thể báo sau khi trả. Phân biệt thiệt hại, căn cứ trách nhiệm, bảo hiểm/bên khác chi trả và yêu cầu bồi thường. Việc báo muộn không có nghĩa được gán sự việc ngoài thời gian khách giữ xe cho khách.
 - Chưa tự tính cọc, phụ phí trễ hạn, lãi/phạt hoặc thu tiền. Hóa đơn không chứng minh đã thanh toán. Tiền VND nguyên đồng; thời điểm UTC, hiển thị Asia/Ho_Chi_Minh.
 - Gia hạn, no-show, tự điều chuyển chưa triển khai; không chuyển trạng thái tùy tiện để giả lập các luồng này.
-- AI bắt đầu sau backend cốt lõi. Chưa chốt Gemini hay mô hình tự train; phải đánh giá dữ liệu/chi phí/schema khi chọn, không tạo bảng huấn luyện dự phòng. Các mô tả Gemini trong kiến trúc/use case là phương án tích hợp ban đầu.
+- AI tích hợp qua backend, giữ giá/lịch/quyền và trạng thái thuê xe tại backend nghiệp vụ. Provider hiện hành là Qwen3 cục bộ qua Ollama, mặc định qwen3:8b, cho phép cấu hình 4B/8B; Gemini là phương án ban đầu, không dùng trong luồng USER hiện tại. Chạy mô hình có sẵn không phải tự train; không thêm bảng huấn luyện dự phòng.
 
 
 ## Trade-off và rủi ro
@@ -68,7 +68,7 @@ Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép 
 | Đặt trùng khi đồng thời | Transaction và khóa xe, truy vấn overlap hiện hành | Tăng thời gian chờ cùng xe; kiểm thử đồng thời trên MySQL |
 | Phụ thuộc vòng giữa module | Service điều phối, DTO, không truy cập chéo repository | Phải rà dependency khi bổ sung luồng phát hành hồ sơ |
 | AI bịa facts/lịch không khả thi | Schema + validation nghiệp vụ, output chỉ tham chiếu dữ liệu được cấp | Không bảo đảm mọi lịch hấp dẫn; cần bộ tình huống đánh giá |
-| Gemini/Map chậm hoặc hết quota | Timeout, giới hạn input/calls, fallback minh bạch | Trải nghiệm giảm khi dịch vụ ngoài lỗi |
+| Qwen/OSRM chậm, bận hoặc không khả dụng | Timeout và giới hạn input/calls; lỗi rõ ràng, giữ biểu mẫu hoặc cho thử lại, không cloud/demo fallback | Model lạnh có thể timeout; snapshot đã lưu vẫn đọc độc lập provider |
 | Lệch schema | Một nguồn Flyway, Hibernate validate | Không sửa migration đã chạy; thay đổi cần migration mới |
 | Quá nhiều công cụ | VS Code là trung tâm; browser, Git, MySQL phục vụ vai trò rõ | Không tận dụng mọi tính năng của IDE khác, đổi lại dễ học và demo |
 | Vượt thời gian/số bảng | Hoàn thành MVP trước, ERD có ngân sách bảng | Dashboard, thông báo, audit nâng cao để sau |
@@ -84,18 +84,18 @@ Admin xem đơn tạo trong khoảng với trạng thái hiện tại, đơn ho�
 
 ## Dữ liệu và xác thực
 
-Tài khoản có ACTIVE/LOCKED; không mở rộng thu thập CCCD. Token ngắn hạn có token_version và thu hồi khi đăng xuất/đổi mật khẩu. Snapshot hợp đồng/hóa đơn là dữ liệu nội bộ tại thời điểm phát hành, không tự khẳng định giá trị pháp lý của chữ ký điện tử. Migration dùng Flyway và Hibernate validate; backup không cấp quyền clean/repair. Phụ phí thông thường không tự chuyển thành hồ sơ sự cố. AI/Map/provider/quota còn phụ thuộc quyết định, không coi mock là tính năng thật.
+Tài khoản có ACTIVE/LOCKED; không mở rộng thu thập CCCD. Token ngắn hạn có token_version và thu hồi khi đăng xuất/đổi mật khẩu. Snapshot hợp đồng/hóa đơn là dữ liệu nội bộ tại thời điểm phát hành, không tự khẳng định giá trị pháp lý của chữ ký điện tử. Migration dùng Flyway và Hibernate validate; backup không cấp quyền clean/repair. Phụ phí thông thường không tự chuyển thành hồ sơ sự cố. Provider AI/định tuyến cục bộ đã chọn; mở rộng phạm vi/quyền và chính sách dữ liệu cần quyết định riêng. Không coi mock là tính năng thật.
 
 ## Gợi ý xe theo quy tắc AI1
 
-Phạm vi đầu tiên chỉ USER, không gọi nhà cung cấp AI hoặc Map. Ngày thuê, tuyến, đủ chỗ và tổng ngân sách gồm phí tuyến là điều kiện bắt buộc. Điểm ngân sách 40%, số chỗ 25%, sở thích 35%; hộp số và tiện nghi là ưu tiên mềm. Công thức có phiên bản và quyền truy cập được mô tả tại [hợp đồng gợi ý xe](../modules/ai-recommendation.md). Recommendation không giữ chỗ; quote/create kiểm tra lại. Parser ngôn ngữ tự nhiên, provider và hành trình thuộc các giai đoạn sau.
+API xếp hạng xe chỉ USER, không gọi mô hình ngôn ngữ hoặc Map trong bước xếp hạng. Ngày thuê, tuyến, đủ chỗ và tổng ngân sách gồm phí tuyến là điều kiện bắt buộc. Điểm ngân sách 40%, số chỗ 25%, sở thích 35%; hộp số và tiện nghi là ưu tiên mềm. Công thức có phiên bản và quyền truy cập được mô tả tại [hợp đồng gợi ý xe](../modules/ai-recommendation.md). Recommendation không giữ chỗ; quote/create kiểm tra lại. Chatbox đã có bước Qwen đọc câu thành bản nháp để USER kiểm tra trước khi chủ động yêu cầu gợi ý; parser và hành trình là các API riêng, không thuộc bước xếp hạng.
 
 
 ## AI cục bộ và dữ liệu tuyến
 
 AI3 MVP dùng graph vùng Đà Nẵng–Hội An; không tuyên bố coverage toàn quốc. Admin quản lý lịch tham quan theo tuần/ngày ngoại lệ, thời lượng ước tính và nguồn kiểm chứng; legacy giữ chưa xác minh. Contract tại [metadata tham quan](../modules/location-visit-metadata.md). USER xem facts/tuyến trong chatbox, không tự lưu itinerary.
 
-Qwen3 cục bộ trích xuất tiêu chí có kiểu, không tự quyết định giá, lịch hoặc hành động đơn thuê. OSRM cung cấp ước tính đường đi theo graph, không cung cấp giao thông trực tiếp, giờ mở cửa hoặc độ nổi tiếng địa điểm. Backend chỉ tính tuyến từ ID địa điểm đang hoạt động; không có tuyến thì không gán quãng đường/thời gian giả hoặc lưu hành trình. Provider mặc định tắt; cấu hình và contract tại [AI cục bộ và định tuyến](../modules/local-ai-routing.md). Chọn provider không tự đóng các quyết định metadata, lưu itinerary hoặc nguồn xu hướng hàng tuần.
+Qwen3 cục bộ trích xuất tiêu chí có kiểu, không tự quyết định giá, lịch hoặc hành động đơn thuê. OSRM cung cấp ước tính đường đi theo graph, không cung cấp giao thông trực tiếp, giờ mở cửa hoặc độ nổi tiếng địa điểm. Backend chỉ tính tuyến từ ID địa điểm đang hoạt động; không có tuyến thì không gán quãng đường/thời gian giả hoặc lưu hành trình. Các cờ AI mặc định tắt; cấu hình và giới hạn hiện hành tại [AI cục bộ và định tuyến](../modules/local-ai-routing.md). Metadata đã có contract và hành trình có luồng lưu snapshot chủ động bên dưới; chưa có nguồn xu hướng hàng tuần.
 
 AI4 MVP chỉ USER: hành trình một ngày, 2–4 điểm trong vùng graph hiện có. Qwen chọn thứ tự ID; backend kiểm lịch mở cửa, thời lượng và từng chặng OSRM. Khách chủ động lưu sau preview; facts thay đổi yêu cầu xem lại bằng409, save không gọi Qwen lần hai. Snapshot được lưu trong ba bảng itinerary đã có và đọc độc lập provider. Không có giá vé, map picker, xu hướng, tối ưu đa ngày hoặc chỉnh sửa hành trình. Xem [contract hành trình](../modules/ai-itinerary.md).
 
