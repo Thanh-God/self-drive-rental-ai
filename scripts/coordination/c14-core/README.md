@@ -143,3 +143,22 @@ Dump, private configuration and photos remain ignored runtime artifacts; never
 publish them. All schemas and volumes are retained. This is a fixture recovery
 proof, not permission to replace the website database, downgrade migrations or
 turn off settlement handling for existing policy snapshots.
+
+QR reconciliation read regression: after building an isolated backend copy with
+`mvnw verify`, run the registered MySQL pool with a fresh evidence directory:
+
+```powershell
+E:/MT_Python/python312/python.exe -X utf8 scripts/coordination/c14-core/run-mysql.py --backend-root .runtime/<run>/build/backend-copy --evidence .runtime/<run>/native --suites QrDemoHttpTest DepositHttpTest CancelBoundaryTest ConcurrencyAndRaceTest MySqlMigrationTest
+```
+
+Prepare the verified historical V1/V2 resources in `<run>/historical-migration`
+as required by the runner; do not substitute current migrations for historical
+ones. The QR suite checks all three reconciliation GETs, ownership/branch
+permissions, unchanged ledger/history/contracts after reads, non-QR omission,
+refund and retry classification, failed-contract recovery, and existing QR
+processing after the new-deposit flag is disabled. The flag-off test temporarily
+changes the test context's configuration fields and restores them in `finally`;
+it does not claim to test a process restart or production deployment.
+Batch-query limits are covered separately by `QrReconciliationReadServiceTest`.
+Native MockMvc/SQL evidence does not constitute browser UI acceptance. Preserve
+frontend test/lint/API-demo build evidence only while its inputs are unchanged.
