@@ -1,5 +1,5 @@
 """Sequential core suites, one owned MySQL fixture, one fresh marked schema per suite."""
-import argparse, hashlib, json, os, shutil, socket, subprocess, time, uuid
+import argparse, hashlib, json, os, shutil, socket, subprocess, sys, time, uuid
 from pathlib import Path
 import xml.etree.ElementTree as ET
 import zipfile
@@ -42,11 +42,22 @@ SUITES = ['ScheduleProtectionHttpTest','ScheduleWarningHttpTest','VehicleSearchT
           'VehicleCatalogHttpServerTest','VehicleAmenityHttpServerTest','VehicleImageHttpServerTest',
           'AccountAssignmentHttpServerTest','IncidentReportIntegrationTest','IncidentReportHttpServerTest',
           'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest',
-          'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest']
+          'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest','LocationPilotImporterMySqlTest']
+
+def validate_pilot_inputs(out, suites):
+    if 'LocationPilotImporterMySqlTest' not in suites:
+        return
+    copied_dir=Path(out).parent/'scripts/ai'
+    for name in ['import_locations_pilot.py','locations-pilot.json']:
+        source=REPO/'scripts/ai'/name
+        copied=copied_dir/name
+        assert copied.is_file(), f'Missing staged pilot input: {copied}'
+        assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(copied.read_bytes()).digest(), f'Pilot input hash mismatch: {name}'
 
 def inputs():
     files = list((REPO/'backend/src').rglob('*')) + list((REPO/'backend/.mvn').rglob('*'))
     files += [REPO/'backend'/n for n in ['pom.xml','mvnw','mvnw.cmd']]
+    files += [REPO/'scripts/ai'/n for n in ['import_locations_pilot.py','locations-pilot.json']]
     files.append(Path(__file__))
     return {p.relative_to(REPO).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()}
 
@@ -60,6 +71,8 @@ def main():
     args=parser.parse_args();build=Path(args.backend_root).resolve();out=Path(args.evidence).resolve()
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
+    selected_suites=args.suites or SUITES
+    validate_pilot_inputs(out,selected_suites)
     previous,pinned=fixture_source(args.reuse_evidence,args.new_fixture_reason,args.fixture_registry)
     if 'LocationRouteHttpServerTest' in (args.suites or SUITES):
         assert args.routing_mode, 'Routing suite requires explicit --routing-mode'
@@ -79,6 +92,7 @@ def main():
     for key in list(env):
         if key.startswith(('KDRIVE_TEST_','KDRIVE_MIGRATION_','SPRING_')):env.pop(key)
     env['JAVA_HOME']='E:/Tools/Java/jdk-21.0.12.1+1'
+    if 'LocationPilotImporterMySqlTest' in selected_suites:env['KDRIVE_PILOT_PYTHON']=sys.executable
     env.pop('KDRIVE_ROUTING_MODE',None)
     if args.routing_mode:env['KDRIVE_ROUTING_MODE']=args.routing_mode
     def run(command,cwd=REPO,log=None,check=True):
@@ -125,7 +139,7 @@ def main():
             assert count.isdecimal() and int(count)>0, 'Existing fixture marker mismatch; do not create or repair markers'
         else:sql(f'CREATE DATABASE IF NOT EXISTS {marker}; CREATE TABLE IF NOT EXISTS {marker}.__kdrive_test_fixture_marker(id INT PRIMARY KEY,target_schema VARCHAR(255),marker_token VARCHAR(255));')
         reports=[]
-        for suite in args.suites or SUITES:
+        for suite in selected_suites:
             schema='kdrive_c14_'+uuid.uuid4().hex[:12]
             sql(f"CREATE DATABASE {schema}; INSERT INTO {marker}.__kdrive_test_fixture_marker VALUES((SELECT COALESCE(MAX(id),0)+1 FROM (SELECT id FROM {marker}.__kdrive_test_fixture_marker) t),'{schema}','{token}');")
             env.update(KDRIVE_TEST_DB_URL=f'jdbc:mysql://127.0.0.1:33676/{schema}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC',

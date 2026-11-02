@@ -114,6 +114,32 @@ class RunnerGuards(unittest.TestCase):
             changed=copy.deepcopy(actual);changed[key]=value
             with self.assertRaises(AssertionError):module.validate_reuse(fixture,changed,{'imageId':'sha256:fixed'})
 
+    def test_pilot_importer_suite_requires_hash_pinned_staged_sources(self):
+        module=load('run-mysql')
+        self.assertIn('LocationPilotImporterMySqlTest',module.SUITES)
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            folder=Path(directory);output=folder/'evidence'/'native';copied=output.parent/'scripts'/'ai'
+            copied.mkdir(parents=True)
+            for name in ['import_locations_pilot.py','locations-pilot.json']:
+                (copied/name).write_bytes((ROOT/'scripts'/'ai'/name).read_bytes())
+            module.validate_pilot_inputs(output,['LocationPilotImporterMySqlTest'])
+            (copied/'locations-pilot.json').write_bytes((copied/'locations-pilot.json').read_bytes()+b' ')
+            with self.assertRaisesRegex(AssertionError,'hash mismatch'):
+                module.validate_pilot_inputs(output,['LocationPilotImporterMySqlTest'])
+            module.validate_pilot_inputs(output,['VehicleSearchTest'])
+            (copied/'locations-pilot.json').unlink()
+            with self.assertRaisesRegex(AssertionError,'Missing staged pilot input'):
+                module.validate_pilot_inputs(output,['LocationPilotImporterMySqlTest'])
+
+    def test_native_entrypoint_refuses_missing_pilot_inputs_before_output_or_native(self):
+        module=load('run-mysql')
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            folder=Path(directory);output=folder/'evidence'/'native';output.parent.mkdir()
+            with self.assertRaisesRegex(AssertionError,'Missing staged pilot input'):
+                self.invoke(module,['--backend-root',str(folder),'--evidence',str(output),
+                                    '--suites','LocationPilotImporterMySqlTest'])
+            self.assertFalse(output.exists())
+
     def test_browser_refuses_existing_output_without_native_commands(self):
         module=load('run-browser')
         with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:

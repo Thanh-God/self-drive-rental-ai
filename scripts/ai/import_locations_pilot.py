@@ -13,10 +13,14 @@ import argparse
 import io
 import json
 import os
+import re
 import sys
 import urllib.error
 import urllib.request
+from datetime import date, datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
+from urllib.parse import urlsplit
 
 # Dam bao output UTF-8 tren Windows console
 if sys.stdout.encoding != 'utf-8':
@@ -44,11 +48,98 @@ def http_request(url, method="GET", token=None, payload=None):
 
 
 def validate_dataset(data):
-    """Kiem tra tinh hop le toan bo dataset JSON truoc khi goi bat ky API nao."""
+    """Validate all importer payloads before any API request can mutate data."""
     errors = []
+    days = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]
+    allowed_states = {"UNKNOWN", "CLOSED", "OPEN_24H", "INTERVALS"}
+
+    def evidence_valid(evidence, prefix):
+        if evidence is None:
+            return False
+        if not isinstance(evidence, dict):
+            errors.append(f"{prefix}: evidence phai la object hoac null.")
+            return False
+        url = evidence.get("url")
+        verified_at = evidence.get("verifiedAt")
+        if not isinstance(url, str) or not url or len(url) > 500:
+            errors.append(f"{prefix}: URL evidence khong hop le.")
+            return False
+        try:
+            parsed = urlsplit(url)
+            if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
+                errors.append(f"{prefix}: URL evidence phai la http/https va khong chua userinfo.")
+        except ValueError:
+            errors.append(f"{prefix}: URL evidence khong hop le.")
+        if not isinstance(verified_at, str):
+            errors.append(f"{prefix}: verifiedAt phai la ISO-8601 co timezone.")
+            return False
+        try:
+            parsed_time = datetime.fromisoformat(verified_at.replace("Z", "+00:00"))
+            if parsed_time.tzinfo is None:
+                raise ValueError("timezone missing")
+            utc_time = parsed_time.astimezone(timezone.utc)
+            if utc_time < datetime(2000, 1, 1, tzinfo=timezone.utc) or utc_time > datetime.now(timezone.utc):
+                errors.append(f"{prefix}: verifiedAt nam ngoai khoang hop le.")
+        except ValueError:
+            errors.append(f"{prefix}: verifiedAt phai la ISO-8601 co timezone.")
+            return False
+        return True
+
+    def validate_hours(value, prefix):
+        if not isinstance(value, dict):
+            errors.append(f"{prefix}: hours phai la object.")
+            return "UNKNOWN", []
+        state = value.get("state")
+        intervals = value.get("intervals")
+        if not isinstance(state, str) or state not in allowed_states:
+            errors.append(f"{prefix}: state hours khong hop le.")
+            state = "UNKNOWN"
+        if not isinstance(intervals, list) or len(intervals) > 4:
+            errors.append(f"{prefix}: intervals phai la danh sach toi da 4 khoang.")
+            intervals = []
+        if state == "INTERVALS" and not intervals:
+            errors.append(f"{prefix}: INTERVALS can it nhat mot khoang.")
+        if state != "INTERVALS" and intervals:
+            errors.append(f"{prefix}: chi INTERVALS moi duoc co khoang gio.")
+
+        parsed_intervals = []
+        previous_end = -1
+        for index, interval in enumerate(intervals):
+            interval_prefix = f"{prefix}.intervals[{index}]"
+            if not isinstance(interval, dict):
+                errors.append(f"{interval_prefix}: khoang gio phai la object.")
+                continue
+            start = interval.get("start")
+            end = interval.get("end")
+            next_day = interval.get("nextDay")
+            if not isinstance(start, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", start):
+                errors.append(f"{interval_prefix}: start phai theo HH:mm.")
+                continue
+            if not isinstance(end, str) or not re.fullmatch(r"(?:[01][0-9]|2[0-3]):[0-5][0-9]", end):
+                errors.append(f"{interval_prefix}: end phai theo HH:mm.")
+                continue
+            if not isinstance(next_day, bool):
+                errors.append(f"{interval_prefix}: nextDay phai la boolean.")
+                continue
+            start_minute = int(start[:2]) * 60 + int(start[3:])
+            end_minute = int(end[:2]) * 60 + int(end[3:]) + (1440 if next_day else 0)
+            if end_minute <= start_minute or end_minute - start_minute > 1440 or start_minute < previous_end:
+                errors.append(f"{interval_prefix}: khoang gio phai tang dan, khong chong lan va dai toi da 24 gio.")
+            previous_end = end_minute
+            parsed_intervals.append((start_minute, end_minute, end, next_day))
+        return state, parsed_intervals
+
+    def check_boundary(previous, current, prefix):
+        if previous[0] != "INTERVALS" or current[0] in {"UNKNOWN", "CLOSED"}:
+            return
+        first_start = 0 if current[0] == "OPEN_24H" else current[1][0][0]
+        for _, _, end, next_day in previous[1]:
+            end_minute = int(end[:2]) * 60 + int(end[3:])
+            if next_day and end_minute > first_start:
+                errors.append(f"{prefix}: khoang qua dem chong voi lich ngay ke tiep.")
+
     if not isinstance(data, dict):
         return ["Dataset phai la JSON object."]
-
     if data.get("schemaVersion") != "kdrive-locations-pilot-v1":
         errors.append(f"schemaVersion khong hop le: {data.get('schemaVersion')}")
 
@@ -58,42 +149,120 @@ def validate_dataset(data):
         return errors
 
     seen_names = set()
-    # Bounding box Da Nang - Hoi An: [107.4, 15.4, 108.8, 16.7]
-    min_lat, max_lat = 15.4, 16.7
-    min_lng, max_lng = 107.4, 108.8
+    for index, location in enumerate(locations):
+        prefix = f"locations[{index}]"
+        if not isinstance(location, dict):
+            errors.append(f"{prefix}: location phai la object.")
+            continue
 
-    for i, loc in enumerate(locations):
-        prefix = f"locations[{i}]"
-        name = loc.get("name")
-        if not name or not isinstance(name, str):
-            errors.append(f"{prefix}: thieu truong name hop le.")
-        elif name in seen_names:
+        name = location.get("name")
+        if not isinstance(name, str) or not name.strip() or len(name.strip()) > 200:
+            errors.append(f"{prefix}: name phai co 1-200 ky tu.")
+        elif name.strip().casefold() in seen_names:
             errors.append(f"{prefix}: trung lap ten dia diem '{name}'.")
         else:
-            seen_names.add(name)
+            seen_names.add(name.strip().casefold())
 
-        if not loc.get("categoryName"):
-            errors.append(f"{prefix}: thieu categoryName.")
+        category = location.get("categoryName")
+        if not isinstance(category, str) or not category.strip() or len(category.strip()) > 100:
+            errors.append(f"{prefix}: categoryName phai co 1-100 ky tu.")
+        if not isinstance(location.get("status"), str) or location["status"] not in {"ACTIVE", "INACTIVE"}:
+            errors.append(f"{prefix}: status phai la ACTIVE hoac INACTIVE.")
 
-        lat = loc.get("latitude")
-        lng = loc.get("longitude")
-        if lat is None or not (min_lat <= lat <= max_lat):
-            errors.append(f"{prefix}: vi do {lat} nam ngoai vung Da Nang - Hoi An ({min_lat}-{max_lat}).")
-        if lng is None or not (min_lng <= lng <= max_lng):
-            errors.append(f"{prefix}: kinh do {lng} nam ngoai vung Da Nang - Hoi An ({min_lng}-{max_lng}).")
+        provenance = location.get("provenance")
+        if not isinstance(provenance, dict):
+            errors.append(f"{prefix}: provenance phai la object.")
+            provenance = {}
+        for field in ("address", "coordinatesSource"):
+            value = provenance.get(field)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{prefix}: provenance.{field} khong duoc de trong.")
 
-        meta = loc.get("metadata")
-        if meta is not None:
-            if not isinstance(meta, dict):
-                errors.append(f"{prefix}: metadata phai la object.")
+        for field, minimum, maximum, label in (
+            ("latitude", Decimal("15.4"), Decimal("16.7"), "vi do"),
+            ("longitude", Decimal("107.4"), Decimal("108.8"), "kinh do"),
+        ):
+            value = location.get(field)
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
+                errors.append(f"{prefix}: {label} phai la so huu han.")
+                continue
+            try:
+                number = Decimal(str(value))
+                if not number.is_finite() or number < minimum or number > maximum:
+                    errors.append(f"{prefix}: {label} nam ngoai vung Da Nang - Hoi An.")
+                if number.as_tuple().exponent < -7:
+                    errors.append(f"{prefix}: {label} khong duoc co qua 7 chu so thap phan.")
+            except InvalidOperation:
+                errors.append(f"{prefix}: {label} khong hop le.")
+
+        metadata = location.get("metadata")
+        if not isinstance(metadata, dict):
+            errors.append(f"{prefix}: metadata phai la object de bieu dien UNKNOWN/null ro rang.")
+            continue
+        if metadata.get("timezone") != "Asia/Ho_Chi_Minh":
+            errors.append(f"{prefix}: timezone phai la Asia/Ho_Chi_Minh.")
+
+        weekly = metadata.get("weekly")
+        if not isinstance(weekly, dict):
+            errors.append(f"{prefix}: weekly phai la object.")
+            weekly = {}
+        unknown_days = set(weekly) - set(days)
+        if unknown_days:
+            errors.append(f"{prefix}: weekly co ngay khong hop le: {sorted(unknown_days)}.")
+        parsed_weekly = {}
+        for day in days:
+            parsed_weekly[day] = validate_hours(
+                weekly.get(day, {"state": "UNKNOWN", "intervals": []}),
+                f"{prefix}.weekly.{day}",
+            )
+        for index, day in enumerate(days):
+            check_boundary(parsed_weekly[days[index - 1]], parsed_weekly[day], f"{prefix}.weekly.{day}")
+
+        exceptions = metadata.get("exceptions")
+        if not isinstance(exceptions, dict) or len(exceptions) > 60:
+            errors.append(f"{prefix}: exceptions phai la object toi da 60 ngay.")
+            exceptions = {}
+        parsed_exceptions = {}
+        for date_text, hours in exceptions.items():
+            try:
+                exception_date = date.fromisoformat(date_text)
+                if exception_date.isoformat() != date_text or not 1900 <= exception_date.year <= 2200:
+                    raise ValueError("invalid date")
+            except (TypeError, ValueError):
+                errors.append(f"{prefix}: ngay exception '{date_text}' khong hop le.")
+                continue
+            parsed_exceptions[exception_date] = validate_hours(hours, f"{prefix}.exceptions.{date_text}")
+        for exception_date, hours in parsed_exceptions.items():
+            previous = parsed_exceptions.get(exception_date.fromordinal(exception_date.toordinal() - 1),
+                                              parsed_weekly[days[exception_date.weekday() - 1]])
+            following = parsed_exceptions.get(exception_date.fromordinal(exception_date.toordinal() + 1),
+                                               parsed_weekly[days[(exception_date.weekday() + 1) % 7]])
+            check_boundary(previous, hours, f"{prefix}.exceptions.{exception_date}")
+            check_boundary(hours, following, f"{prefix}.exceptions.{exception_date}")
+
+        all_hours = list(parsed_weekly.values()) + list(parsed_exceptions.values())
+        has_known_hours = any(state != "UNKNOWN" for state, _ in all_hours)
+        hours_evidence = metadata.get("hoursEvidence")
+        if has_known_hours and hours_evidence is None:
+            errors.append(f"{prefix}: co gio da biet nhung thieu hoursEvidence.")
+        elif not has_known_hours and hours_evidence is not None:
+            errors.append(f"{prefix}: khong co gio da biet thi hoursEvidence phai la null.")
+        elif hours_evidence is not None:
+            evidence_valid(hours_evidence, f"{prefix}.hoursEvidence")
+
+        duration = metadata.get("durationMinutes")
+        duration_evidence = metadata.get("durationEvidence")
+        if duration is not None:
+            if isinstance(duration, bool) or not isinstance(duration, int) or not 1 <= duration <= 1440:
+                errors.append(f"{prefix}: durationMinutes phai la so nguyen tu 1 den 1440.")
+            if not isinstance(provenance.get("durationBasis"), str) or not provenance["durationBasis"].strip():
+                errors.append(f"{prefix}: durationMinutes can provenance.durationBasis.")
+            if duration_evidence is None:
+                errors.append(f"{prefix}: co durationMinutes nhung thieu durationEvidence.")
             else:
-                if meta.get("timezone") != "Asia/Ho_Chi_Minh":
-                    errors.append(f"{prefix}: timezone phai la Asia/Ho_Chi_Minh.")
-                dur = meta.get("durationMinutes")
-                if dur is not None and (not isinstance(dur, int) or dur <= 0 or dur > 1440):
-                    errors.append(f"{prefix}: durationMinutes phai tu 1 den 1440.")
-                if dur is not None and not meta.get("durationEvidence"):
-                    errors.append(f"{prefix}: co durationMinutes nhung thieu durationEvidence.")
+                evidence_valid(duration_evidence, f"{prefix}.durationEvidence")
+        elif duration_evidence is not None:
+            errors.append(f"{prefix}: durationEvidence phai la null khi durationMinutes la null.")
 
     return errors
 
@@ -202,6 +371,14 @@ def import_pilot_locations(json_path, base_url, token, dry_run=True):
     if status != 200:
         report["errors"].append(f"Khong the doc danh muc dia diem: HTTP {status} ({categories})")
         return report
+    if not isinstance(categories, list) or any(
+        not isinstance(category, dict)
+        or not isinstance(category.get("name"), str)
+        or not isinstance(category.get("id"), str)
+        for category in categories
+    ):
+        report["errors"].append("Danh sach danh muc dia diem tu API khong hop le.")
+        return report
 
     category_map = {c["name"]: c["id"] for c in categories}
 
@@ -216,17 +393,25 @@ def import_pilot_locations(json_path, base_url, token, dry_run=True):
                 category_map[cat_name] = f"dry-run-cat-{cat_name}"
             else:
                 c_status, c_res = http_request(cat_url, method="POST", token=token, payload={"name": cat_name})
-                if c_status in (200, 201) and "id" in c_res:
+                if c_status in (200, 201) and isinstance(c_res, dict) and isinstance(c_res.get("id"), str) and c_res["id"]:
                     category_map[cat_name] = c_res["id"]
                     report["categoriesCreated"].append(cat_name)
                 else:
                     report["errors"].append(f"Loi tao danh muc '{cat_name}': {c_res}")
+    if report["errors"]:
+        return report
 
     # 4. Lay danh sach dia diem hien co
     loc_url = f"{base_url}/api/v1/admin/locations"
     status, existing_locations = http_request(loc_url, method="GET", token=token)
     if status != 200:
         report["errors"].append(f"Khong the doc danh sach dia diem: HTTP {status} ({existing_locations})")
+        return report
+    if not isinstance(existing_locations, list) or any(
+        not isinstance(location, dict) or not isinstance(location.get("name"), str)
+        for location in existing_locations
+    ):
+        report["errors"].append("Danh sach dia diem tu API khong hop le.")
         return report
 
     existing_by_name = {loc["name"]: loc for loc in existing_locations}
@@ -237,7 +422,7 @@ def import_pilot_locations(json_path, base_url, token, dry_run=True):
         cat_id = category_map.get(loc["categoryName"])
         lat = round(float(loc["latitude"]), 7)
         lng = round(float(loc["longitude"]), 7)
-        status_val = loc.get("status", "ACTIVE")
+        status_val = loc["status"]
         meta = loc.get("metadata")
 
         payload = {
@@ -251,9 +436,10 @@ def import_pilot_locations(json_path, base_url, token, dry_run=True):
 
         if name in existing_by_name:
             existing = existing_by_name[name]
-            ex_lat = round(float(existing["latitude"]), 7)
-            ex_lng = round(float(existing["longitude"]), 7)
-            coords_match = abs(ex_lat - lat) < 1e-5 and abs(ex_lng - lng) < 1e-5
+            coords_match = (
+                Decimal(str(existing["latitude"])) == Decimal(str(loc["latitude"]))
+                and Decimal(str(existing["longitude"])) == Decimal(str(loc["longitude"]))
+            )
             category_match = existing.get("categoryId") == cat_id
             status_match = existing.get("status") == status_val
             meta_match = metadata_matches(existing.get("metadata"), meta)
@@ -266,7 +452,10 @@ def import_pilot_locations(json_path, base_url, token, dry_run=True):
             else:
                 conflict_reasons = []
                 if not coords_match:
-                    conflict_reasons.append(f"coordinates diff (server: {ex_lat},{ex_lng} vs pilot: {lat},{lng})")
+                    conflict_reasons.append(
+                        f"coordinates diff (server: {existing.get('latitude')},{existing.get('longitude')} "
+                        f"vs pilot: {loc['latitude']},{loc['longitude']})"
+                    )
                 if not category_match:
                     conflict_reasons.append(f"category diff (server: {existing.get('categoryId')} vs pilot: {cat_id})")
                 if not status_match:
@@ -283,7 +472,7 @@ def import_pilot_locations(json_path, base_url, token, dry_run=True):
                 report["locationsCreated"].append({"name": name, "status": "[DRY-RUN] Plan to create"})
             else:
                 l_status, l_res = http_request(loc_url, method="POST", token=token, payload=payload)
-                if l_status in (200, 201) and "id" in l_res:
+                if l_status in (200, 201) and isinstance(l_res, dict) and isinstance(l_res.get("id"), str) and l_res["id"]:
                     report["locationsCreated"].append({"name": name, "id": l_res["id"]})
                 else:
                     report["errors"].append(f"Loi tao dia diem '{name}': HTTP {l_status} - {l_res}")

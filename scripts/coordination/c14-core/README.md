@@ -33,11 +33,24 @@ Prerequisites: Docker, JDK 21, Maven Wrapper cache, Node/npm dependencies,
 Python 3.12 and Playwright Chromium. Configure runtime executable paths in the
 runner for the machine being used. Run from the repository root.
 
+For the pilot-location importer, select `--suites LocationPilotImporterMySqlTest`
+in `run-mysql.py`. This test starts the real Spring API on a marked MySQL schema
+and invokes the repository's Python importer. It checks invalid-input preflight,
+read-only dry-run, a deliberately injected HTTP 503 after three persisted
+locations, recovery, idempotency, exact-coordinate conflict preservation, and
+database/API readback. The proxy injects only the adverse response; successful
+requests still reach the real application and MySQL. This is not a source review,
+route/snapping proof, vehicle-amenity verification, or approval to apply the pilot
+to the website database.
+
 Create a new directory under `.runtime/`, with an exact copy of `backend/src`,
 `backend/.mvn`, `backend/pom.xml` and both Maven wrappers in `evidence/backend-copy`.
 Also copy `scripts/ai/locations-pilot.json` to `scripts/ai/locations-pilot.json`
 beside the backend-copy directory (for example `evidence/scripts/ai/locations-pilot.json`),
-preserving its hash: the dataset regression suite resolves it relative to the backend.
+preserving its hash. For `LocationPilotImporterMySqlTest`, also copy
+`scripts/ai/import_locations_pilot.py` to `evidence/scripts/ai/import_locations_pilot.py`.
+The runner refuses missing or hash-mismatched copies and records both source files
+in its input provenance. The native test uses the runner's Python interpreter.
 Run `verify` on that copy before running native suites. Put the genuine historical
 V1/V2 migration snapshot in `evidence/historical-migration` for the failed partial
 migration probe. Retrieve it from the appropriate repository revision; do not

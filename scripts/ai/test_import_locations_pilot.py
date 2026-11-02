@@ -9,9 +9,11 @@ Kiem thu tu dong cho script import_locations_pilot.py (F06):
 
 import http.server
 import json
+import tempfile
 import threading
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from import_locations_pilot import (
     validate_dataset,
@@ -168,7 +170,7 @@ class ImportLocationsPilotTest(unittest.TestCase):
         json_path = Path(__file__).parent / "locations-pilot.json"
         # Thay doi toa do cua 1 dia diem tren mock server de gia lap facts bi drift
         orig_lat = MockBackendHandler.locations[0]["latitude"]
-        MockBackendHandler.locations[0]["latitude"] = 16.5555555  # Toa do khac
+        MockBackendHandler.locations[0]["latitude"] = orig_lat + 0.000001
 
         res = import_pilot_locations(json_path, self.base_url, token="valid-admin-token", dry_run=False)
         self.assertEqual(len(res["locationsConflict"]), 1, "Phai phat hien conflict do toa do bi drift.")
@@ -176,6 +178,38 @@ class ImportLocationsPilotTest(unittest.TestCase):
 
         # Restore
         MockBackendHandler.locations[0]["latitude"] = orig_lat
+
+    def test_11_malformed_dataset_is_rejected_before_http(self):
+        source = Path(__file__).parent / "locations-pilot.json"
+        data = json.loads(source.read_text(encoding="utf-8"))
+        data["locations"][-1]["metadata"]["weekly"]["MONDAY"] = {
+            "state": "INTERVALS",
+            "intervals": [{"start": "99:00", "end": "17:00", "nextDay": False}],
+        }
+        data["locations"][0]["latitude"] = True
+        data["locations"][1]["status"] = []
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "invalid.json"
+            path.write_text(json.dumps(data), encoding="utf-8")
+            with patch("import_locations_pilot.http_request") as request:
+                report = import_pilot_locations(path, "http://127.0.0.1:1", "admin-token", dry_run=False)
+
+        self.assertFalse(report["validationSuccess"])
+        self.assertTrue(any("vi do" in error for error in report["errors"]))
+        self.assertTrue(any("status" in error for error in report["errors"]))
+        self.assertTrue(any("start" in error for error in report["errors"]))
+        request.assert_not_called()
+
+    def test_12_non_object_values_do_not_crash_validation(self):
+        data = json.loads((Path(__file__).parent / "locations-pilot.json").read_text(encoding="utf-8"))
+        data["locations"][0]["metadata"]["weekly"]["MONDAY"]["state"] = []
+        data["locations"][0]["metadata"]["exceptions"] = {"not-a-date": {"state": "CLOSED", "intervals": []}}
+
+        errors = validate_dataset(data)
+
+        self.assertTrue(any("state" in error for error in errors))
+        self.assertTrue(any("ngay exception" in error for error in errors))
 
     def test_08_adverse_probe_metadata_matches_weekly_and_exceptions(self):
         m_base = {
@@ -265,4 +299,3 @@ class ImportLocationsPilotTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-
