@@ -44,22 +44,38 @@ SUITES = ['ScheduleProtectionHttpTest','ScheduleWarningHttpTest','VehicleSearchT
           'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest',
           'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest','LocationPilotImporterMySqlTest']
 
-def validate_pilot_inputs(out, suites):
-    if 'LocationPilotImporterMySqlTest' not in suites:
-        return
-    copied_dir=Path(out).parent/'scripts/ai'
-    for name in ['import_locations_pilot.py','locations-pilot.json']:
+PILOT_IMPORTER_SUITE = 'LocationPilotImporterMySqlTest'
+PILOT_INPUT_NAMES = ['import_locations_pilot.py', 'locations-pilot.json']
+
+def validate_pilot_inputs(backend_root, suites):
+    if PILOT_IMPORTER_SUITE not in suites:
+        return {}
+    # The Java test resolves these files from user.dir/../scripts/ai.
+    copied_dir=Path(backend_root).resolve().parent/'scripts'/'ai'
+    pinned={}
+    for name in PILOT_INPUT_NAMES:
         source=REPO/'scripts/ai'/name
         copied=copied_dir/name
         assert copied.is_file(), f'Missing staged pilot input: {copied}'
-        assert hashlib.sha256(source.read_bytes()).digest()==hashlib.sha256(copied.read_bytes()).digest(), f'Pilot input hash mismatch: {name}'
+        source_hash=hashlib.sha256(source.read_bytes()).hexdigest()
+        copied_hash=hashlib.sha256(copied.read_bytes()).hexdigest()
+        assert copied_hash==source_hash, f'Pilot input hash mismatch at execution path: {copied}'
+        pinned[source.relative_to(REPO).as_posix()]=source_hash
+        pinned[copied.relative_to(REPO).as_posix()]=copied_hash
+    return pinned
 
-def inputs():
+def inputs(backend_root=None, suites=()):
     files = list((REPO/'backend/src').rglob('*')) + list((REPO/'backend/.mvn').rglob('*'))
     files += [REPO/'backend'/n for n in ['pom.xml','mvnw','mvnw.cmd']]
     files += [REPO/'scripts/ai'/n for n in ['import_locations_pilot.py','locations-pilot.json']]
     files.append(Path(__file__))
+    if backend_root is not None and PILOT_IMPORTER_SUITE in suites:
+        staged_dir=Path(backend_root).resolve().parent/'scripts'/'ai'
+        files += [staged_dir/name for name in PILOT_INPUT_NAMES]
     return {p.relative_to(REPO).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()}
+
+def assert_inputs_unchanged(expected, backend_root, suites):
+    assert expected==inputs(backend_root,suites), 'Source or staged pilot input drift'
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--backend-root',required=True)
@@ -72,7 +88,7 @@ def main():
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
     selected_suites=args.suites or SUITES
-    validate_pilot_inputs(out,selected_suites)
+    pilot_inputs=validate_pilot_inputs(build,selected_suites)
     previous,pinned=fixture_source(args.reuse_evidence,args.new_fixture_reason,args.fixture_registry)
     if 'LocationRouteHttpServerTest' in (args.suites or SUITES):
         assert args.routing_mode, 'Routing suite requires explicit --routing-mode'
@@ -114,7 +130,9 @@ def main():
     else:
         assert name not in run(['docker','ps','-a','--format','{{.Names}}']).stdout.decode().splitlines()
         assert volume not in run(['docker','volume','ls','--format','{{.Name}}']).stdout.decode().splitlines()
-    before=inputs();out.mkdir(parents=True)
+    before=inputs(build,selected_suites)
+    assert all(before.get(path)==value for path,value in pilot_inputs.items()), 'Pilot inputs drifted before native execution'
+    out.mkdir(parents=True)
     (out/'inputs-before.json').write_text(json.dumps(before,indent=2))
     private=out/'mysql.private.env';private.write_text('MYSQL_ROOT_PASSWORD='+password+'\nMYSQL_DATABASE=kdrive_c14_core\n')
     (out/'marker.private.token').write_text(token)
@@ -171,7 +189,7 @@ def main():
             for entry in z.namelist():
                 if entry.startswith('BOOT-INF/classes/') and not entry.endswith('/'):
                     rel=entry.removeprefix('BOOT-INF/classes/');assert z.read(entry)==(build/'target/classes'/rel).read_bytes(),rel;matched.append(rel)
-        assert before==inputs(),'Source drift'
+        assert_inputs_unchanged(before,build,selected_suites)
         (out/'jar-provenance.json').write_text(json.dumps({'jarSHA256':hashlib.sha256(jar.read_bytes()).hexdigest(),'matchedEntries':matched},indent=2))
         final={'status':'PASS C14 native scoped','tests':sum(r['counts'][0] for r in reports),'skips':0,'suites':reports}
     finally:

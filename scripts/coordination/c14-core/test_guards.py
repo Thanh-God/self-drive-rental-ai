@@ -114,31 +114,98 @@ class RunnerGuards(unittest.TestCase):
             changed=copy.deepcopy(actual);changed[key]=value
             with self.assertRaises(AssertionError):module.validate_reuse(fixture,changed,{'imageId':'sha256:fixed'})
 
-    def test_pilot_importer_suite_requires_hash_pinned_staged_sources(self):
+    def test_pilot_importer_suite_pins_files_at_java_execution_path(self):
         module=load('run-mysql')
-        self.assertIn('LocationPilotImporterMySqlTest',module.SUITES)
+        self.assertIn(module.PILOT_IMPORTER_SUITE,module.SUITES)
         with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
-            folder=Path(directory);output=folder/'evidence'/'native';copied=output.parent/'scripts'/'ai'
+            folder=Path(directory);backend=folder/'build-parent'/'backend-copy';backend.mkdir(parents=True)
+            copied=backend.parent/'scripts'/'ai'
             copied.mkdir(parents=True)
-            for name in ['import_locations_pilot.py','locations-pilot.json']:
-                (copied/name).write_bytes((ROOT/'scripts'/'ai'/name).read_bytes())
-            module.validate_pilot_inputs(output,['LocationPilotImporterMySqlTest'])
+            output_copies=folder/'different-evidence-parent'/'scripts'/'ai'
+            output_copies.mkdir(parents=True)
+            for name in module.PILOT_INPUT_NAMES:
+                content=(ROOT/'scripts'/'ai'/name).read_bytes()
+                (copied/name).write_bytes(content)
+                (output_copies/name).write_bytes(content+b' decoy')
+            pinned=module.validate_pilot_inputs(backend,[module.PILOT_IMPORTER_SUITE])
+            expected_paths={
+                path.relative_to(ROOT).as_posix()
+                for name in module.PILOT_INPUT_NAMES
+                for path in (ROOT/'scripts'/'ai'/name,copied/name)
+            }
+            self.assertEqual(set(pinned),expected_paths)
             (copied/'locations-pilot.json').write_bytes((copied/'locations-pilot.json').read_bytes()+b' ')
-            with self.assertRaisesRegex(AssertionError,'hash mismatch'):
-                module.validate_pilot_inputs(output,['LocationPilotImporterMySqlTest'])
-            module.validate_pilot_inputs(output,['VehicleSearchTest'])
-            (copied/'locations-pilot.json').unlink()
-            with self.assertRaisesRegex(AssertionError,'Missing staged pilot input'):
-                module.validate_pilot_inputs(output,['LocationPilotImporterMySqlTest'])
+            with self.assertRaisesRegex(AssertionError,'hash mismatch at execution path'):
+                module.validate_pilot_inputs(backend,[module.PILOT_IMPORTER_SUITE])
+            self.assertEqual(module.validate_pilot_inputs(backend,['VehicleSearchTest']),{})
 
-    def test_native_entrypoint_refuses_missing_pilot_inputs_before_output_or_native(self):
+    def test_native_entrypoint_uses_build_parent_and_refuses_missing_or_drifted_inputs(self):
         module=load('run-mysql')
         with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
-            folder=Path(directory);output=folder/'evidence'/'native';output.parent.mkdir()
-            with self.assertRaisesRegex(AssertionError,'Missing staged pilot input'):
-                self.invoke(module,['--backend-root',str(folder),'--evidence',str(output),
-                                    '--suites','LocationPilotImporterMySqlTest'])
-            self.assertFalse(output.exists())
+            root=Path(directory)
+
+            def snapshot():
+                return {
+                    path.relative_to(root).as_posix():path.read_bytes()
+                    for path in root.rglob('*') if path.is_file()
+                }
+
+            for state in ('valid','missing','drifted'):
+                with self.subTest(state=state):
+                    case=root/state;case.mkdir()
+                    backend=case/'build-parent'/'backend-copy';backend.mkdir(parents=True)
+                    output_parent=case/'different-evidence-parent'
+                    output=output_parent/'native'
+                    decoy=output_parent/'scripts'/'ai';decoy.mkdir(parents=True)
+                    for name in module.PILOT_INPUT_NAMES:
+                        (decoy/name).write_bytes((ROOT/'scripts'/'ai'/name).read_bytes())
+
+                    actual=backend.parent/'scripts'/'ai'
+                    if state != 'missing':
+                        actual.mkdir(parents=True)
+                        for name in module.PILOT_INPUT_NAMES:
+                            content=(ROOT/'scripts'/'ai'/name).read_bytes()
+                            if state == 'drifted' and name == 'import_locations_pilot.py':
+                                content += b'\n# build-side drift\n'
+                            (actual/name).write_bytes(content)
+
+                    before=snapshot()
+                    arguments=[
+                        '--backend-root',str(backend),
+                        '--evidence',str(output),
+                        '--suites',module.PILOT_IMPORTER_SUITE,
+                    ]
+                    with patch.object(sys,'argv',['runner']+arguments), \
+                            patch.object(module.subprocess,'run') as native, \
+                            patch.object(module,'fixture_source',side_effect=RuntimeError('fixture boundary reached')) as fixture:
+                        if state == 'valid':
+                            with self.assertRaisesRegex(RuntimeError,'fixture boundary reached'):
+                                module.main()
+                            fixture.assert_called_once()
+                        else:
+                            expected='Missing staged pilot input' if state == 'missing' else 'hash mismatch at execution path'
+                            with self.assertRaisesRegex(AssertionError,expected):
+                                module.main()
+                            fixture.assert_not_called()
+                        native.assert_not_called()
+
+                    self.assertFalse(output.exists())
+                    self.assertEqual(snapshot(),before)
+
+    def test_native_input_manifest_detects_staged_file_drift_after_run(self):
+        module=load('run-mysql')
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            folder=Path(directory);backend=folder/'backend-copy';backend.mkdir()
+            copied=backend.parent/'scripts'/'ai';copied.mkdir(parents=True)
+            for name in module.PILOT_INPUT_NAMES:
+                (copied/name).write_bytes((ROOT/'scripts'/'ai'/name).read_bytes())
+            module.validate_pilot_inputs(backend,[module.PILOT_IMPORTER_SUITE])
+            before=module.inputs(backend,[module.PILOT_IMPORTER_SUITE])
+            (copied/'import_locations_pilot.py').write_bytes(
+                (copied/'import_locations_pilot.py').read_bytes()+b'\n# post-run drift\n'
+            )
+            with self.assertRaisesRegex(AssertionError,'Source or staged pilot input drift'):
+                module.assert_inputs_unchanged(before,backend,[module.PILOT_IMPORTER_SUITE])
 
     def test_browser_refuses_existing_output_without_native_commands(self):
         module=load('run-browser')
