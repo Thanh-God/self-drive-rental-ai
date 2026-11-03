@@ -16,8 +16,8 @@ const urgencyWarnings = Object.freeze({
   EXPIRED: 'Đã hết hạn đối soát',
 });
 const timingWarnings = Object.freeze({
-  TRANSFER_LATE: 'Có khoản chuyển sau hạn đóng cọc',
-  VERIFICATION_LATE: 'Xác minh sau hạn đối soát',
+  TRANSFER_LATE: 'Có khoản chuyển từ hạn đóng cọc trở đi',
+  VERIFICATION_LATE: 'Xác minh từ hạn đối soát trở đi',
 });
 
 export function qrReconciliationStageLabel(summary) {

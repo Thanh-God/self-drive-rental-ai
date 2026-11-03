@@ -39,8 +39,8 @@ test('backend reconciliation warnings are translated without inferring unknown v
   }), [
     'Sắp đến hạn đối soát',
     'Cần tiếp tục xử lý đối soát',
-    'Có khoản chuyển sau hạn đóng cọc',
-    'Xác minh sau hạn đối soát',
+    'Có khoản chuyển từ hạn đóng cọc trở đi',
+    'Xác minh từ hạn đối soát trở đi',
   ]);
   assert.deepEqual(qrReconciliationWarnings({ urgency: 'NORMAL', processingIssue: 'NONE', timingIssues: [] }), []);
   assert.deepEqual(qrReconciliationWarnings({ urgency: 'FUTURE', processingIssue: 'FUTURE', timingIssues: ['FUTURE'] }), []);
