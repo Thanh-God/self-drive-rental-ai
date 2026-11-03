@@ -80,6 +80,29 @@ class RecommendationHttpTest {
         c.put("budgetVndTotal",4099999);assertEquals("NO_MATCH",call("demo-user",c).getBody().path("status").asText());
         assertEquals(before,jdbc.queryForObject("select count(*) from bookings",Integer.class));
     }
+    @Test void recommendationVehicleCanBeQuotedAndQuoteRechecksCurrentPriceAndSchedule(){
+        var c=criteria();c.put("pickupDate","2026-10-22");c.put("returnDate","2026-10-26");
+        var recommendation=call("demo-user",c);assertEquals(200,recommendation.getStatusCode().value());
+        var item=recommendation.getBody().path("results").get(0);assertNotNull(item);
+        var input=new LinkedHashMap<String,Object>();
+        input.put("vehicleId",item.path("vehicleId").asText());
+        input.put("pickupBranchId",c.get("pickupBranchId"));input.put("returnBranchId",c.get("returnBranchId"));
+        input.put("pickupDate",c.get("pickupDate"));input.put("returnDate",c.get("returnDate"));
+        var bookingsBefore=jdbc.queryForList("select * from bookings order by id");
+        var historyBefore=jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at");
+        var headers=new HttpHeaders();headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(tokens.issue(accounts.require("demo-user")));
+        var quote=http.exchange("/api/v1/bookings/quote",HttpMethod.POST,new HttpEntity<>(input,headers),
+            com.fasterxml.jackson.databind.JsonNode.class);
+        assertEquals(200,quote.getStatusCode().value());
+        assertEquals(item.path("total").asLong(),quote.getBody().path("total").asLong());
+        assertEquals(item.path("vehicleId").asText(),quote.getBody().path("vehicleId").asText());
+        var anonymous=http.exchange("/api/v1/bookings/quote",HttpMethod.POST,new HttpEntity<>(input,new HttpHeaders()),
+            com.fasterxml.jackson.databind.JsonNode.class);
+        assertEquals(401,anonymous.getStatusCode().value());
+        assertEquals(bookingsBefore,jdbc.queryForList("select * from bookings order by id"));
+        assertEquals(historyBefore,jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at"));
+    }
     @Test void deterministicRankingSoftPreferencesAndStableTies(){
         jdbc.update("update vehicles set seats=4,transmission='AUTO',daily_price=650000 where id in ('v1','v3')");
         var c=criteria();var first=call("demo-user",c).getBody();var again=call("demo-user",c).getBody();

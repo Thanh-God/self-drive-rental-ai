@@ -7,6 +7,8 @@ import com.carrental.modules.booking.service.RentalBranchCatalog;
 import com.carrental.security.Actor;
 import java.text.Normalizer;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.ObjectProvider;
@@ -16,6 +18,9 @@ import org.springframework.stereotype.Service;
 /** Extract a draft only. A customer must review it before requesting authoritative recommendations. */
 @Service
 public class CriteriaExtractionService {
+    private static final Pattern AUTOMATIC_TERMS=Pattern.compile("\\b(?:tu\\s*dong|automatic)\\b");
+    private static final Pattern MANUAL_TERMS=Pattern.compile("\\b(?:so\\s*san|so\\s*tay|manual)\\b");
+    private static final Pattern NEGATION_SUFFIX=Pattern.compile("(?:^|\\s)(?:khong|not)(?:\\s+[a-z0-9]+){0,5}\\s*$");
     private final ObjectProvider<QwenCriteriaParser> parser;
     private final RentalBranchCatalog branches;
     private final AiDiagnostics diagnostics;
@@ -67,10 +72,19 @@ public class CriteriaExtractionService {
         return java.util.regex.Pattern.compile(form).matcher(text).find()?date:null;
     }
     private static String explicitTransmission(String selected,String text){
-        String normalized=normalize(text);
-        boolean automatic=normalized.contains("tudong")||normalized.contains("automatic"),manual=normalized.contains("sosan")||normalized.contains("sotay")||normalized.contains("manual");
-        if(normalized.contains("khong")||automatic==manual)return null;
+        String normalized=normalizeWords(text);
+        boolean automatic=containsUnnegated(AUTOMATIC_TERMS,normalized);
+        boolean manual=containsUnnegated(MANUAL_TERMS,normalized);
+        if(automatic==manual)return null;
         return Objects.equals(selected,automatic?"AUTO":"MANUAL")?selected:null;
+    }
+    private static boolean containsUnnegated(Pattern terms,String text){
+        Matcher matcher=terms.matcher(text);
+        while(matcher.find()){
+            int clauseStart=text.lastIndexOf('|',Math.max(0,matcher.start()-1))+1;
+            if(!NEGATION_SUFFIX.matcher(text.substring(clauseStart,matcher.start())).find())return true;
+        }
+        return false;
     }
     private static String resolve(String name,List<RentalBranchCatalog.Item> active){
         if(name==null)return null;
@@ -78,4 +92,10 @@ public class CriteriaExtractionService {
         return matches.size()==1?matches.get(0).id():null;
     }
     private static String normalize(String name){return Normalizer.normalize(name,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replace('đ','d').replaceFirst("^kdrive\\s*","").replaceAll("[^a-z0-9]","");}
+    private static String normalizeWords(String text){
+        String normalized=Normalizer.normalize(text,Normalizer.Form.NFD).replaceAll("\\p{M}","")
+            .toLowerCase(Locale.ROOT).replace('đ','d').replaceAll("[,.!?;:]+"," | ")
+            .replaceAll("\\b(?:nhung|ma|tuy nhien)\\b"," | ");
+        return normalized.replaceAll("[^a-z0-9|]+"," ").trim();
+    }
 }
