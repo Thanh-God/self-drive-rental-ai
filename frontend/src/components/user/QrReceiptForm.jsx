@@ -64,7 +64,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
     }
     setPhase(operation.blocked ? 'blocked' : operation.acknowledged ? 'recorded' : 'unknown');
     setCanRetry(!operation.blocked && !operation.acknowledged && order.status === 'fulfilled');
-    setNotice(operation.acknowledged ? 'Máy chủ đã ghi nhận nhưng giao dịch chưa xuất hiện trong lần tải này. Không ghi nhận lại; hãy kiểm tra kết quả.' : 'Chưa thấy giao dịch không chứng minh lần gửi trước thất bại. Chỉ kiểm tra lại hoặc thử lại đúng yêu cầu cũ; không đổi tham chiếu.');
+    setNotice(operation.acknowledged ? 'Máy chủ đã ghi nhận nhưng giao dịch chưa xuất hiện trong lần tải này. Không ghi nhận lại; hãy kiểm tra kết quả.' : 'Chưa thấy giao dịch trong lần tải này chưa chứng minh lần gửi trước thất bại. Ưu tiên tiếp tục kiểm tra kết quả; nếu đã đối soát để thử lại, chỉ dùng đúng yêu cầu cũ, không đổi tham chiếu.');
   }
 
   async function send(operation) {

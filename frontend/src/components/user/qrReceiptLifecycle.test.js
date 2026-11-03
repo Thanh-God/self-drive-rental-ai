@@ -82,7 +82,7 @@ test('timeout after server store correlates existing receipt without retry',asyn
 });
 test('timeout before store freezes payload/key; explicit retry uses exact old operation',async()=>{
   let payload,stored=false;await mount(c=>{if(c.method==='post'){if(!payload){payload=c.body;throw error();}assert.deepEqual(c.body,payload);stored=true;return {};}return c.url.endsWith('/deposit')?(stored?ledger(payload):{payments:[]}):{booking:{...booking,status:'PENDING',deposit:{missingAmount:90000}}};});
-  await ready();await click('Xác nhận ghi nhận DEMO');assert.match(container.textContent,/Chưa thấy giao dịch không chứng minh/);assert.equal(field('Mã tham chiếu giao dịch').matches(':disabled'),true);
+  await ready();await click('Xác nhận ghi nhận DEMO');assert.match(container.textContent,/Ưu tiên tiếp tục kiểm tra kết quả/);assert.equal(field('Mã tham chiếu giao dịch').matches(':disabled'),true);
   assert.equal(requests.filter(r=>r.method==='post').length,1);await click('Thử lại đúng yêu cầu cũ');assert.equal(requests.filter(r=>r.method==='post').length,2);assert.equal(refreshes,1);
 });
 for(const status of [400,403,409])test(`HTTP ${status} is not silently retried or treated as money`,async()=>{
