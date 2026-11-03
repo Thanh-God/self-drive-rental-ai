@@ -63,9 +63,26 @@ class CriteriaExtractionServiceTest {
         assertEquals("AUTO",unrelated.draft().transmission());
         var directlyNegated=service(true).extract(user,"Không muốn xe số sàn.");
         assertNull(directlyNegated.draft().transmission());
+        assertTrue(directlyNegated.unresolvedFields().contains("transmission"));
         var explicitAlternative=service(true).extract(user,"Không muốn xe số sàn, ưu tiên xe tự động.");
         assertEquals("AUTO",explicitAlternative.draft().transmission());
         var englishNegation=service(true).extract(user,"not automatic");
         assertNull(englishNegation.draft().transmission());
+        assertTrue(englishNegation.unresolvedFields().contains("transmission"));
+    }
+    @Test void ambiguousTransmissionCannotProduceReadyDraft(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+            .thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng"))
+            .thenReturn(extraction("2026-10-20","2026-10-24","Đà Nẵng","Đà Nẵng"));
+        var negative=service(true).extract(user,"Từ20/10/2026 đến24/10/2026,4người,3triệu, nhậntrảĐàNẵng, không muốn xe số sàn.");
+        assertEquals("NEEDS_CLARIFICATION",negative.status());
+        assertEquals(List.of("transmission"),negative.unresolvedFields());
+        assertNull(negative.draft().transmission());
+
+        var conflicting=service(true).extract(user,"Từ20/10/2026 đến24/10/2026,4người,3triệu, nhậntrảĐàNẵng, xe số sàn và xe số tự động.");
+        assertEquals("NEEDS_CLARIFICATION",conflicting.status());
+        assertEquals(List.of("transmission"),conflicting.unresolvedFields());
+        assertNull(conflicting.draft().transmission());
     }
 }

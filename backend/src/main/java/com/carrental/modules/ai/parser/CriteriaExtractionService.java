@@ -61,8 +61,10 @@ public class CriteriaExtractionService {
         if(start==null)missing.add("pickupDate");if(end==null)missing.add("returnDate");
         if(pickup==null)missing.add("pickupBranchName");if(destination==null)missing.add("returnBranchName");
         if(extracted.passengers()==null)missing.add("passengers");if(extracted.budgetVndTotal()==null)missing.add("budgetVndTotal");
+        var transmission=explicitTransmission(extracted.transmission(),text);
+        if(transmission.ambiguous())missing.add("transmission");
         return new Result(missing.isEmpty()?"READY_FOR_REVIEW":"NEEDS_CLARIFICATION",
-            new Draft(start,end,pickup,destination,extracted.passengers(),extracted.budgetVndTotal(),explicitTransmission(extracted.transmission(),text)),List.copyOf(missing));
+            new Draft(start,end,pickup,destination,extracted.passengers(),extracted.budgetVndTotal(),transmission.value()),List.copyOf(missing));
     }
     private static String explicitDate(String date,String text){
         if(date==null)return null;
@@ -71,18 +73,34 @@ public class CriteriaExtractionService {
         String form="(?<![0-9])(?:"+java.util.regex.Pattern.quote(date)+"|"+d+"\\s*[/.-]\\s*"+m+"\\s*[/.-]\\s*"+day.getYear()+")(?![0-9])";
         return java.util.regex.Pattern.compile(form).matcher(text).find()?date:null;
     }
-    private static String explicitTransmission(String selected,String text){
+    private record TransmissionDecision(String value,boolean ambiguous) {}
+    private static TransmissionDecision explicitTransmission(String selected,String text){
         String normalized=normalizeWords(text);
         boolean automatic=containsUnnegated(AUTOMATIC_TERMS,normalized);
         boolean manual=containsUnnegated(MANUAL_TERMS,normalized);
-        if(automatic==manual)return null;
-        return Objects.equals(selected,automatic?"AUTO":"MANUAL")?selected:null;
+        boolean automaticNegated=containsNegated(AUTOMATIC_TERMS,normalized);
+        boolean manualNegated=containsNegated(MANUAL_TERMS,normalized);
+        if((automatic&&manual)||(automatic&&automaticNegated)||(manual&&manualNegated))
+            return new TransmissionDecision(null,true);
+        if(!automatic&&!manual)
+            return new TransmissionDecision(null,automaticNegated||manualNegated);
+        String explicit=automatic?"AUTO":"MANUAL";
+        return Objects.equals(selected,explicit)
+            ?new TransmissionDecision(selected,false):new TransmissionDecision(null,true);
     }
     private static boolean containsUnnegated(Pattern terms,String text){
         Matcher matcher=terms.matcher(text);
         while(matcher.find()){
             int clauseStart=text.lastIndexOf('|',Math.max(0,matcher.start()-1))+1;
             if(!NEGATION_SUFFIX.matcher(text.substring(clauseStart,matcher.start())).find())return true;
+        }
+        return false;
+    }
+    private static boolean containsNegated(Pattern terms,String text){
+        Matcher matcher=terms.matcher(text);
+        while(matcher.find()){
+            int clauseStart=text.lastIndexOf('|',Math.max(0,matcher.start()-1))+1;
+            if(NEGATION_SUFFIX.matcher(text.substring(clauseStart,matcher.start())).find())return true;
         }
         return false;
     }
