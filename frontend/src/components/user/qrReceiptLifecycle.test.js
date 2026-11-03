@@ -63,7 +63,11 @@ test('synchronous guard allows one POST, locks input and resets only after ledge
 test('success with failed readback says recorded, never offers retry POST',async()=>{
   let payload,failed=true;
   await mount(c=>{if(c.method==='post'){payload=c.body;return {};}if(failed)throw error();return c.url.endsWith('/deposit')?ledger(payload):{booking:{...booking,status:'CONFIRMED'}};});
-  await ready();await click('Xác nhận ghi nhận DEMO');assert.match(container.textContent,/đã ghi nhận.*chưa tải lại/);assert.equal(button('Thử lại đúng yêu cầu cũ'),undefined);
+  await ready();await click('Xác nhận ghi nhận DEMO');
+  assert.match(container.textContent,/máy chủ chấp nhận.*chưa tải được trạng thái khoản nhận mới/);
+  assert.doesNotMatch(container.textContent,/Chưa thấy giao dịch|Chưa tìm thấy bản ghi/);
+  assert.equal(button('Thử lại đúng yêu cầu cũ'),undefined);
+  assert.equal(requests.filter(r=>r.method==='post').length,1);
   failed=false;await click('Kiểm tra kết quả ghi nhận');assert.equal(refreshes,1);assert.equal(requests.filter(r=>r.method==='post').length,1);
 });
 test('timeout after server store correlates existing receipt without retry',async()=>{
@@ -99,4 +103,22 @@ test('changing booking key prevents old POST from updating the new form',async()
   const pending=deferred();await mount(c=>c.method==='post'?pending.promise:{});await ready();await click('Xác nhận ghi nhận DEMO');
   await act(async()=>root.render(createElement(Form,{key:'new-booking',booking:{...booking,id:'new-booking'},onRefresh:()=>{refreshes++;}})));
   await act(async()=>pending.resolve({}));assert.equal(refreshes,0);assert.equal(requests.length,1);assert.equal(field('Mã tham chiếu giao dịch').value,'');assert.doesNotMatch(container.textContent,/Đã ghi nhận khoản DEMO/);
+});
+
+test('late ledger readback after switching bookings cannot update the new form',async()=>{
+  const pendingLedger=deferred();let payload;
+  await mount(c=>{
+    if(c.method==='post'){payload=c.body;return {};}
+    if(c.url.endsWith('/deposit'))return pendingLedger.promise.then(data=>({config:c,data,status:200,statusText:'OK',headers:{}}));
+    return {booking:{...booking,status:'PENDING',deposit:{missingAmount:90000}}};
+  });
+  await ready();await click('Xác nhận ghi nhận DEMO');
+  assert.equal(requests.filter(r=>r.method==='post').length,1);
+  assert.equal(requests.filter(r=>r.method==='get').length,2);
+  await act(async()=>root.render(createElement(Form,{key:'next-booking',booking:{...booking,id:'next-booking'},onRefresh:()=>{refreshes++;}})));
+  await act(async()=>pendingLedger.resolve(ledger(payload)));
+  assert.equal(refreshes,0);
+  assert.equal(requests.filter(r=>r.method==='post').length,1);
+  assert.doesNotMatch(container.textContent,/Đã ghi nhận khoản DEMO/);
+  assert.equal(field('Mã tham chiếu giao dịch').value,'');
 });

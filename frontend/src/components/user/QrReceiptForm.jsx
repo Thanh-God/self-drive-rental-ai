@@ -38,7 +38,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
     if (!alive.current) return;
     if (ledger.status !== 'fulfilled' || !Array.isArray(ledger.value.data?.payments)) {
       setPhase(operation.acknowledged ? 'recorded' : 'unknown'); setCanRetry(false);
-      setNotice(operation.acknowledged ? 'Máy chủ đã ghi nhận khoản DEMO nhưng chưa tải lại được giao dịch. Không nhập lại khoản này.' : 'Chưa xác định kết quả; chưa tải được giao dịch. Kiểm tra trước khi thử lại.');
+      setNotice(operation.acknowledged ? 'Yêu cầu đã được máy chủ chấp nhận nhưng chưa tải được trạng thái khoản nhận mới. Kiểm tra lại; không nhập lại khoản này.' : 'Chưa xác định kết quả; chưa tải được giao dịch. Kiểm tra trước khi thử lại.');
       return;
     }
     const payments = ledger.value.data.payments;
