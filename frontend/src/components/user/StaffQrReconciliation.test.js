@@ -114,7 +114,7 @@ async function mount() {
   return container;
 }
 
-const settle = () => new Promise(resolve => setImmediate(resolve));
+const settle = () => Promise.resolve();
 
 test('Staff detail loads the backend projection and keeps the summary read-only', async () => {
   let resolveGet;

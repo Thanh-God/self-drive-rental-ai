@@ -115,7 +115,7 @@ test('Staff QR approval queue shows backend reconciliation summary and composes 
   assert.match(c.textContent,/Cọc yêu cầu: 600\.000/);
   assert.match(c.textContent,/Tổng nhận \(lịch sử\): 750\.000/);
   assert.match(c.textContent,/Hạn đối soát: 13:00 24\/10\/2026/);
-  for(const warning of ['Sắp đến hạn đối soát','Cần tiếp tục xử lý đối soát','Có khoản chuyển sau hạn đóng cọc','Xác minh sau hạn đối soát'])assert.ok(c.textContent.includes(warning));
+    for(const warning of ['Sắp đến hạn đối soát','Cần tiếp tục xử lý đối soát','Có khoản chuyển từ hạn đóng cọc trở đi','Xác minh từ hạn đối soát trở đi'])assert.ok(c.textContent.includes(warning));
   assert.doesNotMatch(c.textContent,/Còn thiếu|Cần chuyển thêm|Yêu cầu khách đóng thêm/);
   assert.equal(c.querySelector('[aria-label="Đối soát cọc QR"] a'),null);
 
