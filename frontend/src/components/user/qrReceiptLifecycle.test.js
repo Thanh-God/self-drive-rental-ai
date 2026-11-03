@@ -42,15 +42,21 @@ async function ready(){
 }
 function error(status){const e=Error('fixture error');if(status)e.response={status,data:{message:`HTTP ${status}`}};return e;}
 
-test('time button is opt-in, editable; validation and cancel do not POST',async t=>{
-  t.mock.timers.enable({apis:['Date'],now:Date.parse('2026-10-25T03:04:05Z')});
-  await mount();assert.equal(field('Thời điểm chuyển (giờ VN)').value,'');await click('Điền thời điểm hiện tại (giờ Việt Nam)');
-  assert.match(field('Thời điểm chuyển (giờ VN)').value,/T\d{2}:\d{2}:\d{2}(?:\.000)?$/);
-  assert.equal(Date.parse(field('Thời điểm chuyển (giờ VN)').value+'+07:00'),Date.parse('2026-10-25T03:04:05Z'));
-  await change('Thời điểm chuyển (giờ VN)','2026-10-25T10:30');await click('Xác minh và ghi nhận');assert.equal(requests.length,0);
-  await ready();assert.match(container.querySelector('[role="dialog"]').textContent,/Khách thử.*Xe thử/);
-  assert.match(container.querySelector('[role="dialog"]').textContent,/90.000/);
-  await click('Quay lại chỉnh sửa');assert.equal(field('Mã tham chiếu giao dịch').value,'REF-TEST');assert.equal(requests.length,0);
+test('time button is opt-in, editable; validation and cancel do not POST',async()=>{
+  const RealDate=Date, now=Date.parse('2026-10-25T03:04:05Z');
+  globalThis.Date=class extends RealDate {
+    constructor(...args){super(...(args.length?args:[now]));}
+    static now(){return now;}
+  };
+  try {
+    await mount();assert.equal(field('Thời điểm chuyển (giờ VN)').value,'');await click('Điền thời điểm hiện tại (giờ Việt Nam)');
+    assert.match(field('Thời điểm chuyển (giờ VN)').value,/T\d{2}:\d{2}:\d{2}(?:\.000)?$/);
+    assert.equal(Date.parse(field('Thời điểm chuyển (giờ VN)').value+'+07:00'),Date.parse('2026-10-25T03:04:05Z'));
+    await change('Thời điểm chuyển (giờ VN)','2026-10-25T10:30');await click('Xác minh và ghi nhận');assert.equal(requests.length,0);
+    await ready();assert.match(container.querySelector('[role="dialog"]').textContent,/Khách thử.*Xe thử/);
+    assert.match(container.querySelector('[role="dialog"]').textContent,/90.000/);
+    await click('Quay lại chỉnh sửa');assert.equal(field('Mã tham chiếu giao dịch').value,'REF-TEST');assert.equal(requests.length,0);
+  } finally { globalThis.Date=RealDate; }
 });
 test('synchronous guard allows one POST, locks input and resets only after ledger/order readback',async()=>{
   const pending=deferred();let payload;
