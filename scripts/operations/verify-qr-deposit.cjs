@@ -31,11 +31,25 @@ async function main() {
     wait = customer.waitForResponse(r => r.url().endsWith('/bookings/quote'));await customer.getByRole('button', { name: 'Kiểm tra lịch & báo giá', exact: true }).click();check('Quote', (await wait).status(), 200);
     await customer.getByRole('checkbox', { name: 'Tôi xác nhận thời gian, chi nhánh và tổng báo giá.', exact: true }).check();wait = customer.waitForResponse(r => r.url().endsWith('/bookings') && r.request().method() === 'POST');await customer.getByRole('button', { name: 'Gửi yêu cầu thuê', exact: true }).click();const r = await wait;check('Request UI', r.status(), 201);const booking = await r.json(), id = booking.id;await customer.waitForURL('**/user/bookings/' + id);
     check('Deposit 30 percent rental', booking.deposit.amount, 390000);check('One booking', sql('select count(*) from bookings'), '1');
+    async function queueStage(stage, label) {
+      await operator.goto(base+'/staff/bookings');
+      const filter=operator.getByLabel('Tình trạng cọc',{exact:true});await filter.selectOption(stage);
+      const row=operator.locator('article').filter({has:operator.getByRole('link',{name:'Chi tiết',exact:true})}).filter({hasText:id});
+      await row.first().waitFor();
+      check('Queue '+stage,await row.first().textContent().then(t=>t.includes(label)),true);
+      await operator.getByLabel('Trạng thái',{exact:true}).selectOption('COMPLETED');
+      check('Stage AND status '+stage,await operator.locator('article').count(),0);
+      await operator.getByLabel('Trạng thái',{exact:true}).selectOption('');
+      await row.first().waitFor();
+      await operator.screenshot({path:path.join(out,'queue-'+stage+'.png'),fullPage:true});
+    }
     await customer.getByText('Chờ kiểm tra hồ sơ', { exact: true }).first().waitFor();check('No checkout before approval', await customer.getByRole('button', { name: 'Thanh toán cọc thử nghiệm' }).count(), 0);
+    await queueStage('AWAITING_APPROVAL', 'Chờ kiểm tra hồ sơ');
     await operator.goto(base + '/staff/bookings/' + id);const panel = operator.getByRole('region', { name: 'Ảnh GPLX', exact: true });
     await panel.getByLabel('Kết quả kiểm tra', { exact: true }).selectOption('APPROVED');await panel.getByLabel('Nhận xét kiểm tra', { exact: true }).fill('Ảnh giả lập, chưa đối chiếu bản gốc.');wait = operator.waitForResponse(r => r.url().endsWith('/license-photo-review'));await panel.getByRole('button', { name: 'Lưu kiểm tra hồ sơ', exact: true }).click();check('Photo review UI', (await wait).status(), 200);
     wait = operator.waitForResponse(r => r.url().endsWith('/deposit/approve'));await operator.getByRole('button', { name: 'Duyệt hồ sơ và tạo mã QR cọc', exact: true }).click();check('Approve deposit UI', (await wait).status(), 200);
     check('Still pending after approval', (await req(user, '/bookings/' + id)).body.booking.status, 'PENDING');
+    await queueStage('AWAITING_TRANSFER','Chờ khách chuyển cọc');
     await customer.goto(base + '/user/bookings/' + id);
     await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).click();
     const qr=customer.getByAltText('Mã QR cọc giả lập');await qr.waitFor();
@@ -45,6 +59,7 @@ async function main() {
     await customer.getByText(/Khách đã báo chuyển khoản lúc/).waitFor();
     check('Customer claim never confirms', (await req(user,'/bookings/'+id)).body.booking.status,'PENDING');
     await customer.screenshot({path:path.join(out,'user-reported-qr.png'),fullPage:true});
+    await queueStage('REPORTED_NO_RECEIPT','Khách đã báo chuyển');
     async function verify(ref,amount) {
       await operator.goto(base+'/staff/bookings/'+id);
       await operator.getByLabel('Mã tham chiếu giao dịch',{exact:true}).fill(ref);
@@ -53,14 +68,31 @@ async function main() {
       await operator.getByLabel('Thời điểm chuyển (giờ VN)',{exact:true}).fill(local);
       await operator.getByLabel('Tài khoản nguồn (giả lập)',{exact:true}).fill('DEMO-PAYER');
       await operator.getByLabel('Đã đối chiếu đúng đơn, nội dung, bên nhận DEMO và số tiền',{exact:true}).check();
-      operator.once('dialog',d=>d.accept());
       const response=operator.waitForResponse(r=>r.url().endsWith('/deposit/verify'));
-      await operator.getByRole('button',{name:'Xác minh và ghi nhận',exact:true}).click();check('Staff receipt '+ref,(await response).status(),200);
+      await operator.getByRole('button',{name:'Xác minh và ghi nhận',exact:true}).click();
+      const readback=operator.waitForResponse(r=>r.url().endsWith('/bookings/'+id+'/deposit') && r.request().method()==='GET');
+      await operator.getByRole('button',{name:'Xác nhận ghi nhận DEMO',exact:true}).click();check('Staff receipt '+ref,(await response).status(),200);
+      const ledger=await (await readback).json();check('Receipt present in ledger '+ref,ledger.payments.some(p=>p.providerTransaction===ref),true);
     }
     await verify('BROWSER-A',200000);
     check('Partial remains pending',(await req(user,'/bookings/'+id)).body.booking.status,'PENDING');
     check('Partial missing amount',(await req(user,'/bookings/'+id)).body.booking.deposit.missingAmount,190000);
+    await queueStage('RECEIVED_INCOMPLETE','Cần đối soát khoản nhận');
+    await operator.goto(base+'/staff/bookings/'+id);
+    const detail=operator.getByRole('region',{name:'Chi tiết đối soát cọc QR',exact:true});
+    await detail.getByText('Tổng đã nhận (lịch sử)',{exact:true}).waitFor();
+    check('Staff detail partial history',await detail.textContent().then(t=>t.includes('200.000')),true);
+    await operator.screenshot({path:path.join(out,'staff-partial-detail.png'),fullPage:true});
+    const beforeRead=sql('select concat((select count(*) from payment_transactions),":",(select count(*) from contracts),":",(select count(*) from booking_status_history))');
+    await operator.route('**/api/v1/bookings/'+id+'/deposit',route=>route.abort(),{times:1});
+    await operator.goto(base+'/staff/bookings/'+id);
+    await operator.getByRole('button',{name:'Tải lại',exact:true}).waitFor();
+    await operator.screenshot({path:path.join(out,'staff-read-error.png'),fullPage:true});
+    await operator.getByRole('button',{name:'Tải lại',exact:true}).click();
+    await operator.getByRole('region',{name:'Chi tiết đối soát cọc QR',exact:true}).getByText('Tổng đã nhận (lịch sử)',{exact:true}).waitFor();
+    check('Read retry preserves ledger/contracts/history',sql('select concat((select count(*) from payment_transactions),":",(select count(*) from contracts),":",(select count(*) from booking_status_history))'),beforeRead);
     await verify('BROWSER-B',300000);
+    await queueStage('APPLIED','Đã ghi nhận cọc vào đơn');
     await customer.goto(base+'/user/bookings/'+id);await customer.getByText('Đã ghi nhận cọc cho đơn',{exact:true}).waitFor();
     check('Backend confirmed',(await req(user,'/bookings/'+id)).body.booking.status,'CONFIRMED');
     check('Applied exactly required',(await req(user,'/bookings/'+id)).body.booking.deposit.appliedAmount,390000);
@@ -70,12 +102,14 @@ async function main() {
     await manager.goto(base+'/admin/payments');
     check('QR refunds do not offer VNPAY',await manager.getByRole('button',{name:'Gửi hoàn VNPAY Sandbox',exact:true}).count(),0);
     await manager.getByRole('button',{name:'Bắt đầu xử lý hoàn (QR DEMO)',exact:true}).click();
+    await manager.getByRole('button',{name:'Xác nhận thao tác',exact:true}).click();
     await manager.getByLabel('Tài khoản nhận hoàn',{exact:true}).fill('DEMO-PAYER');
     await manager.getByLabel('Tham chiếu hoàn',{exact:true}).fill('BROWSER-REFUND');
     await manager.getByLabel('Thời điểm hoàn (giờ Việt Nam)',{exact:true}).fill(new Date(Date.now()+7*3600000).toISOString().slice(0,19));
     check('Starting refund is not completion',sql('select status from payment_refunds'),'PROCESSING');
+    await manager.getByLabel('Đã đối chiếu tài khoản, số tiền và chứng từ hoàn DEMO',{exact:true}).check();
     wait=manager.waitForResponse(r=>r.url().endsWith('/complete-manual'));
-    await manager.getByRole('button',{name:'Xác nhận đã hoàn DEMO',exact:true}).click();check('Manual completion response',(await wait).status(),200);
+    await manager.getByRole('button',{name:'Xác nhận đã hoàn DEMO',exact:true}).click();await manager.getByRole('button',{name:'Xác nhận thao tác',exact:true}).click();check('Manual completion response',(await wait).status(),200);
     check('Refund verified complete',sql('select status from payment_refunds'),'SUCCEEDED');
     check('Refund has bank reference',sql('select provider_transaction from payment_refunds'),'BROWSER-REFUND');
     await manager.screenshot({path:path.join(out,'admin-refund-qr.png'),fullPage:true});

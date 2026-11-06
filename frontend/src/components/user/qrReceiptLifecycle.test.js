@@ -64,7 +64,7 @@ test('synchronous guard allows one POST, locks input and resets only after ledge
   await ready();await act(async()=>{button('Xác nhận ghi nhận DEMO').click();button('Xác nhận ghi nhận DEMO')?.click();});
   assert.equal(requests.filter(r=>r.method==='post').length,1);assert.equal(field('Mã tham chiếu giao dịch').matches(':disabled'),true);assert.match(container.textContent,/Đang ghi nhận/);
   assert.equal(payload.transferTime,'2026-10-25T03:30:00.000Z');
-  await act(async()=>pending.resolve({}));assert.equal(refreshes,1);assert.equal(field('Mã tham chiếu giao dịch').value,'');assert.match(container.textContent,/còn thiếu 90.000/);
+  await act(async()=>pending.resolve({}));assert.equal(refreshes,1);assert.equal(field('Mã tham chiếu giao dịch').value,'');assert.match(container.textContent,/kiểm tra tình trạng đối soát/);
 });
 test('success with failed readback says recorded, never offers retry POST',async()=>{
   let payload,failed=true;
@@ -127,4 +127,25 @@ test('late ledger readback after switching bookings cannot update the new form',
   assert.equal(requests.filter(r=>r.method==='post').length,1);
   assert.doesNotMatch(container.textContent,/Đã ghi nhận khoản DEMO/);
   assert.equal(field('Mã tham chiếu giao dịch').value,'');
+});
+
+for (const [status, stage, missing] of [
+  ['PENDING', 'AWAITING_APPLICATION', 0],
+  ['PENDING', 'RECEIVED_INCOMPLETE', 90000],
+  ['EXPIRED', 'EXPIRED', 90000],
+  ['CANCELLED', 'CLOSED', 90000],
+  ['CONFIRMED', 'APPLIED', 0],
+]) test(`receipt readback ${status}/${stage} never invents a collectible shortage`, async () => {
+  let payload;
+  await mount(c => {
+    if (c.method === 'post') { payload=c.body; return {}; }
+    return c.url.endsWith('/deposit') ? ledger(payload) : {booking:{...booking,status,deposit:{missingAmount:missing},qrReconciliation:{stage,processingIssue:'RETRY_REQUIRED'}}};
+  });
+  await ready(); await click('Xác nhận ghi nhận DEMO');
+  assert.equal(requests.filter(r=>r.method==='post').length,1);
+  assert.doesNotMatch(container.textContent,/còn thiếu|Cần chuyển thêm/i);
+  if(status==='CONFIRMED') assert.match(container.textContent,/Đơn đã xác nhận/);
+  else if(['EXPIRED','CANCELLED'].includes(status)) assert.match(container.textContent,/không yêu cầu khách đóng thêm/);
+  else assert.match(container.textContent,/kiểm tra tình trạng đối soát/);
+  assert.equal(refreshes,1);
 });

@@ -51,8 +51,7 @@ export default function QrReceiptForm({ booking, onRefresh }) {
         return;
       }
       const updated = order.value.data.booking || order.value.data;
-      const missing = updated.deposit?.missingAmount;
-      setNotice(`Đã ghi nhận khoản DEMO ${money(receipt.amount)} · Tham chiếu ${receipt.providerTransaction}. ${updated.status === 'CONFIRMED' ? 'Đơn đã xác nhận.' : `Đơn chưa xác nhận; còn thiếu ${money(missing)}.`}`);
+      setNotice(`Đã ghi nhận khoản DEMO ${money(receipt.amount)} · Tham chiếu ${receipt.providerTransaction}. ${updated.status === 'CONFIRMED' ? 'Đơn đã xác nhận.' : ['EXPIRED', 'CANCELLED', 'REJECTED', 'RETURNED', 'COMPLETED'].includes(updated.status) ? 'Đơn đã hết hạn hoặc kết thúc; không yêu cầu khách đóng thêm. Kiểm tra chi tiết đối soát.' : 'Khoản nhận đã được tìm thấy; kiểm tra tình trạng đối soát và điều kiện đơn. Không ghi nhận lại khoản này.'}`);
       pending.current = null; setForm(emptyForm()); setVerified(false); setCandidate(null); setPhase('idle');
       try { onRefresh(); } catch { setNotice('Khoản DEMO đã được ghi nhận. Cần tải lại đơn; không nhập lại khoản này.'); }
       return;
