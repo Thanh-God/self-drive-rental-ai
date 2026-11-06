@@ -20,7 +20,9 @@ import org.springframework.stereotype.Service;
 public class CriteriaExtractionService {
     private static final Pattern AUTOMATIC_TERMS=Pattern.compile("\\b(?:tu\\s*dong|automatic)\\b");
     private static final Pattern MANUAL_TERMS=Pattern.compile("\\b(?:so\\s*san|so\\s*tay|manual)\\b");
-    private static final Pattern NEGATION_SUFFIX=Pattern.compile("(?:^|\\s)(?:khong|not)(?:\\s+[a-z0-9]+){0,5}\\s*$");
+    private static final Pattern NEGATION_SUFFIX=Pattern.compile("(?:^|\\s)(?:khong|not)\\b.*$");
+    private static final Pattern REQUEST_AFTER_CONJUNCTION=Pattern.compile(
+        "\\b(?:va|and)\\s+(?=(?:toi\\s+)?(?:muon|can|thich|chon|uu\\s+tien|want|need|prefer)\\b)");
     private final ObjectProvider<QwenCriteriaParser> parser;
     private final RentalBranchCatalog branches;
     private final AiDiagnostics diagnostics;
@@ -114,6 +116,7 @@ public class CriteriaExtractionService {
         String normalized=Normalizer.normalize(text,Normalizer.Form.NFD).replaceAll("\\p{M}","")
             .toLowerCase(Locale.ROOT).replace('đ','d').replaceAll("[,.!?;:]+"," | ")
             .replaceAll("\\b(?:nhung|ma|tuy nhien)\\b"," | ");
+        normalized=REQUEST_AFTER_CONJUNCTION.matcher(normalized).replaceAll(" | ");
         return normalized.replaceAll("[^a-z0-9|]+"," ").trim();
     }
 }

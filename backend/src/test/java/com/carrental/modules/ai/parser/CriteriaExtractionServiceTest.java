@@ -85,4 +85,30 @@ class CriteriaExtractionServiceTest {
         assertEquals(List.of("transmission"),conflicting.unresolvedFields());
         assertNull(conflicting.draft().transmission());
     }
+    @Test void longTransmissionNegationCannotSelectAnOppositeGearbox(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"MANUAL",List.of(),List.of()));
+
+        var automatic=service(true).extract(user,"Tôi không muốn thuê loại xe có hộp số tự động");
+        var manual=service(true).extract(user,"Tôi không muốn thuê loại xe có hộp số sàn");
+        assertAll(
+            () -> {assertNull(automatic.draft().transmission());assertTrue(automatic.unresolvedFields().contains("transmission"));},
+            () -> {assertNull(manual.draft().transmission());assertTrue(manual.unresolvedFields().contains("transmission"));}
+        );
+    }
+    @Test void unrelatedNegationDoesNotEraseAutomaticChoiceAcrossConjunction(){
+        when(branches.active()).thenReturn(List.of(new RentalBranchCatalog.Item("dn","KDrive Đà Nẵng")));
+        when(parser.parse(anyString(),any(AiRequestDeadline.class)))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()))
+            .thenReturn(new CriteriaParser.Extraction("RECOMMEND_VEHICLE",null,null,"Đà Nẵng","Đà Nẵng",4,3000000L,"AUTO",List.of(),List.of()));
+
+        var vietnamese=service(true).extract(user,"Tôi không hút thuốc và muốn xe tự động");
+        var english=service(true).extract(user,"I do not smoke and want an automatic car");
+        assertAll(
+            () -> {assertEquals("AUTO",vietnamese.draft().transmission());assertFalse(vietnamese.unresolvedFields().contains("transmission"));},
+            () -> {assertEquals("AUTO",english.draft().transmission());assertFalse(english.unresolvedFields().contains("transmission"));}
+        );
+    }
 }

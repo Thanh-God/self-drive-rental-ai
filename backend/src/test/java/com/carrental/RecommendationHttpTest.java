@@ -64,6 +64,17 @@ class RecommendationHttpTest {
         if(role!=null)headers.setBearerAuth(tokens.issue(accounts.require(role)));
         return http.exchange("/api/v1/ai/recommendations",HttpMethod.POST,new HttpEntity<>(Map.of("requestId","test-1","criteria",c),headers),com.fasterxml.jackson.databind.JsonNode.class);
     }
+    Map<String,Object> quoteInput(String vehicleId,Map<String,Object> c){
+        return new LinkedHashMap<>(Map.of("vehicleId",vehicleId,
+            "pickupBranchId",c.get("pickupBranchId"),"returnBranchId",c.get("returnBranchId"),
+            "pickupDate",c.get("pickupDate"),"returnDate",c.get("returnDate")));
+    }
+    ResponseEntity<com.fasterxml.jackson.databind.JsonNode> quote(Map<String,Object> input){
+        var headers=new HttpHeaders();headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(tokens.issue(accounts.require("demo-user")));
+        return http.exchange("/api/v1/bookings/quote",HttpMethod.POST,new HttpEntity<>(input,headers),
+            com.fasterxml.jackson.databind.JsonNode.class);
+    }
     @Test void httpRoleBoundaries(){
         assertEquals(401,call(null,criteria()).getStatusCode().value());
         assertEquals(403,call("demo-admin",criteria()).getStatusCode().value());
@@ -84,22 +95,60 @@ class RecommendationHttpTest {
         var c=criteria();c.put("pickupDate","2026-10-22");c.put("returnDate","2026-10-26");
         var recommendation=call("demo-user",c);assertEquals(200,recommendation.getStatusCode().value());
         var item=recommendation.getBody().path("results").get(0);assertNotNull(item);
-        var input=new LinkedHashMap<String,Object>();
-        input.put("vehicleId",item.path("vehicleId").asText());
-        input.put("pickupBranchId",c.get("pickupBranchId"));input.put("returnBranchId",c.get("returnBranchId"));
-        input.put("pickupDate",c.get("pickupDate"));input.put("returnDate",c.get("returnDate"));
+        var input=quoteInput(item.path("vehicleId").asText(),c);
         var bookingsBefore=jdbc.queryForList("select * from bookings order by id");
         var historyBefore=jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at");
-        var headers=new HttpHeaders();headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.setBearerAuth(tokens.issue(accounts.require("demo-user")));
-        var quote=http.exchange("/api/v1/bookings/quote",HttpMethod.POST,new HttpEntity<>(input,headers),
-            com.fasterxml.jackson.databind.JsonNode.class);
-        assertEquals(200,quote.getStatusCode().value());
-        assertEquals(item.path("total").asLong(),quote.getBody().path("total").asLong());
-        assertEquals(item.path("vehicleId").asText(),quote.getBody().path("vehicleId").asText());
+        var response=quote(input);
+        assertEquals(200,response.getStatusCode().value());
+        assertEquals(item.path("total").asLong(),response.getBody().path("total").asLong());
+        assertEquals(item.path("vehicleId").asText(),response.getBody().path("vehicleId").asText());
         var anonymous=http.exchange("/api/v1/bookings/quote",HttpMethod.POST,new HttpEntity<>(input,new HttpHeaders()),
             com.fasterxml.jackson.databind.JsonNode.class);
         assertEquals(401,anonymous.getStatusCode().value());
+        assertEquals(bookingsBefore,jdbc.queryForList("select * from bookings order by id"));
+        assertEquals(historyBefore,jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at"));
+    }
+    @Test void quoteUsesCurrentDailyPriceAfterRecommendation(){
+        var c=criteria();c.put("pickupDate","2026-10-22");c.put("returnDate","2026-10-26");
+        var recommendation=call("demo-user",c);assertEquals(200,recommendation.getStatusCode().value());
+        var item=recommendation.getBody().path("results").get(0);assertNotNull(item);
+        String vehicleId=item.path("vehicleId").asText();
+        long originalPrice=jdbc.queryForObject("select daily_price from vehicles where id=?",Long.class,vehicleId);
+        long currentPrice=originalPrice+50000;
+        var input=quoteInput(vehicleId,c);
+        jdbc.update("update vehicles set daily_price=? where id=?",currentPrice,vehicleId);
+        try {
+            var bookingsBefore=jdbc.queryForList("select * from bookings order by id");
+            var historyBefore=jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at");
+            var response=quote(input);
+            assertEquals(200,response.getStatusCode().value());
+            assertEquals(currentPrice,response.getBody().path("dailyPrice").asLong());
+            assertEquals(currentPrice*response.getBody().path("rentalDays").asLong(),response.getBody().path("total").asLong());
+            assertNotEquals(item.path("total").asLong(),response.getBody().path("total").asLong());
+            assertEquals(bookingsBefore,jdbc.queryForList("select * from bookings order by id"));
+            assertEquals(historyBefore,jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at"));
+        } finally {
+            jdbc.update("update vehicles set daily_price=? where id=?",originalPrice,vehicleId);
+        }
+    }
+    @Test void quoteRejectsRecommendationWhenVehicleScheduleBecomesUnavailable(){
+        var c=criteria();c.put("pickupDate","2026-10-22");c.put("returnDate","2026-10-26");
+        var recommendation=call("demo-user",c);assertEquals(200,recommendation.getStatusCode().value());
+        var item=recommendation.getBody().path("results").get(0);assertNotNull(item);
+        String vehicleId=item.path("vehicleId").asText();
+        var input=quoteInput(vehicleId,c);
+        var pickup=LocalDate.parse((String)c.get("pickupDate"));
+        var returns=LocalDate.parse((String)c.get("returnDate"));
+        var beforeReservation=new BookingService.Input(vehicleId,"dn","dn",null,null,null,pickup,returns);
+        long freshTotal=bookings.quote(user,beforeReservation).total();
+        var blocker=bookings.create(user,new BookingService.Input(vehicleId,"dn","dn",null,null,freshTotal,pickup,returns));
+        assertNotNull(blocker.id());
+        var bookingsBefore=jdbc.queryForList("select * from bookings order by id");
+        var historyBefore=jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at");
+
+        var response=quote(input);
+        assertEquals(409,response.getStatusCode().value());
+        assertTrue(response.getBody().toString().contains("Xe đã có đơn trùng khoảng thuê."));
         assertEquals(bookingsBefore,jdbc.queryForList("select * from bookings order by id"));
         assertEquals(historyBefore,jdbc.queryForList("select * from booking_status_history order by booking_id,occurred_at"));
     }
