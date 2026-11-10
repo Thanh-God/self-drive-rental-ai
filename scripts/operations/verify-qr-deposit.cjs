@@ -83,12 +83,49 @@ async function main() {
     check('Uncertain report blocks blind resend',await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).count(),0);
     check('Aborted report not recorded',sql('select count(*) from bookings where reported_at is not null'),'0');
     await customer.screenshot({path:path.join(out,'user-report-uncertain.png'),fullPage:true});
-    // Chờ đúng lần tải lại đơn (component được mount lại) trước khi thao tác tiếp; chữ trạng thái cũ đã có sẵn trên DOM.
-    wait=customer.waitForResponse(r=>r.url().endsWith('/api/v1/bookings/'+id) && r.request().method()==='GET');
-    await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).click();check('Recheck reloads booking with GET',(await wait).status(),200);
-    await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).waitFor({state:'detached'});
-    await userStatus.getByText('Tình trạng cọc: Chờ bạn chuyển cọc',{exact:true}).waitFor();
-    await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).click();await qr.waitFor();
+    // R02-a: ghi trace chuỗi kiểm tra lại -> mở QR (mạng của đúng đơn + danh tính DOM khu cọc) trước khi assert.
+    const r02=[],r02t0=Date.now(),r02mark=e=>r02.push({t:Date.now()-r02t0,...e});
+    const r02path=u=>u.slice(u.indexOf('/api/v1'));
+    const r02mine=u=>u.includes('/api/v1/bookings/'+id);
+    const r02req=r=>{if(r02mine(r.url()))r02mark({ev:'request',method:r.method(),path:r02path(r.url())});};
+    const r02res=r=>{if(r02mine(r.url()))r02mark({ev:'response',method:r.request().method(),path:r02path(r.url()),status:r.status()});};
+    const r02fail=r=>{if(r02mine(r.url()))r02mark({ev:'requestfailed',method:r.method(),path:r02path(r.url()),error:r.failure()?.errorText||''});};
+    customer.on('request',r02req);customer.on('response',r02res);customer.on('requestfailed',r02fail);
+    let r02img=false,r02same=-1,r02decoded=false,r02payload=null;
+    try {
+      // Chờ đúng lần tải lại đơn (component được mount lại); chữ trạng thái cũ đã có sẵn trên DOM.
+      wait=customer.waitForResponse(r=>r.url().endsWith('/api/v1/bookings/'+id) && r.request().method()==='GET');
+      // Sẵn sàng của đúng đơn: component cọc mới mount sẽ GET ledger của đơn này; response làm khu cọc render lại và đổi bố cục.
+      const ledgerReady=customer.waitForResponse(r=>r.url().endsWith('/api/v1/bookings/'+id+'/deposit') && r.request().method()==='GET');ledgerReady.catch(()=>{});
+      r02mark({ev:'click-recheck'});
+      await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).click();check('Recheck reloads booking with GET',(await wait).status(),200);
+      await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).waitFor({state:'detached'});
+      await userStatus.getByText('Tình trạng cọc: Chờ bạn chuyển cọc',{exact:true}).waitFor();
+      r02mark({ev:'status-visible'});
+      check('Reloaded deposit ledger of this booking ready before reopening QR',(await ledgerReady).status(),200);
+      // Chờ một khung render sau dữ liệu ledger để cú bấm không rơi vào lúc bố cục đang đổi (không bấm lần hai, không tăng timeout).
+      await customer.evaluate(()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))));
+      r02mark({ev:'ledger-ready'});
+      // Danh tính DOM khu cọc hiện tại: nếu bị dựng lại sau cú bấm, dấu này sẽ mất.
+      await userStatus.evaluate(el=>{el.dataset.r02='before-click';});
+      const payloadReq=customer.waitForRequest(r=>r.url().endsWith('/api/v1/bookings/'+id+'/deposit/qr-payload'),{timeout:15000}).catch(()=>null);
+      r02mark({ev:'click-show-qr'});
+      await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).click();
+      r02payload=await payloadReq;r02mark({ev:r02payload?'qr-payload-request-seen':'qr-payload-request-not-seen'});
+      r02img=await qr.waitFor({timeout:15000}).then(()=>true,()=>false);
+      r02same=await customer.locator('[data-r02="before-click"]').count();
+      r02decoded=r02img && await qr.evaluate(async i=>{await i.decode();return i.complete && i.naturalWidth>0;}).catch(()=>false);
+      r02mark({ev:'after-click',imageVisible:r02img,sectionKeptIdentity:r02same===1,decoded:r02decoded,showButtonLabel:(await customer.getByRole('button',{name:/mã QR/}).first().textContent().catch(()=>''))});
+    } finally {
+      customer.off('request',r02req);customer.off('response',r02res);customer.off('requestfailed',r02fail);
+      fs.writeFileSync(path.join(out,'qr-reopen-trace.json'),JSON.stringify(r02,null,2));
+    }
+    check('Reopen sends QR payload GET for this booking',!!r02payload,true);
+    check('Deposit section not rebuilt after the QR click',r02same,1);
+    check('QR image of this booking visible after one click',r02img,true);
+    check('Reopened QR image decodes',r02decoded,true);
+    check('Recheck and reopen send no report POST',r02.filter(e=>e.ev==='request' && e.method==='POST' && e.path.endsWith('/deposit/report')).length,0);
+    check('QR image request belongs to this booking',r02.some(e=>e.ev==='response' && e.path==='/api/v1/bookings/'+id+'/deposit/qr' && e.status===200),true);
     await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).click();
     await customer.getByText(/Bạn đã báo chuyển khoản lúc/).waitFor();
     check('Exactly one report event',sql("select count(*) from payment_events where kind='TRANSFER_REPORTED'"),'1');
@@ -98,24 +135,45 @@ async function main() {
     check('Customer claim never confirms', (await req(user,'/bookings/'+id)).body.booking.status,'PENDING');
     await customer.screenshot({path:path.join(out,'user-reported-qr.png'),fullPage:true});
     await queueStage('REPORTED_NO_RECEIPT','Khách đã báo chuyển');
-    async function verify(ref,amount,target=id) {
-      // Backend từ chối thời điểm chuyển trước approvedAt; ô nhập theo giây nên chờ qua giây kế tiếp sau duyệt.
+    // R02-b: Chromium chuẩn hóa datetime-local giây 00 thành YYYY-MM-DDTHH:MM; điền đúng dạng chuẩn hóa (cùng thời điểm),
+    // đọc lại input và đối chiếu transferTime trong payload. Không đổi 00 thành 01.
+    const vnLocal=ms=>new Date(ms+7*3600000).toISOString().slice(0,19);
+    const inputForm=v=>v.endsWith(':00')?v.slice(0,16):v;
+    const transferTimes={};
+    async function verify(ref,amount,target=id,{seconds,notBefore}={}) {
+      // Backend từ chối thời điểm chuyển trước approvedAt hoặc ở tương lai; ô nhập theo giây.
       const approvedAt=Date.parse((await req(user,'/bookings/'+target)).body.booking.deposit.approvedAt);
-      while(Date.now()<Math.ceil(approvedAt/1000)*1000+1000) await new Promise(r=>setTimeout(r,200));
+      let t;
+      if(seconds===undefined) {
+        while(Date.now()<Math.ceil(approvedAt/1000)*1000+1000) await new Promise(r=>setTimeout(r,200));
+        t=Math.floor(Date.now()/1000)*1000;
+      } else {
+        // Ca cố định: giây đầu tiên sau approvedAt (và sau notBefore) có số giây = seconds; chờ tới khi không còn ở tương lai.
+        t=Math.ceil((Math.max(approvedAt,notBefore||0)+1)/1000)*1000;
+        while(new Date(t).getUTCSeconds()!==seconds) t+=1000;
+        while(Date.now()<t+1000) await new Promise(r=>setTimeout(r,200));
+      }
+      transferTimes[ref]=t;
       await operator.goto(base+'/staff/bookings/'+target);
       await operator.getByLabel('Mã tham chiếu giao dịch',{exact:true}).fill(ref);
       await operator.getByLabel('Số tiền thực nhận (VND)',{exact:true}).fill(String(amount));
-      const local=new Date(Date.now()+7*3600000).toISOString().slice(0,19);
-      await operator.getByLabel('Thời điểm chuyển (giờ VN)',{exact:true}).fill(local);
+      const timeInput=operator.getByLabel('Thời điểm chuyển (giờ VN)',{exact:true});
+      await timeInput.fill(inputForm(vnLocal(t)));
+      check('Transfer time input readback '+ref,await timeInput.inputValue(),inputForm(vnLocal(t)));
+      if(seconds!==undefined) check('Transfer time case seconds '+ref,new Date(t).getUTCSeconds(),seconds);
       await operator.getByLabel('Tài khoản nguồn (giả lập)',{exact:true}).fill('DEMO-PAYER');
       await operator.getByLabel('Đã đối chiếu đúng đơn, nội dung, bên nhận DEMO và số tiền',{exact:true}).check();
       const response=operator.waitForResponse(r=>r.url().endsWith('/deposit/verify'));response.catch(()=>{});
       await operator.getByRole('button',{name:'Xác minh và ghi nhận',exact:true}).click();
       const readback=operator.waitForResponse(r=>r.url().endsWith('/bookings/'+target+'/deposit') && r.request().method()==='GET');readback.catch(()=>{});
-      await operator.getByRole('button',{name:'Xác nhận ghi nhận DEMO',exact:true}).click();check('Staff receipt '+ref,(await response).status(),200);
+      await operator.getByRole('button',{name:'Xác nhận ghi nhận DEMO',exact:true}).click();const verifyResponse=await response;check('Staff receipt '+ref,verifyResponse.status(),200);
+      check('Transfer time payload equals intended VN time '+ref,vnLocal(Date.parse(verifyResponse.request().postDataJSON().transferTime)),vnLocal(t));
+      check('Transfer time not before approval '+ref,t>=approvedAt,true);
       const ledger=await (await readback).json();check('Receipt present in ledger '+ref,ledger.payments.some(p=>p.providerTransaction===ref),true);
+      check('Exactly one receipt for '+ref,sql(`select count(*) from payment_transactions where provider_transaction='${ref}'`),'1');
+      check('Stored transfer time '+ref,sql(`select date_format(transfer_time,'%Y-%m-%dT%H:%i:%s') from payment_transactions where provider_transaction='${ref}'`),new Date(t).toISOString().slice(0,19));
     }
-    await verify('BROWSER-A',200000);
+    await verify('BROWSER-A',200000,id,{seconds:0});
     check('Partial remains pending',(await req(user,'/bookings/'+id)).body.booking.status,'PENDING');
     await customer.goto(base+'/user/bookings/'+id);
     await userStatus.getByText('Tình trạng cọc: Đã có khoản nhận — đang đối soát',{exact:true}).waitFor();
@@ -137,7 +195,7 @@ async function main() {
     await operator.getByRole('button',{name:'Tải lại',exact:true}).click();
     await operator.getByRole('region',{name:'Chi tiết đối soát cọc QR',exact:true}).getByText('Tổng đã nhận (lịch sử)',{exact:true}).waitFor();
     check('Read retry preserves ledger/contracts/history',sql('select concat((select count(*) from payment_transactions),":",(select count(*) from contracts),":",(select count(*) from booking_status_history))'),beforeRead);
-    await verify('BROWSER-B',300000);
+    await verify('BROWSER-B',300000,id,{seconds:37,notBefore:transferTimes['BROWSER-A']});
     await queueStage('APPLIED','Đã ghi nhận cọc vào đơn');
     await customer.goto(base+'/user/bookings/'+id);await userStatus.getByText('Tình trạng cọc: Đã ghi nhận cọc vào đơn',{exact:true}).waitFor();
     check('Confirmed USER sees no QR transfer prompt',await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).count(),0);
