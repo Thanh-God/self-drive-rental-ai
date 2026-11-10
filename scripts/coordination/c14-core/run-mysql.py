@@ -55,12 +55,26 @@ ITINERARY_LIVE_METHODS = {
     'offline': ['offlineOsrmStopped_PreviewIsUnavailableNotInfeasible'],
 }
 ROUTING_SUITES = ('LocationRouteHttpServerTest', ITINERARY_LIVE_SUITE)
+ITINERARY_QWEN_METHOD = 'onlineRealQwenAndOsrm_PreviewMatchesDirectOsrmLegs'
+ITINERARY_SCOPES = ('all', 'no-qwen', 'qwen')
 
-def require_itinerary_live(selected, routing_mode, environ):
+def itinerary_methods(routing_mode, scope='all'):
+    """Methods for one run. 'no-qwen' leaves out the live Qwen case; 'qwen' runs only that case."""
+    assert scope in ITINERARY_SCOPES, 'Unknown itinerary scope'
+    methods = ITINERARY_LIVE_METHODS[routing_mode]
+    if scope == 'no-qwen':
+        return [m for m in methods if m != ITINERARY_QWEN_METHOD]
+    if scope == 'qwen':
+        return [m for m in methods if m == ITINERARY_QWEN_METHOD]
+    return list(methods)
+
+def require_itinerary_live(selected, routing_mode, environ, scope='all'):
     if ITINERARY_LIVE_SUITE not in selected:
         return
     assert routing_mode in ITINERARY_LIVE_METHODS, 'Itinerary live suite requires explicit --routing-mode'
-    if routing_mode == 'online':
+    methods = itinerary_methods(routing_mode, scope)
+    assert methods, 'Itinerary scope selects no method for this routing mode'
+    if ITINERARY_QWEN_METHOD in methods:
         assert environ.get('KDRIVE_AI_LIVE_ITINERARY')=='true', 'Online itinerary live suite requires explicit KDRIVE_AI_LIVE_ITINERARY=true'
 
 def select_suites(requested, environ):
@@ -109,11 +123,12 @@ def main():
     parser.add_argument('--new-fixture-reason',help='Exceptional new container only; requires a specific approved reason')
     parser.add_argument('--suites',nargs='+',choices=SUITES)
     parser.add_argument('--routing-mode',choices=['online','offline'])
+    parser.add_argument('--itinerary-scope',choices=list(ITINERARY_SCOPES),default='all')
     args=parser.parse_args();build=Path(args.backend_root).resolve();out=Path(args.evidence).resolve()
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
     selected_suites=select_suites(args.suites,os.environ)
-    require_itinerary_live(selected_suites,args.routing_mode,os.environ)
+    require_itinerary_live(selected_suites,args.routing_mode,os.environ,args.itinerary_scope)
     pilot_inputs=validate_pilot_inputs(build,selected_suites)
     previous,pinned=fixture_source(args.reuse_evidence,args.new_fixture_reason,args.fixture_registry)
     if any(s in ROUTING_SUITES for s in selected_suites):
@@ -202,13 +217,13 @@ def main():
                         if args.routing_mode=='online' else 'offlineRoutePreview_WhenOsrmStopped_ReturnsUnavailableWithNoInventedEstimates')
                 selector+='#httpPermissionsAndInputNegativesWithPerRequestDatabaseInvariance+snapshotDetectsUpdatesWithoutRowCountChanges+'+method
             if suite==ITINERARY_LIVE_SUITE:
-                selector+='#'+'+'.join(ITINERARY_LIVE_METHODS[args.routing_mode])
+                selector+='#'+'+'.join(itinerary_methods(args.routing_mode,args.itinerary_scope))
             run([str(build/'mvnw.cmd'),'-o','-B','-ntp',f'-Dmaven.repo.local={REPO/".runtime/m2"}','-Dtest='+selector,'test'],build,suite+'.log')
             xml=build/f'target/surefire-reports/TEST-com.carrental.{suite}.xml';report=ET.parse(xml).getroot()
             counts=[int(report.get(k,'0')) for k in ['tests','failures','errors','skipped']]
             assert counts[0]>0 and counts[1:]==[0,0,0],(suite,counts)
             if suite=='ConcurrencyAndRaceTest':assert counts[0]==8
-            if suite==ITINERARY_LIVE_SUITE:assert counts[0]==len(ITINERARY_LIVE_METHODS[args.routing_mode])
+            if suite==ITINERARY_LIVE_SUITE:assert counts[0]==len(itinerary_methods(args.routing_mode,args.itinerary_scope))
             if suite=='MySqlMigrationTest':assert counts[0]==10
             shutil.copy2(xml,out/xml.name)
             reports.append({'suite':suite,'counts':counts,'schema':schema,'routingMode':args.routing_mode if suite in ROUTING_SUITES else None,'methods':[c.get('name') for c in report.findall('testcase')]})

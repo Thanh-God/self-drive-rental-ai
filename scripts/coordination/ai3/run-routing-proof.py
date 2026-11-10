@@ -66,9 +66,17 @@ def main():
     parser.add_argument('--browser-script', help='Optional repository proof run against the live regional graph')
     parser.add_argument('--itinerary-live', action='store_true',
                         help='Also run ItineraryLivePreviewIT online (live Qwen, KDRIVE_AI_LIVE_ITINERARY=true) and offline')
+    parser.add_argument('--itinerary-scope', choices=['all', 'no-qwen', 'qwen'], default='all',
+                        help='no-qwen: provider cases only; qwen: only the live Qwen case (online)')
     args = parser.parse_args()
+    itinerary_counts = {'online': 0, 'offline': 0}
     if args.itinerary_live:
-        assert os.environ.get('KDRIVE_AI_LIVE_ITINERARY') == 'true', 'Itinerary live proof requires explicit KDRIVE_AI_LIVE_ITINERARY=true'
+        if args.itinerary_scope != 'no-qwen':
+            assert os.environ.get('KDRIVE_AI_LIVE_ITINERARY') == 'true', 'Itinerary live proof requires explicit KDRIVE_AI_LIVE_ITINERARY=true'
+        itinerary_counts = {'all': {'online': 2, 'offline': 1}, 'no-qwen': {'online': 1, 'offline': 1},
+                            'qwen': {'online': 1, 'offline': 0}}[args.itinerary_scope]
+    else:
+        assert args.itinerary_scope == 'all', '--itinerary-scope needs --itinerary-live'
     out, build = Path(args.evidence).resolve(), Path(args.backend_root).resolve()
     graph, manifest_path = Path(args.graph_dir).resolve(), Path(args.graph_manifest).resolve()
     assert out.is_relative_to(REPO / '.runtime') and not out.exists(), 'New runtime evidence required'
@@ -129,7 +137,7 @@ def main():
         assert expected in failure, failure
         shutil.copy2(xml, out / ('adverse-' + mode + '.xml'))
 
-    def native(mode, previous, suite='LocationRouteHttpServerTest', expected=3):
+    def native(mode, previous, suite='LocationRouteHttpServerTest', expected=3, extra=()):
         evidence = out / (mode if suite == 'LocationRouteHttpServerTest' else 'itinerary-' + mode)
         historical = evidence.parent / 'historical-migration'
         if not historical.exists():
@@ -139,7 +147,7 @@ def main():
         run([os.sys.executable, str(REPO / 'scripts/coordination/c14-core/run-mysql.py'),
              '--backend-root', str(build), '--evidence', str(evidence),
              '--reuse-evidence', str(previous), '--suites', suite,
-             '--routing-mode', mode], log='native-' + evidence.name + '.log')
+             '--routing-mode', mode, *extra], log='native-' + evidence.name + '.log')
         result = json.loads((evidence / 'result.json').read_text())
         assert result['tests'] == expected and result['skips'] == 0
         assert result['suites'][0]['routingMode'] == mode
@@ -191,8 +199,9 @@ def main():
              '--evidence', str(out / 'raw-graph')], log='raw-graph.log')
         adverse('offline')
         previous = native('online', Path(args.reuse_evidence).resolve())
-        if args.itinerary_live:
-            previous = native('online', previous, 'ItineraryLivePreviewIT', 2)
+        if itinerary_counts['online']:
+            previous = native('online', previous, 'ItineraryLivePreviewIT', itinerary_counts['online'],
+                              ('--itinerary-scope', args.itinerary_scope))
         if args.browser_script:
             browser_env = env.copy()
             browser_env['AI_ROUTING_ENABLED'] = 'true'
@@ -203,10 +212,13 @@ def main():
         stop_owned()
         adverse('online')
         previous = native('offline', previous)
-        if args.itinerary_live:
-            native('offline', previous, 'ItineraryLivePreviewIT', 1)
-        (out / 'result.json').write_text(json.dumps({'status': 'PASS scoped', 'nativeTests': 6 + (3 if args.itinerary_live else 0),
-            'nativeSkips': 0, 'expectedAdverseFailures': 2, 'itineraryLive': args.itinerary_live, 'scope': manifest['scope']}, indent=2))
+        if itinerary_counts['offline']:
+            native('offline', previous, 'ItineraryLivePreviewIT', itinerary_counts['offline'],
+                   ('--itinerary-scope', args.itinerary_scope))
+        (out / 'result.json').write_text(json.dumps({'status': 'PASS scoped',
+            'nativeTests': 6 + itinerary_counts['online'] + itinerary_counts['offline'], 'nativeSkips': 0,
+            'expectedAdverseFailures': 2, 'itineraryLive': args.itinerary_live,
+            'itineraryScope': args.itinerary_scope if args.itinerary_live else None, 'scope': manifest['scope']}, indent=2))
     finally:
         if owned:
             stop_owned()

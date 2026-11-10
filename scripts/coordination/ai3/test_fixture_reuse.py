@@ -57,5 +57,24 @@ class OsrmReuseTest(unittest.TestCase):
                 fixture.assert_not_called()
             self.assertFalse(out.exists())
 
+    def test_no_qwen_scope_needs_no_opt_in_but_scope_needs_itinerary_live(self):
+        import os, sys
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory(dir=runner.REPO/'.runtime') as directory:
+            out=Path(directory)/'proof'
+            base=['run-routing-proof.py','--backend-root',directory,'--evidence',str(out),'--reuse-evidence',directory,
+                  '--graph-dir',directory,'--graph-manifest',directory]
+            with patch.dict(os.environ,{},clear=False),\
+                 patch.object(runner,'osrm_fixture',side_effect=AssertionError('reached fixture lookup')) as fixture:
+                os.environ.pop('KDRIVE_AI_LIVE_ITINERARY',None)
+                with patch.object(sys,'argv',base+['--itinerary-live','--itinerary-scope','no-qwen']):
+                    with self.assertRaisesRegex(AssertionError,'reached fixture lookup'):runner.main()
+                with patch.object(sys,'argv',base+['--itinerary-scope','no-qwen']):
+                    with self.assertRaisesRegex(AssertionError,'needs --itinerary-live'):runner.main()
+                with patch.object(sys,'argv',base+['--itinerary-live','--itinerary-scope','qwen']):
+                    with self.assertRaisesRegex(AssertionError,'KDRIVE_AI_LIVE_ITINERARY'):runner.main()
+                self.assertEqual(1,fixture.call_count)
+            self.assertFalse(out.exists())
+
 
 if __name__=='__main__':unittest.main()

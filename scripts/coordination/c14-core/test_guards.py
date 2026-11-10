@@ -136,6 +136,17 @@ class RunnerGuards(unittest.TestCase):
         module.require_itinerary_live(['ItineraryLivePreviewIT'],'online',{'KDRIVE_AI_LIVE_ITINERARY':'true'})
         self.assertEqual(2,len(module.ITINERARY_LIVE_METHODS['online']));self.assertEqual(1,len(module.ITINERARY_LIVE_METHODS['offline']))
 
+    def test_itinerary_scope_splits_qwen_from_provider_cases(self):
+        module=load('run-mysql')
+        self.assertEqual(['onlineForcedSearch_MatchesOracleOnRealGraphWithinBudget'],module.itinerary_methods('online','no-qwen'))
+        self.assertEqual([module.ITINERARY_QWEN_METHOD],module.itinerary_methods('online','qwen'))
+        self.assertEqual(module.ITINERARY_LIVE_METHODS['offline'],module.itinerary_methods('offline','no-qwen'))
+        self.assertEqual([],module.itinerary_methods('offline','qwen'))
+        module.require_itinerary_live(['ItineraryLivePreviewIT'],'online',{},'no-qwen')
+        with self.assertRaisesRegex(AssertionError,'KDRIVE_AI_LIVE_ITINERARY'):module.require_itinerary_live(['ItineraryLivePreviewIT'],'online',{},'qwen')
+        with self.assertRaisesRegex(AssertionError,'selects no method'):module.require_itinerary_live(['ItineraryLivePreviewIT'],'offline',{'KDRIVE_AI_LIVE_ITINERARY':'true'},'qwen')
+        with self.assertRaises(AssertionError):module.itinerary_methods('online','some')
+
     def test_itinerary_live_refusal_precedes_evidence_and_fixture(self):
         module=load('run-mysql')
         with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
