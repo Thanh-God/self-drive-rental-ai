@@ -16,8 +16,9 @@ async function login(email) { const r = await req(null, '/auth/login', 'POST', {
 async function main() {
   const user = await login('user@example.test'), staff = await login('staff.dn@example.test'), admin = await login('admin@example.test');
   const browser = await chromium.launch({ headless: true });
-  async function page(token) { const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });await context.addInitScript(jwt => localStorage.setItem('kdrive.jwt', jwt), token);const p = await context.newPage();p.setDefaultTimeout(15000);p.on('pageerror', e => errors.push(e.message));return p; }
-  const customer = await page(user), operator = await page(staff), manager = await page(admin);
+  const visible = locator => locator.textContent().then(t => t.replaceAll('\u00a0', ' '));
+  async function page(token, permissions = []) { const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });if (permissions.length) await context.grantPermissions(permissions, { origin: base });await context.addInitScript(jwt => localStorage.setItem('kdrive.jwt', jwt), token);const p = await context.newPage();p.setDefaultTimeout(15000);p.on('pageerror', e => errors.push(e.message));return p; }
+  const customer = await page(user, ['clipboard-read', 'clipboard-write']), operator = await page(staff), manager = await page(admin);
   try {
     await customer.goto(base + '/user/profile');
     await customer.getByLabel('Số giấy phép', { exact: true }).fill('SYNTHETIC-DEPOSIT-BROWSER');
@@ -51,12 +52,46 @@ async function main() {
     check('Still pending after approval', (await req(user, '/bookings/' + id)).body.booking.status, 'PENDING');
     await queueStage('AWAITING_TRANSFER','Chờ khách chuyển cọc');
     await customer.goto(base + '/user/bookings/' + id);
+    const userStatus=customer.getByRole('region',{name:'Tình trạng cọc của bạn',exact:true});
+    await userStatus.getByText('Tình trạng cọc: Chờ bạn chuyển cọc',{exact:true}).waitFor();
+    check('USER next action after approval',await visible(userStatus).then(t=>t.includes('Bước tiếp theo: Sau khi chuyển, gửi báo đã chuyển khoản')),true);
+    check('USER sees no Staff reconciliation detail',await customer.getByRole('region',{name:'Chi tiết đối soát cọc QR',exact:true}).count(),0);
+    check('USER sees no Staff receipt form',await customer.getByRole('button',{name:'Xác minh và ghi nhận',exact:true}).count(),0);
+    await customer.route('**/api/v1/bookings/'+id+'/deposit/qr-payload',route=>route.abort(),{times:1});
     await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).click();
+    await customer.getByRole('button',{name:'Thử tải lại mã QR',exact:true}).waitFor();
+    check('QR GET failure shows neutral retry',await customer.getByText('Không tải được mã QR. Kiểm tra kết nối rồi thử tải lại; chưa chuyển tiền khi chưa thấy mã QR.',{exact:false}).count(),1);
+    check('QR GET failure shows no image',await customer.getByAltText('Mã QR cọc giả lập').count(),0);
+    await customer.screenshot({path:path.join(out,'user-qr-get-error.png'),fullPage:true});
+    await customer.getByRole('button',{name:'Thử tải lại mã QR',exact:true}).click();
     const qr=customer.getByAltText('Mã QR cọc giả lập');await qr.waitFor();
+    const payload=(await req(user,'/bookings/'+id+'/deposit/qr-payload')).body;
+    const qrBlock=customer.locator('[aria-label="Mã QR cọc DEMO"]');
+    const qrText=await visible(qrBlock);
+    check('QR block amount',qrText.includes('Số tiền cọc390.000 ₫'),true);
+    check('QR block request code matches API',qrText.includes('Nội dung chuyển khoản (mã yêu cầu)'+payload.requestCode),true);
+    check('QR block VN deadline label',qrText.includes('Hạn đóng cọc (giờ Việt Nam)'),true);
+    check('QR block DEMO warning',qrText.includes('Mã QR DEMO — không chuyển tiền thật'),true);
+    await customer.getByRole('button',{name:'Sao chép nội dung chuyển khoản',exact:true}).click();
+    await customer.getByText('Đã sao chép nội dung chuyển khoản.',{exact:true}).waitFor();
+    check('Copied request code',await customer.evaluate(()=>navigator.clipboard.readText()),payload.requestCode);
     check('Authenticated QR image loads',await qr.evaluate(async i=>{await i.decode();return i.complete && i.naturalWidth>0;}),true);
     check('QR is local authenticated blob',await qr.getAttribute('src').then(s=>s.startsWith('blob:')),true);
+    await customer.route('**/api/v1/bookings/'+id+'/deposit/report',route=>route.abort(),{times:1});
     await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).click();
-    await customer.getByText(/Khách đã báo chuyển khoản lúc/).waitFor();
+    await customer.getByText('Chưa rõ báo đã chuyển khoản đã được ghi nhận hay chưa. Không gửi lại ngay; tải lại đơn để kiểm tra trước.',{exact:true}).waitFor();
+    check('Uncertain report blocks blind resend',await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).count(),0);
+    check('Aborted report not recorded',sql('select count(*) from bookings where reported_at is not null'),'0');
+    await customer.screenshot({path:path.join(out,'user-report-uncertain.png'),fullPage:true});
+    await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).click();
+    await userStatus.getByText('Tình trạng cọc: Chờ bạn chuyển cọc',{exact:true}).waitFor();
+    await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).click();await qr.waitFor();
+    await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).click();
+    await customer.getByText(/Bạn đã báo chuyển khoản lúc/).waitFor();
+    check('Exactly one report event',sql("select count(*) from payment_events where kind='TRANSFER_REPORTED'"),'1');
+    await customer.reload();await customer.getByText(/Bạn đã báo chuyển khoản lúc/).waitFor();
+    await userStatus.getByText('Tình trạng cọc: Đã báo chuyển — chờ nhân viên đối chiếu',{exact:true}).waitFor();
+    check('Reload keeps backend report time',await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).count(),0);
     check('Customer claim never confirms', (await req(user,'/bookings/'+id)).body.booking.status,'PENDING');
     await customer.screenshot({path:path.join(out,'user-reported-qr.png'),fullPage:true});
     await queueStage('REPORTED_NO_RECEIPT','Khách đã báo chuyển');
@@ -76,6 +111,11 @@ async function main() {
     }
     await verify('BROWSER-A',200000);
     check('Partial remains pending',(await req(user,'/bookings/'+id)).body.booking.status,'PENDING');
+    await customer.goto(base+'/user/bookings/'+id);
+    await userStatus.getByText('Tình trạng cọc: Đã có khoản nhận — đang đối soát',{exact:true}).waitFor();
+    check('USER partial gives no missing-amount demand',await visible(customer.locator('main')).then(t=>t.includes('Còn thiếu')),false);
+    check('USER partial hides verifier identity',await visible(customer.locator('main')).then(t=>t.includes('Xác minh bởi')),false);
+    await customer.screenshot({path:path.join(out,'user-partial-qr.png'),fullPage:true});
     check('Partial missing amount',(await req(user,'/bookings/'+id)).body.booking.deposit.missingAmount,190000);
     await queueStage('RECEIVED_INCOMPLETE','Cần đối soát khoản nhận');
     await operator.goto(base+'/staff/bookings/'+id);
@@ -93,12 +133,20 @@ async function main() {
     check('Read retry preserves ledger/contracts/history',sql('select concat((select count(*) from payment_transactions),":",(select count(*) from contracts),":",(select count(*) from booking_status_history))'),beforeRead);
     await verify('BROWSER-B',300000);
     await queueStage('APPLIED','Đã ghi nhận cọc vào đơn');
-    await customer.goto(base+'/user/bookings/'+id);await customer.getByText('Đã ghi nhận cọc cho đơn',{exact:true}).waitFor();
+    await customer.goto(base+'/user/bookings/'+id);await userStatus.getByText('Tình trạng cọc: Đã ghi nhận cọc vào đơn',{exact:true}).waitFor();
+    check('Confirmed USER sees no QR transfer prompt',await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).count(),0);
     check('Backend confirmed',(await req(user,'/bookings/'+id)).body.booking.status,'CONFIRMED');
     check('Applied exactly required',(await req(user,'/bookings/'+id)).body.booking.deposit.appliedAmount,390000);
     check('One contract',sql('select count(*) from contracts'),'1');
     check('Excess refund amount',sql('select sum(amount) from payment_refunds'),'110000');
+    check('Excess refund starts approved, not refunded',sql('select status from payment_refunds'),'APPROVED');
+    const userRefund=customer.getByRole('region',{name:'Tình trạng hoàn của bạn',exact:true});
+    check('USER approved refund is not refunded',await visible(userRefund).then(t=>t.includes('Hoàn 110.000 ₫ · Đã duyệt, chưa hoàn tiền') && t.includes('Đã hoàn (đã xác minh): 0 ₫')),true);
+    check('USER refund hides admin identity',await visible(customer.locator('main')).then(t=>t.includes('Duyệt bởi')),false);
     await customer.screenshot({path:path.join(out,'user-confirmed-qr.png'),fullPage:true});
+    wait=customer.waitForResponse(r=>r.url().endsWith('/bookings/'+id+'/contract') && r.request().method()==='GET');
+    await customer.getByRole('link',{name:'Hợp đồng',exact:true}).click();check('USER reads confirmed contract',(await wait).status(),200);
+    await customer.screenshot({path:path.join(out,'user-contract-qr.png'),fullPage:true});
     await manager.goto(base+'/admin/payments');
     check('QR refunds do not offer VNPAY',await manager.getByRole('button',{name:'Gửi hoàn VNPAY Sandbox',exact:true}).count(),0);
     await manager.getByRole('button',{name:'Bắt đầu xử lý hoàn (QR DEMO)',exact:true}).click();
@@ -107,14 +155,20 @@ async function main() {
     await manager.getByLabel('Tham chiếu hoàn',{exact:true}).fill('BROWSER-REFUND');
     await manager.getByLabel('Thời điểm hoàn (giờ Việt Nam)',{exact:true}).fill(new Date(Date.now()+7*3600000).toISOString().slice(0,19));
     check('Starting refund is not completion',sql('select status from payment_refunds'),'PROCESSING');
+    await customer.goto(base+'/user/bookings/'+id);
+    check('USER processing refund is not refunded',await visible(userRefund).then(t=>t.includes('Hoàn 110.000 ₫ · Đang xử lý hoàn') && t.includes('Đã hoàn (đã xác minh): 0 ₫')),true);
     await manager.getByLabel('Đã đối chiếu tài khoản, số tiền và chứng từ hoàn DEMO',{exact:true}).check();
     wait=manager.waitForResponse(r=>r.url().endsWith('/complete-manual'));
     await manager.getByRole('button',{name:'Xác nhận đã hoàn DEMO',exact:true}).click();await manager.getByRole('button',{name:'Xác nhận thao tác',exact:true}).click();check('Manual completion response',(await wait).status(),200);
     check('Refund verified complete',sql('select status from payment_refunds'),'SUCCEEDED');
     check('Refund has bank reference',sql('select provider_transaction from payment_refunds'),'BROWSER-REFUND');
+    await customer.goto(base+'/user/bookings/'+id);
+    check('USER sees verified refund only after SUCCEEDED',await visible(userRefund).then(t=>t.includes('Hoàn 110.000 ₫ · Đã hoàn') && t.includes('Đã hoàn (đã xác minh): 110.000 ₫')),true);
+    await customer.screenshot({path:path.join(out,'user-refund-succeeded-qr.png'),fullPage:true});
     await manager.screenshot({path:path.join(out,'admin-refund-qr.png'),fullPage:true});
     check('Guest cannot read QR',(await req(null,'/bookings/'+id+'/deposit/qr-payload')).status,401);
     check('User cannot access admin',(await req(user,'/admin/payments')).status,403);
+    check('Staff cannot report transfer for customer',(await req(staff,'/bookings/'+id+'/deposit/report','POST',{idempotencyKey:'report-'+id})).status>=400,true);
     check('No JS page errors',errors,[]);
   } catch(error) { for(const [name,p] of [["user",customer],["staff",operator],["admin",manager]]) {await p.screenshot({path:path.join(out,`failure-${name}.png`),fullPage:true}).catch(()=>{});} throw error;} finally {await browser.close();}
 }
