@@ -42,7 +42,17 @@ SUITES = ['ScheduleProtectionHttpTest','ScheduleWarningHttpTest','VehicleSearchT
           'VehicleCatalogHttpServerTest','VehicleAmenityHttpServerTest','VehicleImageHttpServerTest',
           'AccountAssignmentHttpServerTest','IncidentReportIntegrationTest','IncidentReportHttpServerTest',
           'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest',
-          'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest','LocationPilotImporterMySqlTest']
+          'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest','LocationPilotImporterMySqlTest',
+          'AssistantReviewQuoteFlowHttpTest','AssistantReviewQuoteLiveIT']
+
+# Live local-Qwen suites never run by default and need an explicit caller opt-in.
+LIVE_QWEN_SUITES = ['AssistantReviewQuoteLiveIT']
+
+def select_suites(requested, environ):
+    selected=list(requested) if requested else [s for s in SUITES if s not in LIVE_QWEN_SUITES]
+    if any(s in LIVE_QWEN_SUITES for s in selected):
+        assert environ.get('KDRIVE_AI_LIVE_FLOW')=='true', 'Live Qwen suite requires explicit KDRIVE_AI_LIVE_FLOW=true'
+    return selected
 
 PILOT_IMPORTER_SUITE = 'LocationPilotImporterMySqlTest'
 PILOT_INPUT_NAMES = ['import_locations_pilot.py', 'locations-pilot.json']
@@ -87,7 +97,7 @@ def main():
     args=parser.parse_args();build=Path(args.backend_root).resolve();out=Path(args.evidence).resolve()
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
-    selected_suites=args.suites or SUITES
+    selected_suites=select_suites(args.suites,os.environ)
     pilot_inputs=validate_pilot_inputs(build,selected_suites)
     previous,pinned=fixture_source(args.reuse_evidence,args.new_fixture_reason,args.fixture_registry)
     if 'LocationRouteHttpServerTest' in (args.suites or SUITES):
