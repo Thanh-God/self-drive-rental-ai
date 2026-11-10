@@ -276,13 +276,10 @@ async function main() {
     check('Rejected late report records nothing',sql(`select count(*) from payment_events where booking_id='${id3}' and kind='TRANSFER_REPORTED'`),'0');
     check('Rejected late report does not extend hold',sql(`select expires_at<utc_timestamp(6) from bookings where id='${id3}'`),'1');
     await customer.screenshot({path:path.join(out,'user-expired-fixture-c.png'),fullPage:true});
-    // FINDING (Staff UI, ngoài phạm vi G5): đơn hết hạn hiệu lực trả status EXPIRED nên form ghi nhận Staff bị ẩn,
-    // trong khi backend vẫn nhận khoản đến muộn để đưa vào hoàn. Ghi nhận hành vi hiện tại, rồi ghi khoản muộn qua API Staff (có nhãn).
-    await operator.goto(base+'/staff/bookings/'+id3);await operator.getByRole('region',{name:'Chi tiết đối soát cọc QR',exact:true}).waitFor();
-    check('FINDING: Staff UI hides receipt form for expired booking',await operator.getByRole('button',{name:'Xác minh và ghi nhận',exact:true}).count(),0);
-    const pay3=(await req(user,`/bookings/${id3}/deposit/qr-payload`)).body, ver3=(await req(staff,'/bookings/'+id3)).body.booking.version;
-    const late=await req(staff,`/bookings/${id3}/deposit/verify`,'POST',{transactionRef:'API-LATE-C',amountVnd:dep3,transferTime:new Date(Date.now()-5000).toISOString(),transferNote:pay3.requestCode,sourceAccount:'DEMO-PAYER',idempotencyKey:'g5-late-'+id3,expectedVersion:ver3,verified:true});
-    check('LABELLED API late receipt by pickup Staff accepted',late.status,200);
+    // G5-F01: pickup Staff records the late DEMO receipt through the UI on the expired booking, with the refund warning.
+    await operator.goto(base+'/staff/bookings/'+id3);
+    check('Staff sees late-receipt refund warning on expired booking',await visible(operator.getByLabel('Cảnh báo đơn hết hạn',{exact:true})).then(t=>t.includes('không xác nhận đơn, không giành lại lịch và được đưa vào hoàn')),true);
+    await verify('BROWSER-LATE',dep3,id3);
     check('Late receipt never confirms C',(await req(user,'/bookings/'+id3)).body.booking.status==='CONFIRMED',false);
     check('Late receipt issues no contract for C',sql(`select count(*) from contracts where booking_id='${id3}'`),'0');
     const late3=sql(`select concat(status,':',kind,':',amount) from payment_refunds where booking_id='${id3}'`);
