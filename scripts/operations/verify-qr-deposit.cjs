@@ -288,7 +288,9 @@ async function main() {
     await customer.goto(base+'/user/bookings/'+id3);await userStatus.getByText('Tình trạng cọc: Đơn đã hết hạn giữ chỗ',{exact:true}).waitFor();
     const late3Text=await visible(customer.locator('main'));
     check('USER sees late-transfer explanation',late3Text.includes('Có khoản chuyển từ hạn đóng cọc trở đi. Khoản này không được áp dụng vào đơn'),true);
-    check('USER is not blamed for late verification',late3Text.includes('Đây không phải lỗi của bạn'),true);
+    check('USER sees from-deadline verification wording',late3Text.includes('Có khoản được xác minh từ thời điểm hết hạn đối soát trở đi. Khoản này không được áp dụng vào đơn; xem tình trạng hoàn bên dưới.'),true);
+    // Chỉ quét khu tình trạng cọc của USER: khung "Hồ sơ sự cố" có sẵn câu "không tự kết luận trách nhiệm".
+    check('USER verification note assigns no blame',/lỗi của bạn|trách nhiệm|sau hạn đối soát của nhân viên/.test(await visible(userStatus)),false);
     check('USER sees historical total, not money held',late3Text.includes(`Tổng đã nhận (lịch sử): ${vnd(dep3)}`) && late3Text.includes('không phải số tiền hệ thống đang giữ'),true);
     check('USER late refund approved but not refunded',await visible(customer.getByRole('region',{name:'Tình trạng hoàn của bạn',exact:true})).then(t=>t.includes('Đã duyệt, chưa hoàn tiền') && t.includes('Đã hoàn (đã xác minh): 0 ₫')),true);
     await customer.screenshot({path:path.join(out,'user-expired-late-money-c.png'),fullPage:true});
