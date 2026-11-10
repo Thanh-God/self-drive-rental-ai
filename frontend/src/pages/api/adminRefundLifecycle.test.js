@@ -126,7 +126,7 @@ test('G4.3 refund rows explain each lifecycle state; only SUCCEEDED is refunded 
 });
 test('G4.4 initial list failure shows an error without stale data or actions, and reload recovers with GET only',async()=>{
   let fail=true;
-  await mount(c=>{if(fail)throw failure(500);return copy(serverData);});
+  await mount(()=>{if(fail)throw failure(500);return copy(serverData);});
   assert.match(container.textContent,/Máy chủ gặp lỗi|HTTP 500/);
   assert.ok(!container.querySelector('[aria-label="Bộ lọc cọc và hoàn"]'),'no data sections while list failed');
   assert.equal(button('Duyệt khoản hoàn'),undefined);
