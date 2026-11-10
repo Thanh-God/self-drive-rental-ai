@@ -1,6 +1,6 @@
 // Internal protocol/browser proof only. No live merchant, payment or refund claim.
 const assert = require('node:assert/strict');
-const fs = require('node:fs'), path = require('node:path'), cp = require('node:child_process');
+const fs = require('node:fs'), path = require('node:path'), cp = require('node:child_process'), crypto = require('node:crypto');
 const { chromium } = require(process.env.C11_PLAYWRIGHT);
 const out = process.env.C11_EVIDENCE, base = 'http://127.0.0.1:5300', api = 'http://127.0.0.1:8300/api/v1';
 const fixture = JSON.parse(fs.readFileSync(path.join(process.env.C11_BACKEND_EVIDENCE, 'fixture.json')));
@@ -237,6 +237,79 @@ async function main() {
     await manager.screenshot({path:path.join(out,'admin-late-cancel-succeeded.png'),fullPage:true});
     u2=await userRefund2();check('USER sees refunded only after SUCCEEDED (fixture B)',u2.includes(`Hoàn ${vnd(half)} · Đã hoàn`) && u2.includes(`Đã hoàn (đã xác minh): ${vnd(half)}`),true);
     await customer.screenshot({path:path.join(out,'user-late-cancel-succeeded.png'),fullPage:true});
+    // QR-G5.2: exact per-booking invariants for the main USER -> STAFF -> USER -> ADMIN booking A.
+    check('A exactly one contract',sql(`select count(*) from contracts where booking_id='${id}'`),'1');
+    check('A ledger two receipts, applied equals deposit',sql(`select concat(count(*),':',sum(amount),':',sum(applied_amount)) from payment_transactions where booking_id='${id}' and status='SUCCEEDED'`),'2:500000:390000');
+    check('A confirmed exactly once',sql(`select count(*) from booking_status_history where booking_id='${id}' and next_status='CONFIRMED'`),'1');
+    check('A one excess refund, succeeded',sql(`select concat(count(*),':',sum(amount),':',min(status)) from payment_refunds where booking_id='${id}'`),'1:110000:SUCCEEDED');
+    check('A exactly one transfer report event',sql(`select count(*) from payment_events where booking_id='${id}' and kind='TRANSFER_REPORTED'`),'1');
+    check('Fixture B keeps its single contract after cancellation',sql(`select count(*) from contracts where booking_id='${id2}'`),'1');
+
+    // QR-G5.3a ownership: a second synthetic USER registered only in this isolated schema (generated test password, never logged).
+    const reg=await req(null,'/auth/register','POST',{email:`g5.other.${Date.now()}@example.test`,fullName:'Khách khác G5',password:'G5-'+crypto.randomBytes(12).toString('hex')});
+    check('Second synthetic USER registered in isolated schema',reg.status,201);const other=reg.body.token;
+    for(const [name,ep] of [['booking',`/bookings/${id}`],['deposit ledger',`/bookings/${id}/deposit`],['QR payload',`/bookings/${id}/deposit/qr-payload`],['QR image',`/bookings/${id}/deposit/qr`]])
+      check('Other USER cannot read A '+name,(await req(other,ep)).status,404);
+    const stranger=await page(other);
+    wait=stranger.waitForResponse(r=>r.url().endsWith('/api/v1/bookings/'+id) && r.request().method()==='GET');await stranger.goto(base+'/user/bookings/'+id);check('Other USER UI read of A is refused',(await wait).status(),404);
+    check('Other USER UI shows no deposit panel or QR',await stranger.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).count()+await stranger.getByText('Cọc giữ chỗ',{exact:false}).count(),0);
+    await stranger.screenshot({path:path.join(out,'other-user-denied.png'),fullPage:true});
+
+    // QR-G5.3b expiry and late money: booking C (vehicle v3, day+4..+5). The expired state is a LABELLED PAST-DATED SQL FIXTURE
+    // on this isolated schema only (approval/deadlines shifted into the past); application and database clocks are untouched.
+    const day3=new Date(Date.now()+4*86400000+7*3600000).toISOString().slice(0,10), end3=new Date(Date.now()+5*86400000+7*3600000).toISOString().slice(0,10);
+    await customer.goto(base+`/user/bookings/new?vehicleId=v3&start=${day3}&end=${end3}&pickupBranchId=dn&returnBranchId=dn`);
+    wait=customer.waitForResponse(r=>r.url().endsWith('/bookings/quote'));await customer.getByRole('button',{name:'Kiểm tra lịch & báo giá',exact:true}).click();check('Fixture C quote',(await wait).status(),200);
+    await customer.getByRole('checkbox',{name:'Tôi xác nhận thời gian, chi nhánh và tổng báo giá.',exact:true}).check();wait=customer.waitForResponse(r=>r.url().endsWith('/bookings') && r.request().method()==='POST');await customer.getByRole('button',{name:'Gửi yêu cầu thuê',exact:true}).click();
+    const r3=await wait;check('Fixture C request',r3.status(),201);const b3=await r3.json(),id3=b3.id,dep3=b3.deposit.amount;await customer.waitForURL('**/user/bookings/'+id3);
+    await operator.goto(base+'/staff/bookings/'+id3);const panel3=operator.getByRole('region',{name:'Ảnh GPLX',exact:true});
+    await panel3.getByLabel('Kết quả kiểm tra',{exact:true}).selectOption('APPROVED');await panel3.getByLabel('Nhận xét kiểm tra',{exact:true}).fill('Ảnh giả lập, chưa đối chiếu bản gốc.');wait=operator.waitForResponse(r=>r.url().endsWith('/license-photo-review'));await panel3.getByRole('button',{name:'Lưu kiểm tra hồ sơ',exact:true}).click();check('Fixture C photo review',(await wait).status(),200);
+    wait=operator.waitForResponse(r=>r.url().endsWith('/deposit/approve'));await operator.getByRole('button',{name:'Duyệt hồ sơ và tạo mã QR cọc',exact:true}).click();check('Fixture C approve deposit',(await wait).status(),200);
+    check('Other USER cannot report for C',(await req(other,`/bookings/${id3}/deposit/report`,'POST',{idempotencyKey:'report-'+id3})).status,404);
+    sql(`update bookings set deposit_approved_at=timestampadd(MINUTE,-120,utc_timestamp(6)),payment_due_at=timestampadd(MINUTE,-90,utc_timestamp(6)),review_due_at=timestampadd(MINUTE,-60,utc_timestamp(6)),original_hold_until=timestampadd(MINUTE,-60,utc_timestamp(6)),expires_at=timestampadd(MINUTE,-60,utc_timestamp(6)) where id='${id3}' and status='PENDING'`);
+    check('LABELLED past-dated fixture C applied (isolated schema only)',sql(`select concat(status,':',payment_due_at<utc_timestamp(6),':',expires_at<utc_timestamp(6)) from bookings where id='${id3}'`),'PENDING:1:1');
+    await customer.goto(base+'/user/bookings/'+id3);
+    await userStatus.getByText('Tình trạng cọc: Đơn đã hết hạn giữ chỗ',{exact:true}).waitFor();
+    check('Expired C offers no QR or report',await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).count()+await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).count(),0);
+    check('Expired C makes no missing-amount demand',await visible(customer.locator('main')).then(t=>t.includes('Còn thiếu')),false);
+    check('Report after deadline rejected by backend',(await req(user,`/bookings/${id3}/deposit/report`,'POST',{idempotencyKey:'report-'+id3})).status,409);
+    check('Rejected late report records nothing',sql(`select count(*) from payment_events where booking_id='${id3}' and kind='TRANSFER_REPORTED'`),'0');
+    check('Rejected late report does not extend hold',sql(`select expires_at<utc_timestamp(6) from bookings where id='${id3}'`),'1');
+    await customer.screenshot({path:path.join(out,'user-expired-fixture-c.png'),fullPage:true});
+    // FINDING (Staff UI, ngoài phạm vi G5): đơn hết hạn hiệu lực trả status EXPIRED nên form ghi nhận Staff bị ẩn,
+    // trong khi backend vẫn nhận khoản đến muộn để đưa vào hoàn. Ghi nhận hành vi hiện tại, rồi ghi khoản muộn qua API Staff (có nhãn).
+    await operator.goto(base+'/staff/bookings/'+id3);await operator.getByRole('region',{name:'Chi tiết đối soát cọc QR',exact:true}).waitFor();
+    check('FINDING: Staff UI hides receipt form for expired booking',await operator.getByRole('button',{name:'Xác minh và ghi nhận',exact:true}).count(),0);
+    const pay3=(await req(user,`/bookings/${id3}/deposit/qr-payload`)).body, ver3=(await req(staff,'/bookings/'+id3)).body.booking.version;
+    const late=await req(staff,`/bookings/${id3}/deposit/verify`,'POST',{transactionRef:'API-LATE-C',amountVnd:dep3,transferTime:new Date(Date.now()-5000).toISOString(),transferNote:pay3.requestCode,sourceAccount:'DEMO-PAYER',idempotencyKey:'g5-late-'+id3,expectedVersion:ver3,verified:true});
+    check('LABELLED API late receipt by pickup Staff accepted',late.status,200);
+    check('Late receipt never confirms C',(await req(user,'/bookings/'+id3)).body.booking.status==='CONFIRMED',false);
+    check('Late receipt issues no contract for C',sql(`select count(*) from contracts where booking_id='${id3}'`),'0');
+    const late3=sql(`select concat(status,':',kind,':',amount) from payment_refunds where booking_id='${id3}'`);
+    check('Late money queued as approved refund of the full unapplied receipt',late3.replace(/:(LATE|UNAPPLIED):/,':K:'),`APPROVED:K:${dep3}`);
+    check('Late receipt applied amount stays zero',sql(`select applied_amount from payment_transactions where booking_id='${id3}'`),'0');
+    await customer.goto(base+'/user/bookings/'+id3);await userStatus.getByText('Tình trạng cọc: Đơn đã hết hạn giữ chỗ',{exact:true}).waitFor();
+    const late3Text=await visible(customer.locator('main'));
+    check('USER sees late-transfer explanation',late3Text.includes('Có khoản chuyển từ hạn đóng cọc trở đi. Khoản này không được áp dụng vào đơn'),true);
+    check('USER is not blamed for late verification',late3Text.includes('Đây không phải lỗi của bạn'),true);
+    check('USER sees historical total, not money held',late3Text.includes(`Tổng đã nhận (lịch sử): ${vnd(dep3)}`) && late3Text.includes('không phải số tiền hệ thống đang giữ'),true);
+    check('USER late refund approved but not refunded',await visible(customer.getByRole('region',{name:'Tình trạng hoàn của bạn',exact:true})).then(t=>t.includes('Đã duyệt, chưa hoàn tiền') && t.includes('Đã hoàn (đã xác minh): 0 ₫')),true);
+    await customer.screenshot({path:path.join(out,'user-expired-late-money-c.png'),fullPage:true});
+    await operator.goto(base+'/staff/bookings/'+id3);
+    const staff3=await visible(operator.getByRole('region',{name:'Chi tiết đối soát cọc QR',exact:true}));
+    check('Staff sees expired stage and late warnings for C',staff3.includes('Đã hết hạn') && staff3.includes('Có khoản chuyển từ hạn đóng cọc trở đi'),true);
+    await operator.screenshot({path:path.join(out,'staff-expired-late-money-c.png'),fullPage:true});
+
+    // QR-G5.3c Admin list read failure and recovery (GET only, no mutation).
+    const mutationsBefore=sql("select concat((select count(*) from payment_refunds),':',(select count(*) from payment_transactions),':',(select count(*) from payment_events))");
+    await manager.route('**/api/v1/admin/payments',route=>route.abort(),{times:1});
+    await manager.goto(base+'/admin/payments');await manager.getByRole('button',{name:'Tải lại',exact:true}).waitFor();
+    await manager.waitForTimeout(500);
+    check('Admin list failure shows no stale rows',await manager.locator('[aria-label^="Khoản nhận "]').count(),0);
+    await manager.screenshot({path:path.join(out,'admin-list-read-error.png'),fullPage:true});
+    await manager.getByRole('button',{name:'Tải lại',exact:true}).click();
+    await manager.locator('[aria-label^="Khoản nhận "]').first().waitFor();
+    check('Admin list recovery mutates nothing',sql("select concat((select count(*) from payment_refunds),':',(select count(*) from payment_transactions),':',(select count(*) from payment_events))"),mutationsBefore);
     check('Staff cannot decide refunds',(await req(staff,'/admin/refunds/'+refundId2+'/decide','POST',{expectedVersion:0,amount:0,reason:'x'})).status,403);
     check('Guest cannot read QR',(await req(null,'/bookings/'+id+'/deposit/qr-payload')).status,401);
     check('User cannot access admin',(await req(user,'/admin/payments')).status,403);
