@@ -125,6 +125,29 @@ class RunnerGuards(unittest.TestCase):
             with self.assertRaises(AssertionError):module.select_suites(['AssistantReviewQuoteLiveIT'],environ)
         self.assertEqual(['AssistantReviewQuoteLiveIT'],module.select_suites(['AssistantReviewQuoteLiveIT'],{'KDRIVE_AI_LIVE_FLOW':'true'}))
 
+    def test_itinerary_live_suite_needs_mode_and_online_opt_in(self):
+        module=load('run-mysql')
+        self.assertIn('ItineraryLivePreviewIT',module.SUITES)
+        self.assertNotIn('ItineraryLivePreviewIT',module.select_suites(None,{}))
+        module.require_itinerary_live(['RecommendationHttpTest'],None,{})
+        for mode,environ in ((None,{}),('online',{}),('online',{'KDRIVE_AI_LIVE_ITINERARY':'1'}),('sideways',{})):
+            with self.assertRaises(AssertionError):module.require_itinerary_live(['ItineraryLivePreviewIT'],mode,environ)
+        module.require_itinerary_live(['ItineraryLivePreviewIT'],'offline',{})
+        module.require_itinerary_live(['ItineraryLivePreviewIT'],'online',{'KDRIVE_AI_LIVE_ITINERARY':'true'})
+        self.assertEqual(2,len(module.ITINERARY_LIVE_METHODS['online']));self.assertEqual(1,len(module.ITINERARY_LIVE_METHODS['offline']))
+
+    def test_itinerary_live_refusal_precedes_evidence_and_fixture(self):
+        module=load('run-mysql')
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            folder=Path(directory);out=folder/'evidence'
+            argv=['run-mysql.py','--backend-root',str(folder/'backend-copy'),'--evidence',str(out),'--suites','ItineraryLivePreviewIT','--routing-mode','online']
+            with patch.object(sys,'argv',argv),patch.dict(os.environ,{},clear=False),\
+                 patch.object(module,'fixture_source',side_effect=AssertionError('fixture must not be reached')) as source:
+                os.environ.pop('KDRIVE_AI_LIVE_ITINERARY',None)
+                with self.assertRaisesRegex(AssertionError,'KDRIVE_AI_LIVE_ITINERARY'):module.main()
+                source.assert_not_called()
+            self.assertFalse(out.exists())
+
     def test_live_qwen_refusal_precedes_evidence_and_fixture(self):
         module=load('run-mysql')
         with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:

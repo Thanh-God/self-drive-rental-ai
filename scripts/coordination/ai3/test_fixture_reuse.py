@@ -43,4 +43,19 @@ class OsrmReuseTest(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError,'mount drift'):runner.validate_osrm_reuse(entry,changed,graph)
 
 
+    def test_itinerary_live_requires_opt_in_before_any_evidence_or_fixture(self):
+        import os, sys
+        from unittest.mock import patch
+        with tempfile.TemporaryDirectory(dir=runner.REPO/'.runtime') as directory:
+            out=Path(directory)/'proof'
+            argv=['run-routing-proof.py','--backend-root',directory,'--evidence',str(out),'--reuse-evidence',directory,
+                  '--graph-dir',directory,'--graph-manifest',directory,'--itinerary-live']
+            with patch.object(sys,'argv',argv),patch.dict(os.environ,{},clear=False),\
+                 patch.object(runner,'osrm_fixture',side_effect=AssertionError('fixture must not be reached')) as fixture:
+                os.environ.pop('KDRIVE_AI_LIVE_ITINERARY',None)
+                with self.assertRaisesRegex(AssertionError,'KDRIVE_AI_LIVE_ITINERARY'):runner.main()
+                fixture.assert_not_called()
+            self.assertFalse(out.exists())
+
+
 if __name__=='__main__':unittest.main()

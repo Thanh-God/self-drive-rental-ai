@@ -43,13 +43,28 @@ SUITES = ['ScheduleProtectionHttpTest','ScheduleWarningHttpTest','VehicleSearchT
           'AccountAssignmentHttpServerTest','IncidentReportIntegrationTest','IncidentReportHttpServerTest',
           'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest',
           'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest','LocationPilotImporterMySqlTest',
-          'AssistantReviewQuoteFlowHttpTest','AssistantReviewQuoteLiveIT']
+          'AssistantReviewQuoteFlowHttpTest','AssistantReviewQuoteLiveIT','ItineraryLivePreviewIT']
 
 # Live local-Qwen suites never run by default and need an explicit caller opt-in.
 LIVE_QWEN_SUITES = ['AssistantReviewQuoteLiveIT']
 
+# Live itinerary preview on the registered OSRM graph: never default, explicit routing mode, Qwen opt-in online.
+ITINERARY_LIVE_SUITE = 'ItineraryLivePreviewIT'
+ITINERARY_LIVE_METHODS = {
+    'online': ['onlineRealQwenAndOsrm_PreviewMatchesDirectOsrmLegs', 'onlineForcedSearch_MatchesOracleOnRealGraphWithinBudget'],
+    'offline': ['offlineOsrmStopped_PreviewIsUnavailableNotInfeasible'],
+}
+ROUTING_SUITES = ('LocationRouteHttpServerTest', ITINERARY_LIVE_SUITE)
+
+def require_itinerary_live(selected, routing_mode, environ):
+    if ITINERARY_LIVE_SUITE not in selected:
+        return
+    assert routing_mode in ITINERARY_LIVE_METHODS, 'Itinerary live suite requires explicit --routing-mode'
+    if routing_mode == 'online':
+        assert environ.get('KDRIVE_AI_LIVE_ITINERARY')=='true', 'Online itinerary live suite requires explicit KDRIVE_AI_LIVE_ITINERARY=true'
+
 def select_suites(requested, environ):
-    selected=list(requested) if requested else [s for s in SUITES if s not in LIVE_QWEN_SUITES]
+    selected=list(requested) if requested else [s for s in SUITES if s not in LIVE_QWEN_SUITES and s != ITINERARY_LIVE_SUITE]
     if any(s in LIVE_QWEN_SUITES for s in selected):
         assert environ.get('KDRIVE_AI_LIVE_FLOW')=='true', 'Live Qwen suite requires explicit KDRIVE_AI_LIVE_FLOW=true'
     return selected
@@ -98,9 +113,10 @@ def main():
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
     selected_suites=select_suites(args.suites,os.environ)
+    require_itinerary_live(selected_suites,args.routing_mode,os.environ)
     pilot_inputs=validate_pilot_inputs(build,selected_suites)
     previous,pinned=fixture_source(args.reuse_evidence,args.new_fixture_reason,args.fixture_registry)
-    if 'LocationRouteHttpServerTest' in (args.suites or SUITES):
+    if any(s in ROUTING_SUITES for s in selected_suites):
         assert args.routing_mode, 'Routing suite requires explicit --routing-mode'
         with socket.socket() as probe:
             online = probe.connect_ex(('127.0.0.1',5000)) == 0
@@ -185,14 +201,17 @@ def main():
                 method=('onlineRoutePreview_RequiresLiveOsrm_MustBeVerified_BothDirectionsAndMultiPoint'
                         if args.routing_mode=='online' else 'offlineRoutePreview_WhenOsrmStopped_ReturnsUnavailableWithNoInventedEstimates')
                 selector+='#httpPermissionsAndInputNegativesWithPerRequestDatabaseInvariance+snapshotDetectsUpdatesWithoutRowCountChanges+'+method
+            if suite==ITINERARY_LIVE_SUITE:
+                selector+='#'+'+'.join(ITINERARY_LIVE_METHODS[args.routing_mode])
             run([str(build/'mvnw.cmd'),'-o','-B','-ntp',f'-Dmaven.repo.local={REPO/".runtime/m2"}','-Dtest='+selector,'test'],build,suite+'.log')
             xml=build/f'target/surefire-reports/TEST-com.carrental.{suite}.xml';report=ET.parse(xml).getroot()
             counts=[int(report.get(k,'0')) for k in ['tests','failures','errors','skipped']]
             assert counts[0]>0 and counts[1:]==[0,0,0],(suite,counts)
             if suite=='ConcurrencyAndRaceTest':assert counts[0]==8
+            if suite==ITINERARY_LIVE_SUITE:assert counts[0]==len(ITINERARY_LIVE_METHODS[args.routing_mode])
             if suite=='MySqlMigrationTest':assert counts[0]==10
             shutil.copy2(xml,out/xml.name)
-            reports.append({'suite':suite,'counts':counts,'schema':schema,'routingMode':args.routing_mode if suite=='LocationRouteHttpServerTest' else None,'methods':[c.get('name') for c in report.findall('testcase')]})
+            reports.append({'suite':suite,'counts':counts,'schema':schema,'routingMode':args.routing_mode if suite in ROUTING_SUITES else None,'methods':[c.get('name') for c in report.findall('testcase')]})
             (out/'progress.json').write_text(json.dumps(reports,indent=2));print(suite+': PASS '+str(counts[0]),flush=True)
         matched=[]
         with zipfile.ZipFile(jar) as z:
