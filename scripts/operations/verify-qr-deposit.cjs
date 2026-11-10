@@ -83,7 +83,10 @@ async function main() {
     check('Uncertain report blocks blind resend',await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).count(),0);
     check('Aborted report not recorded',sql('select count(*) from bookings where reported_at is not null'),'0');
     await customer.screenshot({path:path.join(out,'user-report-uncertain.png'),fullPage:true});
-    await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).click();
+    // Chờ đúng lần tải lại đơn (component được mount lại) trước khi thao tác tiếp; chữ trạng thái cũ đã có sẵn trên DOM.
+    wait=customer.waitForResponse(r=>r.url().endsWith('/api/v1/bookings/'+id) && r.request().method()==='GET');
+    await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).click();check('Recheck reloads booking with GET',(await wait).status(),200);
+    await customer.getByRole('button',{name:'Kiểm tra lại tình trạng báo',exact:true}).waitFor({state:'detached'});
     await userStatus.getByText('Tình trạng cọc: Chờ bạn chuyển cọc',{exact:true}).waitFor();
     await customer.getByRole('button',{name:'Hiển thị mã QR cọc',exact:true}).click();await qr.waitFor();
     await customer.getByRole('button',{name:'Gửi báo đã chuyển khoản',exact:true}).click();
@@ -95,17 +98,20 @@ async function main() {
     check('Customer claim never confirms', (await req(user,'/bookings/'+id)).body.booking.status,'PENDING');
     await customer.screenshot({path:path.join(out,'user-reported-qr.png'),fullPage:true});
     await queueStage('REPORTED_NO_RECEIPT','Khách đã báo chuyển');
-    async function verify(ref,amount) {
-      await operator.goto(base+'/staff/bookings/'+id);
+    async function verify(ref,amount,target=id) {
+      // Backend từ chối thời điểm chuyển trước approvedAt; ô nhập theo giây nên chờ qua giây kế tiếp sau duyệt.
+      const approvedAt=Date.parse((await req(user,'/bookings/'+target)).body.booking.deposit.approvedAt);
+      while(Date.now()<Math.ceil(approvedAt/1000)*1000+1000) await new Promise(r=>setTimeout(r,200));
+      await operator.goto(base+'/staff/bookings/'+target);
       await operator.getByLabel('Mã tham chiếu giao dịch',{exact:true}).fill(ref);
       await operator.getByLabel('Số tiền thực nhận (VND)',{exact:true}).fill(String(amount));
       const local=new Date(Date.now()+7*3600000).toISOString().slice(0,19);
       await operator.getByLabel('Thời điểm chuyển (giờ VN)',{exact:true}).fill(local);
       await operator.getByLabel('Tài khoản nguồn (giả lập)',{exact:true}).fill('DEMO-PAYER');
       await operator.getByLabel('Đã đối chiếu đúng đơn, nội dung, bên nhận DEMO và số tiền',{exact:true}).check();
-      const response=operator.waitForResponse(r=>r.url().endsWith('/deposit/verify'));
+      const response=operator.waitForResponse(r=>r.url().endsWith('/deposit/verify'));response.catch(()=>{});
       await operator.getByRole('button',{name:'Xác minh và ghi nhận',exact:true}).click();
-      const readback=operator.waitForResponse(r=>r.url().endsWith('/bookings/'+id+'/deposit') && r.request().method()==='GET');
+      const readback=operator.waitForResponse(r=>r.url().endsWith('/bookings/'+target+'/deposit') && r.request().method()==='GET');readback.catch(()=>{});
       await operator.getByRole('button',{name:'Xác nhận ghi nhận DEMO',exact:true}).click();check('Staff receipt '+ref,(await response).status(),200);
       const ledger=await (await readback).json();check('Receipt present in ledger '+ref,ledger.payments.some(p=>p.providerTransaction===ref),true);
     }
@@ -166,6 +172,72 @@ async function main() {
     check('USER sees verified refund only after SUCCEEDED',await visible(userRefund).then(t=>t.includes('Hoàn 110.000 ₫ · Đã hoàn') && t.includes('Đã hoàn (đã xác minh): 110.000 ₫')),true);
     await customer.screenshot({path:path.join(out,'user-refund-succeeded-qr.png'),fullPage:true});
     await manager.screenshot({path:path.join(out,'admin-refund-qr.png'),fullPage:true});
+    // G4.5: separate fixture booking (vehicle v3, pickup tomorrow => always <24h before start of pickup day).
+    // Staff records the full DEMO deposit, then cancels as a late customer cancellation => REQUESTED refund that only Admin decides.
+    const vnd=n=>new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'}).format(n).replaceAll('\u00a0',' ');
+    const day2=new Date(Date.now()+1*86400000+7*3600000).toISOString().slice(0,10), end2=new Date(Date.now()+2*86400000+7*3600000).toISOString().slice(0,10);
+    await customer.goto(base+`/user/bookings/new?vehicleId=v3&start=${day2}&end=${end2}&pickupBranchId=dn&returnBranchId=dn`);
+    wait=customer.waitForResponse(r=>r.url().endsWith('/bookings/quote'));await customer.getByRole('button',{name:'Kiểm tra lịch & báo giá',exact:true}).click();check('Fixture B quote',(await wait).status(),200);
+    await customer.getByRole('checkbox',{name:'Tôi xác nhận thời gian, chi nhánh và tổng báo giá.',exact:true}).check();wait=customer.waitForResponse(r=>r.url().endsWith('/bookings') && r.request().method()==='POST');await customer.getByRole('button',{name:'Gửi yêu cầu thuê',exact:true}).click();
+    const r2=await wait;check('Fixture B request',r2.status(),201);const b2=await r2.json(),id2=b2.id;await customer.waitForURL('**/user/bookings/'+id2);
+    check('Fixture B deposit required',b2.deposit.required,true);const dep2=b2.deposit.amount;
+    await operator.goto(base+'/staff/bookings/'+id2);const panel2=operator.getByRole('region',{name:'Ảnh GPLX',exact:true});
+    await panel2.getByLabel('Kết quả kiểm tra',{exact:true}).selectOption('APPROVED');await panel2.getByLabel('Nhận xét kiểm tra',{exact:true}).fill('Ảnh giả lập, chưa đối chiếu bản gốc.');wait=operator.waitForResponse(r=>r.url().endsWith('/license-photo-review'));await panel2.getByRole('button',{name:'Lưu kiểm tra hồ sơ',exact:true}).click();check('Fixture B photo review',(await wait).status(),200);
+    wait=operator.waitForResponse(r=>r.url().endsWith('/deposit/approve'));await operator.getByRole('button',{name:'Duyệt hồ sơ và tạo mã QR cọc',exact:true}).click();check('Fixture B approve deposit',(await wait).status(),200);
+    await verify('BROWSER-C',dep2,id2);
+    check('Fixture B confirmed by full deposit',(await req(user,'/bookings/'+id2)).body.booking.status,'CONFIRMED');
+    // Staff chỉ hủy CONFIRMED trong ngày nhận (bookingActions); trước đó Admin hủy theo yêu cầu khách sát giờ.
+    await operator.goto(base+'/staff/bookings/'+id2);await operator.getByText('Hiện tại: Đã xác nhận',{exact:true}).waitFor();
+    check('Staff has no cancel before pickup day',await operator.getByLabel('Chuyển trạng thái',{exact:true}).count(),0);
+    await manager.goto(base+'/admin/bookings/'+id2);
+    await manager.getByLabel('Chuyển trạng thái',{exact:true}).selectOption('CANCELLED');
+    await manager.getByLabel('Lý do',{exact:true}).fill('Fixture: khách báo hủy sát giờ nhận.');
+    await manager.getByLabel('Nguyên nhân hủy và chính sách hoàn cọc',{exact:true}).selectOption('LATE_CUSTOMER');
+    wait=manager.waitForResponse(r=>r.url().endsWith('/bookings/'+id2+'/actions') && r.request().method()==='POST');await manager.getByRole('button',{name:'Xác nhận hủy đơn',exact:true}).click();check('Admin late-customer cancellation',(await wait).status(),200);
+    const refund2=()=>sql(`select concat(status,':',kind,':',amount) from payment_refunds where booking_id='${id2}'`);
+    check('Late cancellation queues Admin decision, not refund',refund2(),`REQUESTED:LATE_CUSTOMER:${dep2}`);
+    const refundId2=sql(`select id from payment_refunds where booking_id='${id2}'`), paymentId2=sql(`select id from payment_transactions where booking_id='${id2}'`);
+    const userRefund2=async()=>{await customer.goto(base+'/user/bookings/'+id2);return visible(customer.getByRole('region',{name:'Tình trạng hoàn của bạn',exact:true}));};
+    let u2=await userRefund2();
+    check('USER sees pending Admin decision with cause',u2.includes('Chờ quyết định hoàn') && u2.includes('Nguyên nhân: Khách hủy sát giờ') && u2.includes('Đã hoàn (đã xác minh): 0 ₫'),true);
+    await customer.screenshot({path:path.join(out,'user-late-cancel-requested.png'),fullPage:true});
+    await manager.goto(base+'/admin/payments');
+    const adminRow=manager.getByRole('region',{name:'Yêu cầu hoàn '+refundId2,exact:true});
+    check('Admin row shows cause code',await visible(adminRow).then(t=>t.includes('Nguyên nhân: Khách hủy sát giờ (LATE_CUSTOMER)') && t.includes('Chờ Admin quyết định')),true);
+    check('Admin lifecycle summary present',await manager.getByLabel('Tóm tắt vòng đời hoàn',{exact:true}).count(),1);
+    check('Admin loaded-range notice',await visible(manager.getByLabel('Phạm vi danh sách đã tải',{exact:true})).then(t=>t.includes('Đây không phải tổng toàn hệ thống')),true);
+    check('Admin receipt shows verification and applied share',await visible(manager.getByRole('region',{name:'Khoản nhận '+paymentId2,exact:true})).then(t=>t.includes('mã người xác minh') && t.includes('Thời điểm chuyển:') && t.includes('Đã áp dụng')),true);
+    const half=Math.floor(dep2/2);
+    await adminRow.getByLabel('Số tiền hoàn (VND)',{exact:true}).fill(String(half));
+    await adminRow.getByLabel('Lý do quyết định',{exact:true}).fill('Fixture: hoàn 50% theo quyết định Admin.');
+    await adminRow.getByRole('button',{name:'Duyệt khoản hoàn',exact:true}).click();
+    check('Decision review shows amount before POST',await visible(manager.getByRole('dialog',{name:'Xác nhận thao tác hoàn tiền',exact:true})).then(t=>t.includes(vnd(half))),true);
+    check('No decision POST before confirmation',refund2(),`REQUESTED:LATE_CUSTOMER:${dep2}`);
+    wait=manager.waitForResponse(r=>r.url().endsWith('/admin/refunds/'+refundId2+'/decide'));await manager.getByRole('button',{name:'Xác nhận thao tác',exact:true}).click();check('Admin partial decision',(await wait).status(),200);
+    await manager.getByText(/Đã kiểm tra kết quả: Đã duyệt hoàn/).waitFor();
+    check('Partial decision approved, not refunded',refund2(),`APPROVED:LATE_CUSTOMER:${half}`);
+    check('Decision records approver',sql(`select approved_by is not null from payment_refunds where id='${refundId2}'`),'1');
+    u2=await userRefund2();check('USER partial decision is not refunded',u2.includes(`Hoàn ${vnd(half)} · Đã duyệt, chưa hoàn tiền`) && u2.includes('Đã hoàn (đã xác minh): 0 ₫'),true);
+    await manager.screenshot({path:path.join(out,'admin-late-cancel-approved.png'),fullPage:true});
+    await adminRow.getByRole('button',{name:'Bắt đầu xử lý hoàn (QR DEMO)',exact:true}).click();
+    wait=manager.waitForResponse(r=>r.url().endsWith('/process-manual'));await manager.getByRole('button',{name:'Xác nhận thao tác',exact:true}).click();check('Fixture B start processing',(await wait).status(),200);
+    check('Processing is not completion (fixture B)',refund2(),`PROCESSING:LATE_CUSTOMER:${half}`);
+    await adminRow.getByLabel('Tài khoản nhận hoàn',{exact:true}).fill('DEMO-PAYER');
+    await adminRow.getByLabel('Tham chiếu hoàn',{exact:true}).fill('BROWSER-REFUND-C');
+    await adminRow.getByLabel('Thời điểm hoàn (giờ Việt Nam)',{exact:true}).fill(new Date(Date.now()+7*3600000).toISOString().slice(0,19));
+    await adminRow.getByLabel('Đã đối chiếu tài khoản, số tiền và chứng từ hoàn DEMO',{exact:true}).check();
+    await adminRow.getByRole('button',{name:'Xác nhận đã hoàn DEMO',exact:true}).click();
+    wait=manager.waitForResponse(r=>r.url().endsWith('/complete-manual'));await manager.getByRole('button',{name:'Xác nhận thao tác',exact:true}).click();check('Fixture B manual completion',(await wait).status(),200);
+    check('Fixture B refund verified complete',refund2(),`SUCCEEDED:LATE_CUSTOMER:${half}`);
+    check('Fixture B refund reference',sql(`select provider_transaction from payment_refunds where id='${refundId2}'`),'BROWSER-REFUND-C');
+    check('Partial refund never exceeds receipt',Number(sql(`select sum(amount) from payment_refunds where booking_id='${id2}'`))<=dep2,true);
+    // Select nằm trong <label> nên tên truy cập gồm cả chữ option; chọn qua label chứa nó.
+    await manager.locator('label').filter({hasText:/^Trạng thái hoàn/}).locator('select').selectOption('');
+    check('Admin row shows verified completion',await visible(adminRow).then(t=>t.includes('Đã hoàn — kết quả đã xác minh với tham chiếu BROWSER-REFUND-C')),true);
+    await manager.screenshot({path:path.join(out,'admin-late-cancel-succeeded.png'),fullPage:true});
+    u2=await userRefund2();check('USER sees refunded only after SUCCEEDED (fixture B)',u2.includes(`Hoàn ${vnd(half)} · Đã hoàn`) && u2.includes(`Đã hoàn (đã xác minh): ${vnd(half)}`),true);
+    await customer.screenshot({path:path.join(out,'user-late-cancel-succeeded.png'),fullPage:true});
+    check('Staff cannot decide refunds',(await req(staff,'/admin/refunds/'+refundId2+'/decide','POST',{expectedVersion:0,amount:0,reason:'x'})).status,403);
     check('Guest cannot read QR',(await req(null,'/bookings/'+id+'/deposit/qr-payload')).status,401);
     check('User cannot access admin',(await req(user,'/admin/payments')).status,403);
     check('Staff cannot report transfer for customer',(await req(staff,'/bookings/'+id+'/deposit/report','POST',{idempotencyKey:'report-'+id})).status>=400,true);
