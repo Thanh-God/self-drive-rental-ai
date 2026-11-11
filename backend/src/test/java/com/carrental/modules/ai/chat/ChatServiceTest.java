@@ -68,6 +68,14 @@ class ChatServiceTest {
     }
 
     void model(String intent, String reply, String... citations) throws Exception {
+        if (List.of("SEARCH_VEHICLES", "ASK_MISSING").contains(intent)) {
+            var criteria = new java.util.LinkedHashMap<String, Object>();
+            for (String k : List.of("pickupDate", "returnDate", "pickupBranchName", "returnBranchName", "passengers", "budgetVndTotal", "transmission"))
+                criteria.put(k, null);
+            criteria.put("unresolvedFields", List.of());
+            content.set(JSON.writeValueAsString(Map.of("intent", intent, "reply", reply, "criteria", criteria)));
+            return;
+        }
         content.set(JSON.writeValueAsString(Map.of("intent", intent, "reply", reply, "citations", List.of(citations))));
     }
 
@@ -92,7 +100,7 @@ class ChatServiceTest {
         assertEquals("qwen3:8b", sent.path("model").asText());
         assertFalse(sent.path("stream").asBoolean());
         assertFalse(sent.path("think").asBoolean());
-        var citations = sent.path("format").path("properties").path("citations");
+        var citations = sent.path("format").path("oneOf").get(0).path("properties").path("citations");
         assertEquals("K-B04", citations.path("items").path("enum").get(0).asText(), "citations are limited to offered passages");
         assertEquals(sent.path("messages").size(), 2);
         assertEquals("system", sent.path("messages").get(0).path("role").asText());

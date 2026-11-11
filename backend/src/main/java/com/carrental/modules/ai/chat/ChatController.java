@@ -19,11 +19,13 @@ public class ChatController {
                             @NotBlank @Size(max = ChatPromptBuilder.MAX_MESSAGE) String text) {}
 
     public record Request(@NotBlank @Size(max = ChatPromptBuilder.MAX_MESSAGE) String message,
-                          @Size(max = 20) List<@NotNull @Valid TurnInput> messages) {}
+                          @Size(max = 20) List<@NotNull @Valid TurnInput> messages,
+                          ChatVehicleSearch.Session criteria) {}
 
     public record Citation(String id, String title) {}
 
     public record Response(String intent, String reply, List<Citation> citations, String knowledgeVersion,
+                           ChatVehicleSearch.Session criteria, List<String> missing, List<ChatVehicleSearch.Card> cards,
                            Map<String, Object> quota) {}
 
     private final ChatService chat;
@@ -42,11 +44,12 @@ public class ChatController {
         var history = request.messages() == null ? List.<ChatPromptBuilder.Turn>of() : request.messages().stream()
             .map(t -> new ChatPromptBuilder.Turn("user".equals(t.role()) ? ChatPromptBuilder.Role.USER : ChatPromptBuilder.Role.ASSISTANT, t.text()))
             .toList();
-        var answer = chat.answer(actor, request.message(), history, deadline);
+        var answer = chat.answer(actor, request.message(), history, request.criteria(), deadline);
         var citations = answer.citations().stream()
             .map(id -> new Citation(id, knowledge.find(id).orElseThrow().questions().get(0))).toList();
         var s = quota.status(actor);
-        return new Response(answer.intent(), answer.reply(), citations, answer.knowledgeVersion(), Map.of(
+        return new Response(answer.intent(), answer.reply(), citations, answer.knowledgeVersion(),
+            answer.criteria(), answer.missing(), answer.cards(), Map.of(
             "limit", s.limit(), "used", s.used(), "remaining", s.remaining(), "resetAt", s.resetAt().toString(),
             "hotline", Map.of("number", s.hotline(), "sample", s.hotlineSample())));
     }

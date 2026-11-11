@@ -134,7 +134,10 @@ class AiChatHttpTest {
         assertEquals("2026-11-11T17:00:00Z", body.path("quota").path("resetAt").asText());
         assertEquals("10008888", body.path("quota").path("hotline").path("number").asText());
         assertTrue(body.path("quota").path("hotline").path("sample").asBoolean());
-        assertEquals(Set.of("intent", "reply", "citations", "knowledgeVersion", "quota"), fields(body));
+        assertEquals(Set.of("intent", "reply", "citations", "knowledgeVersion", "criteria", "missing", "cards", "quota"), fields(body));
+        assertTrue(body.path("criteria").isNull(), "a knowledge answer carries no search criteria");
+        assertEquals(0, body.path("missing").size());
+        assertEquals(0, body.path("cards").size());
         var sent = PROVIDER_REQUESTS.get(0).path("messages");
         assertEquals(List.of("system", "user", "assistant", "user"), roles(sent));
         for (String forbidden : List.of("demo-user", "Bearer", "u1"))

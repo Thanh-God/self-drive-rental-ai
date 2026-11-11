@@ -5,7 +5,6 @@ import com.carrental.modules.ai.AiDiagnostics;
 import com.carrental.modules.ai.AiRequestDeadline;
 import com.carrental.modules.booking.service.RentalBranchCatalog;
 import com.carrental.security.Actor;
-import java.text.Normalizer;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +20,7 @@ public class CriteriaExtractionService {
     private final AiDiagnostics diagnostics;
     private final String model;
     private final com.carrental.modules.ai.AiDailyQuota quota;
+    private final CriteriaResolver resolver;
     @Autowired
     public CriteriaExtractionService(
             ObjectProvider<QwenCriteriaParser> parser,
@@ -28,7 +28,7 @@ public class CriteriaExtractionService {
             AiDiagnostics diagnostics,
             @Value("${app.qwen-model:qwen3:8b}") String model,
             com.carrental.modules.ai.AiDailyQuota quota) {
-        this.parser=parser;this.branches=branches;this.diagnostics=diagnostics;this.model=model;this.quota=quota;
+        this.parser=parser;this.branches=branches;this.diagnostics=diagnostics;this.model=model;this.quota=quota;this.resolver=new CriteriaResolver(branches);
     }
     /** No daily limit (unit tests and offline tools). */
     public CriteriaExtractionService(
@@ -56,80 +56,15 @@ public class CriteriaExtractionService {
                 AiDiagnostics.Cause.DISABLED, deadline.elapsedNanos());
             throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE,"Chưa bật đọc nhu cầu bằng Qwen; hãy dùng biểu mẫu.");
         }
-        var candidates=mentionedBranches(text,branches.active());
-        var names=candidates.stream().map(RentalBranchCatalog.Item::name).distinct().sorted().toList();
+        var mentioned=resolver.mentioned(text);
         CriteriaParser.Extraction extracted;
         // Counts only when the model answered: 429 busy, provider errors and timeouts give the slot back.
         try(var held=quota.reserve(actor)){
-            extracted=engine.parse(text,deadline,names);
+            extracted=engine.parse(text,deadline,mentioned.names());
             held.commit();
         }
-        if("OUT_OF_SCOPE".equals(extracted.intent()))return new Result("OUT_OF_SCOPE",null,List.of());
-        if(!extracted.conflicts().isEmpty())return new Result("NEEDS_CLARIFICATION",null,List.of("conflicts"));
-        var stated=StatedCriteria.from(text,names);
-        String pickup=resolve(stated.getOrDefault(StatedCriteria.PICKUP,extracted.pickupBranchName()),candidates);
-        String destination=resolve(stated.getOrDefault(StatedCriteria.RETURN,extracted.returnBranchName()),candidates);
-        String start=explicitDate(extracted.pickupDate(),text),end=explicitDate(extracted.returnDate(),text);
-        var missing=new LinkedHashSet<>(extracted.unresolvedFields());missing.remove("transmission");
-        if(stated.containsKey(StatedCriteria.PICKUP)&&pickup!=null)missing.remove(StatedCriteria.PICKUP);
-        if(stated.containsKey(StatedCriteria.RETURN)&&destination!=null)missing.remove(StatedCriteria.RETURN);
-        if(pickup!=null&&pickup.equals(destination)&&names.size()==1&&StatedCriteria.confirmsPair(text,names.get(0))){
-            missing.remove(StatedCriteria.PICKUP);
-            missing.remove(StatedCriteria.RETURN);
-        }
-        if(missing.contains(StatedCriteria.PICKUP))pickup=null;
-        if(missing.contains(StatedCriteria.RETURN))destination=null;
-        if(firmDatePair(text,start,end)){missing.remove("pickupDate");missing.remove("returnDate");}
-        if(start==null)missing.add("pickupDate");if(end==null)missing.add("returnDate");
-        if(pickup==null)missing.add("pickupBranchName");if(destination==null)missing.add("returnBranchName");
-        Integer passengers=stated.containsKey(StatedCriteria.PEOPLE)?null:extracted.passengers();
-        if(passengers==null)missing.add("passengers");
-        var statedBudget=ExplicitBudget.fromText(text);
-        Long budget=statedBudget.fixed()?statedBudget.value():extracted.budgetVndTotal();
-        if(statedBudget.fixed() && budget!=null)missing.remove("budgetVndTotal");
-        if(budget==null)missing.add("budgetVndTotal");
-        var transmission=TransmissionPreference.fromText(text);
-        if(transmission.ambiguous())missing.add("transmission");
-        return new Result(missing.isEmpty()?"READY_FOR_REVIEW":"NEEDS_CLARIFICATION",
-            new Draft(start,end,pickup,destination,passengers,budget,transmission.value()),List.copyOf(missing));
+        return resolver.resolve(text,extracted,mentioned);
     }
-    private static final java.util.regex.Pattern FULL_DATE=java.util.regex.Pattern.compile(
-        "(?<![0-9])(?:([0-9]{4})-([0-9]{2})-([0-9]{2})|([0-9]{1,2})\\s*[/.-]\\s*([0-9]{1,2})\\s*[/.-]\\s*([0-9]{4}))(?![0-9])");
-    private static final java.util.regex.Pattern DATE_HEDGE=java.util.regex.Pattern.compile(
-        "\\b(?:chua|hoac|hay|khoang|co the|du kien)\\b");
-    /**
-     * The text itself settles both dates: exactly two full dates, in pickup-then-return order, matching the
-     * verified values, with no hedging or alternatives. Then a model "unresolved" flag on the dates is overridden.
-     */
-    static boolean firmDatePair(String text,String start,String end){
-        if(start==null||end==null||start.compareTo(end)>=0)return false;
-        if(DATE_HEDGE.matcher(StatedCriteria.words(text)).find())return false;
-        var found=new ArrayList<String>();
-        var m=FULL_DATE.matcher(text);
-        while(m.find()){
-            try{
-                found.add(m.group(1)!=null
-                    ?java.time.LocalDate.of(Integer.parseInt(m.group(1)),Integer.parseInt(m.group(2)),Integer.parseInt(m.group(3))).toString()
-                    :java.time.LocalDate.of(Integer.parseInt(m.group(6)),Integer.parseInt(m.group(5)),Integer.parseInt(m.group(4))).toString());
-            }catch(java.time.DateTimeException invalid){return false;}
-        }
-        return found.size()==2&&found.get(0).equals(start)&&found.get(1).equals(end);
-    }
-    private static String explicitDate(String date,String text){
-        if(date==null)return null;
-        var day=java.time.LocalDate.parse(date);
-        String d=(day.getDayOfMonth()<10?"0?":"")+day.getDayOfMonth(),m=(day.getMonthValue()<10?"0?":"")+day.getMonthValue();
-        String form="(?<![0-9])(?:"+java.util.regex.Pattern.quote(date)+"|"+d+"\\s*[/.-]\\s*"+m+"\\s*[/.-]\\s*"+day.getYear()+")(?![0-9])";
-        return java.util.regex.Pattern.compile(form).matcher(text).find()?date:null;
-    }
-    private static String resolve(String name,List<RentalBranchCatalog.Item> active){
-        if(name==null)return null;
-        var matches=active.stream().filter(b->normalize(b.name()).equals(normalize(name))).toList();
-        return matches.size()==1?matches.get(0).id():null;
-    }
-    private static List<RentalBranchCatalog.Item> mentionedBranches(String text,List<RentalBranchCatalog.Item> active){
-        String words=StatedCriteria.words(text);
-        return active.stream().filter(branch -> StatedCriteria.mentioned(words,branch.name())).toList();
-    }
-    private static String normalize(String name){return Normalizer.normalize(name,Normalizer.Form.NFD).replaceAll("\\p{M}","").toLowerCase(Locale.ROOT).replace('đ','d').replaceFirst("^kdrive\\s*","").replaceAll("[^a-z0-9]","");}
+    /** See {@link CriteriaResolver#firmDatePair}. */
+    static boolean firmDatePair(String text,String start,String end){return CriteriaResolver.firmDatePair(text,start,end);}
 }

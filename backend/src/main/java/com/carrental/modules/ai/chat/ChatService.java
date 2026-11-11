@@ -41,7 +41,13 @@ public class ChatService {
         HOTLINE_LABEL_ADDED
     }
 
-    public record Answer(String intent, String reply, List<String> citations, String knowledgeVersion, List<Guard> guards) {}
+    /** {@code criteria}, {@code missing} and {@code cards} are set only for a vehicle-search turn. */
+    public record Answer(String intent, String reply, List<String> citations, String knowledgeVersion, List<Guard> guards,
+                         ChatVehicleSearch.Session criteria, List<String> missing, List<ChatVehicleSearch.Card> cards) {
+        public Answer(String intent, String reply, List<String> citations, String knowledgeVersion, List<Guard> guards) {
+            this(intent, reply, citations, knowledgeVersion, guards, null, List.of(), List.of());
+        }
+    }
 
     private static final Pattern INJECTION = Pattern.compile(
         "\\b(?:bo qua|phot lo|quen|ignore|disregard|forget)\\b.{0,40}\\b(?:chi dan|huong dan|quy tac|lenh|instruction|instructions|rules|prompt)\\b"
@@ -62,15 +68,23 @@ public class ChatService {
     private final ChatPromptBuilder builder;
     private final ObjectProvider<QwenChatModel> model;
     private final AiDailyQuota quota;
+    private final ChatVehicleSearch search;
 
     @Autowired
     public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
-                       ObjectProvider<QwenChatModel> model, AiDailyQuota quota) {
+                       ObjectProvider<QwenChatModel> model, AiDailyQuota quota, ChatVehicleSearch search) {
         this.knowledge = knowledge;
         this.retriever = retriever;
         this.builder = builder;
         this.model = model;
         this.quota = quota;
+        this.search = search;
+    }
+
+    /** Question answering only (no vehicle search), with a daily limit. */
+    public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
+                       ObjectProvider<QwenChatModel> model, AiDailyQuota quota) {
+        this(knowledge, retriever, builder, model, quota, null);
     }
 
     /** No daily limit: unit tests and offline tools. */
@@ -84,15 +98,22 @@ public class ChatService {
      * errors and timeouts do not use the daily allowance; an answer given without the model does not either.
      */
     public Answer answer(Actor actor, String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline) {
+        return answer(actor, message, history, null, deadline);
+    }
+
+    /** As above, with the vehicle-search criteria the client carried from earlier turns (may be null). */
+    public Answer answer(Actor actor, String message, List<ChatPromptBuilder.Turn> history,
+                         ChatVehicleSearch.Session session, AiRequestDeadline deadline) {
         actor.require("USER");
-        return answer(message, history, deadline, actor);
+        return answer(message, history, deadline, actor, session);
     }
 
     public Answer answer(String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline) {
-        return answer(message, history, deadline, null);
+        return answer(message, history, deadline, null, null);
     }
 
-    private Answer answer(String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline, Actor actor) {
+    private Answer answer(String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline, Actor actor,
+                          ChatVehicleSearch.Session session) {
         var passages = retriever.retrieve(message);
         var prompt = builder.build(message, history, passages); // 400 for blank, oversized or sensitive input
         boolean injection = looksLikeInjection(message);
@@ -103,13 +124,20 @@ public class ChatService {
         }
         var engine = model.getIfAvailable();
         if (engine == null) throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa bật trợ lý hỏi đáp.");
+        boolean searching = actor != null && search != null;
+        var hints = searching ? search.hints(message) : QwenChatModel.SearchHints.NONE;
         QwenChatModel.Reply drafted;
-        if (actor == null) drafted = engine.ask(prompt, deadline);
+        if (actor == null) drafted = engine.ask(prompt, deadline, hints);
         else try (var held = quota.reserve(actor)) {
-            drafted = engine.ask(prompt, deadline);
+            drafted = engine.ask(prompt, deadline, hints);
             held.commit();
         }
-        return check(drafted, prompt, message, injection, guards);
+        var checked = check(drafted, prompt, message, injection, guards);
+        if (!searching || !Set.of("SEARCH_VEHICLES", "ASK_MISSING").contains(checked.intent())) return checked;
+        // One model call per message: the same reply carries the criteria draft; the backend does the search.
+        var found = search.run(actor, message, drafted.criteria(), session);
+        return new Answer(found.intent(), found.reply(), List.of(), knowledge.version(), checked.guards(),
+            found.criteria(), found.missing(), found.cards());
     }
 
     Answer check(QwenChatModel.Reply drafted, ChatPromptBuilder.Prompt prompt, String message, boolean injection, List<Guard> guards) {
