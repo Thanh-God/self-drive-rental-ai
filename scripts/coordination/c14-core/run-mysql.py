@@ -103,18 +103,39 @@ def validate_pilot_inputs(backend_root, suites):
         pinned[copied.relative_to(REPO).as_posix()]=copied_hash
     return pinned
 
-def inputs(backend_root=None, suites=()):
-    files = list((REPO/'backend/src').rglob('*')) + list((REPO/'backend/.mvn').rglob('*'))
-    files += [REPO/'backend'/n for n in ['pom.xml','mvnw','mvnw.cmd']]
+DEFAULT_SOURCE = REPO/'backend'
+
+def resolve_source_root(source_root=None):
+    """Backend checkout whose src the isolated copy must match; default is this repository's backend."""
+    source=Path(source_root).resolve() if source_root else DEFAULT_SOURCE
+    assert not source.is_relative_to(REPO/'.runtime'), 'Source root must be a checkout, not a runtime copy'
+    assert (source/'src/main').is_dir() and (source/'pom.xml').is_file(), 'Backend source root required'
+    return source
+
+def verify_source_copy(source, build):
+    """Byte-equal copy in both directions: every source file present and identical, no extra copied file."""
+    files=[p for p in (source/'src').rglob('*') if p.is_file()]
+    for p in files:assert p.read_bytes()==(build/p.relative_to(source)).read_bytes(),p
+    copied=[p for p in (build/'src').rglob('*') if p.is_file()]
+    assert len(copied)==len(files),'Backend copy has source files absent from the source root'
+
+def source_key(p, source):
+    if p.is_relative_to(REPO):return p.relative_to(REPO).as_posix()
+    return 'source-root:'+p.relative_to(source).as_posix()
+
+def inputs(backend_root=None, suites=(), source=None):
+    source=source or DEFAULT_SOURCE
+    files = list((source/'src').rglob('*')) + list((source/'.mvn').rglob('*'))
+    files += [source/n for n in ['pom.xml','mvnw','mvnw.cmd']]
     files += [REPO/'scripts/ai'/n for n in ['import_locations_pilot.py','locations-pilot.json']]
     files.append(Path(__file__))
     if backend_root is not None and PILOT_IMPORTER_SUITE in suites:
         staged_dir=Path(backend_root).resolve().parent/'scripts'/'ai'
         files += [staged_dir/name for name in PILOT_INPUT_NAMES]
-    return {p.relative_to(REPO).as_posix():hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()}
+    return {source_key(p,source):hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()}
 
-def assert_inputs_unchanged(expected, backend_root, suites):
-    assert expected==inputs(backend_root,suites), 'Source or staged pilot input drift'
+def assert_inputs_unchanged(expected, backend_root, suites, source=None):
+    assert expected==inputs(backend_root,suites,source), 'Source or staged pilot input drift'
 
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--backend-root',required=True)
@@ -124,9 +145,11 @@ def main():
     parser.add_argument('--suites',nargs='+',choices=SUITES)
     parser.add_argument('--routing-mode',choices=['online','offline'])
     parser.add_argument('--itinerary-scope',choices=list(ITINERARY_SCOPES),default='all')
+    parser.add_argument('--source-root',help='Backend checkout the isolated copy must match (default: this repository backend)')
     args=parser.parse_args();build=Path(args.backend_root).resolve();out=Path(args.evidence).resolve()
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
+    source=resolve_source_root(args.source_root)
     selected_suites=select_suites(args.suites,os.environ)
     require_itinerary_live(selected_suites,args.routing_mode,os.environ,args.itinerary_scope)
     pilot_inputs=validate_pilot_inputs(build,selected_suites)
@@ -138,8 +161,7 @@ def main():
         assert online == (args.routing_mode == 'online'), 'Routing provider state does not match requested mode'
     assert out.is_relative_to(REPO/'.runtime') and not out.exists(),'New runtime evidence required'
     assert build.is_relative_to(REPO/'.runtime'),'Isolated source copy required'
-    for p in (REPO/'backend/src').rglob('*'):
-        if p.is_file():assert p.read_bytes()==(build/p.relative_to(REPO/'backend')).read_bytes(),p
+    verify_source_copy(source,build)
     jar=build/'target/kdrive-0.1.0-SNAPSHOT.jar';assert jar.is_file(),'Verify before native proof'
     historical=out.parent/'historical-migration';assert len(list(historical.glob('V*.sql')))==2
     if 'MySqlMigrationTest' in (args.suites or SUITES):
@@ -171,10 +193,16 @@ def main():
     else:
         assert name not in run(['docker','ps','-a','--format','{{.Names}}']).stdout.decode().splitlines()
         assert volume not in run(['docker','volume','ls','--format','{{.Name}}']).stdout.decode().splitlines()
-    before=inputs(build,selected_suites)
+    before=inputs(build,selected_suites,source)
     assert all(before.get(path)==value for path,value in pilot_inputs.items()), 'Pilot inputs drifted before native execution'
     out.mkdir(parents=True)
     (out/'inputs-before.json').write_text(json.dumps(before,indent=2))
+    head=run(['git','-C',str(source),'rev-parse','HEAD'],check=False)
+    status=run(['git','-C',str(source),'status','--porcelain','--','.'],check=False)
+    provenance={'sourceRoot':str(source),'default':source==DEFAULT_SOURCE,
+                'gitHead':head.stdout.decode().strip() if head.returncode==0 else None,
+                'gitClean':status.returncode==0 and not status.stdout.strip()}
+    (out/'source.json').write_text(json.dumps(provenance,indent=2))
     private=out/'mysql.private.env';private.write_text('MYSQL_ROOT_PASSWORD='+password+'\nMYSQL_DATABASE=kdrive_c14_core\n')
     (out/'marker.private.token').write_text(token)
     marker='kdrive_c14_meta'
@@ -233,9 +261,9 @@ def main():
             for entry in z.namelist():
                 if entry.startswith('BOOT-INF/classes/') and not entry.endswith('/'):
                     rel=entry.removeprefix('BOOT-INF/classes/');assert z.read(entry)==(build/'target/classes'/rel).read_bytes(),rel;matched.append(rel)
-        assert_inputs_unchanged(before,build,selected_suites)
+        assert_inputs_unchanged(before,build,selected_suites,source)
         (out/'jar-provenance.json').write_text(json.dumps({'jarSHA256':hashlib.sha256(jar.read_bytes()).hexdigest(),'matchedEntries':matched},indent=2))
-        final={'status':'PASS C14 native scoped','tests':sum(r['counts'][0] for r in reports),'skips':0,'suites':reports}
+        final={'status':'PASS C14 native scoped','tests':sum(r['counts'][0] for r in reports),'skips':0,'suites':reports,'source':provenance}
     finally:
         if owned:
             assert run(['docker','inspect','--format','{{.Id}}',name]).stdout.decode().strip()==identity

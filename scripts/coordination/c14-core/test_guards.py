@@ -60,6 +60,49 @@ class RunnerGuards(unittest.TestCase):
                 self.invoke(module,['--backend-root',str(folder),'--evidence',str(output),'--suites','VehicleSearchTest','--new-fixture-reason','guard source mismatch test'])
             self.assertFalse(output.exists())
 
+    def test_source_root_must_be_backend_checkout_outside_runtime_before_native_or_output(self):
+        module=load('run-mysql')
+        self.assertEqual(module.resolve_source_root(None),(ROOT/'backend').resolve())
+        with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            folder=Path(directory);output=folder/'output'
+            (folder/'src/main').mkdir(parents=True);(folder/'pom.xml').write_text('<project/>')
+            with self.assertRaisesRegex(AssertionError,'not a runtime copy'):
+                self.invoke(module,['--backend-root',str(folder),'--evidence',str(output),'--source-root',str(folder)])
+            self.assertFalse(output.exists())
+        with tempfile.TemporaryDirectory() as outside, tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            output=Path(directory)/'output'
+            with self.assertRaisesRegex(AssertionError,'Backend source root required'):
+                self.invoke(module,['--backend-root',directory,'--evidence',str(output),'--source-root',outside])
+            self.assertFalse(output.exists())
+
+    def test_source_copy_must_match_source_root_in_both_directions(self):
+        module=load('run-mysql')
+        with tempfile.TemporaryDirectory() as outside, tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:
+            source=Path(outside);build=Path(directory)
+            for root in (source,build):
+                (root/'src/main/java').mkdir(parents=True);(root/'src/main/java/A.java').write_text('class A {}')
+            (source/'pom.xml').write_text('<project/>')
+            module.verify_source_copy(module.resolve_source_root(str(source)),build)
+            (build/'src/main/java/A.java').write_text('class A { int drift; }')
+            with self.assertRaises(AssertionError):module.verify_source_copy(source,build)
+            (build/'src/main/java/A.java').write_text('class A {}');(build/'src/main/java/Extra.java').write_text('class Extra {}')
+            with self.assertRaisesRegex(AssertionError,'absent from the source root'):module.verify_source_copy(source,build)
+            (build/'src/main/java/Extra.java').unlink();(source/'src/main/java/B.java').write_text('class B {}')
+            with self.assertRaises(FileNotFoundError):module.verify_source_copy(source,build)
+
+    def test_external_source_inputs_are_keyed_and_detect_drift(self):
+        module=load('run-mysql')
+        with tempfile.TemporaryDirectory() as outside:
+            source=Path(outside);(source/'src/main').mkdir(parents=True);(source/'src/main/A.java').write_text('class A {}')
+            (source/'pom.xml').write_text('<project/>')
+            before=module.inputs(None,(),source)
+            self.assertIn('source-root:src/main/A.java',before);self.assertIn('source-root:pom.xml',before)
+            self.assertFalse(any(k.startswith('backend/') for k in before))
+            module.assert_inputs_unchanged(before,None,(),source)
+            (source/'src/main/A.java').write_text('class A { int drift; }')
+            with self.assertRaisesRegex(AssertionError,'drift'):module.assert_inputs_unchanged(before,None,(),source)
+        self.assertIn('backend/pom.xml',module.inputs())
+
     def test_browser_refuses_protected_port_before_native_or_output(self):
         module=load('run-browser')
         with tempfile.TemporaryDirectory(dir=ROOT/'.runtime') as directory:

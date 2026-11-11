@@ -63,6 +63,14 @@ python scripts/coordination/c14-core/verify-refusals.py --backend-root .runtime/
 python scripts/coordination/c14-core/run-browser.py --backend-root .runtime/<run>/evidence/backend-copy --backend-evidence .runtime/<run>/evidence/native-a --evidence .runtime/<run>/evidence/browser-a
 ```
 
+By default the copy must match this repository's `backend/src`. To prove a
+different checkout (for example the publication clone of the faculty repository),
+pass `--source-root <checkout>/backend`. The root must be a real checkout outside
+`.runtime`; the copy must be byte-equal to its `src` in both directions, its inputs
+are hashed before and after the run, and `source.json`/`result.json` record the
+root, its Git HEAD and whether it was clean. The fixture, registry and evidence
+rules are unchanged.
+
 Each output directory must be new. Native assertions require nonempty suites
 with zero failures, errors and skips. The native runner verifies an exact fixture
 identity and marker before database writes. A retry can use `--reuse-evidence`
