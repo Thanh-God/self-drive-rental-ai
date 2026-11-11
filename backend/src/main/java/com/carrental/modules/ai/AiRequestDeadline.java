@@ -12,6 +12,7 @@ public final class AiRequestDeadline {
         ITINERARY_PREVIEW,
         ITINERARY_SAVE,
         ROUTE_PREVIEW,
+        CHAT,
         UNSPECIFIED
     }
 
