@@ -140,11 +140,15 @@ async function main() {
     const vnLocal=ms=>new Date(ms+7*3600000).toISOString().slice(0,19);
     const inputForm=v=>v.endsWith(':00')?v.slice(0,16):v;
     const transferTimes={};
-    async function verify(ref,amount,target=id,{seconds,notBefore}={}) {
+    async function verify(ref,amount,target=id,{seconds,notBefore,at}={}) {
       // Backend từ chối thời điểm chuyển trước approvedAt hoặc ở tương lai; ô nhập theo giây.
       const approvedAt=Date.parse((await req(user,'/bookings/'+target)).body.booking.deposit.approvedAt);
       let t;
-      if(seconds===undefined) {
+      if(at!==undefined) {
+        // D3: thời điểm chuyển chỉ định (giây nguyên); không ở tương lai, không trước approvedAt.
+        t=at;assert(t>=approvedAt,'transfer time before approval');
+        while(Date.now()<t+1000) await new Promise(r=>setTimeout(r,200));
+      } else if(seconds===undefined) {
         while(Date.now()<Math.ceil(approvedAt/1000)*1000+1000) await new Promise(r=>setTimeout(r,200));
         t=Math.floor(Date.now()/1000)*1000;
       } else {
@@ -295,6 +299,26 @@ async function main() {
     await manager.screenshot({path:path.join(out,'admin-late-cancel-succeeded.png'),fullPage:true});
     u2=await userRefund2();check('USER sees refunded only after SUCCEEDED (fixture B)',u2.includes(`Hoàn ${vnd(half)} · Đã hoàn`) && u2.includes(`Đã hoàn (đã xác minh): ${vnd(half)}`),true);
     await customer.screenshot({path:path.join(out,'user-late-cancel-succeeded.png'),fullPage:true});
+    // D3 (phương án 2): tiền ghi nhận sau khi đơn B đã hủy sát giờ — phân xử theo thời điểm chuyển so với thời điểm hủy.
+    const hist2=(await req(admin,'/bookings/'+id2)).body.history;
+    const closed2=Math.max(...hist2.filter(h=>h.next_status==='CANCELLED').map(h=>typeof h.occurred_at==='number'?h.occurred_at:Date.parse(h.occurred_at)));
+    const approved2=Date.parse((await req(user,'/bookings/'+id2)).body.booking.deposit.approvedAt);
+    const before2=Math.ceil(approved2/1000)*1000+1000, after2=Math.ceil(closed2/1000)*1000+1000;
+    check('D3 fixture: before-closure transfer time lies between approval and cancellation',before2>=approved2 && before2<closed2,true);
+    await operator.goto(base+'/staff/bookings/'+id2);
+    check('D3 Staff sees closed-booking policy warning',await visible(operator.getByLabel('Cảnh báo đơn đã hủy',{exact:true})).then(t=>t.includes('Khoản chuyển từ thời điểm đó trở đi được hoàn toàn bộ')),true);
+    await verify('D3-BEFORE',100000,id2,{at:before2});
+    await verify('D3-AFTER',70000,id2,{at:after2});
+    const d3=ref=>sql(`select concat(r.status,':',r.kind,':',r.amount) from payment_refunds r join payment_transactions p on p.id=r.payment_id where p.provider_transaction='${ref}'`);
+    check('D3 transfer before cancellation follows late-cancellation policy (Admin decides)',d3('D3-BEFORE'),'REQUESTED:LATE_CUSTOMER:100000');
+    check('D3 transfer after cancellation is refunded in full',d3('D3-AFTER'),'APPROVED:UNAPPLIED:70000');
+    check('D3 earlier refund of B untouched',sql(`select status from payment_refunds where id='${refundId2}'`),'SUCCEEDED');
+    check('D3 B stays cancelled with its single contract',[(await req(user,'/bookings/'+id2)).body.booking.status,sql(`select count(*) from contracts where booking_id='${id2}'`)],['CANCELLED','1']);
+    check('D3 late money never applied on B',sql(`select coalesce(sum(applied_amount),0) from payment_transactions where booking_id='${id2}' and provider_transaction like 'D3-%'`),'0');
+    u2=await userRefund2();
+    check('D3 USER sees pending Admin decision for money sent before cancellation',u2.includes(`Hoàn ${vnd(100000)} · Chờ quyết định hoàn`) && u2.includes('Nguyên nhân: Khách hủy sát giờ'),true);
+    check('D3 USER sees approved-not-refunded full refund for money sent after cancellation',u2.includes(`Hoàn ${vnd(70000)} · Đã duyệt, chưa hoàn tiền`) && u2.includes('Khoản nhận không áp dụng được vào đơn'),true);
+    await customer.screenshot({path:path.join(out,'user-d3-after-cancellation.png'),fullPage:true});
     // QR-G5.2: exact per-booking invariants for the main USER -> STAFF -> USER -> ADMIN booking A.
     check('A exactly one contract',sql(`select count(*) from contracts where booking_id='${id}'`),'1');
     check('A ledger two receipts, applied equals deposit',sql(`select concat(count(*),':',sum(amount),':',sum(applied_amount)) from payment_transactions where booking_id='${id}' and status='SUCCEEDED'`),'2:500000:390000');
