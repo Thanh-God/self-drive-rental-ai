@@ -182,6 +182,19 @@ class RunnerGuards(unittest.TestCase):
             with self.assertRaises(AssertionError):module.select_suites(['AssistantReviewQuoteLiveIT'],environ)
         self.assertEqual(['AssistantReviewQuoteLiveIT'],module.select_suites(['AssistantReviewQuoteLiveIT'],{'KDRIVE_AI_LIVE_FLOW':'true'}))
 
+    def test_chat_suites_stub_by_default_and_live_chat_opt_in(self):
+        module=load('run-mysql')
+        default=module.select_suites(None,{})
+        for suite in ('AiChatHttpTest','AiChatSearchHttpTest'):
+            self.assertIn(suite,module.SUITES)
+            self.assertIn(suite,default)
+        self.assertIn('AiChatLiveIT',module.SUITES)
+        self.assertIn('AiChatLiveIT',module.LIVE_QWEN_SUITES)
+        self.assertNotIn('AiChatLiveIT',default)
+        for environ in ({},{'KDRIVE_AI_LIVE_FLOW':'yes'}):
+            with self.assertRaises(AssertionError):module.select_suites(['AiChatLiveIT'],environ)
+        self.assertEqual(['AiChatLiveIT'],module.select_suites(['AiChatLiveIT'],{'KDRIVE_AI_LIVE_FLOW':'true'}))
+
     def test_itinerary_live_suite_needs_mode_and_online_opt_in(self):
         module=load('run-mysql')
         self.assertIn('ItineraryLivePreviewIT',module.SUITES)

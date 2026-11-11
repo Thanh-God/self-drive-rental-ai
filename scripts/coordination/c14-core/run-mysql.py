@@ -43,10 +43,11 @@ SUITES = ['ScheduleProtectionHttpTest','ScheduleWarningHttpTest','VehicleSearchT
           'AccountAssignmentHttpServerTest','IncidentReportIntegrationTest','IncidentReportHttpServerTest',
           'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest',
           'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest','LocationPilotImporterMySqlTest',
-          'AssistantReviewQuoteFlowHttpTest','AssistantReviewQuoteLiveIT','ItineraryLivePreviewIT']
+          'AssistantReviewQuoteFlowHttpTest','AssistantReviewQuoteLiveIT','ItineraryLivePreviewIT',
+          'AiChatHttpTest','AiChatSearchHttpTest','AiChatLiveIT']
 
 # Live local-Qwen suites never run by default and need an explicit caller opt-in.
-LIVE_QWEN_SUITES = ['AssistantReviewQuoteLiveIT']
+LIVE_QWEN_SUITES = ['AssistantReviewQuoteLiveIT','AiChatLiveIT']
 
 # Live itinerary preview on the registered OSRM graph: never default, explicit routing mode, Qwen opt-in online.
 ITINERARY_LIVE_SUITE = 'ItineraryLivePreviewIT'
