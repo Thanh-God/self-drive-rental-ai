@@ -43,6 +43,10 @@ public class ChatService {
         FALLBACK_SOURCES_DROPPED,
         /** Model wording repeated a run of the system instructions; replaced by the approved refusal. */
         INSTRUCTION_LEAK,
+        /** D2: the message answered the field the backend asked for; handled without the model and without quota. */
+        ANSWERED_WITHOUT_MODEL,
+        /** The model chose a vehicle search the customer did not ask for; answered without searching (REVIEW #5). */
+        SEARCH_NOT_REQUESTED,
         /** Sample hotline mentioned without its sample label; the label was added. */
         HOTLINE_LABEL_ADDED
     }
@@ -147,6 +151,16 @@ public class ChatService {
             guards.add(Guard.INJECTION_NO_PASSAGE);
             return new Answer("OUT_OF_SCOPE", refusal("K-G01"), List.of(), knowledge.version(), List.copyOf(guards));
         }
+        if (actor != null && search != null && session != null && !injection) {
+            // D2 (REVIEW #8): a plain answer to the field the backend asked for needs no model and uses no allowance.
+            var direct = search.answerToAskedField(message, session);
+            if (direct != null) {
+                guards.add(Guard.ANSWERED_WITHOUT_MODEL);
+                var found = search.run(actor, message, direct, session);
+                return new Answer(found.intent(), found.reply(), List.of(), knowledge.version(), List.copyOf(guards),
+                    found.criteria(), found.missing(), found.cards());
+            }
+        }
         var engine = model.getIfAvailable();
         if (engine == null) throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa bật trợ lý hỏi đáp.");
         boolean searching = actor != null && search != null;
@@ -166,6 +180,12 @@ public class ChatService {
                           List<Guard> guards, Actor actor, ChatVehicleSearch.Session session) {
         var checked = check(drafted, prompt, message, injection, guards);
         if (actor == null || search == null || !Set.of("SEARCH_VEHICLES", "ASK_MISSING").contains(checked.intent())) return checked;
+        if (!search.searchRequested(message, session)) {
+            // REVIEW #5: "Xe có ghế trẻ em không?" is a question, not a search; the model's choice is not enough.
+            guards.add(Guard.SEARCH_NOT_REQUESTED);
+            if (search.asksAboutOwnBooking(message)) return done("OUT_OF_SCOPE", refusal("K-G03"), List.of(), guards);
+            return done("ANSWER", knowledge.fallbackReply(), List.of(), guards);
+        }
         // One model call per message: the same reply carries the criteria draft; the backend does the search.
         var found = search.run(actor, message, drafted.criteria(), session);
         return new Answer(found.intent(), found.reply(), List.of(), knowledge.version(), checked.guards(),

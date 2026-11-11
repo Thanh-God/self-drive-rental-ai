@@ -1,6 +1,7 @@
 package com.carrental.modules.ai.chat;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.parser.CriteriaExtractionService;
 import com.carrental.modules.ai.parser.CriteriaParser;
 import com.carrental.modules.ai.parser.CriteriaResolver;
 import com.carrental.modules.ai.recommendation.RecommendationModels;
@@ -27,9 +28,22 @@ public class ChatVehicleSearch {
         "passengers", "budgetVndTotal");
     private static final DateTimeFormatter VN_DATE = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
-    /** Criteria carried between turns by the client. Untrusted: every value is re-validated. */
+    /**
+     * Criteria carried between turns by the client. Untrusted: every value is re-validated. {@code askedField} is
+     * the required field the last backend question asked for (null when nothing was asked).
+     */
     public record Session(String pickupDate, String returnDate, String pickupBranchId, String returnBranchId,
-                          Integer passengers, Long budgetVndTotal, String transmission) {}
+                          Integer passengers, Long budgetVndTotal, String transmission, String askedField) {
+        public Session(String pickupDate, String returnDate, String pickupBranchId, String returnBranchId,
+                       Integer passengers, Long budgetVndTotal, String transmission) {
+            this(pickupDate, returnDate, pickupBranchId, returnBranchId, passengers, budgetVndTotal, transmission, null);
+        }
+
+        boolean active() {
+            return pickupDate != null || returnDate != null || pickupBranchId != null || returnBranchId != null
+                || passengers != null || budgetVndTotal != null;
+        }
+    }
 
     public record Card(String vehicleId, String vehicleName, int seats, String transmission, int rentalDays,
                        long rentalTotal, long oneWayFee, long total, List<String> reasonCodes) {}
@@ -51,15 +65,80 @@ public class ChatVehicleSearch {
         return new QwenChatModel.SearchHints(resolver.mentioned(message).names(), CriteriaResolver.statedTransmission(message));
     }
 
+    /**
+     * R3 (REVIEW #5): the model may only start or continue a vehicle search when the customer asks for one, states
+     * at least one criterion the backend can read itself, or a search is already under way.
+     */
+    public boolean searchRequested(String message, Session session) {
+        return CriteriaResolver.asksForVehicles(message) || resolver.statesCriterion(message)
+            || (session != null && sanitize(session, activeIds()).active());
+    }
+
+    /** "Xe tôi đặt hôm qua…": a question about the customer's own booking, which the assistant cannot read. */
+    public boolean asksAboutOwnBooking(String message) { return CriteriaResolver.asksAboutOwnBooking(message); }
+
+    /**
+     * D2 (REVIEW #8): when the backend asked for one field and the message answers it in a way the backend reads
+     * itself (a full date, a branch name, "4 người", "3 triệu"), the criteria for this turn without any model call.
+     * Null when the message does not answer the asked field that way.
+     */
+    public QwenChatModel.Criteria answerToAskedField(String message, Session session) {
+        if (session == null) return null;
+        var base = sanitize(session, activeIds());
+        String asked = base.askedField();
+        if (asked == null) return null;
+        var dates = CriteriaResolver.fullDates(message);
+        String start = null, end = null;
+        if (dates.size() >= 2) { start = dates.get(0); end = dates.get(1); }
+        else if (dates.size() == 1) {
+            if ("returnDate".equals(asked)) end = dates.get(0);
+            else if ("pickupDate".equals(asked)) start = dates.get(0);
+        }
+        var names = resolver.mentioned(message).names();
+        String pickupName = null, returnName = null;
+        if (names.size() == 1) {
+            if ("pickupBranchId".equals(asked)) pickupName = names.get(0);
+            if ("returnBranchId".equals(asked)) returnName = names.get(0);
+        }
+        var drafted = new QwenChatModel.Criteria(start, end, pickupName, returnName,
+            CriteriaResolver.statedPassengers(message, "passengers".equals(asked)),
+            CriteriaResolver.statedBudget(message, true), null, List.of());
+        var draft = resolve(message, drafted, base);
+        boolean answered = switch (asked) {
+            case "pickupDate" -> draft.pickupDate() != null;
+            case "returnDate" -> draft.returnDate() != null;
+            case "pickupBranchId" -> draft.pickupBranchId() != null;
+            case "returnBranchId" -> draft.returnBranchId() != null;
+            case "passengers" -> draft.passengers() != null;
+            default -> draft.budgetVndTotal() != null;
+        };
+        return answered ? drafted : null;
+    }
+
+    private List<String> activeIds() {
+        return branches.active().stream().map(RentalBranchCatalog.Item::id).toList();
+    }
+
+    /** This turn's values that the customer's own text supports (dates and branches as the parser checks them). */
+    private CriteriaExtractionService.Draft resolve(String message, QwenChatModel.Criteria c, Session base) {
+        var extraction = new CriteriaParser.Extraction("NEEDS_CLARIFICATION", c.pickupDate(), c.returnDate(),
+            c.pickupBranchName(), c.returnBranchName(), c.passengers(), c.budgetVndTotal(), c.transmission(),
+            c.unresolvedFields(), List.of());
+        var r = resolver.resolve(message, extraction, resolver.mentioned(message)).draft();
+        String asked = base == null ? null : base.askedField();
+        // D8 (REVIEW #6): party size and budget only when the text states them; a model guess is asked again.
+        // One plain amount without a daily rate counts as the budget; a lone number counts as people only when asked.
+        return new CriteriaExtractionService.Draft(r.pickupDate(), r.returnDate(), r.pickupBranchId(), r.returnBranchId(),
+            CriteriaResolver.statedPassengers(message, "passengers".equals(asked)),
+            CriteriaResolver.statedBudget(message, true), r.transmission());
+    }
+
     public Result run(Actor actor, String message, QwenChatModel.Criteria drafted, Session session) {
         var active = branches.active();
         var activeIds = active.stream().map(RentalBranchCatalog.Item::id).toList();
         var base = sanitize(session, activeIds);
         var c = drafted == null ? new QwenChatModel.Criteria(null, null, null, null, null, null, null, List.of()) : drafted;
-        var extraction = new CriteriaParser.Extraction("NEEDS_CLARIFICATION", c.pickupDate(), c.returnDate(),
-            c.pickupBranchName(), c.returnBranchName(), c.passengers(), c.budgetVndTotal(), c.transmission(),
-            c.unresolvedFields(), List.of());
-        var resolved = resolver.resolve(message, extraction, resolver.mentioned(message)).draft();
+        var resolved = resolve(message, c, base);
         var undecided = c.unresolvedFields();
 
         String pickupDate = pick(resolved.pickupDate(), base.pickupDate(), undecided.contains("pickupDate"));
@@ -68,7 +147,13 @@ public class ChatVehicleSearch {
         String returnBranch = pick(resolved.returnBranchId(), base.returnBranchId(), undecided.contains("returnBranchName"));
         Integer passengers = pick(resolved.passengers(), base.passengers(), undecided.contains("passengers"));
         Long budget = pick(resolved.budgetVndTotal(), base.budgetVndTotal(), undecided.contains("budgetVndTotal"));
-        String transmission = resolved.transmission() != null ? resolved.transmission() : base.transmission();
+        // REVIEW #7: "loại số nào cũng được" drops an earlier preference; not mentioning the gearbox keeps it.
+        String transmission = switch (CriteriaResolver.transmissionChange(message)) {
+            case "AUTO" -> "AUTO";
+            case "MANUAL" -> "MANUAL";
+            case "CLEAR" -> null;
+            default -> base.transmission();
+        };
         if (pickupDate != null && returnDate != null && !LocalDate.parse(returnDate).isAfter(LocalDate.parse(pickupDate)))
             returnDate = null;
         var merged = new Session(pickupDate, returnDate, pickupBranch, returnBranch, passengers, budget, transmission);
@@ -80,8 +165,10 @@ public class ChatVehicleSearch {
         if (returnBranch == null) missing.add("returnBranchId");
         if (passengers == null) missing.add("passengers");
         if (budget == null) missing.add("budgetVndTotal");
-        if (!missing.isEmpty())
-            return new Result("ASK_MISSING", question(missing.get(0), active), merged, List.copyOf(missing), List.of());
+        if (!missing.isEmpty()) {
+            var asking = new Session(pickupDate, returnDate, pickupBranch, returnBranch, passengers, budget, transmission, missing.get(0));
+            return new Result("ASK_MISSING", question(missing.get(0), active), asking, List.copyOf(missing), List.of());
+        }
 
         var request = new RecommendationModels.Request("chat-" + UUID.randomUUID(), new RecommendationModels.Criteria(
             LocalDate.parse(pickupDate), LocalDate.parse(returnDate), pickupBranch, returnBranch, passengers, budget,
@@ -116,14 +203,15 @@ public class ChatVehicleSearch {
 
     /** Drops anything the client sent that is not a valid, currently usable value. */
     static Session sanitize(Session s, List<String> activeIds) {
-        if (s == null) return new Session(null, null, null, null, null, null, null);
+        if (s == null) return new Session(null, null, null, null, null, null, null, null);
         String start = date(s.pickupDate()), end = date(s.returnDate());
         return new Session(start, end,
             activeIds.contains(s.pickupBranchId()) ? s.pickupBranchId() : null,
             activeIds.contains(s.returnBranchId()) ? s.returnBranchId() : null,
             s.passengers() != null && s.passengers() >= 2 && s.passengers() <= 9 ? s.passengers() : null,
             s.budgetVndTotal() != null && s.budgetVndTotal() >= 0 && s.budgetVndTotal() <= 9007199254740991L ? s.budgetVndTotal() : null,
-            "AUTO".equals(s.transmission()) || "MANUAL".equals(s.transmission()) ? s.transmission() : null);
+            "AUTO".equals(s.transmission()) || "MANUAL".equals(s.transmission()) ? s.transmission() : null,
+            s.askedField() != null && REQUIRED.contains(s.askedField()) ? s.askedField() : null);
     }
 
     private static String date(String value) {

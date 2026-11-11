@@ -279,3 +279,23 @@ test('R4 the "no information" answer offers the vehicle search page; sourced ans
  const sourced=[...c.querySelectorAll('.assistant-turn')].at(-1);
  assert.equal(sourced.querySelector('a'),null);
 });
+
+test('R3 askedField is accepted and sent back; an invented one is rejected',async()=>{
+ await mount();await open();
+ await send('Tìm xe');await respond(take('/ai/chat'),reply('Bạn nhận xe ngày nào?',{intent:'ASK_MISSING',criteria:{pickupBranchId:'dn',askedField:'pickupDate'},missing:['pickupDate']}));
+ await send('22/12/2026');const second=take('/ai/chat');assert.deepEqual(JSON.parse(second.config.data).criteria,{pickupBranchId:'dn',askedField:'pickupDate'});
+ await respond(second,reply('Bạn trả xe ngày nào?',{intent:'ASK_MISSING',criteria:{pickupDate:'2026-12-22',pickupBranchId:'dn',askedField:'returnDate'},missing:['returnDate']}));
+ await send('Tìm xe');await respond(take('/ai/chat'),reply('x',{intent:'ASK_MISSING',criteria:{askedField:'weather'},missing:['pickupDate']}));
+ assert.ok(c.querySelector('[role="alert"]'));
+});
+
+test('R3 / D3 "Tìm chuyến mới" clears only the search criteria and keeps the conversation',async()=>{
+ await mount();await open();
+ assert.equal(button('Tìm chuyến mới'),undefined,'no button without criteria');
+ await send('Tìm xe 4 người');await respond(take('/ai/chat'),reply('Bạn nhận xe ngày nào?',{intent:'ASK_MISSING',criteria:{passengers:4,askedField:'pickupDate'},missing:['pickupDate']}));
+ const before=bubbles().length;
+ await click(button('Tìm chuyến mới'));
+ assert.equal(bubbles().length,before,'messages stay');
+ assert.equal(button('Tìm chuyến mới'),undefined);
+ await send('Tìm xe khác');assert.equal('criteria' in JSON.parse(take('/ai/chat').config.data),false,'the next turn starts a new search');
+});

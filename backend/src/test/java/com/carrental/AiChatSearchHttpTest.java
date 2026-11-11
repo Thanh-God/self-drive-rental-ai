@@ -135,7 +135,9 @@ class AiChatSearchHttpTest {
         String second = "Trả tại " + DN + " ngày 26/10/2026, đi 4 người, tổng ngân sách 3 triệu.";
         draft(second, "SEARCH_VEHICLES", null, "2026-10-26", null, DN, 4, 3_000_000L, null);
         var found = chat(second, asked.path("criteria")).getBody();
-        assertEquals(2, PROVIDER_REQUESTS.size(), "one model call per message");
+        // R3 / D2 (deliberate change): the second message answers the asked return date in a form the backend reads
+        // itself, so it is handled without a model call (before R3 this was a second call).
+        assertEquals(1, PROVIDER_REQUESTS.size(), "the follow-up that answers the asked field needs no model");
         assertEquals("SEARCH_VEHICLES", found.path("intent").asText());
         assertEquals(0, found.path("missing").size());
         var criteria = found.path("criteria");
@@ -206,6 +208,63 @@ class AiChatSearchHttpTest {
         assertTrue(cleaned.path("budgetVndTotal").isNull());
         assertTrue(cleaned.path("transmission").isNull());
         assertEquals(400, chat(more, JSON.readTree("{\"passengers\":\"bốn\"}")).getStatusCode().value());
+    }
+
+    /** R3 (REVIEW #5): the model choosing a search is not enough; FAQs and own-booking questions are not searched. */
+    @Test void questionsThatAreNotSearchesAreNotSearched() throws Exception {
+        String seat = "Xe có sẵn ghế cho trẻ em không?";
+        draft(seat, "ASK_MISSING", null, null, null, null, null, null, null);
+        var a = chat(seat, null).getBody();
+        assertEquals("ANSWER", a.path("intent").asText());
+        assertEquals("Mình chưa có thông tin về câu hỏi này. Bạn có thể hỏi chi nhánh hoặc gọi hotline 10008888 (số mẫu dùng cho bản demo).",
+            a.path("reply").asText());
+        assertTrue(a.path("criteria").isNull(), "no search session was started");
+        String own = "Chiếc xe tôi đặt hôm qua đang ở trạng thái nào?";
+        draft(own, "ASK_MISSING", null, null, null, null, null, null, null);
+        var b = chat(own, null).getBody();
+        assertEquals("OUT_OF_SCOPE", b.path("intent").asText());
+        assertTrue(b.path("reply").asText().startsWith("Mình không xem được đơn thuê của bạn"), b.path("reply").asText());
+        String start = "Mình muốn tìm một chiếc xe để đi chơi.";
+        draft(start, "ASK_MISSING", null, null, null, null, null, null, null);
+        var c = chat(start, null).getBody();
+        assertEquals("ASK_MISSING", c.path("intent").asText(), "an explicit request still starts a search");
+        assertEquals("pickupDate", c.path("criteria").path("askedField").asText());
+    }
+
+    /** R3 / D8 (REVIEW #6): party size and budget the text does not state are asked, not taken from the model. */
+    @Test void modelGuessesForPeopleAndBudgetAreAskedAgain() throws Exception {
+        String m = "Tìm xe nhận và trả tại " + DN + " từ 22/10/2026 đến 26/10/2026.";
+        draft(m, "SEARCH_VEHICLES", "2026-10-22", "2026-10-26", DN, DN, 4, 3_000_000L, null);
+        var r = chat(m, null).getBody();
+        assertEquals("ASK_MISSING", r.path("intent").asText());
+        assertTrue(r.path("criteria").path("passengers").isNull());
+        assertTrue(r.path("criteria").path("budgetVndTotal").isNull());
+        assertEquals(List.of("passengers", "budgetVndTotal"), texts(r.path("missing")));
+        assertEquals("passengers", r.path("criteria").path("askedField").asText());
+    }
+
+    /** R3 (REVIEW #7): "any gearbox is fine" drops an earlier AUTO preference. */
+    @Test void anyGearboxClearsAnEarlierPreference() throws Exception {
+        String first = "Tìm xe số tự động nhận và trả tại " + DN + " từ 22/10/2026 đến 26/10/2026, 4 người, tổng ngân sách 3 triệu.";
+        draft(first, "SEARCH_VEHICLES", "2026-10-22", "2026-10-26", DN, DN, 4, 3_000_000L, "AUTO");
+        var a = chat(first, null).getBody();
+        assertEquals("AUTO", a.path("criteria").path("transmission").asText());
+        String any = "Loại số nào cũng được.";
+        draft(any, "SEARCH_VEHICLES", null, null, null, null, null, null, null);
+        var b = chat(any, a.path("criteria")).getBody();
+        assertEquals("SEARCH_VEHICLES", b.path("intent").asText());
+        assertTrue(b.path("criteria").path("transmission").isNull(), b.path("criteria").toString());
+        assertEquals(4, b.path("criteria").path("passengers").asInt(), "the rest of the trip is kept");
+    }
+
+    /** R3 / D2: an askedField the client invents is dropped, so the turn goes to the model as usual. */
+    @Test void aForgedAskedFieldIsIgnored() throws Exception {
+        var forged = (ObjectNode) JSON.readTree("{\"pickupBranchId\":\"dn\",\"askedField\":\"weather\"}");
+        String m = "4 người";
+        draft(m, "ASK_MISSING", null, null, null, null, 4, null, null);
+        var r = chat(m, forged).getBody();
+        assertEquals(1, PROVIDER_REQUESTS.size(), "not a recognised question to answer without the model");
+        assertEquals(4, r.path("criteria").path("passengers").asInt());
     }
 
     static List<String> texts(JsonNode array) {

@@ -5,12 +5,13 @@ const INTENTS = ['ANSWER', 'SEARCH_VEHICLES', 'ASK_MISSING', 'OUT_OF_SCOPE'];
 const KNOWLEDGE_ID = /^K-[A-H]\d{2}$/;
 const count = value => Number.isSafeInteger(value) && value >= 0;
 const FIELDS = ['pickupDate', 'returnDate', 'pickupBranchId', 'returnBranchId', 'passengers', 'budgetVndTotal', 'transmission'];
+const REQUIRED = FIELDS.filter(f => f !== 'transmission');
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** Search criteria the client will store and send back: known fields only, each null or of the right shape. */
 export function validCriteria(c) {
   if (c === null) return true;
-  if (typeof c !== 'object' || Array.isArray(c) || Object.keys(c).some(k => !FIELDS.includes(k))) return false;
+  if (typeof c !== 'object' || Array.isArray(c) || Object.keys(c).some(k => !FIELDS.includes(k) && k !== 'askedField')) return false;
   const nullOr = (v, ok) => v === null || v === undefined || ok(v);
   return nullOr(c.pickupDate, v => typeof v === 'string' && ISO_DATE.test(v))
     && nullOr(c.returnDate, v => typeof v === 'string' && ISO_DATE.test(v))
@@ -18,7 +19,8 @@ export function validCriteria(c) {
     && nullOr(c.returnBranchId, v => typeof v === 'string' && v.length > 0 && v.length <= 36)
     && nullOr(c.passengers, v => Number.isInteger(v) && v >= 2 && v <= 9)
     && nullOr(c.budgetVndTotal, count)
-    && nullOr(c.transmission, v => v === 'AUTO' || v === 'MANUAL');
+    && nullOr(c.transmission, v => v === 'AUTO' || v === 'MANUAL')
+    && nullOr(c.askedField, v => REQUIRED.includes(v));
 }
 
 /** One chat turn. The history and search criteria live only in the browser and are sent back each turn. */

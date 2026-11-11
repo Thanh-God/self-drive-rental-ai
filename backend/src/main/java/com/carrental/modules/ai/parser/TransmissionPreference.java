@@ -11,6 +11,20 @@ record TransmissionPreference(String value, boolean ambiguous) {
     private static final Pattern NEGATION_SUFFIX=Pattern.compile("(?:^|\\s)(?:khong|not|tranh|loai tru)\\b.*$");
     private static final Pattern REQUEST_AFTER_CONJUNCTION=Pattern.compile(
         "\\b(?:va|and)\\s+(?=(?:toi\\s+)?(?:muon|can|thich|chon|uu\\s+tien|want|need|prefer)\\b)");
+    /** How a chat message changes a gearbox preference stated earlier. */
+    enum Change { KEEP, AUTO, MANUAL, CLEAR }
+    private static final Pattern ANY_GEARBOX=Pattern.compile(
+        "\\b(?:(?:loai |hop )?so nao|hop so nao|loai nao)\\b.{0,12}\\bcung duoc\\b|\\bkhong (?:can|quan trong|yeu cau)\\b.{0,12}\\b(?:hop so|so tu dong|so san|so tay|auto|manual)\\b");
+    static Change change(String text){
+        String normalized=normalizeWords(text);
+        if(ANY_GEARBOX.matcher(normalized).find())return Change.CLEAR;
+        var stated=fromText(text);
+        if(stated.value()!=null)return "AUTO".equals(stated.value())?Change.AUTO:Change.MANUAL;
+        boolean mentioned=mentions(AUTOMATIC_TERMS,normalized).positive()||mentions(AUTOMATIC_TERMS,normalized).negative()
+            ||mentions(MANUAL_TERMS,normalized).positive()||mentions(MANUAL_TERMS,normalized).negative();
+        // "both are fine", a refusal of the only option named, or a contradiction: do not filter on a gearbox.
+        return mentioned?Change.CLEAR:Change.KEEP;
+    }
     static TransmissionPreference fromText(String text){
         String normalized=normalizeWords(text);
         var automatic=mentions(AUTOMATIC_TERMS,normalized);

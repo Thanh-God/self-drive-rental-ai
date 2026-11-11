@@ -57,3 +57,4 @@
 .assistant-chat-cards { margin-top: 2px; }
 .assistant-chat-cards article { margin-top: 8px; }
 .assistant-sources { margin: 0; color: #65574b; font-size: 11px; }
+.assistant-link { padding: 0; border: 0; background: none; color: #8f3d0f; font: inherit; text-decoration: underline; cursor: pointer; }

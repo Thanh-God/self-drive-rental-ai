@@ -42,7 +42,7 @@ record ExplicitBudget(boolean fixed, Long value) {
         }
         OptionalLong total=OptionalLong.empty();
         for(String clause:CLAUSE.split(words)){
-            var parsed=clauseTotal(clause);
+            var parsed=clauseTotal(clause,true);
             if(parsed.isEmpty())continue;
             if(total.isPresent() && total.getAsLong()!=parsed.getAsLong())return ASK;
             total=parsed;
@@ -58,7 +58,26 @@ record ExplicitBudget(boolean fixed, Long value) {
             .toLowerCase(Locale.ROOT).replace('đ','d');
     }
 
-    private static OptionalLong clauseTotal(String words){
+    /**
+     * The amount a customer gives in reply to "what is your total budget?": a fixed total as {@link #fromText}
+     * reads it, or else one plain amount ("3 triệu") without a daily rate, alternatives or uncertainty.
+     */
+    static OptionalLong answeredAmount(String text){
+        var stated=fromText(text);
+        if(stated.fixed())return stated.value()==null?OptionalLong.empty():OptionalLong.of(stated.value());
+        String words=fold(text);
+        if(DAILY_SHORT.matcher(words).find()||DAILY.matcher(words).find())return OptionalLong.empty();
+        OptionalLong total=OptionalLong.empty();
+        for(String clause:CLAUSE.split(words)){
+            var parsed=clauseTotal(clause,false);
+            if(parsed.isEmpty())continue;
+            if(total.isPresent() && total.getAsLong()!=parsed.getAsLong())return OptionalLong.empty();
+            total=parsed;
+        }
+        return total;
+    }
+
+    private static OptionalLong clauseTotal(String words,boolean requireTotalWording){
         if(UNCERTAIN.matcher(words).find())return OptionalLong.empty();
         var match=MONEY.matcher(words);
         if(!match.find())return OptionalLong.empty();
@@ -72,7 +91,7 @@ record ExplicitBudget(boolean fixed, Long value) {
         String before=words.substring(0,start);
         if(before.replace("khong qua","").matches("(?s).*\\b(?:khong|chua|tranh|loai tru)\\b.*"))return OptionalLong.empty();
         if(words.substring(end).matches("(?s)^\\s*(?:nguoi|khach|cho|km|gio|ngay|dem|nghiep)\\b.*"))return OptionalLong.empty();
-        if(!TOTAL_PREFIX.matcher(before).find()&&!(SPENDING.matcher(before).find()&&TRIP_SUFFIX.matcher(words.substring(end)).find()))
+        if(requireTotalWording&&!TOTAL_PREFIX.matcher(before).find()&&!(SPENDING.matcher(before).find()&&TRIP_SUFFIX.matcher(words.substring(end)).find()))
             return OptionalLong.empty();
         boolean baseUnit=unit.equals("dong")||unit.equals("vnd");
         int wordNumber=NUMBERS.indexOf(number);

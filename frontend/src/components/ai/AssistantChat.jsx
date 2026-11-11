@@ -172,6 +172,8 @@ export default function AssistantChat({ visible }) {
               placeholder="Ví dụ: Có giao xe tận nhà không?" />
             <button type="submit" aria-label="Gửi" disabled={busy || exhausted || !text.trim()}><Send size={18} /></button>
           </form>
+          {criteria && Object.entries(criteria).some(([k, v]) => k !== 'askedField' && v !== null && v !== undefined) && !busy &&
+            <p className="assistant-note"><button type="button" className="assistant-link" onClick={() => setCriteria(null)}>Tìm chuyến mới</button> (xóa tiêu chí tìm xe, giữ cuộc trò chuyện)</p>}
           <p className="assistant-note">Không nhập số điện thoại, email hoặc số giấy tờ. Trợ lý không đặt, hủy hay sửa đơn; giá và lịch được kiểm tra lại khi đặt thuê.</p>
           <p className="assistant-note"><Link to="/vehicles">Tìm xe theo bộ lọc</Link></p>
           <RouteExplorer key={routeRevision} />
