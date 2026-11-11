@@ -1,3 +1,4 @@
+/* Stacking: site navbar z 46 (account menu) > assistant z 45; modals z 50; toasts z 60. */
 .kdrive-assistant { position: fixed; right: 24px; bottom: 24px; z-index: 45; color: #1a1a1a; font: 14px/1.5 "Segoe UI", system-ui, sans-serif; }
 .assistant-launcher { display: flex; align-items: center; gap: 10px; margin-left: auto; min-height: 52px; padding: 14px 21px; border: 1px solid #bb4a0a; border-radius: 30px; background: #ff7e33; color: #1a1a1a; font-weight: 650; box-shadow: 0 5px 22px #5b331429; cursor: pointer; }
 .assistant-panel { width: 420px; max-width: calc(100vw - 48px); margin-bottom: 14px; border: 1px solid #d9cfc2; border-radius: 22px; box-shadow: 0 16px 60px #30231930; background: #faf8f4; overflow: hidden; }

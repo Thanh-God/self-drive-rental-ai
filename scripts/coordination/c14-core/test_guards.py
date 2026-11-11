@@ -23,6 +23,18 @@ class RunnerGuards(unittest.TestCase):
             suite.unlink()
             with self.assertRaisesRegex(AssertionError,'Suite source missing'):runner.declared_tests(build,'MySqlMigrationTest')
 
+    def test_ai_chat_proof_is_explicit_and_exclusive(self):
+        module=load('run-browser')
+        chat=Path('verify-ai-chat.cjs')
+        settings=module.proof_settings(chat,ai_chat=True)
+        for line in ('app.qwen-parser-enabled=true','app.ai-recommendation-enabled=true','app.qwen-model=qwen3:8b'):self.assertIn(line,settings)
+        self.assertNotIn('ai-daily-limit',settings,'the default allowance is what the proof exercises')
+        with self.assertRaises(AssertionError):module.proof_settings(chat)
+        with self.assertRaises(AssertionError):module.proof_settings(Path('verify-browser.cjs'),ai_chat=True)
+        for kwargs in ({'qr':True},{'synthetic':True},{'return_policy':True}):
+            with self.assertRaises(AssertionError):module.proof_settings(chat,ai_chat=True,**kwargs)
+        self.assertNotIn('qwen',module.proof_settings(Path('verify-browser.cjs')))
+
     def test_return_policy_mode_is_explicit_and_bounded(self):
         module=load('run-browser'); proof=ROOT/'scripts/operations/verify-return-policy.cjs'
         self.assertEqual(module.proof_settings(proof,qr=True,return_policy=True),'app.return-policy-enabled=true\napp.return-settlement-demo=true\n')

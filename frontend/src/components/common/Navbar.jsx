@@ -45,7 +45,7 @@ export default function Navbar() {
   };
 
   return (
-    <header className="urban-navbar sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <header className="urban-navbar sticky top-0 z-[46] border-b border-slate-200 bg-white/90 backdrop-blur">
       {logoutWarning ? (
         <p role="alert" className="bg-rose-50 px-4 py-2 text-sm text-rose-800">
           {logoutWarning}

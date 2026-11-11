@@ -8,8 +8,15 @@ def resolve_proof(value):
  assert proof.is_relative_to(REPO/'scripts') and proof.is_file(),'Repository browser proof required'
  return proof
 
-def proof_settings(proof, qr=False, synthetic=False, return_policy=False):
+AI_CHAT_SETTINGS='app.ai-recommendation-enabled=true\napp.qwen-parser-enabled=true\napp.qwen-model=qwen3:8b\napp.gemini-parser-enabled=false\n'
+
+def proof_settings(proof, qr=False, synthetic=False, return_policy=False, ai_chat=False):
  return_proofs={'verify-return-policy.cjs','verify-return-late.cjs'}
+ # Live local Qwen is only switched on for the bounded chat proof, and only on explicit request.
+ assert ai_chat==(proof.name=='verify-ai-chat.cjs'),'AI chat proof requires --ai-chat and vice versa'
+ if ai_chat:
+  assert not(qr or synthetic or return_policy),'AI chat proof runs without payment or return modes'
+  return 'app.return-policy-enabled=false\napp.return-settlement-demo=true\n'+AI_CHAT_SETTINGS
  assert not(qr and synthetic),'Choose one payment proof'
  if return_policy:
   assert qr and not synthetic and proof.name in return_proofs,'Return policy requires bounded QR DEMO return proof'
@@ -19,9 +26,9 @@ def proof_settings(proof, qr=False, synthetic=False, return_policy=False):
  return 'app.return-policy-enabled='+str(return_policy).lower()+'\napp.return-settlement-demo=true\n'
 
 def main():
- p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);p.add_argument('--browser-script');p.add_argument('--synthetic-deposit',action='store_true',help='Internal protocol only; never merchant acceptance');p.add_argument('--qr-manual',action='store_true');p.add_argument('--return-policy',action='store_true');a=p.parse_args()
+ p=argparse.ArgumentParser();p.add_argument('--backend-evidence',required=True);p.add_argument('--backend-root',required=True);p.add_argument('--evidence',required=True);p.add_argument('--browser-script');p.add_argument('--synthetic-deposit',action='store_true',help='Internal protocol only; never merchant acceptance');p.add_argument('--qr-manual',action='store_true');p.add_argument('--return-policy',action='store_true');p.add_argument('--ai-chat',action='store_true',help='Live local Qwen chat proof only');a=p.parse_args()
  proof=resolve_proof(a.browser_script)
- settings=proof_settings(proof,a.qr_manual,a.synthetic_deposit,a.return_policy)
+ settings=proof_settings(proof,a.qr_manual,a.synthetic_deposit,a.return_policy,a.ai_chat)
  native=Path(a.backend_evidence).resolve();build=Path(a.backend_root).resolve();out=Path(a.evidence).resolve()
  assert all(x.is_relative_to(REPO/'.runtime') for x in [native,build,out]) and not out.exists()
  f=json.loads((native/'fixture.json').read_text());assert f['name'].startswith('kltn-c14-core-') and f['port']==33676
