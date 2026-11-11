@@ -37,6 +37,10 @@ public class ChatService {
         UNSUPPORTED_AMOUNT,
         /** Injection pattern and the reply had no valid citation, replaced by the approved refusal. */
         INJECTION_UNGROUNDED,
+        /** ANSWER whose reply is an approved refusal: labelled OUT_OF_SCOPE, sources dropped. */
+        REFUSAL_RELABELLED,
+        /** The approved "no information" reply came with citations; they were dropped. */
+        FALLBACK_SOURCES_DROPPED,
         /** Sample hotline mentioned without its sample label; the label was added. */
         HOTLINE_LABEL_ADDED
     }
@@ -149,6 +153,17 @@ public class ChatService {
             else if (!guards.contains(Guard.UNKNOWN_CITATION)) guards.add(Guard.UNKNOWN_CITATION);
         }
         if (!"ANSWER".equals(intent)) citations.clear();
+        if ("ANSWER".equals(intent) && isApprovedRefusal(reply)) {
+            // C5.2-F1: an approved refusal is a refusal whatever label the model gave it, and it has no sources.
+            guards.add(Guard.REFUSAL_RELABELLED);
+            intent = "OUT_OF_SCOPE";
+            citations.clear();
+        } else if ("ANSWER".equals(intent) && !citations.isEmpty()
+                && wordsOnly(reply).equals(wordsOnly(knowledge.fallbackReply()))) {
+            // C5.2-F2: "no information" cites nothing, otherwise the UI shows a source next to it.
+            guards.add(Guard.FALLBACK_SOURCES_DROPPED);
+            citations.clear();
+        }
 
         if (injection && citations.isEmpty() && !isApprovedRefusal(reply)) {
             guards.add(Guard.INJECTION_UNGROUNDED);

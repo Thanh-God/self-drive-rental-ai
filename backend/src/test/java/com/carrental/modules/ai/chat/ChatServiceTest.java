@@ -181,6 +181,45 @@ class ChatServiceTest {
             assertTrue(ChatService.inDomain(domain), domain);
     }
 
+    /** C5.2-F1: approved refusal labelled ANSWER (seen live for "giá vàng", "15 nhân 23", "đơn đã duyệt chưa"). */
+    @Test
+    void anApprovedRefusalLabelledAnswerIsARefusalWithoutSources() throws Exception {
+        model("ANSWER", answer("K-G01"));
+        var gold = ask("Giá vàng hôm nay bao nhiêu một chỉ?");
+        assertEquals("OUT_OF_SCOPE", gold.intent());
+        assertEquals(answer("K-G01"), gold.reply());
+        assertEquals(List.of(), gold.citations());
+        assertEquals(List.of(Guard.REFUSAL_RELABELLED), gold.guards());
+
+        model("ANSWER", answer("K-G03"), "K-E01", "K-F01");
+        var own = ask("Đơn thuê của tôi đã được duyệt chưa?");
+        assertEquals("OUT_OF_SCOPE", own.intent());
+        assertEquals(answer("K-G03"), own.reply());
+        assertEquals(List.of(), own.citations(), "a refusal never shows sources");
+
+        model("ANSWER", answer("K-G01"));
+        var key = ask("Tôi làm mất chìa khóa xe thì phải làm sao?");
+        assertEquals("ANSWER", key.intent(), "the in-domain rule still applies after relabelling");
+        assertEquals(KB.fallbackReply(), key.reply());
+        assertEquals(List.of(Guard.REFUSAL_RELABELLED, Guard.OUT_OF_SCOPE_IN_DOMAIN), key.guards());
+    }
+
+    /** C5.2-F2: "no information" with a citation (seen live for the deposit question citing K-H06). */
+    @Test
+    void theNoInformationReplyCarriesNoSources() throws Exception {
+        model("ANSWER", KB.fallbackReply(), "K-H06");
+        var a = ask("Thuê xe có phải đóng tiền cọc không, bao nhiêu?");
+        assertEquals("ANSWER", a.intent());
+        assertEquals(KB.fallbackReply(), a.reply());
+        assertEquals(List.of(), a.citations());
+        assertEquals(List.of(Guard.FALLBACK_SOURCES_DROPPED), a.guards());
+
+        model("ANSWER", "Cọc bằng 30% tiền thuê và được tính vào tiền thuê.", "K-B07");
+        var grounded = ask("Thuê xe có phải đóng tiền cọc không, bao nhiêu?");
+        assertEquals(List.of("K-B07"), grounded.citations(), "a real answer keeps its source");
+        assertEquals(List.of(), grounded.guards());
+    }
+
     @Test
     void inventedMoneyAmountsAreWithdrawn() throws Exception {
         model("ANSWER", "Phí tuyến Đà Nẵng – Hà Nội là 1.500.000đ, hiển thị trong báo giá.", "K-B03");
