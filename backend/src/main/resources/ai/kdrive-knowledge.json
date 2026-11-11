@@ -1,0 +1,614 @@
+{
+  "version": "2026-11-11-v1",
+  "approvedOn": "2026-11-11",
+  "hotline": {
+    "number": "10008888",
+    "sample": true
+  },
+  "fallbackReply": "Mình chưa có thông tin về câu hỏi này. Bạn có thể hỏi chi nhánh hoặc gọi hotline 10008888 (số mẫu dùng cho bản demo).",
+  "entries": [
+    {
+      "id": "K-A01",
+      "group": "A",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Trợ lý KDrive làm được gì?",
+        "Bạn giúp được gì?",
+        "Trợ lý này dùng để làm gì?"
+      ],
+      "answer": "Mình trả lời câu hỏi về dịch vụ thuê xe tự lái KDrive (quy trình thuê, giấy tờ, chi nhánh, hủy đơn…) và giúp gợi ý xe khi bạn cho biết ngày, nơi nhận/trả, số người và ngân sách. Mình không đặt, hủy hay sửa đơn thay bạn; giá và lịch xe luôn do hệ thống kiểm tra lại khi bạn đặt.",
+      "sources": [
+        "docs/modules/ai-assistant.md",
+        "decisions.md OP-01"
+      ]
+    },
+    {
+      "id": "K-A02",
+      "group": "A",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Mỗi ngày hỏi được bao nhiêu câu?",
+        "Tôi được hỏi bao nhiêu lần một ngày?",
+        "Hết lượt hỏi thì sao?"
+      ],
+      "answer": "Mỗi tài khoản có 6 câu hỏi AI mỗi ngày (làm mới lúc 0 giờ). Hết lượt, bạn vẫn tìm xe bằng trang Tìm xe hoặc gọi hotline mẫu 10008888 (số minh họa trong bản demo).",
+      "sources": [
+        "docs/modules/ai-assistant.md (Hạn mức câu hỏi AI mỗi ngày)"
+      ]
+    },
+    {
+      "id": "K-A03",
+      "group": "A",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Ai được dùng trợ lý?",
+        "Chưa đăng nhập có dùng trợ lý được không?",
+        "Ai được dùng chatbot?"
+      ],
+      "answer": "Khách hàng đã đăng nhập tài khoản. Khách chưa đăng nhập cần đăng nhập để dùng.",
+      "sources": [
+        "decisions.md OP-01"
+      ]
+    },
+    {
+      "id": "K-A04",
+      "group": "A",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Trợ lý có lưu nội dung trò chuyện không?",
+        "Cuộc trò chuyện có bị lưu lại không?",
+        "Trợ lý có giữ tin nhắn của tôi không?"
+      ],
+      "answer": "Không. Nội dung chỉ được giữ trong lúc bạn đang mở trò chuyện; tải lại trang, đăng xuất hoặc đổi tài khoản sẽ xóa. Đừng nhập số điện thoại, email hay số giấy tờ vào ô chat.",
+      "sources": [
+        "ai-assistant.md",
+        "docs/modules/ai-assistant.md"
+      ]
+    },
+    {
+      "id": "K-B01",
+      "group": "B",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Quy trình thuê xe gồm những bước nào?",
+        "Các bước thuê xe như thế nào?",
+        "Muốn thuê xe thì làm sao?"
+      ],
+      "answer": "(1) Chọn xe, ngày nhận/trả và chi nhánh nhận/trả để xem báo giá; (2) khai báo GPLX và tải ảnh hai mặt; (3) gửi yêu cầu thuê — đơn ở trạng thái chờ xác nhận; (4) nhân viên chi nhánh nhận kiểm tra hồ sơ và xác nhận, hợp đồng được phát hành khi xác nhận; (5) nhận xe tại chi nhánh trong ngày nhận; (6) trả xe tại chi nhánh trả đã chọn; (7) đơn hoàn tất và có hóa đơn.",
+      "sources": [
+        "use-cases.md UC-U02/U03, decisions.md OP-04/OP-05, license-photos.md"
+      ]
+    },
+    {
+      "id": "K-B02",
+      "group": "B",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Giá thuê tính thế nào?",
+        "Tiền thuê xe tính ra sao?",
+        "Cách tính giá thuê theo ngày?"
+      ],
+      "answer": "Tính theo số ngày giữa ngày nhận và ngày trả theo lịch Việt Nam (ví dụ nhận 17/10, trả 21/10 là 4 ngày), nhân giá thuê theo ngày của xe, cộng phí tuyến nếu nhận và trả ở hai chi nhánh khác nhau. Tiền tính bằng VND tròn đồng. Giá chính xác hiển thị ở bước báo giá.",
+      "sources": [
+        "decisions.md OP-03, quy tắc phí tuyến"
+      ]
+    },
+    {
+      "id": "K-B03",
+      "group": "B",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Phí tuyến là bao nhiêu?",
+        "Nhận một nơi trả một nơi mất bao nhiêu phí?",
+        "Phí khác chi nhánh là bao nhiêu?"
+      ],
+      "answer": "Phí tuyến phụ thuộc cặp chi nhánh nhận–trả và được hiển thị trong báo giá. Trợ lý chỉ nêu con số lấy từ hệ thống tại thời điểm hỏi.",
+      "sources": [
+        "decisions.md \"Phí tuyến phải cấu hình, công khai…\""
+      ]
+    },
+    {
+      "id": "K-B04",
+      "group": "B",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Đơn chờ xác nhận được giữ bao lâu?",
+        "Đơn chờ duyệt giữ chỗ bao lâu?",
+        "Bao lâu thì đơn chờ xác nhận hết hạn?"
+      ],
+      "answer": "Yêu cầu thuê được giữ lịch tối đa 2 giờ và không quá hết ngày nhận xe; quá hạn mà chưa được xác nhận thì đơn hết hiệu lực.",
+      "sources": [
+        "decisions.md OP-04"
+      ]
+    },
+    {
+      "id": "K-B05",
+      "group": "B",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Gợi ý xe của trợ lý có giữ chỗ không?",
+        "Xe trợ lý gợi ý có được giữ cho tôi không?",
+        "Gợi ý xe có phải đã đặt chỗ chưa?"
+      ],
+      "answer": "Không. Gợi ý chỉ dựa trên dữ liệu tại lúc hỏi; khi bạn đặt, hệ thống kiểm tra lại giá, lịch và GPLX.",
+      "sources": [
+        "ai-recommendation.md"
+      ]
+    },
+    {
+      "id": "K-B06",
+      "group": "B",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Có thanh toán online không?",
+        "Có trả tiền qua mạng được không?",
+        "Có thanh toán bằng thẻ trên web không?"
+      ],
+      "answer": "Bản hiện tại không thanh toán online thật.",
+      "sources": [
+        "decisions.md AD-10"
+      ]
+    },
+    {
+      "id": "K-B07",
+      "group": "B",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": true,
+      "questions": [
+        "Có phải đặt cọc không?",
+        "Tiền cọc là bao nhiêu?",
+        "Đặt cọc như thế nào?"
+      ],
+      "answer": "KDrive đang thử nghiệm cọc giữ chỗ (không thu tiền thật). Khi chế độ này được bật cho đơn của bạn: cọc bằng 30% tiền thuê (làm tròn lên đồng, không tính phí tuyến) và được tính vào tiền thuê, không phải tiền đảm bảo thiệt hại. Sau khi nhân viên chi nhánh nhận duyệt hồ sơ GPLX, bạn có tối đa 30 phút để chuyển khoản theo mã QR thử nghiệm (không vượt quá thời hạn giữ lịch của đơn). Nhân viên đối chiếu khoản chuyển; khi đủ cọc, đơn được xác nhận và hợp đồng được phát hành. Bấm \"đã chuyển\" chưa có nghĩa là tiền đã được ghi nhận.",
+      "sources": [
+        "booking-deposit.md (Quy tắc, QR DEMO thủ công)"
+      ]
+    },
+    {
+      "id": "K-C01",
+      "group": "C",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Thuê xe cần giấy tờ gì?",
+        "Cần những giấy tờ gì để thuê xe?",
+        "Thuê xe tự lái cần bằng lái gì?"
+      ],
+      "answer": "Bạn cần khai báo GPLX còn hiệu lực đến hết ngày trả xe, phù hợp số chỗ và hộp số của xe, và tải ảnh hai mặt GPLX (JPEG/PNG, tối đa 5 MB mỗi mặt) trước khi gửi yêu cầu thuê. Nhân viên kiểm tra hồ sơ trước khi xác nhận và đối chiếu bản gốc khi giao xe.",
+      "sources": [
+        "license-photos.md",
+        "decisions.md OP-02"
+      ]
+    },
+    {
+      "id": "K-C02",
+      "group": "C",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Bằng lái theo hệ mới 2025 có dùng được không?",
+        "Bằng lái hệ mới có thuê được không?",
+        "GPLX hạng mới năm 2025 có được chấp nhận không?"
+      ],
+      "answer": "Có. Hệ thống xét cả GPLX hệ cũ (trước 2025) và hệ mới 2025, dựa trên số chỗ ngồi, hộp số và hạn dùng, không chỉ dựa vào tên hạng.",
+      "sources": [
+        "decisions.md quy tắc GPLX"
+      ]
+    },
+    {
+      "id": "K-C03",
+      "group": "C",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Ảnh GPLX có được gửi cho AI không?",
+        "Ảnh bằng lái của tôi có bị đưa cho AI không?",
+        "Ai xem ảnh GPLX của tôi?"
+      ],
+      "answer": "Không. Ảnh là dữ liệu riêng tư, chỉ nhân viên chi nhánh nhận xem khi kiểm tra đơn; không gửi cho AI.",
+      "sources": [
+        "license-photos.md",
+        "OP-02"
+      ]
+    },
+    {
+      "id": "K-C04",
+      "group": "C",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Đổi ảnh GPLX thì sao?",
+        "Tôi muốn thay ảnh bằng lái thì sao?",
+        "Sửa thông tin GPLX có ảnh hưởng gì không?"
+      ],
+      "answer": "Thay ảnh hoặc sửa thông tin GPLX sẽ làm hồ sơ phải được kiểm tra lại.",
+      "sources": [
+        "license-photos.md"
+      ]
+    },
+    {
+      "id": "K-D01",
+      "group": "D",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Nhận và trả xe ở đâu?",
+        "Lấy xe ở đâu?",
+        "Có nhận xe tại địa chỉ của tôi không?"
+      ],
+      "answer": "Tại các chi nhánh KDrive đang hoạt động, theo tuyến nhận–trả được mở; không nhận/trả ở địa chỉ tùy ý. Danh sách chi nhánh lấy từ hệ thống.",
+      "sources": [
+        "decisions.md quy tắc nghiệp vụ",
+        "branch-status.md"
+      ]
+    },
+    {
+      "id": "K-D02",
+      "group": "D",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Có nhận xe ở chi nhánh này và trả ở chi nhánh khác được không?",
+        "Nhận ở Đà Nẵng trả ở chi nhánh khác được không?",
+        "Có thuê một chiều được không?"
+      ],
+      "answer": "Được nếu tuyến giữa hai chi nhánh đang mở; có thể có phí tuyến, hiển thị trong báo giá.",
+      "sources": [
+        "decisions.md",
+        "ai-recommendation.md"
+      ]
+    },
+    {
+      "id": "K-D03",
+      "group": "D",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Có đổi điểm trả giữa chuyến được không?",
+        "Đang đi có đổi nơi trả xe được không?",
+        "Muốn trả xe ở chi nhánh khác giữa chuyến?"
+      ],
+      "answer": "Hiện chưa hỗ trợ đổi điểm trả giữa chuyến; xe trả tại chi nhánh đã chọn khi đặt.",
+      "sources": [
+        "decisions.md quy tắc nghiệp vụ"
+      ]
+    },
+    {
+      "id": "K-D04",
+      "group": "D",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Nhận xe khi nào?",
+        "Mấy giờ thì được nhận xe?",
+        "Khi nào tôi lấy được xe?"
+      ],
+      "answer": "Đơn theo ngày được giao xe trong ngày nhận đã đặt.",
+      "sources": [
+        "decisions.md OP-04"
+      ]
+    },
+    {
+      "id": "K-D05",
+      "group": "D",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": true,
+      "questions": [
+        "Trả xe sớm có được giảm tiền không? Trả muộn bị tính thế nào?",
+        "Trả xe trễ bị phạt bao nhiêu?",
+        "Trả xe sớm có được hoàn tiền không?"
+      ],
+      "answer": "KDrive đang thử nghiệm chính sách trả xe cho đơn theo ngày nhận và trả cùng một chi nhánh; nếu áp dụng, chính sách hiện trong báo giá và bạn xác nhận khi đặt. Theo chính sách này: trả sớm không tự giảm tiền và xe vẫn giữ lịch đến ngày trả đã đặt; trả muộn tính thêm theo số ngày (lịch Việt Nam) vượt quá ngày trả, nhân với giá thuê/ngày đã lưu trong đơn, không có tiền phạt thêm.",
+      "sources": [
+        "return-policy.md"
+      ]
+    },
+    {
+      "id": "K-D06",
+      "group": "D",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Có gia hạn thuê được không?",
+        "Tôi muốn thuê thêm ngày được không?",
+        "Có dời lịch thuê được không?"
+      ],
+      "answer": "Hiện chưa hỗ trợ gia hạn hoặc dời lịch trong hệ thống; liên hệ chi nhánh để được hướng dẫn.",
+      "sources": [
+        "decisions.md OP-04 \"chưa hỗ trợ gia hạn\""
+      ]
+    },
+    {
+      "id": "K-E01",
+      "group": "E",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Tôi có tự hủy đơn được không?",
+        "Hủy đơn thuê như thế nào?",
+        "Tôi muốn hủy chuyến thì làm sao?"
+      ],
+      "answer": "Bạn tự hủy được nếu còn ít nhất 24 giờ trước mốc nhận xe (đơn theo ngày lấy đầu ngày nhận làm mốc). Sát giờ hơn thì nhân viên xử lý và ghi lý do.",
+      "sources": [
+        "decisions.md OP-06"
+      ]
+    },
+    {
+      "id": "K-E02",
+      "group": "E",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": true,
+      "questions": [
+        "Hủy đơn có được hoàn tiền không?",
+        "Hủy đơn có được trả lại tiền cọc không?",
+        "Hoàn tiền khi hủy như thế nào?"
+      ],
+      "answer": "Trong chế độ cọc thử nghiệm (không thu tiền thật): chưa có khoản nào được ghi nhận thì không có gì để hoàn; bạn hủy trước mốc nhận ít nhất 24 giờ hoặc KDrive từ chối/không cung cấp được xe → hoàn toàn bộ; hủy sát giờ hoặc không đến nhận xe → quản trị viên quyết định mức hoàn từ 0–100% và ghi lý do; tiền đến muộn, đơn không xác nhận được hoặc chuyển thừa → hoàn toàn bộ phần không áp dụng. Yêu cầu hoàn đã được duyệt hay đang xử lý chưa có nghĩa là đã hoàn xong.",
+      "sources": [
+        "booking-deposit.md (Hủy và hoàn)"
+      ]
+    },
+    {
+      "id": "K-F01",
+      "group": "F",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Tôi xem hợp đồng và hóa đơn ở đâu?",
+        "Hóa đơn của tôi ở đâu?",
+        "Xem hợp đồng thuê xe ở đâu?"
+      ],
+      "answer": "Trong mục đơn thuê của bạn: hợp đồng có khi đơn được xác nhận, hóa đơn có khi đơn hoàn tất. Hóa đơn thể hiện giá trị dịch vụ, không phải chứng từ đã thanh toán.",
+      "sources": [
+        "use-cases.md U04",
+        "OP-05",
+        "decisions.md"
+      ]
+    },
+    {
+      "id": "K-F02",
+      "group": "F",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Tôi đánh giá xe được không?",
+        "Làm sao để đánh giá chuyến đi?",
+        "Tôi có thể viết nhận xét về xe không?"
+      ],
+      "answer": "Được, mỗi đơn đã hoàn tất được gửi một đánh giá.",
+      "sources": [
+        "system-scope.md FR-11"
+      ]
+    },
+    {
+      "id": "K-F03",
+      "group": "F",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Xe gặp sự cố thì sao?",
+        "Xe bị hỏng giữa đường thì làm gì?",
+        "Báo sự cố xe như thế nào?"
+      ],
+      "answer": "Bạn có thể báo sự cố cho chuyến đã nhận xe, kể cả sau khi trả, miễn thời điểm xảy ra nằm trong thời gian bạn giữ xe. Nhân viên thẩm định; hệ thống không tự trừ tiền của bạn.",
+      "sources": [
+        "use-cases.md §12",
+        "decisions.md"
+      ]
+    },
+    {
+      "id": "K-G01",
+      "group": "G",
+      "kind": "REFUSAL",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Thời tiết Đà Nẵng hôm nay thế nào?",
+        "Viết giúp tôi một bài thơ."
+      ],
+      "answer": "Mình chỉ hỗ trợ các câu hỏi về dịch vụ thuê xe KDrive.",
+      "sources": [
+        "docs/modules/ai-assistant.md"
+      ]
+    },
+    {
+      "id": "K-G02",
+      "group": "G",
+      "kind": "REFUSAL",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Đặt xe giúp tôi luôn đi.",
+        "Hủy đơn của tôi giúp nhé."
+      ],
+      "answer": "Mình không đặt, hủy hay sửa đơn thay bạn. Bạn thao tác trên trang Đơn thuê của mình nhé.",
+      "sources": [
+        "docs/modules/ai-assistant.md"
+      ]
+    },
+    {
+      "id": "K-G03",
+      "group": "G",
+      "kind": "REFUSAL",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Đơn của tôi tới đâu rồi?",
+        "Đơn thuê của tôi đã được xác nhận chưa?"
+      ],
+      "answer": "Mình không xem được đơn thuê của bạn. Bạn mở trang Đơn thuê để xem trạng thái đơn.",
+      "sources": [
+        "docs/modules/ai-assistant.md"
+      ]
+    },
+    {
+      "id": "K-H01",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Nhận xe cần mang theo gì?",
+        "Đi nhận xe cần mang gì?",
+        "Có cần mang bằng lái bản gốc không?"
+      ],
+      "answer": "Bạn mang giấy phép lái xe bản gốc (đúng GPLX đã khai báo trên hệ thống) để nhân viên đối chiếu khi giao xe; nhân viên và bạn cùng kiểm tra tình trạng xe và ký biên bản giao xe.",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026",
+        "hệ thống đã có đối chiếu GPLX bản gốc và biên bản giao/nhận"
+      ]
+    },
+    {
+      "id": "K-H02",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Xăng/nhiên liệu tính thế nào?",
+        "Có phải đổ đầy xăng khi trả xe không?",
+        "Xe giao có bao nhiêu xăng?"
+      ],
+      "answer": "Khi giao, xe có khoảng 50% nhiên liệu. KDrive không tính chi phí nhiên liệu khi bạn trả xe.",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026"
+      ]
+    },
+    {
+      "id": "K-H03",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Có giới hạn số km không?",
+        "Thuê xe có giới hạn km không?",
+        "Đi bao nhiêu cây số một ngày?"
+      ],
+      "answer": "KDrive hiện chưa áp dụng giới hạn số km.",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026 (\"chưa hỗ trợ\")"
+      ]
+    },
+    {
+      "id": "K-H04",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Bị phạt nguội trong thời gian thuê thì sao?",
+        "Bị phạt nguội ai chịu?",
+        "Vi phạm giao thông khi thuê xe thì sao?"
+      ],
+      "answer": "Vi phạm giao thông phát sinh trong thời gian bạn giữ xe do bạn chịu, xác định theo chứng cứ về thời điểm vi phạm.",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026",
+        "decisions.md \"người thuê chịu trách nhiệm vi phạm/thiệt hại thuộc trách nhiệm của mình, theo chứng cứ\""
+      ]
+    },
+    {
+      "id": "K-H05",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Xe có bảo hiểm không?",
+        "Xe có bảo hiểm không?",
+        "Gặp tai nạn thì bảo hiểm có chi trả không?"
+      ],
+      "answer": "Xe được chi nhánh hỗ trợ bảo hiểm; chi tiết quyền lợi và mức chi trả vui lòng hỏi chi nhánh hoặc hotline mẫu 10008888. Khi có sự cố, nhân viên thẩm định và tách phần bảo hiểm/bên khác chi trả; hệ thống không tự trừ tiền của bạn.",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026 (ghi rõ chi nhánh hỗ trợ bảo hiểm, không cần chi tiết cho khóa luận)",
+        "use-cases §12"
+      ]
+    },
+    {
+      "id": "K-H06",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Có cần thế chấp tài sản (xe máy, giấy tờ) không?",
+        "Có phải để lại xe máy hay giấy tờ không?",
+        "Thuê xe có cần thế chấp không?"
+      ],
+      "answer": "Không cần thế chấp tài sản hay để lại giấy tờ; KDrive dùng cọc giữ chỗ (đang thử nghiệm, xem K-B07).",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026"
+      ]
+    },
+    {
+      "id": "K-H07",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Có giao xe tận nhà không?",
+        "Có giao xe tận nơi không?",
+        "KDrive có mang xe đến nhà không?"
+      ],
+      "answer": "KDrive hiện chưa hỗ trợ giao xe tận nhà; bạn nhận và trả xe tại chi nhánh.",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026",
+        "decisions.md"
+      ]
+    },
+    {
+      "id": "K-H08",
+      "group": "H",
+      "kind": "ANSWER",
+      "status": "APPROVED",
+      "experimental": false,
+      "questions": [
+        "Người nước ngoài/bằng quốc tế thuê được không?",
+        "Bằng lái quốc tế thuê được không?",
+        "Người nước ngoài có thuê xe được không?"
+      ],
+      "answer": "KDrive hiện chỉ hỗ trợ giấy phép lái xe Việt Nam (hệ cũ và hệ 2025).",
+      "sources": [
+        "chính sách chủ dự án chốt 11/11/2026",
+        "decisions.md quy tắc GPLX"
+      ]
+    }
+  ]
+}

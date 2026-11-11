@@ -167,7 +167,7 @@ Migration: `backend/src/main/resources/db/migration/`. `.runtime/`, `target/`, `
 - [Database](docs/database/database-design.md) và [API ảnh xe](docs/api/c10b-vehicle-images.md).
 - [Báo cáo vận hành](docs/modules/operational-reports.md), [danh mục địa điểm](docs/modules/location-catalog.md), [trạng thái chi nhánh](docs/modules/branch-status.md).
 - [Frontend](frontend/README.md), [vận hành và phát triển](docs/architecture/development-workflow.md).
-- [Trợ lý khách hàng](docs/modules/ai-assistant.md), [API gợi ý xe](docs/modules/ai-recommendation.md), [Qwen và tuyến đường cục bộ](docs/modules/local-ai-routing.md).
+- [Trợ lý khách hàng](docs/modules/ai-assistant.md), [kho kiến thức trợ lý](docs/modules/ai-knowledge.md), [API gợi ý xe](docs/modules/ai-recommendation.md), [Qwen và tuyến đường cục bộ](docs/modules/local-ai-routing.md).
 - [Tìm xe theo chuyến](docs/api/vehicle-trip-search.md), [quy tắc giao diện khách hàng](docs/ui/customer-experience.md).
 
 
