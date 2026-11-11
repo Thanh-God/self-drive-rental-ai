@@ -6,6 +6,19 @@ Các quy tắc dưới đây định hướng triển khai và vận hành. Ph�
 
 Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép VNPAY Sandbox, cọc 30% tiền thuê không gồm phí tuyến; Staff duyệt hồ sơ trước, backend xác nhận khi nhận đủ cọc trong hạn. Đơn cũ giữ quy trình cũ. Không thu tiền thật, cọc thiệt hại hoặc thu phần còn lại. Chính sách hủy/no-show/hoàn và cấu hình tại [cọc giữ chỗ](../modules/booking-deposit.md). Tích hợp thực cần merchant sandbox và nghiệm thu riêng; mặc định tắt.
 
+## Trợ lý hỏi đáp KDrive
+
+Chủ dự án duyệt ngày 11/11/2026:
+
+- Trợ lý chỉ trả lời về dịch vụ KDrive, từ [kho kiến thức đã duyệt](../modules/ai-knowledge.md) và dữ liệu hệ thống; câu ngoài lề nhận câu từ chối đã duyệt, câu thuộc lĩnh vực mà kho chưa có nhận câu “chưa có thông tin” kèm hotline mẫu. Không bịa chính sách, giá, phí hay lịch xe.
+- Kho nhóm A–H được duyệt toàn bộ. Cọc giữ chỗ, hoàn tiền và chính sách trả xe được mô tả là chính sách thử nghiệm; nhóm H là chính sách mô tả mà hệ thống chưa tự kiểm tra hoặc tính tiền.
+- Hội thoại chỉ nhớ trong phiên ở trình duyệt; đăng xuất, đổi tài khoản hoặc tải lại trang là xóa. Không lưu hội thoại vào database, localStorage hay sessionStorage.
+- Tìm xe là khả năng phụ trong trò chuyện: trợ lý hỏi bổ sung từng thông tin, đưa tối đa 3 xe từ quy tắc gợi ý hiện có kèm liên kết Xem xe. Biểu mẫu tiêu chí được bỏ khỏi chatbox; trang Tìm xe vẫn là cách tìm đầy đủ.
+- Model là qwen3:8b chạy cục bộ qua Ollama, một lần gọi model cho mỗi tin nhắn. Model chỉ soạn nháp; backend quyết định nội dung trả về (trích dẫn, câu từ chối, số tiền, tiêu chí và thẻ xe). qwen3:4b được giữ trên máy để so sánh, không dùng cho chat.
+- Mỗi USER có 6 câu hỏi AI mỗi ngày theo lịch Việt Nam, chỉ tính câu model đã trả lời. Hotline 10008888 là số tượng trưng cho bản demo, cấu hình được và luôn ghi rõ là số mẫu.
+
+Chi tiết: [chatbox](../modules/ai-assistant.md), [API hỏi đáp](../modules/ai-chat.md).
+
 ## Kiến trúc
 
 | ID | Quyết định | Lý do và tác động |
@@ -35,7 +48,7 @@ Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép 
 
 | ID | Nội dung | Phương án và giới hạn | Chốt trước |
 |---|---|---|---|
-| OP-01 | Quyền dùng AI | MVP gợi ý xe, parser, catalog/tuyến và hành trình chỉ USER; Guest không được truy cập, STAFF/ADMIN không dùng các API dành cho USER. Mở quyền Guest là quyết định tương lai riêng. Mỗi USER có 6 câu hỏi AI/ngày theo lịch Việt Nam (chỉ tính câu model đã trả lời); hết lượt trả 429 `AI_DAILY_LIMIT` kèm hotline mẫu 10008888, xem [hạn mức](../modules/ai-assistant.md#hạn-mức-câu-hỏi-ai-mỗi-ngày) | API/UX AI |
+| OP-01 | Quyền dùng AI | MVP gợi ý xe, parser, catalog/tuyến và hành trình chỉ USER; Guest không được truy cập, STAFF/ADMIN không dùng các API dành cho USER. Mở quyền Guest là quyết định tương lai riêng. Trợ lý hỏi đáp và tìm xe trong trò chuyện dùng [API hỏi đáp](../modules/ai-chat.md). Mỗi USER có 6 câu hỏi AI/ngày theo lịch Việt Nam (chỉ tính câu model đã trả lời); hết lượt trả 429 `AI_DAILY_LIMIT` kèm hotline mẫu 10008888, xem [hạn mức](../modules/ai-assistant.md#hạn-mức-câu-hỏi-ai-mỗi-ngày) | API/UX AI |
 | OP-02 | Giấy phép lái xe — chốt một phần | Tương thích xe, hệ cũ/mới, còn hiệu lực đến hết thuê, Ảnh JPEG/PNG hai mặt bắt buộc trước gửi yêu cầu thuê; Staff chi nhánh nhận kiểm tra hồ sơ trước xác nhận và vẫn đối chiếu bản gốc khi giao. Ảnh riêng tư, không gửi AI; giữ đến khi khách thay ảnh, xóa bản cũ sau lưu thành công. Thay ảnh/thông tin đặt lại kết quả kiểm tra. Không tra cứu cơ sở dữ liệu quốc gia | Hoàn thiện GPLX/giao nhận |
 | OP-03 | Ngày thuê/giá/cọc — chốt một phần | Đơn mới chọn ngày nhận/trả, tính chênh lệch ngày Việt Nam (17/10 → 21/10 = 4 ngày); được trả hết ngày trả, lịch tiếp theo từ ngày kế tiếp kể cả trả sớm. Đơn cũ giữ giá/quy tắc block 24 giờ đã lưu. VND nguyên đồng, UTC lưu; cọc còn mở | Schema snapshot và booking |
 | OP-04 | PENDING/state machine — chốt một phần | Giữ lịch tối đa 2 giờ; đơn theo ngày không vượt hết ngày nhận, đơn cũ không vượt giờ nhận. Đơn theo ngày chỉ bàn giao trong ngày nhận. Luồng PENDING → CONFIRMED → IN_PROGRESS → RETURNED → COMPLETED; đã có cảnh báo và kiểm tra bảo vệ lịch/đơn kế tiếp khi xe cùng chi nhánh quá hạn chưa trả; chưa hỗ trợ gia hạn, đổi xe hoặc dời lịch đơn kế tiếp. Đơn cùng chi nhánh có snapshot chính sách được xem trước/ghi nhận trả thực tế và khoản vượt hạn Chưa thu; chặn hoàn tất khi chưa xử lý khoản này. Cờ tạo chính sách mới mặc định tắt, xem [chính sách trả xe](../modules/return-policy.md) | ERD và transaction booking |

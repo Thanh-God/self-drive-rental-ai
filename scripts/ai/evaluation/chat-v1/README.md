@@ -1,6 +1,6 @@
 # chat-v1 — bộ đánh giá Trợ lý KDrive (DRAFT)
 
-64 ca cho `POST /api/v1/ai/chat`, chia `dev.json` (32) và `heldout.json` (32) xen kẽ theo nhóm: kiến thức (mỗi mục trả lời A–F, H một câu diễn đạt mới), trong lĩnh vực nhưng kho không có, ngoài lề, nhờ thao tác đơn, hỏi đơn riêng, chèn lệnh, dữ liệu cá nhân và tìm xe nhiều lượt. Kỳ vọng được viết trước mọi lần đo; `heldout.json` không dùng để chỉnh prompt, kho kiến thức hay bộ lọc. Trạng thái DRAFT: chủ dự án duyệt trước khi dùng số liệu cho báo cáo.
+64 ca cho `POST /api/v1/ai/chat`, chia `dev.json` (32) và `heldout.json` (32) xen kẽ theo nhóm: kiến thức (mỗi mục trả lời A–F, H một câu diễn đạt mới), trong lĩnh vực nhưng kho không có, ngoài lề, nhờ thao tác đơn, hỏi đơn riêng, chèn lệnh, dữ liệu cá nhân và tìm xe nhiều lượt. Kỳ vọng được viết trước mọi lần đo; `heldout.json` không dùng để chỉnh prompt, kho kiến thức hay bộ lọc. Chủ dự án duyệt bộ câu hỏi ngày 11/11/2026; trường `status` trong JSON giữ `DRAFT` để không đổi hash của `heldout.json` đã chốt trước khi đo. Chạy đo live: `run_chat_evaluation.py prepare`, `AiChatEvaluationIT` (`KDRIVE_EVAL_LIVE=1`), rồi `run_chat_evaluation.py score`; mỗi tách chỉ đo một lần cho mỗi phiên bản.
 
 Mỗi lượt có `expect.status` (400 cho dữ liệu cá nhân) hoặc `expect.anyOf`: các phương án chấp nhận gồm `intents`, `replyIn` (`fallback`, `G01`–`G03` lấy nguyên văn từ kho), `citationsAny`, `cardsMin`/`cardsMax`, `criteria`, `missingContains`. Ngày `{D+n}`/`{ISO+n}` được thay theo ngày chạy. Tìm xe dùng chi nhánh mẫu “Đà Nẵng · mẫu” của dữ liệu seed.
 

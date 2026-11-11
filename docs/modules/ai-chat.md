@@ -31,6 +31,7 @@ Mỗi tin nhắn chỉ gọi model một lần; model đề xuất tiêu chí t�
 
 Model chỉ soạn nháp; backend quyết định nội dung trả về:
 - Trích dẫn phải là mục đã cấp cho model; câu trả lời không có trích dẫn hợp lệ được thay bằng câu “chưa có thông tin” đã duyệt.
+- Câu từ chối đã duyệt luôn có `intent` `OUT_OF_SCOPE` và không kèm nguồn; câu “chưa có thông tin” cũng không kèm nguồn.
 - Câu ngoài phạm vi dùng đúng câu từ chối đã duyệt; câu thuộc lĩnh vực thuê xe mà kho không có thông tin nhận câu “chưa có thông tin” thay vì từ chối.
 - Số tiền hoặc tỉ lệ không có trong mục được trích hoặc câu của khách bị thu hồi; giá, phí và lịch xe chỉ lấy từ hệ thống.
 - Tin nhắn có dấu hiệu chèn lệnh mà không có mục liên quan được trả lời bằng câu từ chối, không gọi model; trả lời không có trích dẫn cho tin nhắn như vậy cũng bị thay bằng câu từ chối.

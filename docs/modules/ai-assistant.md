@@ -1,4 +1,6 @@
-# Trợ lý KDrive — chatbox gợi ý xe
+# Trợ lý KDrive — chatbox hỏi đáp và tìm xe
+
+Chatbox là khung trò chuyện cho USER: trả lời câu hỏi về dịch vụ KDrive từ [kho kiến thức đã duyệt](ai-knowledge.md) và tìm xe qua nhiều lượt bằng [API hỏi đáp](ai-chat.md). Các đoạn dưới đây cũng mô tả cách đọc nhu cầu tìm xe, dùng chung cho tìm xe trong trò chuyện và API đọc nhu cầu.
 
 Khách có thể chỉ rõ hai vai trò, ví dụ “nhận tại A, trả tại B”, hoặc nói rõ cùng một chi nhánh cho cả hai đầu. Nếu một điểm chưa chọn, không hoạt động, trùng tên hoặc còn nhiều lựa chọn, draft giữ điểm đã xác định và hỏi lại điểm còn thiếu. Hai số người chưa chọn cũng cần được làm rõ trước khi gửi gợi ý.
 
@@ -19,7 +21,7 @@ Khi trợ lý tìm xe, tin trả lời có tối đa 3 thẻ xe theo thứ tự 
 API gợi ý xe mặc định tắt bằng `AI_RECOMMENDATION_ENABLED`. Phân tích văn bản dùng `QWEN_PARSER_ENABLED` và tuyến đường dùng `AI_ROUTING_ENABLED`; các cờ mặc định tắt. Cần chuẩn bị dịch vụ Qwen/OSRM tương ứng theo [hướng dẫn cấu hình cục bộ](local-ai-routing.md). Có source tích hợp không đồng nghĩa tính năng đang bật hoặc đã được kiểm thử trên mọi môi trường.
 
 
-POST `/api/v1/ai/criteria/parse` chỉ USER, body `{ "text": "..." }` tối đa1000ký tự. Backend từ chối một số mẫu email/số điện thoại/số giấy tờ phổ biến trước khi suy luận; đây không phải bộ phát hiện mọi dữ liệu cá nhân. Không gửi userID/token/hồ sơ hoặc lưu hội thoại cho model. Chỉ đối chiếu tên với điểm nhận/trả ACTIVE qua API nội bộ booking; tên không rõ hoặc nhiều kết quả phải chọn lại. Ngày phải xuất hiện đầy đủ trong câu nhập ở dạng YYYY-MM-DD hoặc ngày/tháng/năm; ngày thiếu năm không tự mặc định. Khi câu có đúng hai ngày đầy đủ theo thứ tự nhận rồi trả và không có từ lưỡng lự như “chưa”, “hoặc”, “khoảng”, backend xác nhận hai ngày đó dù model đánh dấu chưa rõ. Ưu tiên hộp số chỉ được điền khi câu nhập nêu rõ, không được biến dữ liệu thiếu thành mặc định tự động. READY_FOR_REVIEW trả bản nháp cần kiểm tra, NEEDS_CLARIFICATION yêu cầu bổ sung, OUT_OF_SCOPE không tạo bản nháp. Phản hồi có mâu thuẫn không được dùng để điền. Không hỗ trợ hội thoại nhiều lượt hoặc tự xác nhận nghiệp vụ.
+POST `/api/v1/ai/criteria/parse` chỉ USER, body `{ "text": "..." }` tối đa1000ký tự. Backend từ chối một số mẫu email/số điện thoại/số giấy tờ phổ biến trước khi suy luận; đây không phải bộ phát hiện mọi dữ liệu cá nhân. Không gửi userID/token/hồ sơ hoặc lưu hội thoại cho model. Chỉ đối chiếu tên với điểm nhận/trả ACTIVE qua API nội bộ booking; tên không rõ hoặc nhiều kết quả phải chọn lại. Ngày phải xuất hiện đầy đủ trong câu nhập ở dạng YYYY-MM-DD hoặc ngày/tháng/năm; ngày thiếu năm không tự mặc định. Khi câu có đúng hai ngày đầy đủ theo thứ tự nhận rồi trả và không có từ lưỡng lự như “chưa”, “hoặc”, “khoảng”, backend xác nhận hai ngày đó dù model đánh dấu chưa rõ. Ưu tiên hộp số chỉ được điền khi câu nhập nêu rõ, không được biến dữ liệu thiếu thành mặc định tự động. READY_FOR_REVIEW trả bản nháp cần kiểm tra, NEEDS_CLARIFICATION yêu cầu bổ sung, OUT_OF_SCOPE không tạo bản nháp. Phản hồi có mâu thuẫn không được dùng để điền. API đọc nhu cầu xử lý một câu mỗi lần và không tự xác nhận nghiệp vụ; trò chuyện nhiều lượt dùng [API hỏi đáp](ai-chat.md).
 API hỏi đáp về dịch vụ KDrive được mô tả tại [Hỏi đáp Trợ lý KDrive](ai-chat.md).
 
 ## Hạn mức câu hỏi AI mỗi ngày
