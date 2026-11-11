@@ -272,6 +272,8 @@ async function main() {
     const half=Math.floor(dep2/2);
     await adminRow.getByLabel('Số tiền hoàn (VND)',{exact:true}).fill(String(half));
     await adminRow.getByLabel('Lý do quyết định',{exact:true}).fill('Fixture: hoàn 50% theo quyết định Admin.');
+    // D4: thông báo cho khách tách khỏi lý do nội bộ.
+    await adminRow.getByLabel('Thông báo cho khách (không bắt buộc)',{exact:true}).fill('Hoàn 50% theo chính sách hủy sát giờ.');
     await adminRow.getByRole('button',{name:'Duyệt khoản hoàn',exact:true}).click();
     check('Decision review shows amount before POST',await visible(manager.getByRole('dialog',{name:'Xác nhận thao tác hoàn tiền',exact:true})).then(t=>t.includes(vnd(half))),true);
     check('No decision POST before confirmation',refund2(),`REQUESTED:LATE_CUSTOMER:${dep2}`);
@@ -279,7 +281,13 @@ async function main() {
     await manager.getByText(/Đã kiểm tra kết quả: Đã duyệt hoàn/).waitFor();
     check('Partial decision approved, not refunded',refund2(),`APPROVED:LATE_CUSTOMER:${half}`);
     check('Decision records approver',sql(`select approved_by is not null from payment_refunds where id='${refundId2}'`),'1');
-    u2=await userRefund2();check('USER partial decision is not refunded',u2.includes(`Hoàn ${vnd(half)} · Đã duyệt, chưa hoàn tiền`) && u2.includes('Đã hoàn (đã xác minh): 0 ₫'),true);
+    u2=await userRefund2();
+    check('D4 USER sees the Admin customer note',u2.includes('Thông báo từ quản trị viên: Hoàn 50% theo chính sách hủy sát giờ.'),true);
+    check('D4 USER never sees internal refund reasons',/Fixture: hoàn 50%|cần lý do|Hoàn khoản QR DEMO không áp dụng/.test(u2),false);
+    // Đọc qua API Admin (client mysql trong docker exec không xuất UTF-8 nên không dùng sql() cho chữ tiếng Việt).
+    const d4Admin=(await req(admin,'/bookings/'+id2+'/deposit')).body.refunds.find(r=>r.id===refundId2);
+    check('D4 internal reason and customer note kept for Admin',[d4Admin.reason,d4Admin.customerNote],['Fixture: hoàn 50% theo quyết định Admin.','Hoàn 50% theo chính sách hủy sát giờ.']);
+    check('USER partial decision is not refunded',u2.includes(`Hoàn ${vnd(half)} · Đã duyệt, chưa hoàn tiền`) && u2.includes('Đã hoàn (đã xác minh): 0 ₫'),true);
     await manager.screenshot({path:path.join(out,'admin-late-cancel-approved.png'),fullPage:true});
     await adminRow.getByRole('button',{name:'Bắt đầu xử lý hoàn (QR DEMO)',exact:true}).click();
     wait=manager.waitForResponse(r=>r.url().endsWith('/process-manual'));await manager.getByRole('button',{name:'Xác nhận thao tác',exact:true}).click();check('Fixture B start processing',(await wait).status(),200);
@@ -414,7 +422,7 @@ async function main() {
     check('User cannot access admin',(await req(user,'/admin/payments')).status,403);
     // D1: ledger theo vai trò trên API thật — USER không nhận mã nội bộ/khóa yêu cầu/events; Admin giữ đầy đủ.
     const d1User=(await req(user,'/bookings/'+id+'/deposit')).body, d1Admin=(await req(admin,'/bookings/'+id+'/deposit')).body;
-    check('D1 USER ledger has no internal fields',!('events' in d1User) && d1User.payments.length===2 && d1User.payments.every(p=>!('verifierId' in p) && !('idempotencyKey' in p)) && d1User.refunds.every(r=>!('approvedBy' in r) && !('requestDate' in r)),true);
+    check('D1 USER ledger has no internal fields',!('events' in d1User) && d1User.payments.length===2 && d1User.payments.every(p=>!('verifierId' in p) && !('idempotencyKey' in p)) && d1User.refunds.every(r=>!('approvedBy' in r) && !('requestDate' in r) && !('reason' in r) && ('customerNote' in r)),true);
     check('D1 USER ledger keeps display fields',d1User.payments.every(p=>p.providerTransaction && p.transferTime && p.verifiedAt && Number.isSafeInteger(p.appliedAmount)),true);
     check('D1 Admin ledger keeps internal fields',d1Admin.events.length>0 && d1Admin.payments.every(p=>!!p.verifierId && !!p.idempotencyKey),true);
     check('Staff cannot report transfer for customer',(await req(staff,'/bookings/'+id+'/deposit/report','POST',{idempotencyKey:'report-'+id})).status>=400,true);

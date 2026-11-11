@@ -148,7 +148,7 @@ V2 bổ sung các trường trạng thái và căn cứ đánh giá vào inciden
 V1–V5 có 25 bảng nghiệp vụ và Flyway history. V6 thêm ba bảng payment_transactions, payment_refunds, payment_events: tổng 28 bảng nghiệp vụ + history =29; 46 khóa ngoại. Thêm snapshot cọc vào bookings, mặc định deposit_required=false cho đơn cũ. Dùng migration mới, không tính lại giá hay truy thu đơn cũ. Xem [chính sách](../modules/booking-deposit.md).
 
 ### Ledger cọc QR
-V7–V9 mở rộng các bảng payment hiện có, không thêm bảng;29 bảng gồm Flyway history,47 FK. applied_amount không vượt amount; business_key hoàn duy nhất theo khoản/nguyên nhân. V9 Java Flyway xử lý tên unique tự sinh trên payment_id theo metadata, không sửa history hoặc chạy DDL ngoài Flyway. Xem [quy tắc cọc](../modules/booking-deposit.md).
+V7–V9 mở rộng các bảng payment hiện có, không thêm bảng;29 bảng gồm Flyway history,47 FK. applied_amount không vượt amount; business_key hoàn duy nhất theo khoản/nguyên nhân. V9 Java Flyway xử lý tên unique tự sinh trên payment_id theo metadata, không sửa history hoặc chạy DDL ngoài Flyway. Xem [quy tắc cọc](../modules/booking-deposit.md). V13 thêm cột nullable `payment_refunds.customer_note` (≤500 ký tự, thông báo hoàn cho khách, tách khỏi `reason` nội bộ); không thêm bảng/FK, vẫn 30 bảng và 50 FK; dữ liệu cũ để trống, không sao chép lý do nội bộ.
 
 ## Nhật ký khoản vượt hạn
 V10–V11 bổ sung snapshot chính sách và kết quả trả xe nullable. V12 thêm booking_return_settlements, độc lập giao dịch cọc: tổng29 bảng nghiệp vụ + Flyway history =30 bảng; thêm3 FK tới booking, actor và bản ghi bị đảo (tổng50 FK). Không backfill khoản thu/miễn, không thay dữ liệu cũ. Xem [chính sách trả xe](../modules/return-policy.md).
