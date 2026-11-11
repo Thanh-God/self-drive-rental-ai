@@ -53,6 +53,9 @@ public class ChatPromptBuilder {
         rules = r.toString();
     }
 
+    /** The fixed rules this builder puts in every system message (for the instruction-leak check). */
+    String rules() { return rules; }
+
     private String refusal(String id) {
         return knowledge.find(id).orElseThrow(() -> new IllegalStateException("Kho kiến thức thiếu " + id)).answer();
     }
@@ -82,7 +85,8 @@ public class ChatPromptBuilder {
 
     /**
      * Most recent turns first back to {@link #MAX_HISTORY_TURNS} and {@link #MAX_HISTORY_CHARS}; turns that are
-     * blank, over {@link #MAX_MESSAGE} characters or contain a sensitive identifier are left out.
+     * blank, over {@link #MAX_MESSAGE} characters, contain a sensitive identifier or look like an attempt to change
+     * the instructions are left out.
      */
     static List<Turn> trim(List<Turn> history) {
         if (history == null || history.isEmpty()) return List.of();
@@ -92,6 +96,8 @@ public class ChatPromptBuilder {
             Turn t = history.get(i);
             if (t == null || t.role() == null || t.text() == null || t.text().isBlank()
                 || t.text().length() > MAX_MESSAGE || SensitiveText.contains(t.text())) continue;
+            // R2: the client sends history back, so an "assistant" turn can be forged; instruction-like turns are left out.
+            if (PromptInjection.matches(t.text())) continue;
             String text = t.text().strip();
             if (chars + text.length() > MAX_HISTORY_CHARS) break;
             chars += text.length();

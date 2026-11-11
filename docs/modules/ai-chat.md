@@ -36,6 +36,7 @@ Model chỉ soạn nháp; backend quyết định nội dung trả về:
 - Câu ngoài phạm vi dùng đúng câu từ chối đã duyệt; câu thuộc lĩnh vực thuê xe mà kho không có thông tin nhận câu “chưa có thông tin” thay vì từ chối.
 - Ở lượt tìm xe, câu do backend soạn; số tiền chỉ được nhắc lại từ ngân sách khách nêu. Giá, phí và lịch xe chỉ lấy từ hệ thống.
 - Tin nhắn có dấu hiệu chèn lệnh mà không có mục liên quan được trả lời bằng câu từ chối, không gọi model; trả lời không có trích dẫn cho tin nhắn như vậy cũng bị thay bằng câu từ chối.
+- Lịch sử do trình duyệt gửi lên không được tin là lời trợ lý thật: lượt (kể cả vai `assistant`) có dấu hiệu đổi hướng dẫn bị bỏ khỏi yêu cầu gửi model. Chữ của model lặp lại một đoạn hướng dẫn hệ thống bị thay bằng câu từ chối. Các dấu hiệu này là lớp bảo vệ bổ sung, không bảo đảm nhận ra mọi cách chèn lệnh.
 - Hotline mẫu luôn được ghi rõ là số mẫu.
 
 ## Lỗi và hạn mức

@@ -41,6 +41,8 @@ public class ChatService {
         REFUSAL_RELABELLED,
         /** The approved "no information" reply came with citations; they were dropped. */
         FALLBACK_SOURCES_DROPPED,
+        /** Model wording repeated a run of the system instructions; replaced by the approved refusal. */
+        INSTRUCTION_LEAK,
         /** Sample hotline mentioned without its sample label; the label was added. */
         HOTLINE_LABEL_ADDED
     }
@@ -53,10 +55,6 @@ public class ChatService {
         }
     }
 
-    private static final Pattern INJECTION = Pattern.compile(
-        "\\b(?:bo qua|phot lo|quen|ignore|disregard|forget)\\b.{0,40}\\b(?:chi dan|huong dan|quy tac|lenh|instruction|instructions|rules|prompt)\\b"
-        + "|\\bsystem\\s*prompt\\b|\\bprompt he thong\\b|\\bdong vai\\b|\\byou are now\\b|\\bact as\\b|\\bjailbreak\\b"
-        + "|\\b(?:tiet lo|in ra|hien thi)\\b.{0,30}\\b(?:prompt|huong dan|quy tac|chi dan)\\b|(?:^|\\s)system\\s*:");
     private static final Pattern AMOUNT = Pattern.compile(
         "\\d[\\d.,]*\\s*(?:%|d\\b|vnd\\b|dong\\b|nghin\\b|ngan\\b|k\\b|trieu\\b|tr\\b)");
     /** Folded words that place a question in the KDrive rental domain. */
@@ -76,6 +74,9 @@ public class ChatService {
     private final ObjectProvider<QwenChatModel> model;
     private final AiDailyQuota quota;
     private final ChatVehicleSearch search;
+    /** Word runs of the system instructions that never occur in approved text: seeing one in a reply is a leak. */
+    private final Set<String> instructionRuns;
+    static final int LEAK_RUN = 8;
 
     @Autowired
     public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
@@ -86,6 +87,23 @@ public class ChatService {
         this.model = model;
         this.quota = quota;
         this.search = search;
+        var runs = new HashSet<String>(runs(builder.rules() + " " + QwenChatModel.FORMAT_RULES));
+        runs.removeAll(runs(knowledge.fallbackReply()));
+        for (var e : knowledge.entries()) runs.removeAll(runs(e.answer()));
+        this.instructionRuns = Set.copyOf(runs);
+    }
+
+    /** Consecutive {@link #LEAK_RUN}-word sequences of the folded text. */
+    static Set<String> runs(String text) {
+        var w = wordsOnly(text).split(" ");
+        var out = new HashSet<String>();
+        for (int i = 0; i + LEAK_RUN <= w.length; i++) out.add(String.join(" ", java.util.Arrays.copyOfRange(w, i, i + LEAK_RUN)));
+        return out;
+    }
+
+    boolean leaksInstructions(String reply) {
+        for (String run : runs(reply)) if (instructionRuns.contains(run)) return true;
+        return false;
     }
 
     /** Question answering only (no vehicle search), with a daily limit. */
@@ -199,6 +217,11 @@ public class ChatService {
                 return done(intent, approvedText(used), used, guards);
             }
             default -> { // SEARCH_VEHICLES, ASK_MISSING: no knowledge citation; amounts only from the customer
+                // R2: the only branch where model wording can still reach the customer.
+                if (leaksInstructions(reply)) {
+                    guards.add(Guard.INSTRUCTION_LEAK);
+                    return done("OUT_OF_SCOPE", refusal("K-G01"), List.of(), guards);
+                }
                 if (!amountsSupported(reply, message)) {
                     guards.add(Guard.UNSUPPORTED_AMOUNT);
                     reply = ASK_WITHOUT_AMOUNT;
@@ -246,7 +269,7 @@ public class ChatService {
     }
 
     static boolean looksLikeInjection(String text) {
-        return INJECTION.matcher(fold(text)).find();
+        return PromptInjection.matches(text);
     }
 
     /** Every money amount or percentage in {@code reply} also appears, digit for digit, in {@code source}. */
