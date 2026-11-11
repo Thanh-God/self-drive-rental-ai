@@ -36,11 +36,15 @@ def ollama_json(path):
     finally:conn.close()
 
 
-def model_identity():
+ALLOWED_MODELS = ('qwen3:8b', 'qwen3:4b')
+
+
+def model_identity(name='qwen3:8b'):
+    require(name in ALLOWED_MODELS,'model outside the qwen3 4B/8B allowlist')
     models=ollama_json('/api/tags')['models']
-    chosen=[m for m in models if m.get('name')=='qwen3:8b']
-    require(len(chosen)==1,'qwen3:8b must already exist; no model pull')
-    value=dict(name='qwen3:8b',digest=chosen[0]['digest'],runtimeVersion=ollama_json('/api/version')['version'],mode='live')
+    chosen=[m for m in models if m.get('name')==name]
+    require(len(chosen)==1,name+' must already exist; no model pull')
+    value=dict(name=name,digest=chosen[0]['digest'],runtimeVersion=ollama_json('/api/version')['version'],mode='live')
     validate_model(value)
     return value
 
@@ -190,7 +194,8 @@ def run(args):
     series='replay-synthetic'; capture=None; observations={}
     observe=getattr(args,'ollama_observe',False)
     require(not observe or not args.capture,'load-state observation requires live HTTP')
-    identity=model_identity() if observe else None
+    model_name=getattr(args,'ollama_model','qwen3:8b')
+    identity=model_identity(model_name) if observe else None
     if args.capture:
         require(args.series=='quality','capture supports one-attempt quality only')
         observations,capture=read_capture(args.capture,cases,hashes)
@@ -238,7 +243,7 @@ def run(args):
     report['certified']=False  # This dev-only runner never certifies heldout/reviewer acceptance.
     report['seriesType']=args.series
     if observe:
-        report['modelIdentityStable']=model_identity()==identity
+        report['modelIdentityStable']=model_identity(model_name)==identity
         report['latencyLoadState']='OBSERVED_BEFORE_REQUEST'
         report['latencyByLoadState']={state:scoring.summary([r for r,l in zip(results,load_states) if l['state']==state],manifest['reviewState'],series)['latencyByOutcome'] for state in ('COLD','WARM','UNKNOWN')}
         (out/'load-state.jsonl').write_text(''.join(json.dumps(s)+'\n' for s in load_states),encoding='utf-8')
@@ -268,7 +273,8 @@ def main():
     p.add_argument('--preflight',type=Path); p.add_argument('--output',type=Path,required=True)
     p.add_argument('--allow-draft',action='store_true'); p.add_argument('--timeout',type=float,default=65)
     p.add_argument('--series',choices=('quality','performance'),default='quality')
-    p.add_argument('--ollama-observe',action='store_true',help='pin existing qwen3:8b and observe loaded state before each HTTP request')
+    p.add_argument('--ollama-observe',action='store_true',help='pin the existing model and observe loaded state before each HTTP request')
+    p.add_argument('--ollama-model',choices=ALLOWED_MODELS,default='qwen3:8b',help='model pinned by --ollama-observe; must match the backend app.qwen-model')
     args=p.parse_args()
     try:
         require(math.isfinite(args.timeout) and 0<args.timeout<=65,'timeout 0..65s')

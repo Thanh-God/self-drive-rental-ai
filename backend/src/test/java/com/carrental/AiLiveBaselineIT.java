@@ -20,7 +20,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /** Explicit integration entrypoint, not a default Surefire test: never downloads or starts a provider. */
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
-    "app.seed-enabled=false","app.qwen-parser-enabled=true","app.qwen-model=qwen3:8b",
+    "app.seed-enabled=false","app.qwen-parser-enabled=true","app.qwen-model=${ai.eval.model:qwen3:8b}",
     "app.gemini-parser-enabled=false","app.token-minutes=120","app.jwt-secret=live-baseline-synthetic-auth-key-not-production",
     "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"})
 @Import(AiLiveBaselineIT.TimeConfig.class)
@@ -68,7 +68,7 @@ class AiLiveBaselineIT {
         Path preflightPath=out.resolve("preflight.json");Files.writeString(preflightPath,json.writeValueAsString(preflight),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
         var before=snapshot();var exits=new LinkedHashMap<String,Integer>();
         for(String series:List.of("quality","performance")){
-            List<String> command=List.of(Objects.requireNonNull(System.getenv("AI_EVAL_PYTHON")),"-X","utf8",repo.resolve("scripts/ai/evaluation/run_evaluation.py").toString(),"--dataset",data.toString(),"--suites","parser","--base-url",base,"--preflight",preflightPath.toString(),"--output",out.resolve(series).toString(),"--allow-draft","--series",series,"--ollama-observe");
+            List<String> command=List.of(Objects.requireNonNull(System.getenv("AI_EVAL_PYTHON")),"-X","utf8",repo.resolve("scripts/ai/evaluation/run_evaluation.py").toString(),"--dataset",data.toString(),"--suites","parser","--base-url",base,"--preflight",preflightPath.toString(),"--output",out.resolve(series).toString(),"--allow-draft","--series",series,"--ollama-observe","--ollama-model",System.getProperty("ai.eval.model","qwen3:8b"));
             var builder=new ProcessBuilder(command).directory(repo.toFile()).redirectErrorStream(true).redirectOutput(out.resolve(series+".log").toFile());
             builder.environment().put("KDRIVE_EVAL_TOKEN",tokens.issue(accounts.require("eval-live-user")));
             Process process=builder.start();

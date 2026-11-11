@@ -15,6 +15,18 @@ class LiveBaselineTests(unittest.TestCase):
             self.assertEqual(evaluator.model_identity(),self.identity)
             self.assertEqual([c.args[0] for c in get.call_args_list],['/api/tags','/api/version'])
 
+    def test_selected_model_is_pinned_and_only_allowlisted_models_are_accepted(self):
+        small=dict(self.identity,name='qwen3:4b',digest='b'*64)
+        with patch.object(evaluator,'ollama_json',side_effect=[{'models':[dict(self.identity),dict(small)]},{'version':'0.0.1'}]):
+            self.assertEqual(evaluator.model_identity('qwen3:4b'),small)
+        with patch.object(evaluator,'ollama_json',side_effect=[{'models':[dict(self.identity),dict(small)]},{'version':'0.0.1'}]):
+            self.assertEqual(evaluator.model_identity(),self.identity,'default stays qwen3:8b')
+        with patch.object(evaluator,'ollama_json') as get,self.assertRaises(ValueError):
+            evaluator.model_identity('qwen3:14b')
+        get.assert_not_called()
+        with patch.object(evaluator,'ollama_json',return_value={'models':[dict(self.identity)]}),self.assertRaisesRegex(ValueError,'qwen3:4b must already exist'):
+            evaluator.model_identity('qwen3:4b')
+
     def test_missing_or_duplicate_model_refused_without_pull(self):
         for models in ([],[self.identity,self.identity]):
             with patch.object(evaluator,'ollama_json',return_value={'models':models}) as get,self.assertRaises(ValueError):
