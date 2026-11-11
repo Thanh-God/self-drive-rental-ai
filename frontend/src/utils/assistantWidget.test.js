@@ -102,3 +102,39 @@ test('Reset ignores a late natural-language reply; model failure keeps the manua
  await text('4 người');await click(button('Điền nhu cầu bằng AI'));const failed=take('/ai/criteria/parse');await act(async()=>failed.reject(new Error('Qwen unavailable')));
  assert.ok(c.querySelector('[role="alert"]'));assert.ok(c.querySelector('form'));assert.equal(button('Gợi ý xe phù hợp').disabled,false);
 });
+
+const quotaBody=(used,limit=6)=>({limit,used,remaining:limit-used,resetAt:'2026-11-11T17:00:00Z',hotline:{number:'10008888',sample:true}});
+async function typeNeed(value){const area=c.querySelector('textarea');await act(async()=>{Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype,'value').set.call(area,value);area.dispatchEvent(new dom.window.Event('input',{bubbles:true}));});}
+test('C1.2 shows remaining AI questions and reloads them after each natural-language read',async()=>{
+ await mount();await open();await respond(take('/ai/quota'),quotaBody(2));
+ assert.match(c.textContent,/Còn 4\/6 lượt hỏi AI hôm nay/);
+ await typeNeed('4 người,3triệu');await click(button('Điền nhu cầu bằng AI'));
+ const req=take('/ai/criteria/parse');await respond(req,{status:'OUT_OF_SCOPE',unresolvedFields:[]});
+ await respond(take('/ai/quota'),quotaBody(3));assert.match(c.textContent,/Còn 3\/6 lượt hỏi AI hôm nay/);
+});
+test('C1.2 an exhausted allowance locks only the AI button and shows the sample hotline; the form still works',async()=>{
+ await mount();await open();await respond(take('/ai/quota'),quotaBody(6));
+ await typeNeed('4 người,3triệu');
+ assert.equal(button('Điền nhu cầu bằng AI').disabled,true);
+ const notice=c.querySelector('.assistant-quota-empty');assert.ok(notice);assert.match(notice.textContent,/hết 6 lượt.*hotline 10008888 \(số mẫu dùng cho bản demo\)/);
+ await click(button('Điền nhu cầu bằng AI'));assert.equal(requests.filter(r=>r.config.url==='/ai/criteria/parse').length,0);
+ assert.equal(button('Gợi ý xe phù hợp').disabled,false);await submit();assert.equal(requests.filter(r=>r.config.url==='/ai/recommendations').length,1);
+});
+test('C1.2 a 429 AI_DAILY_LIMIT from parse becomes the limit notice, not a generic error, and keeps the typed need',async()=>{
+ await mount();await open();await respond(take('/ai/quota'),quotaBody(5));
+ await typeNeed('4 người,3triệu');await click(button('Điền nhu cầu bằng AI'));
+ const req=take('/ai/criteria/parse');
+ await act(async()=>req.reject({config:req.config,response:{status:429,data:{message:'Bạn đã dùng hết 6 lượt…',code:'AI_DAILY_LIMIT',...quotaBody(6)}}}));
+ assert.equal(c.querySelector('[role="alert"]'),null);
+ assert.match(c.querySelector('.assistant-quota-empty').textContent,/hotline 10008888 \(số mẫu dùng cho bản demo\)/);
+ assert.equal(button('Điền nhu cầu bằng AI').disabled,true);assert.equal(c.querySelector('textarea').value,'4 người,3triệu');
+ const reload=take('/ai/quota');await act(async()=>reload.reject({config:reload.config,response:{status:503,data:{message:'down'}}}));
+ assert.ok(c.querySelector('.assistant-quota-empty'),'The 429 body still holds the notice when the reload fails');
+});
+test('C1.2 a provider-busy 429 without the daily-limit code stays an ordinary retryable error',async()=>{
+ await mount();await open();await respond(take('/ai/quota'),quotaBody(1));
+ await typeNeed('4 người');await click(button('Điền nhu cầu bằng AI'));
+ const req=take('/ai/criteria/parse');await act(async()=>req.reject({config:req.config,response:{status:429,data:{message:'Trợ lý đang bận, hãy thử lại sau.'}}}));
+ assert.match(c.querySelector('[role="alert"]').textContent,/đang bận/);assert.equal(c.querySelector('.assistant-quota-empty'),null);
+ await respond(take('/ai/quota'),quotaBody(1));assert.equal(button('Điền nhu cầu bằng AI').disabled,false);
+});

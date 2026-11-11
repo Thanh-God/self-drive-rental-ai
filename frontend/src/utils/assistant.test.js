@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { assistantCriteria, assistantDraft, assistantSearch, assistantVisible, extractedAssistantDraft } from './assistant.js';
+import { assistantCriteria, assistantDraft, assistantQuota, assistantQuotaExhausted, assistantSearch, assistantVisible, extractedAssistantDraft } from './assistant.js';
 const branches=[{id:'dn',status:'ACTIVE'},{id:'hn',status:'ACTIVE'},{id:'closed',status:'INACTIVE'}];
 const valid={...assistantDraft(),start:'2100-10-20',end:'2100-10-24',pickupBranchId:'dn',returnBranchId:'hn',passengers:'4',budget:'3000000'};
 test('USER assistant main routes exclude roles, auth and documents',()=>{
@@ -22,4 +22,11 @@ test('Extracted draft never guesses missing data or accepts unknown branches',()
  assert.equal(extractedAssistantDraft({draft:{}},branches).passengers,'');
  for(const delta of [{pickupBranchId:'evil'},{pickupDate:'2100-02-30'},{budgetVndTotal:3.5},{passengers:12},{transmission:'EVIL'}])assert.throws(()=>extractedAssistantDraft({draft:{...data.draft,...delta}},branches));
  assert.throws(()=>extractedAssistantDraft({draft:null},branches));
+});
+test('C1.2 quota view trusts only a well-formed allowance and shows the reset in Vietnam time with the sample label',()=>{
+ const body={limit:6,used:6,remaining:0,resetAt:'2026-11-11T17:00:00Z',hotline:{number:'10008888',sample:true}};
+ const q=assistantQuota(body);assert.deepEqual(q,{limit:6,remaining:0,resetText:'00:00 12/11/2026',hotline:'10008888',sample:true});
+ assert.match(assistantQuotaExhausted(q),/hết 6 lượt.*00:00 12\/11\/2026.*hotline 10008888 \(số mẫu dùng cho bản demo\)\.$/);
+ assert.doesNotMatch(assistantQuotaExhausted(assistantQuota({...body,hotline:{number:'19001234',sample:false}})),/số mẫu/);
+ for(const bad of [null,'x',{...body,remaining:7},{...body,remaining:-1},{...body,limit:1.5},{...body,resetAt:'later'},{...body,hotline:{number:'<b>',sample:true}},{...body,hotline:{number:'10008888'}}])assert.equal(assistantQuota(bad),null,JSON.stringify(bad));
 });

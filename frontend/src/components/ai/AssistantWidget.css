@@ -25,6 +25,8 @@
 .assistant-error p { margin: 0 0 6px; }
 .assistant-error :is(a, button) { color: inherit; text-decoration: underline; cursor: pointer; }
 .assistant-note { margin: 16px 0 0; font-size: 11px; color: #67584a; }
+.assistant-quota { margin: 8px 0 0; font-size: 12px; font-weight: 600; color: #4d3f33; }
+.assistant-quota-empty { padding: 8px 10px; border-radius: 8px; background: #fff4e5; border: 1px solid #f0c48a; color: #6b3d06; font-weight: 500; }
 .assistant-results { margin-top: 22px; }
 .assistant-results h3 { margin: 0 0 12px; font-size: 16px; font-weight: 650; }
 .assistant-results article { padding: 15px; margin-top: 10px; border: 1px solid #d9cfc2; border-radius: 14px; background: #fffdf9; }

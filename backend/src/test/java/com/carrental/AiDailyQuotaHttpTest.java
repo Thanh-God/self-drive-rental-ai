@@ -79,6 +79,11 @@ class AiDailyQuotaHttpTest {
         assertEquals(403, flow.parse("demo-staff-dn", "Thuê xe").getStatusCode().value());
         assertEquals(503, flow.parse("demo-user", FAILING).getStatusCode().value());
         assertEquals(1, PROVIDER_REQUESTS.size());
+        // C1.2: reading the allowance needs a USER token and never uses a question.
+        assertEquals(401, quota(flow, null).getStatusCode().value());
+        assertEquals(403, quota(flow, "demo-staff-dn").getStatusCode().value());
+        assertEquals(403, quota(flow, "demo-admin").getStatusCode().value());
+        for (int i = 0; i < 3; i++) assertQuota(flow, 0, 6);
 
         for (int i = 1; i <= 6; i++) {
             var answered = flow.parse("demo-user", "Câu hỏi số " + i);
@@ -86,6 +91,7 @@ class AiDailyQuotaHttpTest {
             assertEquals("OUT_OF_SCOPE", answered.getBody().path("status").asText());
         }
         assertEquals(7, PROVIDER_REQUESTS.size());
+        assertQuota(flow, 6, 0);
 
         var refused = flow.parse("demo-user", "Câu hỏi số 7");
         assertEquals(429, refused.getStatusCode().value());
@@ -100,5 +106,23 @@ class AiDailyQuotaHttpTest {
         assertEquals(7, PROVIDER_REQUESTS.size(), "The refused question must not reach the model");
         for (String forbidden : List.of("demo-user", "Bearer"))
             assertFalse(body.toString().contains(forbidden), "429 body must not echo account data: " + forbidden);
+        assertQuota(flow, 6, 0);
+    }
+
+    org.springframework.http.ResponseEntity<com.fasterxml.jackson.databind.JsonNode> quota(AssistantReviewQuoteFlowSupport flow, String accountId) {
+        return http.exchange("/api/v1/ai/quota", org.springframework.http.HttpMethod.GET,
+            new org.springframework.http.HttpEntity<>(flow.headers(accountId)), com.fasterxml.jackson.databind.JsonNode.class);
+    }
+
+    void assertQuota(AssistantReviewQuoteFlowSupport flow, int used, int remaining) {
+        var response = quota(flow, "demo-user");
+        assertEquals(200, response.getStatusCode().value());
+        var body = response.getBody();
+        assertEquals(6, body.path("limit").asInt());
+        assertEquals(used, body.path("used").asInt());
+        assertEquals(remaining, body.path("remaining").asInt());
+        assertEquals("2026-11-11T17:00:00Z", body.path("resetAt").asText());
+        assertEquals("10008888", body.path("hotline").path("number").asText());
+        assertTrue(body.path("hotline").path("sample").asBoolean());
     }
 }

@@ -36,3 +36,18 @@ export function extractedAssistantDraft(data, branches) {
   if (value.transmission != null && !['AUTO', 'MANUAL'].includes(value.transmission)) throw new Error('Hộp số không hợp lệ.');
   return { start: value.pickupDate ?? '', end: value.returnDate ?? '', pickupBranchId: value.pickupBranchId ?? '', returnBranchId: value.returnBranchId ?? '', passengers: value.passengers == null ? '' : String(value.passengers), budget: value.budgetVndTotal == null ? '' : String(value.budgetVndTotal), transmission: value.transmission ?? '', amenityIds: [] };
 }
+
+/** Today's AI allowance from GET /ai/quota or a 429 AI_DAILY_LIMIT body; null when the shape is not trusted. */
+export function assistantQuota(data) {
+  if (!data || typeof data !== 'object') return null;
+  const { limit, remaining, resetAt, hotline } = data;
+  if (!Number.isInteger(limit) || limit < 0 || !Number.isInteger(remaining) || remaining < 0 || remaining > limit) return null;
+  const reset = typeof resetAt === 'string' ? new Date(resetAt) : null;
+  if (!reset || Number.isNaN(reset.getTime())) return null;
+  if (!hotline || typeof hotline.number !== 'string' || !/^[0-9 .]{3,20}$/.test(hotline.number) || typeof hotline.sample !== 'boolean') return null;
+  const resetText = new Intl.DateTimeFormat('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit', year: 'numeric', hour12: false }).format(reset);
+  return { limit, remaining, resetText, hotline: hotline.number, sample: hotline.sample };
+}
+export function assistantQuotaExhausted(quota) {
+  return `Bạn đã dùng hết ${quota.limit} lượt hỏi trợ lý AI hôm nay; lượt mới có từ ${quota.resetText}. Bạn vẫn có thể điền biểu mẫu bên dưới, dùng trang Tìm xe hoặc gọi hotline ${quota.hotline}${quota.sample ? ' (số mẫu dùng cho bản demo)' : ''}.`;
+}

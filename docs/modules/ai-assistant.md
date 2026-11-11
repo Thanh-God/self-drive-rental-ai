@@ -20,6 +20,16 @@ API gợi ý xe mặc định tắt bằng `AI_RECOMMENDATION_ENABLED`. Phân t�
 
 
 POST `/api/v1/ai/criteria/parse` chỉ USER, body `{ "text": "..." }` tối đa1000ký tự. Backend từ chối một số mẫu email/số điện thoại/số giấy tờ phổ biến trước khi suy luận; đây không phải bộ phát hiện mọi dữ liệu cá nhân. Không gửi userID/token/hồ sơ hoặc lưu hội thoại cho model. Chỉ đối chiếu tên với điểm nhận/trả ACTIVE qua API nội bộ booking; tên không rõ hoặc nhiều kết quả phải chọn lại. Ngày phải xuất hiện đầy đủ trong câu nhập ở dạng YYYY-MM-DD hoặc ngày/tháng/năm; ngày thiếu năm không tự mặc định. Khi câu có đúng hai ngày đầy đủ theo thứ tự nhận rồi trả và không có từ lưỡng lự như “chưa”, “hoặc”, “khoảng”, backend xác nhận hai ngày đó dù model đánh dấu chưa rõ. Ưu tiên hộp số chỉ được điền khi câu nhập nêu rõ, không được biến dữ liệu thiếu thành mặc định tự động. READY_FOR_REVIEW trả bản nháp cần kiểm tra, NEEDS_CLARIFICATION yêu cầu bổ sung, OUT_OF_SCOPE không tạo bản nháp. Phản hồi có mâu thuẫn không được dùng để điền. Không hỗ trợ hội thoại nhiều lượt hoặc tự xác nhận nghiệp vụ.
+## Hạn mức câu hỏi AI mỗi ngày
+
+Mỗi tài khoản USER có 6 câu hỏi AI mỗi ngày theo lịch Việt Nam; lượt mới có từ 00:00 Asia/Ho_Chi_Minh. Một câu chỉ bị tính khi model đã trả lời, kể cả khi câu nằm ngoài phạm vi. Không tính câu bị từ chối trước khi suy luận (rỗng, quá dài, có email/số điện thoại/số giấy tờ), sai vai trò, parser chưa bật, model đang bận, lỗi hoặc hết thời gian chờ. Gợi ý xe bằng biểu mẫu và xem tuyến/hành trình không tính lượt. Lượt dùng được giữ trong bộ nhớ backend nên khởi động lại backend sẽ đếm lại; các câu đang xử lý cùng lúc vẫn không vượt hạn mức.
+
+GET `/api/v1/ai/quota` chỉ USER, đọc lượt không trừ lượt: `{ "limit": 6, "used": 2, "remaining": 4, "resetAt": "2026-11-11T17:00:00Z", "hotline": { "number": "10008888", "sample": true } }`. Khi hết lượt, POST `/api/v1/ai/criteria/parse` trả 429 với cùng các trường cùng `code: "AI_DAILY_LIMIT"` và `message`, không gọi model. 429 không có mã này là trợ lý đang bận và có thể thử lại.
+
+Chatbox hiện “Còn x/6 lượt hỏi AI hôm nay” và tải lại sau mỗi lần đọc nhu cầu. Khi hết lượt, nút Điền nhu cầu bằng AI bị khóa và thông báo cho biết giờ có lượt mới, trang Tìm xe và hotline; biểu mẫu tay vẫn dùng được. Hotline 10008888 là số mẫu cho bản demo và được ghi rõ như vậy khi `hotline.sample` là true.
+
+Cấu hình: `AI_DAILY_LIMIT` (mặc định 6), `AI_HOTLINE` (mặc định 10008888), `AI_HOTLINE_SAMPLE` (mặc định true; đặt false khi dùng số thật).
+
 # Địa điểm và tuyến đường AI3
 
 Trong chatbox, mở “Khám phá địa điểm và tuyến đường” để đọc metadata địa điểm và preview tuyến2–8 điểm theo thứ tự. Graph hiện hỗ trợ vùng Đà Nẵng–Hội An; số liệu chỉ xuất hiện khi tuyến VERIFIED. Thông tin chưa xác minh, nguồn và thời điểm kiểm chứng được hiển thị rõ; không tự lưu itinerary. Xem [contract metadata](location-visit-metadata.md).

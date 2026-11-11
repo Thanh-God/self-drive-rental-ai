@@ -6,7 +6,7 @@ import { DEMO_MODE } from '../../demo/config';
 import { useApiData } from '../../hooks/useApiData';
 import { Field, money } from '../common/PageKit';
 import { recommendVehicles, parseRentalCriteria } from '../../api/recommendation';
-import { assistantCriteria, assistantDraft, assistantReasons, assistantSearch, assistantVisible, extractedAssistantDraft } from '../../utils/assistant';
+import { assistantCriteria, assistantDraft, assistantQuota, assistantQuotaExhausted, assistantReasons, assistantSearch, assistantVisible, extractedAssistantDraft } from '../../utils/assistant';
 import { getErrorMessage } from '../../utils/roles';
 import './AssistantWidget.css';
 import RouteExplorer from './RouteExplorer';
@@ -22,7 +22,7 @@ export default function AssistantWidget() {
 function AssistantSession({ visible }) {
   const { search } = useLocation();
   const [open, setOpen] = useState(false), [draft, setDraft] = useState(assistantDraft), [result, setResult] = useState(null), [error, setError] = useState(''), [busy, setBusy] = useState(false);
-  const [naturalText, setNaturalText] = useState(''), [parseNote, setParseNote] = useState(''), [routeRevision,setRouteRevision]=useState(0);
+  const [naturalText, setNaturalText] = useState(''), [parseNote, setParseNote] = useState(''), [routeRevision,setRouteRevision]=useState(0), [limitBody, setLimitBody] = useState(null);
   const previousOpen = useRef(false);
   const initialized = useRef(false), pending = useRef(null), generation = useRef(0), busyRef = useRef(false), launcher = useRef(null), panel = useRef(null), reply = useRef(null);
   const title = useId();
@@ -30,6 +30,9 @@ function AssistantSession({ visible }) {
   const catalog = useApiData('/vehicles/catalog', open && visible && !DEMO_MODE);
   const activeBranches = (branches.data || []).filter(b => b.status === 'ACTIVE');
   const amenities = catalog.data?.amenities || [];
+  // Today's AI allowance: read without using a question; a 429 AI_DAILY_LIMIT body covers the gap until it reloads.
+  const quotaData = useApiData('/ai/quota', open && visible && !DEMO_MODE);
+  const quota = assistantQuota(quotaData.data) ?? assistantQuota(limitBody), exhausted = quota?.remaining === 0;
   useEffect(() => () => { generation.current++; pending.current?.abort(); }, []);
   useEffect(() => {
     if (open && visible) panel.current?.focus();
@@ -57,7 +60,7 @@ function AssistantSession({ visible }) {
     } finally { if (generation.current === run) { busyRef.current = false; setBusy(false); } }
   }
   async function readNatural() {
-    if (busyRef.current || DEMO_MODE || !naturalText.trim() || branches.loading || branches.error) return;
+    if (busyRef.current || DEMO_MODE || exhausted || !naturalText.trim() || branches.loading || branches.error) return;
     invalidate();
     const run = ++generation.current, controller = new globalThis.AbortController(); pending.current = controller; busyRef.current = true; setBusy(true); setParseNote('Đang đọc nhu cầu, có thể mất khoảng một phút…');
     try {
@@ -67,8 +70,11 @@ function AssistantSession({ visible }) {
       setDraft(extractedAssistantDraft(data, activeBranches));
       setParseNote(data.status === 'READY_FOR_REVIEW' ? 'Đã điền nhu cầu. Hãy kiểm tra các trường bên dưới rồi bấm Gợi ý xe phù hợp.' : 'Đã điền phần đọc được. Hãy bổ sung các ô còn trống, kiểm tra ngày gồm cả năm rồi tìm xe.');
     } catch (failure) {
-      if (generation.current === run && !controller.signal.aborted) { setParseNote(''); setError(getErrorMessage(failure, failure.message || 'Chưa đọc được nhu cầu; hãy dùng biểu mẫu.')); }
-    } finally { if (generation.current === run) { busyRef.current = false; setBusy(false); } }
+      if (generation.current !== run || controller.signal.aborted) return;
+      setParseNote('');
+      if (failure?.response?.status === 429 && failure.response.data?.code === 'AI_DAILY_LIMIT' && assistantQuota(failure.response.data)) setLimitBody(failure.response.data);
+      else setError(getErrorMessage(failure, failure.message || 'Chưa đọc được nhu cầu; hãy dùng biểu mẫu.'));
+    } finally { if (generation.current === run) { busyRef.current = false; setBusy(false); } quotaData.reload(); }
   }
   if (!visible) return null;
   return <div className="kdrive-assistant">
@@ -85,7 +91,8 @@ function AssistantSession({ visible }) {
           <div className="assistant-natural">
             <Field label="Mô tả nhu cầu"><textarea maxLength={1000} rows={3} value={naturalText} onChange={e => { invalidate(); setNaturalText(e.target.value); }} placeholder="Ví dụ: 4 người, nhận và trả tại Đà Nẵng từ 20/10/2026 đến 24/10/2026, tổng ngân sách 3 triệu, xe tự động." /></Field>
             <p className="assistant-note">Ghi cả năm. Không nhập số điện thoại, email hoặc số giấy tờ.</p>
-            <button className="assistant-submit" type="button" onClick={readNatural} disabled={busy || !naturalText.trim() || branches.loading || Boolean(branches.error)}>Điền nhu cầu bằng AI</button>
+            <button className="assistant-submit" type="button" onClick={readNatural} disabled={busy || exhausted || !naturalText.trim() || branches.loading || Boolean(branches.error)}>Điền nhu cầu bằng AI</button>
+            {quota && (exhausted ? <p role="status" className="assistant-quota assistant-quota-empty">{assistantQuotaExhausted(quota)}</p> : <p className="assistant-quota">Còn {quota.remaining}/{quota.limit} lượt hỏi AI hôm nay.</p>)}
             {parseNote && <p role="status" className="assistant-note">{parseNote}</p>}
           </div>
           <form onSubmit={submit} aria-label="Nhu cầu thuê xe">
