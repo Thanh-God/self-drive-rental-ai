@@ -147,3 +147,65 @@ test('Demo assistant has explicit unavailable copy and sends no API calls',async
   let calls=0;demoClient.defaults.adapter=async()=>{calls++;throw new Error('Demo must not call API');};c=document.createElement('div');document.body.append(c);root=createRoot(c);await act(async()=>root.render(h(DemoAuth.Provider,{value:{user:{id:'demo-user',role:'USER'},isAuthenticated:true,loading:false}},h(DemoRouter,null,h(DemoWidget)))));await click(button('Mở Trợ lý KDrive'));assert.match(c.textContent,/Bản demo chưa kết nối/);assert.equal(c.querySelector('form'),null);assert.equal(calls,0);await act(async()=>root.unmount());root=null;
  } finally {await demoServer?.close();process.env.VITE_DATA_MODE='api';}
 });
+
+const trip={pickupDate:'2100-10-22',returnDate:'2100-10-26',pickupBranchId:'dn',returnBranchId:'hn',passengers:4,budgetVndTotal:3000000,transmission:'AUTO'};
+const card=(id,total,fee=0)=>({vehicleId:id,vehicleName:'Xe '+id,seats:5,transmission:'AUTO',rentalDays:4,rentalTotal:total-fee,oneWayFee:fee,total,reasonCodes:['WITHIN_TOTAL_BUDGET','ENOUGH_SEATS','TRANSMISSION_MATCH']});
+const found=(cards,criteria=trip)=>reply('Mình tìm được '+cards.length+' xe phù hợp.',{intent:'SEARCH_VEHICLES',criteria,cards});
+
+test('C4.2 vehicle cards show backend totals, reasons and trip links; earlier cards survive later turns',async()=>{
+ await mount();await open();
+ await send('4 người, tổng 3 triệu');
+ await respond(take('/ai/chat'),found([card('v3',2400000),card('v1',2600000,500000)]));
+ let articles=c.querySelectorAll('.assistant-chat-cards article');
+ assert.equal(articles.length,2);
+ assert.match(articles[0].textContent,/Gợi ý đầu tiên/);
+ assert.match(articles[0].textContent,/Xe v3/);assert.match(articles[0].textContent,/2\.400\.000/);
+ assert.match(articles[0].textContent,/Tổng tiền thuê và phí tuyến · 4 ngày/);
+ assert.match(articles[0].textContent,/Đủ chỗ cho 4 người · Trong tổng ngân sách · Khớp hộp số ưu tiên/);
+ const link=articles[1].querySelector('a').getAttribute('href');
+ assert.match(link,/^\/vehicles\/v1\?/);for(const part of ['start=2100-10-22','end=2100-10-26','pickupBranchId=dn','returnBranchId=hn','budget=3000000'])assert.match(link,new RegExp(part));
+ assert.match(c.querySelector('.assistant-all').getAttribute('href'),/^\/vehicles\?.*start=2100-10-22/);
+ await send('Đổi sang trả tại Đà Nẵng');
+ await respond(take('/ai/chat'),found([card('v9',1900000)],{...trip,returnBranchId:'dn'}));
+ const groups=c.querySelectorAll('.assistant-chat-cards');
+ assert.equal(groups.length,2,'each turn keeps its own cards');
+ assert.match(groups[0].querySelectorAll('article')[1].querySelector('a').getAttribute('href'),/returnBranchId=hn/,'the first turn keeps its own criteria');
+ assert.match(groups[1].querySelector('article a').getAttribute('href'),/returnBranchId=dn/);
+});
+
+test('C4.2 incomplete criteria give plain links; citations show their titles',async()=>{
+ await mount();await open();
+ await send('Có phải đặt cọc không?');
+ await respond(take('/ai/chat'),reply('KDrive đang thử nghiệm cọc giữ chỗ 30%.',{citations:[{id:'K-B07',title:'Có phải đặt cọc không?'},{id:'K-E02',title:'Hủy đơn có được hoàn tiền không?'}]}));
+ assert.equal(c.querySelector('.assistant-sources').textContent,'Nguồn: Có phải đặt cọc không? · Hủy đơn có được hoàn tiền không?');
+ assert.equal(c.querySelector('.assistant-sources a'),null,'sources are text, not internal links');
+ await send('Tìm xe');
+ await respond(take('/ai/chat'),found([card('v2',2000000)],{...trip,budgetVndTotal:null}));
+ assert.equal(c.querySelector('.assistant-chat-cards article a').getAttribute('href'),'/vehicles/v2');
+});
+
+test('C4.2 incoherent cards or unknown citation IDs are rejected, never shown',async()=>{
+ await mount();await open();
+ const bad=[
+  found([{...card('v1',2600000,500000),total:1}]),
+  found([card('v1',2600000),card('v1',2600000)]),
+  found([{...card('v1',2600000),vehicleId:''}]),
+  found([{...card('v1',2600000),rentalDays:0}]),
+  reply('Có thẻ trong câu trả lời thường',{cards:[card('v1',2600000)]}),
+  reply('Nguồn lạ',{citations:[{id:'POLICY-1',title:'x'}]}),
+ ];
+ for(const body of bad){
+  await send('Tìm xe giúp mình');await respond(take('/ai/chat'),body);
+  assert.ok(c.querySelector('[role="alert"]'),JSON.stringify(body).slice(0,80));
+  assert.equal(c.querySelectorAll('.assistant-chat-cards article').length,0);
+  assert.equal(c.querySelector('.assistant-sources'),null);
+  assert.equal(area().value,'Tìm xe giúp mình','the question stays in the input box');
+ }
+});
+
+test('C4.2 the last remaining question is flagged',async()=>{
+ await mount();await open(5);
+ assert.match(c.querySelector('.assistant-quota').textContent,/Còn 1\/6 lượt hỏi AI hôm nay\. Đây là lượt cuối/);
+ await send('Xe có bảo hiểm không?');await respond(take('/ai/chat'),reply('Chi nhánh hỗ trợ bảo hiểm.',{quota:quotaBody(6)}));
+ assert.ok(c.querySelector('.assistant-quota-empty'));assert.equal(area().disabled,true);
+});

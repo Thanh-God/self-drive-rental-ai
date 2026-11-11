@@ -14,7 +14,7 @@ Chatbox là khung trò chuyện dùng [API hỏi đáp](ai-chat.md): lời chào
 
 Lỗi của trợ lý (bận, lỗi provider, phản hồi sai định dạng) hiện thông báo, giữ câu hỏi trong ô nhập để gửi lại và không tự tạo câu trả lời. Demo mode chỉ thông báo chưa kết nối, không gọi API.
 
-Thẻ xe và nguồn trích dẫn trong khung trò chuyện được bổ sung ở bước tiếp theo; tìm xe chi tiết dùng trang Tìm xe. Không đặt/hủy/sửa đơn qua chatbox; quote/create vẫn kiểm tra lại GPLX, giá và lịch.
+Khi trợ lý tìm xe, tin trả lời có tối đa 3 thẻ xe theo thứ tự backend: tên xe, tổng tiền gồm phí tuyến, số ngày, lý do và liên kết Xem xe kèm ngày, chi nhánh và ngân sách của lượt đó, cùng liên kết Tìm thêm xe theo chuyến đi. Thẻ của lượt trước giữ nguyên khi trò chuyện tiếp. Câu trả lời từ kho kiến thức ghi "Nguồn:" kèm tiêu đề mục đã dùng. Thẻ không nhất quán (tổng khác tiền thuê cộng phí tuyến, trùng xe) hoặc nguồn không hợp lệ bị coi là lỗi và không hiển thị. Khi còn một lượt, chatbox nhắc đây là lượt cuối. Không đặt/hủy/sửa đơn qua chatbox; quote/create vẫn kiểm tra lại GPLX, giá và lịch.
 
 API gợi ý xe mặc định tắt bằng `AI_RECOMMENDATION_ENABLED`. Phân tích văn bản dùng `QWEN_PARSER_ENABLED` và tuyến đường dùng `AI_ROUTING_ENABLED`; các cờ mặc định tắt. Cần chuẩn bị dịch vụ Qwen/OSRM tương ứng theo [hướng dẫn cấu hình cục bộ](local-ai-routing.md). Có source tích hợp không đồng nghĩa tính năng đang bật hoặc đã được kiểm thử trên mọi môi trường.
 

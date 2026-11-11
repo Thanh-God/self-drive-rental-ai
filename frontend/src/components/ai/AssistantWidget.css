@@ -52,3 +52,7 @@
 .assistant-compose button:disabled { opacity: .5; cursor: not-allowed; }
 .kdrive-assistant :is(textarea):focus-visible { outline: 3px solid #ad4a0e; outline-offset: 2px; }
 .kdrive-assistant .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.assistant-turn { display: grid; gap: 8px; justify-self: stretch; }
+.assistant-chat-cards { margin-top: 2px; }
+.assistant-chat-cards article { margin-top: 8px; }
+.assistant-sources { margin: 0; color: #65574b; font-size: 11px; }

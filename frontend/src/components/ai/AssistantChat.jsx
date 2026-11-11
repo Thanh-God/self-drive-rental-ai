@@ -4,10 +4,41 @@ import { Minus, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import { DEMO_MODE } from '../../demo/config';
 import { useApiData } from '../../hooks/useApiData';
 import { sendChat } from '../../api/assistantChat';
-import { assistantQuota, assistantQuotaExhausted } from '../../utils/assistant';
+import { assistantQuota, assistantQuotaExhausted, assistantSearch } from '../../utils/assistant';
+import { money } from '../common/PageKit';
 import { CHAT_MAX_MESSAGE, CHAT_SUGGESTIONS, chatHistory } from '../../utils/assistantChat';
 import { getErrorMessage } from '../../utils/roles';
 import RouteExplorer from './RouteExplorer';
+
+/** Trip parameters for vehicle links, only when the turn's criteria are complete. */
+function tripSuffix(criteria) {
+  const c = criteria || {};
+  return c.pickupDate && c.returnDate && c.pickupBranchId && c.returnBranchId && Number.isSafeInteger(c.budgetVndTotal) ? assistantSearch(c) : '';
+}
+
+function cardReasons(card, criteria) {
+  const reasons = [];
+  if (Number.isInteger(criteria?.passengers)) reasons.push(`Đủ chỗ cho ${criteria.passengers} người`);
+  if (card.reasonCodes.includes('WITHIN_TOTAL_BUDGET')) reasons.push('Trong tổng ngân sách');
+  if (card.reasonCodes.includes('TRANSMISSION_MATCH')) reasons.push('Khớp hộp số ưu tiên');
+  return reasons.join(' · ');
+}
+
+/** Up to three vehicles found by the backend for this turn; totals include the route fee. */
+function ChatCards({ cards, criteria }) {
+  const suffix = tripSuffix(criteria);
+  return <div className="assistant-results assistant-chat-cards">
+    {cards.map((card, index) => <article key={card.vehicleId}>
+      {index === 0 && <span className="assistant-best">Gợi ý đầu tiên</span>}
+      <h4>{card.vehicleName}</h4>
+      <strong>{money(card.total)}</strong>
+      <span className="assistant-total">Tổng tiền thuê và phí tuyến · {card.rentalDays} ngày</span>
+      {cardReasons(card, criteria) && <p>{cardReasons(card, criteria)}</p>}
+      <Link to={`/vehicles/${encodeURIComponent(card.vehicleId)}${suffix}`}>Xem xe <span aria-hidden="true">↗</span></Link>
+    </article>)}
+    <Link className="assistant-all" to={`/vehicles${suffix}`}>Tìm thêm xe theo chuyến đi</Link>
+  </div>;
+}
 
 /**
  * One chat session for the signed-in renter. The conversation and the vehicle-search criteria live only in
@@ -59,8 +90,9 @@ export default function AssistantChat({ visible }) {
     try {
       const data = await sendChat({ message, history, criteria }, controller.signal);
       if (generation.current !== run) return;
+      // Cards keep the criteria of their own turn, so their links stay right after later turns.
       setMessages(old => [...old.map(m => m.id === id ? { ...m, pending: false } : m),
-        { id: nextId.current++, role: 'assistant', text: data.reply, intent: data.intent, citations: data.citations, cards: data.cards }]);
+        { id: nextId.current++, role: 'assistant', text: data.reply, intent: data.intent, citations: data.citations, cards: data.cards, criteria: data.criteria }]);
       if (data.criteria) setCriteria(data.criteria);
       if (assistantQuota(data.quota)) setLimitBody(data.quota);
     } catch (failure) {
@@ -94,14 +126,19 @@ export default function AssistantChat({ visible }) {
             {messages.length === 0 && <div className="assistant-suggestions" aria-label="Câu hỏi gợi ý">
               {CHAT_SUGGESTIONS.map(s => <button key={s} type="button" disabled={busy || exhausted} onClick={() => send(s)}>{s}</button>)}
             </div>}
-            {messages.map(m => <p key={m.id} className={`assistant-bubble ${m.role === 'user' ? 'assistant-bubble-user' : 'assistant-bubble-bot'}`}>
-              <span className="sr-only">{m.role === 'user' ? 'Bạn: ' : 'Trợ lý: '}</span>{m.text}
-            </p>)}
+            {messages.map(m => m.role === 'user'
+              ? <p key={m.id} className="assistant-bubble assistant-bubble-user"><span className="sr-only">Bạn: </span>{m.text}</p>
+              : <div key={m.id} className="assistant-turn">
+                <p className="assistant-bubble assistant-bubble-bot"><span className="sr-only">Trợ lý: </span>{m.text}</p>
+                {m.cards?.length > 0 && <ChatCards cards={m.cards} criteria={m.criteria} />}
+                {m.citations?.length > 0 && <p className="assistant-sources">Nguồn: {m.citations.map(c => c.title).join(' · ')}</p>}
+              </div>)}
             {busy && <p role="status" className="assistant-typing">Đang trả lời… có thể mất đến một phút.</p>}
             <span ref={end} />
           </div>
           {error && <div role="alert" className="assistant-error"><p>{error}</p><p>Bạn có thể gửi lại hoặc dùng trang <Link to="/vehicles">Tìm xe</Link>.</p></div>}
-          {quota && (exhausted ? <p role="status" className="assistant-quota assistant-quota-empty">{assistantQuotaExhausted(quota)}</p> : <p className="assistant-quota">Còn {quota.remaining}/{quota.limit} lượt hỏi AI hôm nay.</p>)}
+          {quota && (exhausted ? <p role="status" className="assistant-quota assistant-quota-empty">{assistantQuotaExhausted(quota)}</p>
+            : <p className="assistant-quota">Còn {quota.remaining}/{quota.limit} lượt hỏi AI hôm nay.{quota.remaining === 1 && ' Đây là lượt cuối; sau đó bạn vẫn tìm xe được ở trang Tìm xe.'}</p>)}
           <form className="assistant-compose" aria-label="Gửi câu hỏi" onSubmit={event => { event.preventDefault(); send(text); }}>
             <textarea aria-label="Câu hỏi cho trợ lý" rows={2} maxLength={CHAT_MAX_MESSAGE} value={text} disabled={exhausted}
               onChange={event => setText(event.target.value)} onKeyDown={onKeyDown}
