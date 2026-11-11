@@ -105,6 +105,20 @@ def validate_pilot_inputs(backend_root, suites):
 
 DEFAULT_SOURCE = REPO/'backend'
 
+MIGRATION_SUITE_MIN = 10
+
+def declared_tests(build, suite):
+    """Number of @Test methods declared in the copied backend's suite source (the XML must run all of them)."""
+    source=build/f'src/test/java/com/carrental/{suite}.java'
+    assert source.is_file(), f'Suite source missing in backend copy: {suite}'
+    return sum(1 for line in source.read_text(encoding='utf-8').splitlines() if line.lstrip().startswith('@Test'))
+
+def assert_migration_suite_complete(build, counts):
+    """Every declared migration test ran (no partial selection), and never fewer than the historical baseline."""
+    expected=declared_tests(build,'MySqlMigrationTest')
+    assert expected>=MIGRATION_SUITE_MIN, f'MySqlMigrationTest declares only {expected} tests'
+    assert counts[0]==expected, f'MySqlMigrationTest ran {counts[0]} of {expected} declared tests'
+
 def resolve_source_root(source_root=None):
     """Backend checkout whose src the isolated copy must match; default is this repository's backend."""
     source=Path(source_root).resolve() if source_root else DEFAULT_SOURCE
@@ -252,7 +266,7 @@ def main():
             assert counts[0]>0 and counts[1:]==[0,0,0],(suite,counts)
             if suite=='ConcurrencyAndRaceTest':assert counts[0]==8
             if suite==ITINERARY_LIVE_SUITE:assert counts[0]==len(itinerary_methods(args.routing_mode,args.itinerary_scope))
-            if suite=='MySqlMigrationTest':assert counts[0]==10
+            if suite=='MySqlMigrationTest':assert_migration_suite_complete(build,counts)
             shutil.copy2(xml,out/xml.name)
             reports.append({'suite':suite,'counts':counts,'schema':schema,'routingMode':args.routing_mode if suite in ROUTING_SUITES else None,'methods':[c.get('name') for c in report.findall('testcase')]})
             (out/'progress.json').write_text(json.dumps(reports,indent=2));print(suite+': PASS '+str(counts[0]),flush=True)

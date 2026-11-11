@@ -9,6 +9,20 @@ def load(name):
     module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
 
 class RunnerGuards(unittest.TestCase):
+    def test_migration_suite_count_follows_the_copied_source_and_keeps_the_minimum(self):
+        runner=load('run-mysql')
+        with tempfile.TemporaryDirectory() as tmp:
+            build=Path(tmp);suite=build/'src/test/java/com/carrental/MySqlMigrationTest.java';suite.parent.mkdir(parents=True)
+            def declare(n):suite.write_text('class MySqlMigrationTest{\n'+''.join(f' @Test void t{i}(){{}}\n' for i in range(n))+' // @Test in a comment is not a test\n}\n',encoding='utf-8')
+            declare(11);self.assertEqual(11,runner.declared_tests(build,'MySqlMigrationTest'))
+            runner.assert_migration_suite_complete(build,[11,0,0,0])
+            with self.assertRaisesRegex(AssertionError,'ran 10 of 11'):runner.assert_migration_suite_complete(build,[10,0,0,0])
+            declare(10);runner.assert_migration_suite_complete(build,[10,0,0,0])
+            declare(9)
+            with self.assertRaisesRegex(AssertionError,'declares only 9'):runner.assert_migration_suite_complete(build,[9,0,0,0])
+            suite.unlink()
+            with self.assertRaisesRegex(AssertionError,'Suite source missing'):runner.declared_tests(build,'MySqlMigrationTest')
+
     def test_return_policy_mode_is_explicit_and_bounded(self):
         module=load('run-browser'); proof=ROOT/'scripts/operations/verify-return-policy.cjs'
         self.assertEqual(module.proof_settings(proof,qr=True,return_policy=True),'app.return-policy-enabled=true\napp.return-settlement-demo=true\n')

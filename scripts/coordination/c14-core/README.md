@@ -12,7 +12,8 @@ afterwards and their volumes are retained; there is no automatic deletion.
 
 For sandbox deposit logic, select `--suites DepositHttpTest MySqlMigrationTest`.
 The migration suite covers fresh V12, preserved upgrades through V11→V12 and
-the historical partial-migration refusal (ten test methods). With matching
+the historical partial-migration refusal. The runner requires the XML to run every
+`@Test` declared in the copied `MySqlMigrationTest.java` (at least ten; eleven since V13). With matching
 native evidence, the desktop proof uses `--synthetic-deposit --browser-script
 scripts/operations/verify-booking-deposit.cjs` on `run-browser.py`. This explicit
 mode configures synthetic merchant values, delays scheduled provider calls, and
