@@ -20,13 +20,23 @@ public class CriteriaExtractionService {
     private final RentalBranchCatalog branches;
     private final AiDiagnostics diagnostics;
     private final String model;
+    private final com.carrental.modules.ai.AiDailyQuota quota;
     @Autowired
     public CriteriaExtractionService(
             ObjectProvider<QwenCriteriaParser> parser,
             RentalBranchCatalog branches,
             AiDiagnostics diagnostics,
-            @Value("${app.qwen-model:qwen3:8b}") String model) {
-        this.parser=parser;this.branches=branches;this.diagnostics=diagnostics;this.model=model;
+            @Value("${app.qwen-model:qwen3:8b}") String model,
+            com.carrental.modules.ai.AiDailyQuota quota) {
+        this.parser=parser;this.branches=branches;this.diagnostics=diagnostics;this.model=model;this.quota=quota;
+    }
+    /** No daily limit (unit tests and offline tools). */
+    public CriteriaExtractionService(
+            ObjectProvider<QwenCriteriaParser> parser,
+            RentalBranchCatalog branches,
+            AiDiagnostics diagnostics,
+            String model) {
+        this(parser,branches,diagnostics,model,com.carrental.modules.ai.AiDailyQuota.unlimited());
     }
     public CriteriaExtractionService(ObjectProvider<QwenCriteriaParser> parser,RentalBranchCatalog branches){
         this(parser,branches,new AiDiagnostics(),"qwen3:8b");
@@ -48,7 +58,12 @@ public class CriteriaExtractionService {
         }
         var candidates=mentionedBranches(text,branches.active());
         var names=candidates.stream().map(RentalBranchCatalog.Item::name).distinct().sorted().toList();
-        var extracted=engine.parse(text,deadline,names);
+        CriteriaParser.Extraction extracted;
+        // Counts only when the model answered: 429 busy, provider errors and timeouts give the slot back.
+        try(var held=quota.reserve(actor)){
+            extracted=engine.parse(text,deadline,names);
+            held.commit();
+        }
         if("OUT_OF_SCOPE".equals(extracted.intent()))return new Result("OUT_OF_SCOPE",null,List.of());
         if(!extracted.conflicts().isEmpty())return new Result("NEEDS_CLARIFICATION",null,List.of("conflicts"));
         var stated=StatedCriteria.from(text,names);

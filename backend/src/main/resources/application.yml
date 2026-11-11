@@ -44,3 +44,6 @@ app:
   qwen-parser-enabled: ${QWEN_PARSER_ENABLED:false}
   ai-routing-enabled: ${AI_ROUTING_ENABLED:false}
   qwen-model: ${QWEN_MODEL:qwen3:8b}
+  ai-daily-limit: ${AI_DAILY_LIMIT:6}
+  ai-hotline: ${AI_HOTLINE:10008888}
+  ai-hotline-sample: ${AI_HOTLINE_SAMPLE:true}

@@ -293,4 +293,46 @@ class CriteriaExtractionServiceTest {
         assertFalse(CriteriaExtractionService.firmDatePair("Nhận 2027-02-14, trả 2027-02-14.","2027-02-14","2027-02-14"));
         assertTrue(CriteriaExtractionService.firmDatePair("Nhận 2027-02-10, trả 2027-02-14.","2027-02-10","2027-02-14"));
     }
+    CriteriaExtractionService limited(boolean enabled,com.carrental.modules.ai.AiDailyQuota quota){
+        var beans=new StaticListableBeanFactory();if(enabled)beans.addBean("qwen",parser);
+        return new CriteriaExtractionService(beans.getBeanProvider(QwenCriteriaParser.class),branches,new AiDiagnostics(),"qwen3:8b",quota);
+    }
+    static com.carrental.modules.ai.AiDailyQuota quota(int limit){
+        return new com.carrental.modules.ai.AiDailyQuota(limit,"10008888",true,java.time.Clock.fixed(java.time.Instant.parse("2026-11-11T03:00:00Z"),java.time.ZoneOffset.UTC));
+    }
+    /** C1.1: a question the model answered counts, whatever the answer (out of scope included). */
+    @Test void answeredQuestionsCountAndTheNextOneIsRefusedBeforeTheModel(){
+        when(branches.active()).thenReturn(List.of());
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList())).thenReturn(new CriteriaParser.Extraction("OUT_OF_SCOPE",null,null,null,null,null,null,null,List.of(),List.of()));
+        var allowance=quota(2);var service=limited(true,allowance);
+        assertEquals("OUT_OF_SCOPE",service.extract(user,"viết thơ").status());
+        assertEquals("OUT_OF_SCOPE",service.extract(user,"viết thơ").status());
+        var refused=assertThrows(com.carrental.modules.ai.AiQuotaExceededException.class,()->service.extract(user,"viết thơ"));
+        assertEquals(429,refused.status.value());
+        verify(parser,times(2)).parse(anyString(),any(AiRequestDeadline.class),anyList());
+        assertEquals(0,allowance.status(user).remaining());
+    }
+    /** C1.1: refused input, a disabled parser, a busy provider and a provider failure do not use the allowance. */
+    @Test void refusedDisabledBusyAndFailedCallsDoNotCount(){
+        when(branches.active()).thenReturn(List.of());
+        var allowance=quota(1);
+        assertEquals(403,assertThrows(DomainException.class,()->limited(true,allowance).extract(new Actor("s","STAFF","Staff"),"xe")).status.value());
+        assertEquals(400,assertThrows(DomainException.class,()->limited(true,allowance).extract(user,"gọi0901234567")).status.value());
+        assertEquals(400,assertThrows(DomainException.class,()->limited(true,allowance).extract(user," ")).status.value());
+        assertEquals(503,assertThrows(DomainException.class,()->limited(false,allowance).extract(user,"xe")).status.value());
+        when(parser.parse(anyString(),any(AiRequestDeadline.class),anyList()))
+            .thenThrow(new DomainException(org.springframework.http.HttpStatus.TOO_MANY_REQUESTS,"Trợ lý đang bận."))
+            .thenThrow(new DomainException(org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,"Qwen lỗi."))
+            .thenThrow(new IllegalStateException("timeout"))
+            .thenReturn(new CriteriaParser.Extraction("OUT_OF_SCOPE",null,null,null,null,null,null,null,List.of(),List.of()));
+        var service=limited(true,allowance);
+        var busy=assertThrows(DomainException.class,()->service.extract(user,"xe"));
+        assertEquals(429,busy.status.value());
+        assertFalse(busy instanceof com.carrental.modules.ai.AiQuotaExceededException,"Provider busy is not the daily limit");
+        assertEquals(503,assertThrows(DomainException.class,()->service.extract(user,"xe")).status.value());
+        assertThrows(IllegalStateException.class,()->service.extract(user,"xe"));
+        assertEquals(1,allowance.status(user).remaining(),"None of the failed calls may use the allowance");
+        assertEquals("OUT_OF_SCOPE",service.extract(user,"xe").status());
+        assertEquals(0,allowance.status(user).remaining());
+    }
 }

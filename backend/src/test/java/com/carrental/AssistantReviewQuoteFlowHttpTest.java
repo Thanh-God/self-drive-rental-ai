@@ -37,6 +37,8 @@ import org.springframework.test.context.*;
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = {
     "app.jwt-secret=assistant-flow-test-secret-at-least-32-bytes",
     "app.ai-recommendation-enabled=true", "app.qwen-parser-enabled=false", "app.gemini-parser-enabled=false",
+    // These flows share one context and one renter across tests; AiDailyQuotaHttpTest covers the allowance.
+    "app.ai-daily-limit=1000",
     "app.seed-enabled=true", "app.seed-password=AssistantFlowOnly123!",
     "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"
 })

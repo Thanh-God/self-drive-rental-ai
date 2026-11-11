@@ -21,6 +21,8 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Explicit integration entrypoint, not a default Surefire test: never downloads or starts a provider. */
 @SpringBootTest(webEnvironment=SpringBootTest.WebEnvironment.RANDOM_PORT,properties={
     "app.seed-enabled=false","app.qwen-parser-enabled=true","app.qwen-model=${ai.eval.model:qwen3:8b}",
+    // The daily question allowance (6) is product behaviour; an evaluation run sends 160 questions with one token.
+    "app.ai-daily-limit=100000",
     "app.gemini-parser-enabled=false","app.token-minutes=120","app.jwt-secret=live-baseline-synthetic-auth-key-not-production",
     "spring.jpa.properties.hibernate.type.preferred_instant_jdbc_type=TIMESTAMP"})
 @Import(AiLiveBaselineIT.TimeConfig.class)
