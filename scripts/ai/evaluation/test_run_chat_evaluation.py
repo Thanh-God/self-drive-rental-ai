@@ -46,12 +46,17 @@ class RunChatEvaluationTests(unittest.TestCase):
         observations = {'model': 'qwen3:8b', 'warmup': {'status': 200, 'elapsedMs': 30000}, 'cases': [
             {'id': pii['id'], 'turns': [{'status': 400, 'body': {'message': 'x'}, 'elapsedMs': 50}]},
             {'id': knowledge['id'], 'turns': [{'status': 200, 'elapsedMs': 9000, 'body': {
-                'intent': 'ANSWER', 'reply': 'Đúng theo mục.', 'citations': [{'id': kid, 'title': 't'}],
+                'intent': 'ANSWER', 'reply': KB['entries'][kid]['answer'], 'citations': [{'id': kid, 'title': 't'}],
                 'criteria': None, 'missing': [], 'cards': []}}]}]}
         results, summary = run.score(cases, observations, KB)
         by_id = {r['id']: r['outcome'] for r in results}
         self.assertEqual('PASS', by_id[pii['id']])
         self.assertEqual('PASS', by_id[knowledge['id']])
+        bare = {**observations, 'cases': [{'id': knowledge['id'], 'turns': [{'status': 200, 'elapsedMs': 1, 'body': {
+            'intent': 'ANSWER', 'reply': 'Đúng theo mục.', 'citations': [{'id': kid, 'title': 't'}],
+            'criteria': None, 'missing': [], 'cards': []}}]}]}
+        self.assertEqual('FAIL', {r['id']: r['outcome'] for r in run.score(cases, bare, KB)[0]}[knowledge['id']],
+                         'a right citation with none of the entry facts is not a pass')
         self.assertEqual(32 - 2, summary['outcomes']['FAIL'], 'a case never asked is a failure, not a skip')
         self.assertEqual(30, len(summary['notAsked']))
         self.assertEqual((30000, 200), (summary['coldMs'], summary['coldStatus']))

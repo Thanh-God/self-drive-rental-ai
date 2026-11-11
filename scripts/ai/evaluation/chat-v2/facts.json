@@ -1,0 +1,197 @@
+{
+  "version": "chat-v2-facts",
+  "status": "DRAFT",
+  "knowledgeVersion": "2026-11-11-v1",
+  "note": "Minimal facts an ANSWER citing the entry must state: key numbers, negations and the experimental status. Each phrase appears verbatim (without diacritics/punctuation) in the approved answer. Owner review pending.",
+  "entries": {
+    "K-A01": {
+      "mustContain": [
+        "không đặt"
+      ]
+    },
+    "K-A02": {
+      "mustContain": [
+        "6"
+      ]
+    },
+    "K-A03": {
+      "mustContain": [
+        "đăng nhập"
+      ]
+    },
+    "K-A04": {
+      "mustContain": [
+        "Không",
+        "xóa"
+      ]
+    },
+    "K-B01": {
+      "mustContain": [
+        "GPLX",
+        "chờ xác nhận",
+        "hóa đơn"
+      ]
+    },
+    "K-B02": {
+      "mustContain": [
+        "số ngày"
+      ]
+    },
+    "K-B03": {
+      "mustContain": [
+        "báo giá"
+      ]
+    },
+    "K-B04": {
+      "mustContain": [
+        "2 giờ",
+        "ngày nhận"
+      ]
+    },
+    "K-B05": {
+      "mustContain": [
+        "Không",
+        "kiểm tra lại"
+      ]
+    },
+    "K-B06": {
+      "mustContain": [
+        "không thanh toán online"
+      ]
+    },
+    "K-B07": {
+      "mustContain": [
+        "thử nghiệm",
+        "30%",
+        "phí tuyến",
+        "30 phút"
+      ],
+      "experimental": true
+    },
+    "K-C01": {
+      "mustContain": [
+        "còn hiệu lực",
+        "hai mặt"
+      ]
+    },
+    "K-C02": {
+      "mustContain": [
+        "Có",
+        "2025"
+      ]
+    },
+    "K-C03": {
+      "mustContain": [
+        "không gửi cho AI"
+      ]
+    },
+    "K-C04": {
+      "mustContain": [
+        "kiểm tra lại"
+      ]
+    },
+    "K-D01": {
+      "mustContain": [
+        "chi nhánh"
+      ]
+    },
+    "K-D02": {
+      "mustContain": [
+        "phí tuyến"
+      ]
+    },
+    "K-D03": {
+      "mustContain": [
+        "chưa hỗ trợ"
+      ]
+    },
+    "K-D04": {
+      "mustContain": [
+        "ngày nhận"
+      ]
+    },
+    "K-D05": {
+      "mustContain": [
+        "thử nghiệm",
+        "không tự giảm",
+        "không có tiền phạt"
+      ],
+      "experimental": true
+    },
+    "K-D06": {
+      "mustContain": [
+        "chưa hỗ trợ gia hạn"
+      ]
+    },
+    "K-E01": {
+      "mustContain": [
+        "24 giờ"
+      ]
+    },
+    "K-E02": {
+      "mustContain": [
+        "thử nghiệm",
+        "hoàn toàn bộ",
+        "0–100%"
+      ],
+      "experimental": true
+    },
+    "K-F01": {
+      "mustContain": [
+        "hợp đồng",
+        "hóa đơn"
+      ]
+    },
+    "K-F02": {
+      "mustContain": [
+        "đánh giá"
+      ]
+    },
+    "K-F03": {
+      "mustContain": [
+        "sự cố"
+      ]
+    },
+    "K-H01": {
+      "mustContain": [
+        "bản gốc"
+      ]
+    },
+    "K-H02": {
+      "mustContain": [
+        "50%",
+        "không tính chi phí nhiên liệu"
+      ]
+    },
+    "K-H03": {
+      "mustContain": [
+        "chưa áp dụng giới hạn"
+      ]
+    },
+    "K-H04": {
+      "mustContain": [
+        "chịu"
+      ]
+    },
+    "K-H05": {
+      "mustContain": [
+        "bảo hiểm"
+      ]
+    },
+    "K-H06": {
+      "mustContain": [
+        "không cần"
+      ]
+    },
+    "K-H07": {
+      "mustContain": [
+        "chưa hỗ trợ giao xe"
+      ]
+    },
+    "K-H08": {
+      "mustContain": [
+        "Việt Nam"
+      ]
+    }
+  }
+}

@@ -25,9 +25,9 @@ def vietnam_today(now=None):
     return (now or datetime.now(timezone.utc)).astimezone(VN).date()
 
 
-def prepare(split, out_dir, today, heldout_sha=None, kb=None):
+def prepare(split, out_dir, today, heldout_sha=None, kb=None, dataset='chat-v1'):
     kb = kb or cs.load_knowledge()
-    path = HERE / 'chat-v1' / f'{split}.json'
+    path = HERE / dataset / f'{split}.json'
     if split == 'heldout':
         actual = hashlib.sha256(path.read_bytes()).hexdigest()
         if heldout_sha is None or actual != heldout_sha:
@@ -45,10 +45,11 @@ def score(cases_doc, observations, kb=None):
     kb = kb or cs.load_knowledge()
     asked = {o['id']: o['turns'] for o in observations.get('cases', [])}
     today = datetime.fromisoformat(cases_doc['resolvedFor']).date()
-    results = [cs.score_case(c, asked.get(c['id'], []), kb, today) for c in cases_doc['cases']]
+    facts = cs.load_facts()
+    results = [cs.score_case(c, asked.get(c['id'], []), kb, today, facts) for c in cases_doc['cases']]
     summary = cs.summarize(results)
     warm = observations.get('warmup') or {}
-    summary.update(split=cases_doc['split'], model=observations.get('model'), resolvedFor=cases_doc['resolvedFor'],
+    summary.update(dataset=cases_doc.get('version'), split=cases_doc['split'], model=observations.get('model'), resolvedFor=cases_doc['resolvedFor'],
                    coldMs=warm.get('elapsedMs'), coldStatus=warm.get('status'),
                    notAsked=sorted(c['id'] for c in cases_doc['cases'] if c['id'] not in asked))
     return results, summary
@@ -56,7 +57,7 @@ def score(cases_doc, observations, kb=None):
 
 def report(results, summary):
     o = summary['outcomes']
-    lines = [f"# chat-v1 {summary['split']} — {summary['model']} ({summary['resolvedFor']})", '',
+    lines = [f"# {summary.get('dataset', 'chat')} {summary['split']} — {summary['model']} ({summary['resolvedFor']})", '',
              f"Ca: {summary['cases']} · PASS {o['PASS']} · SAFE_MISS {o['SAFE_MISS']} · FAIL {o['FAIL']} · UNSAFE {o['UNSAFE']} · ERROR {o['ERROR']}",
              f"Thời gian/lượt: p50 {summary['latencyMs']['p50']} ms · p95 {summary['latencyMs']['p95']} ms · {summary['latencyMs']['turns']} lượt · lượt khởi động (cold) {summary['coldMs']} ms",
              '', '| Nhóm | PASS | SAFE_MISS | FAIL | UNSAFE | ERROR |', '|---|---|---|---|---|---|']
@@ -77,13 +78,14 @@ def main(argv=None):
     pr.add_argument('--split', choices=['dev', 'heldout'], required=True)
     pr.add_argument('--out', required=True)
     pr.add_argument('--heldout-sha')
+    pr.add_argument('--dataset', choices=['chat-v1', 'chat-v2'], default='chat-v2')
     sc = sub.add_parser('score')
     sc.add_argument('--dir', required=True)
     a = p.parse_args(argv)
     if a.command == 'prepare':
         out = Path(a.out).resolve()
         assert out.is_relative_to(REPO / '.runtime'), 'runtime output only'
-        doc = prepare(a.split, out, vietnam_today(), a.heldout_sha)
+        doc = prepare(a.split, out, vietnam_today(), a.heldout_sha, dataset=a.dataset)
         print(f"prepared {len(doc['cases'])} {a.split} cases for {doc['resolvedFor']}")
         return 0
     d = Path(a.dir).resolve()

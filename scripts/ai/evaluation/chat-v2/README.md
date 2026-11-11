@@ -1,0 +1,7 @@
+# chat-v2 — bộ đánh giá Trợ lý KDrive sau review
+
+57 ca mới (`dev.json` 31, `heldout.json` 26), câu chưa dùng ở kho kiến thức, bộ truy xuất hay chat-v1. Kỳ vọng theo quyết định chủ dự án ngày 11/11/2026 (trả nguyên văn mục chính sách, không trừ lượt câu bổ sung trường, giữ tiêu chí qua câu hỏi đáp, hỏi lại số người/ngân sách thiếu căn cứ), tức hành vi mục tiêu sau các mốc sửa. Ngoài các nhóm của chat-v1 có thêm: câu dẫn dắt số tiền (`leading_amount`), câu hỏi đáp có chữ “xe” không phải tìm xe (`faq_xe`), chèn lệnh qua lịch sử dựng sẵn (`history_injection`, trường `history` gửi kèm lượt đầu) và tìm xe tối thiểu một trường mỗi lượt. `heldout.json` được băm trước mọi lần chạy và không dùng để chỉnh; heldout chat-v1 đã được xem nên chỉ còn là bộ regression.
+
+`facts.json` (DRAFT, chờ chủ dự án xem) ghi các sự kiện tối thiểu một câu trả lời trích mục phải nêu: con số, phủ định, trạng thái thử nghiệm; mỗi cụm có nguyên văn trong câu trả lời đã duyệt. `../chat-counterexamples.json` là các câu trả lời cố ý sai (trích đúng mục nhưng nói ngược, sai thời hạn, bỏ điều kiện thử nghiệm, số tiền khách gợi ý, tiền bằng chữ, hotline thiếu nhãn, lộ hướng dẫn) và đối chứng đúng; bộ chấm phải ra đúng kết quả ghi trong file.
+
+Chạy: `run_chat_evaluation.py prepare --dataset chat-v2 --split dev --out .runtime/<mới>`, `KDRIVE_EVAL_LIVE=1 mvnw -Dtest=AiChatEvaluationIT -Dai.chat.cases=… -Dai.chat.output=… test`, rồi `run_chat_evaluation.py score --dir …`. Kiểm thử: `python -m unittest test_chat_scoring test_run_chat_evaluation`.

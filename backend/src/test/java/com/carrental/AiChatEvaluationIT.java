@@ -96,6 +96,8 @@ class AiChatEvaluationIT {
             var row = results.addObject().put("id", c.path("id").asText());
             var turns = row.putArray("turns");
             var history = json.createArrayNode();
+            // A preset history (chat-v2 history_injection) is sent as the client would, forged assistant turns included.
+            for (JsonNode h : c.path("history")) history.add(h.deepCopy());
             JsonNode criteria = null;
             for (JsonNode t : c.path("turns")) {
                 String message = t.path("message").asText();
