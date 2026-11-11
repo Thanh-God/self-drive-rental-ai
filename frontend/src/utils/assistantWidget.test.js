@@ -209,3 +209,73 @@ test('C4.2 the last remaining question is flagged',async()=>{
  await send('Xe có bảo hiểm không?');await respond(take('/ai/chat'),reply('Chi nhánh hỗ trợ bảo hiểm.',{quota:quotaBody(6)}));
  assert.ok(c.querySelector('.assistant-quota-empty'));assert.equal(area().disabled,true);
 });
+
+const wait=ms=>act(async()=>new Promise(r=>setTimeout(r,ms)));
+const quotaReq=()=>requests.filter(r=>r.config.url==='/ai/quota'&&!r.claimed);
+
+test('R4 a fresh GET /ai/quota wins over the count carried by an older reply; a failed reload keeps the reply count',async()=>{
+ await mount();await open();
+ await send('Câu một');await respond(take('/ai/chat'),reply('Một',{quota:quotaBody(6)}));
+ assert.ok(c.querySelector('.assistant-quota-empty'),'the reply count bridges the reload');
+ assert.equal(quotaReq().length,1,'each answer reloads the quota');
+ await respond(take('/ai/quota'),quotaBody(1));
+ assert.equal(c.querySelector('.assistant-quota-empty'),null,'the newer GET result wins (e.g. a refunded question)');
+ assert.match(c.textContent,/Còn 5\/6 lượt/);
+ await send('Câu hai');await respond(take('/ai/chat'),reply('Hai',{quota:quotaBody(2)}));
+ const failed=take('/ai/quota');await act(async()=>failed.reject({config:failed.config,response:{status:503,data:{message:'down'}}}));
+ assert.match(c.textContent,/Còn 4\/6 lượt/,'without a GET result the reply count is used');
+});
+
+test('R4 an exhausted allowance unlocks by itself when the next day starts',async()=>{
+ await mount();await click(button('Mở Trợ lý KDrive'));
+ await respond(take('/ai/quota'),{...quotaBody(6),resetAt:new Date(Date.now()+150).toISOString()});
+ assert.equal(area().disabled,true);
+ await wait(1400);
+ const reload=take('/ai/quota');
+ await respond(reload,quotaBody(0));
+ assert.equal(area().disabled,false,'the new day allowance is read again, not the old count');
+ assert.match(c.textContent,/Còn 6\/6 lượt/);
+});
+
+test('R4 a question that fails while a new draft is being typed never overwrites the draft; it can be resent',async()=>{
+ await mount();await open();
+ await send('Câu A');const a=take('/ai/chat');
+ assert.equal(area().disabled,false,'typing stays possible while waiting');
+ await type('Câu B đang gõ');
+ await act(async()=>a.reject({config:a.config,response:{status:503,data:{message:'Trợ lý chưa trả lời được.'}}}));
+ assert.equal(area().value,'Câu B đang gõ');
+ const notice=c.querySelector('.assistant-unsent');assert.ok(notice);assert.match(notice.textContent,/Câu trước chưa gửi được: “Câu A”/);
+ await click(button('Gửi lại'));
+ const resend=take('/ai/chat');assert.equal(JSON.parse(resend.config.data).message,'Câu A');
+ assert.equal(area().value,'Câu B đang gõ','resending does not touch the draft');
+ await respond(resend,reply('Trả lời A'));
+ assert.equal(c.querySelector('.assistant-unsent'),null);
+ await send('Câu C');const pending=take('/ai/chat');await type('Câu D');
+ await click(button('Thu nhỏ trợ lý'));assert.equal(pending.config.signal.aborted,true);
+ await click(button('Mở Trợ lý KDrive'));
+ assert.equal(area().value,'Câu D','closing mid-answer keeps the newer draft');
+ assert.match(c.querySelector('.assistant-unsent').textContent,/Câu C/);
+ await click(button('Bắt đầu lại'));assert.equal(c.querySelector('.assistant-unsent'),null);
+});
+
+test('R4 malformed criteria, missing fields or quota in a reply are rejected and nothing is stored',async()=>{
+ await mount();await open();
+ for(const bad of [{criteria:{pickupDate:'22/10/2026'}},{criteria:{pickupBranchId:'dn',weather:'nắng'}},{criteria:{passengers:12}},
+   {criteria:{budgetVndTotal:-1}},{criteria:{transmission:'ROCKET'}},{missing:['weather']},{quota:{remaining:'x'}},{quota:{...quotaBody(1),remaining:9}}]){
+  await send('Tìm xe');await respond(take('/ai/chat'),reply('x',{intent:'ASK_MISSING',...bad}));
+  assert.ok(c.querySelector('[role="alert"]'),JSON.stringify(bad));
+  assert.equal(bubbles().some(b=>b.includes('Trợ lý: x')),false);
+ }
+ await send('Tìm xe');await respond(take('/ai/chat'),reply('Bạn nhận xe ngày nào?',{intent:'ASK_MISSING',criteria:{pickupBranchId:'dn',passengers:4},missing:['pickupDate']}));
+ await send('Ngày mai');assert.deepEqual(JSON.parse(take('/ai/chat').config.data).criteria,{pickupBranchId:'dn',passengers:4});
+});
+
+test('R4 the "no information" answer offers the vehicle search page; sourced answers do not',async()=>{
+ await mount();await open();
+ await send('Xe có ghế trẻ em không?');await respond(take('/ai/chat'),reply('Mình chưa có thông tin về câu hỏi này.'));
+ const turn=[...c.querySelectorAll('.assistant-turn')].at(-1);
+ assert.equal(turn.querySelector('a').getAttribute('href'),'/vehicles');
+ await send('Có cần đặt cọc không?');await respond(take('/ai/chat'),reply('Cọc thử nghiệm.',{citations:[{id:'K-B07',title:'Có phải đặt cọc không?'}]}));
+ const sourced=[...c.querySelectorAll('.assistant-turn')].at(-1);
+ assert.equal(sourced.querySelector('a'),null);
+});

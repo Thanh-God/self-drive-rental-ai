@@ -47,12 +47,17 @@ function ChatCards({ cards, criteria }) {
 export default function AssistantChat({ visible }) {
   const [open, setOpen] = useState(false), [messages, setMessages] = useState([]), [text, setText] = useState('');
   const [busy, setBusy] = useState(false), [error, setError] = useState(''), [criteria, setCriteria] = useState(null);
-  const [limitBody, setLimitBody] = useState(null), [routeRevision, setRouteRevision] = useState(0);
+  const [responseQuota, setResponseQuota] = useState(null), [routeRevision, setRouteRevision] = useState(0);
+  const [unsent, setUnsent] = useState(null);
   const previousOpen = useRef(false), pending = useRef(null), generation = useRef(0), busyRef = useRef(false);
   const launcher = useRef(null), panel = useRef(null), end = useRef(null), nextId = useRef(1), inFlight = useRef('');
   const title = useId();
   const quotaData = useApiData('/ai/quota', open && visible && !DEMO_MODE);
-  const quota = assistantQuota(limitBody) ?? assistantQuota(quotaData.data), exhausted = quota?.remaining === 0;
+  // GET /ai/quota is the source of truth once loaded; the quota in a reply only bridges the reload that follows it.
+  const freshQuota = quotaData.loading ? null : assistantQuota(quotaData.data);
+  const quotaSource = freshQuota ? quotaData.data : responseQuota;
+  const quota = freshQuota ?? assistantQuota(responseQuota), exhausted = quota?.remaining === 0;
+  const resetAt = quota ? quotaSource.resetAt : null, reloadQuota = quotaData.reload;
 
   useEffect(() => () => { generation.current++; pending.current?.abort(); }, []);
   useEffect(() => {
@@ -61,6 +66,14 @@ export default function AssistantChat({ visible }) {
     previousOpen.current = open;
   }, [open, visible]);
   useEffect(() => { if (open && visible) end.current?.scrollIntoView?.({ block: 'nearest' }); }, [messages, busy, open, visible]);
+  // A new allowance starts at resetAt (00:00 Vietnam): read it again then instead of trusting the old count.
+  useEffect(() => {
+    if (!open || !resetAt) return undefined;
+    const wait = new Date(resetAt).getTime() - Date.now();
+    if (!(wait > 0)) return undefined;
+    const timer = setTimeout(() => { setResponseQuota(null); reloadQuota(); }, Math.min(wait + 1000, 2147483000));
+    return () => clearTimeout(timer);
+  }, [open, resetAt, reloadQuota]);
 
   /** Drops a request in flight. When {@code restore} is set, its question goes back to the input box. */
   function cancelPending(restore) {
@@ -70,21 +83,28 @@ export default function AssistantChat({ visible }) {
     busyRef.current = false;
     setBusy(false);
     setMessages(old => old.filter(m => !m.pending));
-    if (restore) setText(inFlight.current);
+    if (restore) giveBack(inFlight.current);
+  }
+  /** A question that was not answered goes back to an empty input box; a newer draft is never overwritten. */
+  function giveBack(question) {
+    setText(current => current.trim() ? current : question);
+    setUnsent(question);
   }
   function close() { cancelPending(true); setOpen(false); }
   function reset() {
     cancelPending(false);
-    setMessages([]); setText(''); setError(''); setCriteria(null); setRouteRevision(old => old + 1);
+    setMessages([]); setText(''); setError(''); setCriteria(null); setUnsent(null); setRouteRevision(old => old + 1);
   }
 
-  async function send(raw) {
+  async function send(raw, fromInput = true) {
     const message = raw.trim();
     if (busyRef.current || DEMO_MODE || exhausted || !message || message.length > CHAT_MAX_MESSAGE) return;
     const history = chatHistory(messages);
     const id = nextId.current++;
     setMessages(old => [...old, { id, role: 'user', text: message, pending: true }]);
-    setText(''); setError(''); inFlight.current = message;
+    if (fromInput) setText('');
+    // Sending another question keeps the unsent one on offer; sending that one clears it.
+    setError(''); setUnsent(old => old === message ? null : old); inFlight.current = message;
     const run = ++generation.current, controller = new globalThis.AbortController();
     pending.current = controller; busyRef.current = true; setBusy(true);
     try {
@@ -94,13 +114,17 @@ export default function AssistantChat({ visible }) {
       setMessages(old => [...old.map(m => m.id === id ? { ...m, pending: false } : m),
         { id: nextId.current++, role: 'assistant', text: data.reply, intent: data.intent, citations: data.citations, cards: data.cards, criteria: data.criteria }]);
       if (data.criteria) setCriteria(data.criteria);
-      if (assistantQuota(data.quota)) setLimitBody(data.quota);
+      setResponseQuota(data.quota);
+      reloadQuota();
     } catch (failure) {
       if (generation.current !== run || controller.signal.aborted) return;
       // The question was not answered: take it out of the conversation and give it back to the input box.
       setMessages(old => old.filter(m => m.id !== id));
-      setText(message);
-      if (failure?.response?.status === 429 && failure.response.data?.code === 'AI_DAILY_LIMIT' && assistantQuota(failure.response.data)) setLimitBody(failure.response.data);
+      giveBack(message);
+      if (failure?.response?.status === 429 && failure.response.data?.code === 'AI_DAILY_LIMIT' && assistantQuota(failure.response.data)) {
+        setResponseQuota(failure.response.data);
+        reloadQuota();
+      }
       else setError(getErrorMessage(failure, failure.message || 'Trợ lý chưa trả lời được. Hãy thử lại.'));
     } finally {
       if (generation.current === run) { busyRef.current = false; setBusy(false); pending.current = null; }
@@ -124,7 +148,7 @@ export default function AssistantChat({ visible }) {
           <div className="assistant-messages" role="log" aria-live="polite" aria-busy={busy} aria-label="Cuộc trò chuyện">
             <p className="assistant-bubble assistant-bubble-bot">Chào bạn, mình là Trợ lý KDrive. Mình trả lời câu hỏi về thuê xe tự lái KDrive và giúp bạn tìm xe theo ngày, chi nhánh, số người và ngân sách.</p>
             {messages.length === 0 && <div className="assistant-suggestions" aria-label="Câu hỏi gợi ý">
-              {CHAT_SUGGESTIONS.map(s => <button key={s} type="button" disabled={busy || exhausted} onClick={() => send(s)}>{s}</button>)}
+              {CHAT_SUGGESTIONS.map(s => <button key={s} type="button" disabled={busy || exhausted} onClick={() => send(s, false)}>{s}</button>)}
             </div>}
             {messages.map(m => m.role === 'user'
               ? <p key={m.id} className="assistant-bubble assistant-bubble-user"><span className="sr-only">Bạn: </span>{m.text}</p>
@@ -132,10 +156,13 @@ export default function AssistantChat({ visible }) {
                 <p className="assistant-bubble assistant-bubble-bot"><span className="sr-only">Trợ lý: </span>{m.text}</p>
                 {m.cards?.length > 0 && <ChatCards cards={m.cards} criteria={m.criteria} />}
                 {m.citations?.length > 0 && <p className="assistant-sources">Nguồn: {m.citations.map(c => c.title).join(' · ')}</p>}
+                {m.intent === 'ANSWER' && !m.citations?.length && <p className="assistant-sources">Bạn có thể xem xe ở trang <Link to="/vehicles">Tìm xe</Link>.</p>}
               </div>)}
             {busy && <p role="status" className="assistant-typing">Đang trả lời… có thể mất đến một phút.</p>}
             <span ref={end} />
           </div>
+          {unsent && unsent !== text.trim() && <div role="status" className="assistant-error assistant-unsent"><p>Câu trước chưa gửi được: “{unsent}”</p>
+            <button type="button" disabled={busy || exhausted} onClick={() => send(unsent, false)}>Gửi lại</button></div>}
           {error && <div role="alert" className="assistant-error"><p>{error}</p><p>Bạn có thể gửi lại hoặc dùng trang <Link to="/vehicles">Tìm xe</Link>.</p></div>}
           {quota && (exhausted ? <p role="status" className="assistant-quota assistant-quota-empty">{assistantQuotaExhausted(quota)}</p>
             : <p className="assistant-quota">Còn {quota.remaining}/{quota.limit} lượt hỏi AI hôm nay.{quota.remaining === 1 && ' Đây là lượt cuối; sau đó bạn vẫn tìm xe được ở trang Tìm xe.'}</p>)}

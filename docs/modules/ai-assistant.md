@@ -14,7 +14,7 @@ Chatbox mở theo thao tác người dùng, có thu nhỏ/đóng, Escape và tr�
 
 Chatbox là khung trò chuyện dùng [API hỏi đáp](ai-chat.md): lời chào, ba câu hỏi gợi ý khi chưa có tin nhắn, danh sách tin nhắn và ô nhập (Enter gửi, Shift+Enter xuống dòng, tối đa 1000 ký tự). Trong lúc chờ hiện “Đang trả lời…” và không gửi thêm. Lịch sử và tiêu chí tìm xe phản hồi trả về được gửi lại ở lượt sau. Chatbox không còn biểu mẫu tiêu chí; trang [Tìm xe](ai-recommendation.md) và khối Khám phá địa điểm vẫn có liên kết trong chatbox.
 
-Lỗi của trợ lý (bận, lỗi provider, phản hồi sai định dạng) hiện thông báo, giữ câu hỏi trong ô nhập để gửi lại và không tự tạo câu trả lời. Demo mode chỉ thông báo chưa kết nối, không gọi API.
+Lỗi của trợ lý (bận, lỗi provider, phản hồi sai định dạng) hiện thông báo và không tự tạo câu trả lời. Câu chưa được trả lời quay lại ô nhập nếu ô đang trống; nếu khách đã gõ câu mới thì bản nháp được giữ nguyên và chatbox hiện “Câu trước chưa gửi được” kèm nút Gửi lại. Câu trả lời “chưa có thông tin” kèm liên kết trang Tìm xe. Demo mode chỉ thông báo chưa kết nối, không gọi API.
 
 Khi trợ lý tìm xe, tin trả lời có tối đa 3 thẻ xe theo thứ tự backend: tên xe, tổng tiền gồm phí tuyến, số ngày, lý do và liên kết Xem xe kèm ngày, chi nhánh và ngân sách của lượt đó, cùng liên kết Tìm thêm xe theo chuyến đi. Thẻ của lượt trước giữ nguyên khi trò chuyện tiếp. Câu trả lời từ kho kiến thức ghi "Nguồn:" kèm tiêu đề mục đã dùng. Thẻ không nhất quán (tổng khác tiền thuê cộng phí tuyến, trùng xe) hoặc nguồn không hợp lệ bị coi là lỗi và không hiển thị. Khi còn một lượt, chatbox nhắc đây là lượt cuối. Không đặt/hủy/sửa đơn qua chatbox; quote/create vẫn kiểm tra lại GPLX, giá và lịch.
 
@@ -30,7 +30,7 @@ Mỗi tài khoản USER có 6 câu hỏi AI mỗi ngày theo lịch Việt Nam; 
 
 GET `/api/v1/ai/quota` chỉ USER, đọc lượt không trừ lượt: `{ "limit": 6, "used": 2, "remaining": 4, "resetAt": "2026-11-11T17:00:00Z", "hotline": { "number": "10008888", "sample": true } }`. Khi hết lượt, POST `/api/v1/ai/criteria/parse` trả 429 với cùng các trường cùng `code: "AI_DAILY_LIMIT"` và `message`, không gọi model. 429 không có mã này là trợ lý đang bận và có thể thử lại.
 
-Chatbox hiện “Còn x/6 lượt hỏi AI hôm nay” và cập nhật sau mỗi câu trả lời. Khi hết lượt, ô nhập và câu gợi ý bị khóa; thông báo cho biết giờ có lượt mới, trang Tìm xe và hotline. Hotline 10008888 là số mẫu cho bản demo và được ghi rõ như vậy khi `hotline.sample` là true.
+Chatbox hiện “Còn x/6 lượt hỏi AI hôm nay”, đọc lại số lượt từ backend khi mở và sau mỗi câu trả lời, và tự đọc lại khi sang ngày mới (00:00 giờ Việt Nam). Khi hết lượt, ô nhập và câu gợi ý bị khóa; thông báo cho biết giờ có lượt mới, trang Tìm xe và hotline. Hotline 10008888 là số mẫu cho bản demo và được ghi rõ như vậy khi `hotline.sample` là true.
 
 Cấu hình: `AI_DAILY_LIMIT` (mặc định 6), `AI_HOTLINE` (mặc định 10008888), `AI_HOTLINE_SAMPLE` (mặc định true; đặt false khi dùng số thật).
 
