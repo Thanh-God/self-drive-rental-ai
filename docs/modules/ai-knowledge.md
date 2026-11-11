@@ -20,3 +20,9 @@ Các mục `experimental` (cọc giữ chỗ, chính sách trả xe, hoàn tiề
 ## Sửa kho
 
 Sửa nội dung cần được chủ dự án duyệt trước khi đặt `APPROVED`. Đổi nội dung phải tăng `version`. Hotline trong kho cần khớp cấu hình `AI_HOTLINE`/`AI_HOTLINE_SAMPLE` của [hạn mức câu hỏi](ai-assistant.md#hạn-mức-câu-hỏi-ai-mỗi-ngày).
+
+## Chọn đoạn liên quan
+
+Trước khi gọi model, backend chọn tối đa 4 mục `ANSWER` liên quan đến câu hỏi theo cách xác định, không dùng model: chuẩn hóa tiếng Việt (bỏ dấu, chữ thường), so khớp âm tiết và cặp âm tiết với câu hỏi mẫu của từng mục, có trọng số theo độ hiếm. Câu không đủ liên quan không nhận đoạn nào; model khi đó chỉ được dùng câu trả lời mặc định hoặc câu từ chối. Các câu từ chối nhóm G luôn là quy tắc cố định trong hướng dẫn cho model, không phải đoạn được chọn.
+
+Hướng dẫn cho model gồm quy tắc, các đoạn kèm ID và phiên bản kho; tin nhắn của khách luôn ở vai người dùng, không ghép vào hướng dẫn. Không gửi tài khoản, token hay ID người dùng. Câu hỏi hiện tại 1–1000 ký tự và bị từ chối nếu có email, số điện thoại hoặc số giấy tờ; lịch sử chỉ giữ 6 lượt gần nhất, tối đa 2000 ký tự, bỏ lượt có các dữ liệu này.

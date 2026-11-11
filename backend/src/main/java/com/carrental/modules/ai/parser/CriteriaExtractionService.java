@@ -48,7 +48,7 @@ public class CriteriaExtractionService {
         actor.require("USER");
         if(text==null||text.isBlank()||text.length()>1000)throw DomainException.bad("Nhập nhu cầu từ1 đến1000 ký tự.");
         // Refuse common sensitive identifiers before inference; no transcript or user account is forwarded.
-        if(text.matches("(?s).*[^\\s@]+@[^\\s@]+\\.[^\\s@]+.*") || text.matches("(?s).*(?<!\\d)(?:0\\d{9}|84\\d{9}|\\d{12,16})(?!\\d).*"))
+        if(com.carrental.modules.ai.SensitiveText.contains(text))
             throw DomainException.bad("Vui lòng bỏ email, số điện thoại hoặc số giấy tờ khỏi nhu cầu thuê xe.");
         var engine=parser.getIfAvailable();
         if(engine==null) {
