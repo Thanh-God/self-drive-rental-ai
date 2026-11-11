@@ -373,6 +373,11 @@ async function main() {
     check('Staff cannot decide refunds',(await req(staff,'/admin/refunds/'+refundId2+'/decide','POST',{expectedVersion:0,amount:0,reason:'x'})).status,403);
     check('Guest cannot read QR',(await req(null,'/bookings/'+id+'/deposit/qr-payload')).status,401);
     check('User cannot access admin',(await req(user,'/admin/payments')).status,403);
+    // D1: ledger theo vai trò trên API thật — USER không nhận mã nội bộ/khóa yêu cầu/events; Admin giữ đầy đủ.
+    const d1User=(await req(user,'/bookings/'+id+'/deposit')).body, d1Admin=(await req(admin,'/bookings/'+id+'/deposit')).body;
+    check('D1 USER ledger has no internal fields',!('events' in d1User) && d1User.payments.length===2 && d1User.payments.every(p=>!('verifierId' in p) && !('idempotencyKey' in p)) && d1User.refunds.every(r=>!('approvedBy' in r) && !('requestDate' in r)),true);
+    check('D1 USER ledger keeps display fields',d1User.payments.every(p=>p.providerTransaction && p.transferTime && p.verifiedAt && Number.isSafeInteger(p.appliedAmount)),true);
+    check('D1 Admin ledger keeps internal fields',d1Admin.events.length>0 && d1Admin.payments.every(p=>!!p.verifierId && !!p.idempotencyKey),true);
     check('Staff cannot report transfer for customer',(await req(staff,'/bookings/'+id+'/deposit/report','POST',{idempotencyKey:'report-'+id})).status>=400,true);
     check('No JS page errors',errors,[]);
   } catch(error) { for(const [name,p] of [["user",customer],["staff",operator],["admin",manager]]) {await p.screenshot({path:path.join(out,`failure-${name}.png`),fullPage:true}).catch(()=>{});} throw error;} finally {await browser.close();}
