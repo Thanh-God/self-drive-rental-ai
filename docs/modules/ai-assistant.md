@@ -8,19 +8,19 @@ Khi đọc nhu cầu, backend lấy các tên chi nhánh đang hoạt động đ
 
 Nút Trợ lý KDrive dành cho USER đã đăng nhập, ở góc dưới bên phải các trang desktop: trang chủ, danh sách/chi tiết xe, danh sách/chi tiết/tạo đơn thuê và hồ sơ. Không hiển thị cho Guest/Staff/Admin hoặc trang đăng nhập, chứng từ. Mobile chưa được triển khai; dưới768px nút được ẩn.
 
-Chatbox mở theo thao tác người dùng, có thu nhỏ/đóng, Escape và trả focus về nút mở. Bắt đầu lại xóa nhu cầu và kết quả. Biểu mẫu/kết quả chỉ giữ trong bộ nhớ khi chuyển trang SPA; tải lại trang, đăng xuất, đổi tài khoản hoặc đổi phiên sẽ xóa. Không lưu hội thoại trong database, localStorage hay sessionStorage. Khi sửa nhu cầu/reset/đổi phiên, phản hồi đang chạy bị hủy và không được gắn vào nhu cầu/phiên mới.
+Chatbox mở theo thao tác người dùng, có thu nhỏ/đóng, Escape và trả focus về nút mở. Bắt đầu lại xóa cuộc trò chuyện. Cuộc trò chuyện và tiêu chí tìm xe chỉ giữ trong bộ nhớ khi chuyển trang SPA; tải lại trang, đăng xuất, đổi tài khoản hoặc đổi phiên sẽ xóa. Không lưu hội thoại trong database, localStorage hay sessionStorage. Bắt đầu lại hoặc đổi phiên hủy câu đang chờ và bỏ phản hồi muộn; đóng chatbox khi trợ lý đang trả lời thì câu hỏi được trả lại ô nhập.
 
-Biểu mẫu kết nối [API AI1](ai-recommendation.md): ngày nhận/trả, chi nhánh, số người gồm tài xế, tổng ngân sách và ưu tiên hộp số/tiện nghi. Ô Mô tả nhu cầu gọi Qwen cục bộ qua backend để điền bản nháp; khách phải kiểm tra rồi chủ động bấm Gợi ý xe phù hợp. Không tự gửi yêu cầu gợi ý sau khi đọc câu. Nếu mở lần đầu từ URL có thông tin chuyến đi, biểu mẫu nhận các ngày và chi nhánh đó; chuyển trang sau đó không ghi đè nhu cầu đang nhập.
+Chatbox là khung trò chuyện dùng [API hỏi đáp](ai-chat.md): lời chào, ba câu hỏi gợi ý khi chưa có tin nhắn, danh sách tin nhắn và ô nhập (Enter gửi, Shift+Enter xuống dòng, tối đa 1000 ký tự). Trong lúc chờ hiện “Đang trả lời…” và không gửi thêm. Lịch sử và tiêu chí tìm xe phản hồi trả về được gửi lại ở lượt sau. Chatbox không còn biểu mẫu tiêu chí; trang [Tìm xe](ai-recommendation.md) và khối Khám phá địa điểm vẫn có liên kết trong chatbox.
 
-API mode tải chi nhánh và tiện nghi từ backend; lỗi danh mục có nút thử lại, không dùng seed/demo thay thế. Kết quả trả tối đa3 xe đầu theo thứ tự server, hiển thị tổng tiền gồm phí tuyến và lý do dựa trên facts. Xem xe chuyển tiếp ngày nhận/trả, chi nhánh và ngân sách vào trang xe. Không áp dụng ưu tiên mềm thành bộ lọc cứng khi chuyển tiếp. Phủ định về thuộc tính khác không xóa hộp số đã nêu; phủ định trực tiếp hoặc lựa chọn hộp số mâu thuẫn cần làm rõ, không được đảo thành lựa chọn ngược. Không đặt/hủy/sửa đơn qua chatbox; quote/create vẫn kiểm tra lại GPLX, giá và lịch.
+Lỗi của trợ lý (bận, lỗi provider, phản hồi sai định dạng) hiện thông báo, giữ câu hỏi trong ô nhập để gửi lại và không tự tạo câu trả lời. Demo mode chỉ thông báo chưa kết nối, không gọi API.
 
-Không có xe thì báo rõ để người dùng tự sửa tiêu chí. Backend chưa bật hoặc lỗi thì giữ biểu mẫu, hiển thị lỗi và đường dẫn Tìm xe. Phản hồi sai requestId/schema bị từ chối. Demo mode chỉ thông báo chưa kết nối, không gọi API hoặc tạo gợi ý giả.
+Thẻ xe và nguồn trích dẫn trong khung trò chuyện được bổ sung ở bước tiếp theo; tìm xe chi tiết dùng trang Tìm xe. Không đặt/hủy/sửa đơn qua chatbox; quote/create vẫn kiểm tra lại GPLX, giá và lịch.
 
 API gợi ý xe mặc định tắt bằng `AI_RECOMMENDATION_ENABLED`. Phân tích văn bản dùng `QWEN_PARSER_ENABLED` và tuyến đường dùng `AI_ROUTING_ENABLED`; các cờ mặc định tắt. Cần chuẩn bị dịch vụ Qwen/OSRM tương ứng theo [hướng dẫn cấu hình cục bộ](local-ai-routing.md). Có source tích hợp không đồng nghĩa tính năng đang bật hoặc đã được kiểm thử trên mọi môi trường.
 
 
 POST `/api/v1/ai/criteria/parse` chỉ USER, body `{ "text": "..." }` tối đa1000ký tự. Backend từ chối một số mẫu email/số điện thoại/số giấy tờ phổ biến trước khi suy luận; đây không phải bộ phát hiện mọi dữ liệu cá nhân. Không gửi userID/token/hồ sơ hoặc lưu hội thoại cho model. Chỉ đối chiếu tên với điểm nhận/trả ACTIVE qua API nội bộ booking; tên không rõ hoặc nhiều kết quả phải chọn lại. Ngày phải xuất hiện đầy đủ trong câu nhập ở dạng YYYY-MM-DD hoặc ngày/tháng/năm; ngày thiếu năm không tự mặc định. Khi câu có đúng hai ngày đầy đủ theo thứ tự nhận rồi trả và không có từ lưỡng lự như “chưa”, “hoặc”, “khoảng”, backend xác nhận hai ngày đó dù model đánh dấu chưa rõ. Ưu tiên hộp số chỉ được điền khi câu nhập nêu rõ, không được biến dữ liệu thiếu thành mặc định tự động. READY_FOR_REVIEW trả bản nháp cần kiểm tra, NEEDS_CLARIFICATION yêu cầu bổ sung, OUT_OF_SCOPE không tạo bản nháp. Phản hồi có mâu thuẫn không được dùng để điền. Không hỗ trợ hội thoại nhiều lượt hoặc tự xác nhận nghiệp vụ.
-API hỏi đáp về dịch vụ KDrive (chưa nối vào chatbox) được mô tả tại [Hỏi đáp Trợ lý KDrive](ai-chat.md).
+API hỏi đáp về dịch vụ KDrive được mô tả tại [Hỏi đáp Trợ lý KDrive](ai-chat.md).
 
 ## Hạn mức câu hỏi AI mỗi ngày
 
@@ -28,7 +28,7 @@ Mỗi tài khoản USER có 6 câu hỏi AI mỗi ngày theo lịch Việt Nam; 
 
 GET `/api/v1/ai/quota` chỉ USER, đọc lượt không trừ lượt: `{ "limit": 6, "used": 2, "remaining": 4, "resetAt": "2026-11-11T17:00:00Z", "hotline": { "number": "10008888", "sample": true } }`. Khi hết lượt, POST `/api/v1/ai/criteria/parse` trả 429 với cùng các trường cùng `code: "AI_DAILY_LIMIT"` và `message`, không gọi model. 429 không có mã này là trợ lý đang bận và có thể thử lại.
 
-Chatbox hiện “Còn x/6 lượt hỏi AI hôm nay” và tải lại sau mỗi lần đọc nhu cầu. Khi hết lượt, nút Điền nhu cầu bằng AI bị khóa và thông báo cho biết giờ có lượt mới, trang Tìm xe và hotline; biểu mẫu tay vẫn dùng được. Hotline 10008888 là số mẫu cho bản demo và được ghi rõ như vậy khi `hotline.sample` là true.
+Chatbox hiện “Còn x/6 lượt hỏi AI hôm nay” và cập nhật sau mỗi câu trả lời. Khi hết lượt, ô nhập và câu gợi ý bị khóa; thông báo cho biết giờ có lượt mới, trang Tìm xe và hotline. Hotline 10008888 là số mẫu cho bản demo và được ghi rõ như vậy khi `hotline.sample` là true.
 
 Cấu hình: `AI_DAILY_LIMIT` (mặc định 6), `AI_HOTLINE` (mặc định 10008888), `AI_HOTLINE_SAMPLE` (mặc định true; đặt false khi dùng số thật).
 

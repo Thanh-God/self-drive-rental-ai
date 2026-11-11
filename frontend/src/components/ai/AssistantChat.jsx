@@ -1,0 +1,119 @@
+import { useEffect, useId, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Minus, RotateCcw, Send, Sparkles, X } from 'lucide-react';
+import { DEMO_MODE } from '../../demo/config';
+import { useApiData } from '../../hooks/useApiData';
+import { sendChat } from '../../api/assistantChat';
+import { assistantQuota, assistantQuotaExhausted } from '../../utils/assistant';
+import { CHAT_MAX_MESSAGE, CHAT_SUGGESTIONS, chatHistory } from '../../utils/assistantChat';
+import { getErrorMessage } from '../../utils/roles';
+import RouteExplorer from './RouteExplorer';
+
+/**
+ * One chat session for the signed-in renter. The conversation and the vehicle-search criteria live only in
+ * memory; the parent remounts this component on identity or token change, which drops both.
+ */
+export default function AssistantChat({ visible }) {
+  const [open, setOpen] = useState(false), [messages, setMessages] = useState([]), [text, setText] = useState('');
+  const [busy, setBusy] = useState(false), [error, setError] = useState(''), [criteria, setCriteria] = useState(null);
+  const [limitBody, setLimitBody] = useState(null), [routeRevision, setRouteRevision] = useState(0);
+  const previousOpen = useRef(false), pending = useRef(null), generation = useRef(0), busyRef = useRef(false);
+  const launcher = useRef(null), panel = useRef(null), end = useRef(null), nextId = useRef(1), inFlight = useRef('');
+  const title = useId();
+  const quotaData = useApiData('/ai/quota', open && visible && !DEMO_MODE);
+  const quota = assistantQuota(limitBody) ?? assistantQuota(quotaData.data), exhausted = quota?.remaining === 0;
+
+  useEffect(() => () => { generation.current++; pending.current?.abort(); }, []);
+  useEffect(() => {
+    if (open && visible) panel.current?.focus();
+    else if (previousOpen.current && visible) launcher.current?.focus();
+    previousOpen.current = open;
+  }, [open, visible]);
+  useEffect(() => { if (open && visible) end.current?.scrollIntoView?.({ block: 'nearest' }); }, [messages, busy, open, visible]);
+
+  /** Drops a request in flight. When {@code restore} is set, its question goes back to the input box. */
+  function cancelPending(restore) {
+    if (!busyRef.current) return;
+    generation.current++;
+    pending.current?.abort();
+    busyRef.current = false;
+    setBusy(false);
+    setMessages(old => old.filter(m => !m.pending));
+    if (restore) setText(inFlight.current);
+  }
+  function close() { cancelPending(true); setOpen(false); }
+  function reset() {
+    cancelPending(false);
+    setMessages([]); setText(''); setError(''); setCriteria(null); setRouteRevision(old => old + 1);
+  }
+
+  async function send(raw) {
+    const message = raw.trim();
+    if (busyRef.current || DEMO_MODE || exhausted || !message || message.length > CHAT_MAX_MESSAGE) return;
+    const history = chatHistory(messages);
+    const id = nextId.current++;
+    setMessages(old => [...old, { id, role: 'user', text: message, pending: true }]);
+    setText(''); setError(''); inFlight.current = message;
+    const run = ++generation.current, controller = new globalThis.AbortController();
+    pending.current = controller; busyRef.current = true; setBusy(true);
+    try {
+      const data = await sendChat({ message, history, criteria }, controller.signal);
+      if (generation.current !== run) return;
+      setMessages(old => [...old.map(m => m.id === id ? { ...m, pending: false } : m),
+        { id: nextId.current++, role: 'assistant', text: data.reply, intent: data.intent, citations: data.citations, cards: data.cards }]);
+      if (data.criteria) setCriteria(data.criteria);
+      if (assistantQuota(data.quota)) setLimitBody(data.quota);
+    } catch (failure) {
+      if (generation.current !== run || controller.signal.aborted) return;
+      // The question was not answered: take it out of the conversation and give it back to the input box.
+      setMessages(old => old.filter(m => m.id !== id));
+      setText(message);
+      if (failure?.response?.status === 429 && failure.response.data?.code === 'AI_DAILY_LIMIT' && assistantQuota(failure.response.data)) setLimitBody(failure.response.data);
+      else setError(getErrorMessage(failure, failure.message || 'Trợ lý chưa trả lời được. Hãy thử lại.'));
+    } finally {
+      if (generation.current === run) { busyRef.current = false; setBusy(false); pending.current = null; }
+    }
+  }
+
+  function onKeyDown(event) {
+    if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent?.isComposing) { event.preventDefault(); send(text); }
+  }
+
+  if (!visible) return null;
+  return <div className="kdrive-assistant">
+    {open && <section ref={panel} tabIndex={-1} role="dialog" aria-modal="false" aria-labelledby={title} className="assistant-panel" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+      <header className="assistant-heading"><div><span className="assistant-mark"><Sparkles size={18} /></span><div><h2 id={title}>Trợ lý KDrive</h2><p>Hỏi đáp về dịch vụ thuê xe</p></div></div><div>
+        <button type="button" aria-label="Bắt đầu lại" title="Bắt đầu lại" onClick={reset}><RotateCcw size={17} /></button>
+        <button type="button" aria-label="Thu nhỏ trợ lý" onClick={close}><Minus size={18} /></button>
+        <button type="button" aria-label="Đóng trợ lý" onClick={close}><X size={18} /></button>
+      </div></header>
+      <div className="assistant-body">
+        {DEMO_MODE ? <p role="status" className="assistant-welcome">Trợ lý dùng dữ liệu thật ở chế độ API. Bản demo chưa kết nối trò chuyện.</p> : <>
+          <div className="assistant-messages" role="log" aria-live="polite" aria-busy={busy} aria-label="Cuộc trò chuyện">
+            <p className="assistant-bubble assistant-bubble-bot">Chào bạn, mình là Trợ lý KDrive. Mình trả lời câu hỏi về thuê xe tự lái KDrive và giúp bạn tìm xe theo ngày, chi nhánh, số người và ngân sách.</p>
+            {messages.length === 0 && <div className="assistant-suggestions" aria-label="Câu hỏi gợi ý">
+              {CHAT_SUGGESTIONS.map(s => <button key={s} type="button" disabled={busy || exhausted} onClick={() => send(s)}>{s}</button>)}
+            </div>}
+            {messages.map(m => <p key={m.id} className={`assistant-bubble ${m.role === 'user' ? 'assistant-bubble-user' : 'assistant-bubble-bot'}`}>
+              <span className="sr-only">{m.role === 'user' ? 'Bạn: ' : 'Trợ lý: '}</span>{m.text}
+            </p>)}
+            {busy && <p role="status" className="assistant-typing">Đang trả lời… có thể mất đến một phút.</p>}
+            <span ref={end} />
+          </div>
+          {error && <div role="alert" className="assistant-error"><p>{error}</p><p>Bạn có thể gửi lại hoặc dùng trang <Link to="/vehicles">Tìm xe</Link>.</p></div>}
+          {quota && (exhausted ? <p role="status" className="assistant-quota assistant-quota-empty">{assistantQuotaExhausted(quota)}</p> : <p className="assistant-quota">Còn {quota.remaining}/{quota.limit} lượt hỏi AI hôm nay.</p>)}
+          <form className="assistant-compose" aria-label="Gửi câu hỏi" onSubmit={event => { event.preventDefault(); send(text); }}>
+            <textarea aria-label="Câu hỏi cho trợ lý" rows={2} maxLength={CHAT_MAX_MESSAGE} value={text} disabled={exhausted}
+              onChange={event => setText(event.target.value)} onKeyDown={onKeyDown}
+              placeholder="Ví dụ: Có giao xe tận nhà không?" />
+            <button type="submit" aria-label="Gửi" disabled={busy || exhausted || !text.trim()}><Send size={18} /></button>
+          </form>
+          <p className="assistant-note">Không nhập số điện thoại, email hoặc số giấy tờ. Trợ lý không đặt, hủy hay sửa đơn; giá và lịch được kiểm tra lại khi đặt thuê.</p>
+          <p className="assistant-note"><Link to="/vehicles">Tìm xe theo bộ lọc</Link></p>
+          <RouteExplorer key={routeRevision} />
+        </>}
+      </div>
+    </section>}
+    <button ref={launcher} type="button" className="assistant-launcher" aria-expanded={open} aria-label="Mở Trợ lý KDrive" onClick={() => open ? close() : setOpen(true)}><Sparkles size={20} /><span>Trợ lý KDrive</span></button>
+  </div>;
+}
