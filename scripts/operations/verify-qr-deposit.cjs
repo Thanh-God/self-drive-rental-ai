@@ -370,6 +370,21 @@ async function main() {
     await manager.getByRole('button',{name:'Tải lại',exact:true}).click();
     await manager.locator('[aria-label^="Khoản nhận "]').first().waitFor();
     check('Admin list recovery mutates nothing',sql("select concat((select count(*) from payment_refunds),':',(select count(*) from payment_transactions),':',(select count(*) from payment_events))"),mutationsBefore);
+    // D2: Admin tra cứu phía server theo tiền tố mã đơn (không phân biệt hoa thường) trên API thật.
+    const d2q=id3.slice(0,8).toUpperCase();
+    await manager.getByLabel('Tra cứu trên máy chủ (mã đơn, mã giao dịch, tham chiếu)',{exact:true}).fill(d2q);
+    wait=manager.waitForResponse(r=>r.url().includes('/api/v1/admin/payments?q=') && r.request().method()==='GET');
+    await manager.getByRole('button',{name:'Tra cứu máy chủ',exact:true}).click();
+    const d2res=await wait;check('D2 server search request',d2res.status(),200);
+    const d2body=await d2res.json();
+    check('D2 server search returns only matching receipts',d2body.payments.length>0 && d2body.payments.every(p=>p.bookingId.toLowerCase().startsWith(d2q.toLowerCase()) || (p.providerTransaction||'').toLowerCase().startsWith(d2q.toLowerCase()) || p.id.toLowerCase().startsWith(d2q.toLowerCase())),true);
+    check('D2 server search includes the late receipt of C',d2body.payments.some(p=>p.providerTransaction==='BROWSER-LATE'),true);
+    await manager.getByLabel('Phạm vi tra cứu máy chủ',{exact:true}).waitFor();
+    check('D2 search scope shown in UI',await visible(manager.getByLabel('Phạm vi tra cứu máy chủ',{exact:true})).then(t=>t.includes('“'+d2q+'”')),true);
+    check('D2 short keyword rejected by API',(await req(admin,'/admin/payments?q=ab')).status,400);
+    check('D2 search is Admin only',(await req(staff,'/admin/payments?q='+d2q)).status,403);
+    await manager.screenshot({path:path.join(out,'admin-server-search.png'),fullPage:true});
+    await manager.getByRole('button',{name:'Bỏ tra cứu',exact:true}).click();
     check('Staff cannot decide refunds',(await req(staff,'/admin/refunds/'+refundId2+'/decide','POST',{expectedVersion:0,amount:0,reason:'x'})).status,403);
     check('Guest cannot read QR',(await req(null,'/bookings/'+id+'/deposit/qr-payload')).status,401);
     check('User cannot access admin',(await req(user,'/admin/payments')).status,403);
