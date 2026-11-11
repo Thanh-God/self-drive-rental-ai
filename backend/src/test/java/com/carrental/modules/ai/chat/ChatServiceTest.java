@@ -359,6 +359,31 @@ class ChatServiceTest {
         assertFalse(sent.toString().contains("200.000"), sent.toString());
     }
 
+    /** R5 / D4: a backend failure after the model replied gives the question back; a finished answer counts. */
+    @Test
+    void aBackendFailureAfterTheModelRepliedDoesNotUseTheAllowance() throws Exception {
+        var quota = new com.carrental.modules.ai.AiDailyQuota(1, "10008888", true, java.time.Clock.systemUTC());
+        var search = org.mockito.Mockito.mock(ChatVehicleSearch.class);
+        org.mockito.Mockito.when(search.hints(org.mockito.ArgumentMatchers.anyString())).thenReturn(QwenChatModel.SearchHints.NONE);
+        org.mockito.Mockito.when(search.run(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+            .thenThrow(new IllegalStateException("recommendation down"))
+            .thenReturn(new ChatVehicleSearch.Result("ASK_MISSING", "Bạn nhận xe ngày nào?", null, List.of("pickupDate"), List.of()));
+        var beans = new StaticListableBeanFactory();
+        beans.addBean("qwenChat", model);
+        var withSearch = new ChatService(KB, new KnowledgeRetriever(KB), new ChatPromptBuilder(KB),
+            beans.getBeanProvider(QwenChatModel.class), quota, search);
+        var renter = new com.carrental.security.Actor("u1", "USER", "Renter");
+        model("ASK_MISSING", "Bạn nhận xe ngày nào?");
+        assertThrows(IllegalStateException.class, () -> withSearch.answer(renter, "Tìm xe 4 người", List.of(), null,
+            AiRequestDeadline.start(AiRequestDeadline.Operation.CHAT)));
+        assertEquals(1, requests.size(), "the model did answer");
+        assertEquals(1, quota.status(renter).remaining(), "but the failed turn is not counted");
+        var ok = withSearch.answer(renter, "Tìm xe 4 người", List.of(), null, AiRequestDeadline.start(AiRequestDeadline.Operation.CHAT));
+        assertEquals("ASK_MISSING", ok.intent());
+        assertEquals(0, quota.status(renter).remaining(), "a finished answer counts");
+    }
+
     /** R1 / D1: trial policies always open with the fixed notice (REVIEW #1, B5). */
     @Test
     void trialPoliciesAlwaysCarryTheNotice() throws Exception {

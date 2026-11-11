@@ -151,4 +151,34 @@ class AiDailyQuotaTest {
         assertTrue(refused.getMessage().endsWith("hotline 19001234."), refused.getMessage());
         assertThrows(IllegalArgumentException.class, () -> new AiDailyQuota(-1, "1", true, Clock.systemUTC()));
     }
+
+    /** R5 (REVIEW #15): what the UI shows as remaining also leaves out questions still being answered. */
+    @Test
+    void statusRemainingExcludesQuestionsInFlight() {
+        var quota = new AiDailyQuota(3, "10008888", true, new MovableClock("2026-11-11T03:00:00Z"));
+        ask(quota, user);
+        var held = quota.reserve(user);
+        assertEquals(1, quota.status(user).used());
+        assertEquals(1, quota.status(user).remaining(), "3 - 1 answered - 1 in flight");
+        held.close();
+        assertEquals(2, quota.status(user).remaining(), "a released question is available again");
+    }
+
+    /** R5: entries of earlier days are dropped once the Vietnam day changes, unless a question is still in flight. */
+    @Test
+    void earlierDaysAreForgottenWhenANewDayStarts() {
+        var clock = new MovableClock("2026-11-11T03:00:00Z");
+        var quota = new AiDailyQuota(6, "10008888", true, clock);
+        var third = new Actor("u3", "USER", "Third");
+        ask(quota, user);
+        ask(quota, other);
+        var slow = quota.reserve(third);
+        assertEquals(3, quota.trackedUsers());
+        clock.now.set(Instant.parse("2026-11-11T17:00:01Z")); // 00:00:01 on 12/11 in Vietnam
+        ask(quota, user);
+        assertEquals(2, quota.trackedUsers(), "other is forgotten; third still has a question in flight");
+        slow.commit(); // finishing yesterday's question does not count today
+        assertEquals(6, quota.status(third).remaining());
+        assertEquals(5, quota.status(user).remaining());
+    }
 }

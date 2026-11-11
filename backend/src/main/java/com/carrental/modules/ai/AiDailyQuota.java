@@ -24,6 +24,8 @@ public class AiDailyQuota {
     private final boolean hotlineSample;
     private final Clock clock;
     private final ConcurrentHashMap<String, Usage> usage = new ConcurrentHashMap<>();
+    /** Last Vietnam day on which entries of earlier days were removed. */
+    private LocalDate cleanedFor;
 
     private static final class Usage {
         LocalDate day;
@@ -68,14 +70,27 @@ public class AiDailyQuota {
         return u;
     }
 
+    /** Today's count. {@code remaining} also excludes questions still being answered (R5, REVIEW #15). */
     public Status status(Actor actor) {
         LocalDate day = today();
         Usage u = usage.get(actor.id());
-        int used;
+        int used, inFlight;
         synchronized (this) {
-            used = u == null || !day.equals(u.day) ? 0 : u.used;
+            boolean today = u != null && day.equals(u.day);
+            used = today ? u.used : 0;
+            inFlight = today ? u.reserved : 0;
         }
-        return new Status(limit, used, Math.max(0, limit - used), resetAt(day), hotline, hotlineSample);
+        return new Status(limit, used, Math.max(0, limit - used - inFlight), resetAt(day), hotline, hotlineSample);
+    }
+
+    /** Number of users with an entry kept in memory (for tests). */
+    int trackedUsers() { return usage.size(); }
+
+    /** Once per Vietnam day, forget users whose entry belongs to an earlier day and has nothing in flight. */
+    private void forgetEarlierDays(LocalDate day) {
+        if (day.equals(cleanedFor)) return;
+        usage.entrySet().removeIf(e -> !day.equals(e.getValue().day) && e.getValue().reserved == 0);
+        cleanedFor = day;
     }
 
     /**
@@ -85,6 +100,7 @@ public class AiDailyQuota {
     public Reservation reserve(Actor actor) {
         LocalDate day = today();
         synchronized (this) {
+            forgetEarlierDays(day);
             Usage u = current(actor.id(), day);
             if (u.used + u.reserved >= limit) {
                 throw new AiQuotaExceededException(new Status(limit, u.used, 0, resetAt(day), hotline, hotlineSample));

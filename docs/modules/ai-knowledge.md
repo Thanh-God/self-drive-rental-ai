@@ -15,7 +15,7 @@ Chỉ mục `APPROVED` được nạp; mục `DRAFT` bị bỏ qua. Trạng thá
 
 A. Giới thiệu và cách dùng trợ lý · B. Đặt xe và giá · C. Giấy phép lái xe · D. Nhận và trả xe · E. Hủy đơn · F. Sau chuyến đi · G. Ngoài phạm vi · H. Chính sách bổ sung.
 
-Các mục `experimental` (cọc giữ chỗ, chính sách trả xe, hoàn tiền) mô tả chính sách đang thử nghiệm, chỉ áp dụng khi cấu hình tương ứng được bật. Nhóm H là chính sách mô tả; hệ thống chưa tự kiểm tra hoặc tính tiền các nội dung này. Giá, phí tuyến và danh sách chi nhánh không được ghi cứng trong kho; trợ lý lấy từ backend tại thời điểm hỏi.
+Các mục `experimental` (cọc giữ chỗ, chính sách trả xe, hoàn tiền) mô tả chính sách đang thử nghiệm, chỉ áp dụng khi cấu hình tương ứng được bật. Nhóm H là chính sách mô tả; hệ thống chưa tự kiểm tra hoặc tính tiền các nội dung này. Giá, phí tuyến và danh sách chi nhánh không được ghi cứng trong kho. Câu hỏi đáp không nêu các con số này; chỉ thẻ xe ở lượt tìm xe có tổng tiền, do backend tính tại thời điểm hỏi.
 
 ## Sửa kho
 

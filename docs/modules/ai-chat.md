@@ -11,7 +11,7 @@ POST `/api/v1/ai/chat` chỉ dành cho USER đã đăng nhập (chưa đăng nh�
 
 `criteria` (tùy chọn) là tiêu chí tìm xe mà phản hồi trước trả về, trình duyệt gửi lại nguyên dạng: `{pickupDate, returnDate, pickupBranchId, returnBranchId, passengers, budgetVndTotal, transmission}`. Backend kiểm lại từng giá trị và bỏ giá trị không hợp lệ hoặc chi nhánh không còn hoạt động.
 
-`message` 1–1000 ký tự. `messages` là lịch sử do trình duyệt giữ, tối đa 20 lượt, `role` là `user` hoặc `assistant`, mỗi lượt tối đa 1000 ký tự. Backend chỉ gửi cho model 6 lượt gần nhất trong 2000 ký tự; không lưu hội thoại. Câu hỏi có email, số điện thoại hoặc số giấy tờ bị từ chối 400 trước khi gọi model; lượt lịch sử có các dữ liệu này bị bỏ.
+`message` 1–1000 ký tự. `messages` là lịch sử do trình duyệt giữ, tối đa 20 lượt, `role` là `user` hoặc `assistant`, mỗi lượt tối đa 1000 ký tự. Backend chỉ gửi cho model 6 lượt gần nhất trong 2000 ký tự; không lưu hội thoại. Câu hỏi có email, số điện thoại (kể cả viết cách bằng khoảng trắng, dấu chấm, gạch hoặc +84) hoặc chuỗi số dài như số giấy tờ bị từ chối 400 trước khi gọi model; lượt lịch sử có các dữ liệu này bị bỏ. Đây là nhận diện các dạng phổ biến, không phải bộ phát hiện mọi dữ liệu cá nhân; khách vẫn được nhắc không nhập thông tin riêng tư.
 
 ## Phản hồi
 
@@ -41,4 +41,4 @@ Model chỉ soạn nháp; backend quyết định nội dung trả về:
 
 ## Lỗi và hạn mức
 
-Mỗi câu model đã trả lời trừ một lượt trong [hạn mức hằng ngày](ai-assistant.md#hạn-mức-câu-hỏi-ai-mỗi-ngày). Không trừ lượt: 400, 401, 403, 503 (tắt hoặc lỗi provider), 429 khi trợ lý đang bận (không có `code`), hết thời gian chờ, và câu backend tự trả lời không cần model. Hết lượt trả 429 `code: "AI_DAILY_LIMIT"`, không gọi model.
+Theo [hạn mức hằng ngày](ai-assistant.md#hạn-mức-câu-hỏi-ai-mỗi-ngày), một câu chỉ trừ lượt khi backend đã có câu trả lời hoàn chỉnh cho nó (model trả lời, hậu kiểm và tìm xe xong). Lỗi phía backend sau khi model trả lời (ví dụ bước tìm xe lỗi) hoàn lại lượt. Khách tự đóng, tải lại hoặc đăng xuất khi backend vẫn hoàn tất câu trả lời thì lượt vẫn bị trừ. Không trừ lượt: 400, 401, 403, 503 (tắt hoặc lỗi provider), 429 khi trợ lý đang bận (không có `code`), hết thời gian chờ, và câu backend tự trả lời không cần model. Hết lượt trả 429 `code: "AI_DAILY_LIMIT"`, không gọi model. Số lượt còn lại (`quota.remaining`) đã trừ cả câu đang được trả lời; hạn mức giữ trong bộ nhớ của một backend nên khởi động lại thì đếm lại, và nhiều backend sẽ đếm riêng.

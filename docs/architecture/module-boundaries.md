@@ -20,6 +20,9 @@ Package gốc: `com.carrental`. Một module là một phần mã nghiệp vụ,
 | `review` | Đánh giá và trạng thái kiểm duyệt | `booking` kiểm tra chủ đơn, xe và điều kiện hoàn tất |
 | `ai/recommendation` | Criteria, hard-filter, điểm và giải thích | `vehicle`, `booking`, Qwen adapter cục bộ |
 | `ai/itinerary` | Kế hoạch cá nhân và các mục lịch trình | `location`, Qwen adapter cục bộ, Map adapter |
+| `ai/knowledge` | Kho kiến thức đã duyệt (file trong resources) và chọn mục liên quan | Không phụ thuộc module nghiệp vụ |
+| `ai/chat` | Hỏi đáp và tìm xe trong trò chuyện; hậu kiểm câu trả lời; không lưu hội thoại | `ai/knowledge`, `ai/recommendation`, `ai/parser`, danh mục chi nhánh của `booking`, Qwen adapter cục bộ |
+| `ai` (hạn mức) | Số câu hỏi AI mỗi ngày theo người dùng, giữ trong bộ nhớ một backend | Không lưu database; khởi động lại thì đếm lại |
 
 `security`, `config`, `exception` là hạ tầng chung. Kiểm tra chủ sở hữu tài nguyên vẫn nằm ở service nghiệp vụ. Không thêm repository/entity cho recommendation nếu chưa có yêu cầu lưu lịch sử.
 

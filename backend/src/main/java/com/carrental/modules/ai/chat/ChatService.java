@@ -151,14 +151,21 @@ public class ChatService {
         if (engine == null) throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa bật trợ lý hỏi đáp.");
         boolean searching = actor != null && search != null;
         var hints = searching ? search.hints(message) : QwenChatModel.SearchHints.NONE;
-        QwenChatModel.Reply drafted;
-        if (actor == null) drafted = engine.ask(prompt, deadline, hints);
-        else try (var held = quota.reserve(actor)) {
-            drafted = engine.ask(prompt, deadline, hints);
+        if (actor == null) return finish(engine.ask(prompt, deadline, hints), prompt, message, injection, guards, null, session);
+        // D4: the question counts once the backend has a complete answer for it. A backend failure after the model
+        // replied (checks, vehicle search) gives the question back; the customer leaving afterwards does not.
+        try (var held = quota.reserve(actor)) {
+            var drafted = engine.ask(prompt, deadline, hints);
+            var answer = finish(drafted, prompt, message, injection, guards, actor, session);
             held.commit();
+            return answer;
         }
+    }
+
+    private Answer finish(QwenChatModel.Reply drafted, ChatPromptBuilder.Prompt prompt, String message, boolean injection,
+                          List<Guard> guards, Actor actor, ChatVehicleSearch.Session session) {
         var checked = check(drafted, prompt, message, injection, guards);
-        if (!searching || !Set.of("SEARCH_VEHICLES", "ASK_MISSING").contains(checked.intent())) return checked;
+        if (actor == null || search == null || !Set.of("SEARCH_VEHICLES", "ASK_MISSING").contains(checked.intent())) return checked;
         // One model call per message: the same reply carries the criteria draft; the backend does the search.
         var found = search.run(actor, message, drafted.criteria(), session);
         return new Answer(found.intent(), found.reply(), List.of(), knowledge.version(), checked.guards(),
