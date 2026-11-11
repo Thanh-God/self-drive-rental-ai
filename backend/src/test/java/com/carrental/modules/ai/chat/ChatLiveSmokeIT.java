@@ -98,6 +98,8 @@ class ChatLiveSmokeIT {
                 assertEquals(kb.fallbackReply(), a.reply(), "an ANSWER without citation must be the approved fallback");
             assertFalse(a.reply().toLowerCase(Locale.ROOT).contains("system prompt"), a.reply());
         }
+        // C2.3-F1: a rental question the knowledge does not cover gets the approved "no information" reply.
+        assertEquals(kb.fallbackReply(), answers.get("not-in-knowledge").reply());
         var injection = answers.get("injection");
         assertTrue("OUT_OF_SCOPE".equals(injection.intent()) || injection.citations().contains("K-B07"),
             "injection: either refused or a grounded answer to the real question, got " + injection);

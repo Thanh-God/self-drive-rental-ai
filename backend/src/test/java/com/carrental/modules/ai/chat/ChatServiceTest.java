@@ -141,6 +141,38 @@ class ChatServiceTest {
         assertEquals(List.of(), own.guards());
     }
 
+    /** C2.3-F1: a rental question the knowledge does not cover is answered "no information", not "off-topic". */
+    @Test
+    void outOfScopeForAnInDomainQuestionBecomesTheApprovedFallback() throws Exception {
+        model("OUT_OF_SCOPE", answer("K-G01"));
+        var key = ask("Tôi làm mất chìa khóa xe thì phải làm sao?");
+        assertEquals("ANSWER", key.intent());
+        assertEquals(KB.fallbackReply(), key.reply());
+        assertEquals(List.of(), key.citations());
+        assertEquals(List.of(Guard.OUT_OF_SCOPE_IN_DOMAIN), key.guards());
+
+        model("OUT_OF_SCOPE", "Câu này mình không trả lời được.");
+        var free = ask("Đi thuê xe ở Đà Lạt có lạnh không?");
+        assertEquals(KB.fallbackReply(), free.reply());
+        assertEquals(List.of(Guard.OUT_OF_SCOPE_IN_DOMAIN), free.guards());
+
+        model("OUT_OF_SCOPE", answer("K-G02"));
+        var onBehalf = ask("Hủy đơn thuê xe của tôi giúp nhé.");
+        assertEquals("OUT_OF_SCOPE", onBehalf.intent(), "the approved on-behalf refusal stays");
+        assertEquals(answer("K-G02"), onBehalf.reply());
+
+        model("OUT_OF_SCOPE", answer("K-G01"));
+        for (String off : com.carrental.modules.ai.knowledge.KnowledgeRetrieverTestSupport.offTopic()) {
+            if (ChatService.looksLikeInjection(off)) continue;
+            assertFalse(ChatService.inDomain(off), off);
+            var a = ask(off);
+            assertEquals("OUT_OF_SCOPE", a.intent(), off);
+            assertEquals(answer("K-G01"), a.reply(), off);
+        }
+        for (String domain : List.of("Mất GPLX thì sao?", "Xe bị xịt lốp", "Tiền cọc trả lại khi nào?", "KDrive có mấy chi nhánh?"))
+            assertTrue(ChatService.inDomain(domain), domain);
+    }
+
     @Test
     void inventedMoneyAmountsAreWithdrawn() throws Exception {
         model("ANSWER", "Phí tuyến Đà Nẵng – Hà Nội là 1.500.000đ, hiển thị trong báo giá.", "K-B03");

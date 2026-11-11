@@ -1,7 +1,10 @@
 package com.carrental.modules.ai.chat;
 
 import com.carrental.exception.DomainException;
+import com.carrental.modules.ai.AiDailyQuota;
 import com.carrental.modules.ai.AiRequestDeadline;
+import com.carrental.security.Actor;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.carrental.modules.ai.knowledge.KnowledgeBase;
 import com.carrental.modules.ai.knowledge.KnowledgeRetriever;
 import java.text.Normalizer;
@@ -28,6 +31,8 @@ public class ChatService {
         UNGROUNDED_ANSWER,
         /** OUT_OF_SCOPE with free text, replaced by the approved refusal. */
         REFUSAL_REWORDED,
+        /** OUT_OF_SCOPE for a rental-related question the knowledge does not cover: the approved fallback instead. */
+        OUT_OF_SCOPE_IN_DOMAIN,
         /** A money amount not present in the cited passages or the question, withdrawn. */
         UNSUPPORTED_AMOUNT,
         /** Injection pattern and the reply had no valid citation, replaced by the approved refusal. */
@@ -44,6 +49,10 @@ public class ChatService {
         + "|\\b(?:tiet lo|in ra|hien thi)\\b.{0,30}\\b(?:prompt|huong dan|quy tac|chi dan)\\b|(?:^|\\s)system\\s*:");
     private static final Pattern AMOUNT = Pattern.compile(
         "\\d[\\d.,]*\\s*(?:%|d\\b|vnd\\b|dong\\b|nghin\\b|ngan\\b|k\\b|trieu\\b|tr\\b)");
+    /** Folded words that place a question in the KDrive rental domain. */
+    private static final Pattern DOMAIN = Pattern.compile(
+        "\\b(?:xe|thue|kdrive|chuyen di|don thue|chi nhanh|gplx|bang lai|giay phep|coc|hoan tien|huy don|nhan xe|tra xe|"
+        + "bao hiem|xang|nhien lieu|km|phat nguoi|hop dong|hoa don|su co|tai nan|chia khoa|lai xe|hotline)\\b");
     private static final String ASK_WITHOUT_AMOUNT =
         "Bạn cho mình biết ngày nhận, ngày trả, điểm nhận/trả, số người và tổng ngân sách để mình gợi ý xe nhé. "
         + "Giá chính xác hiển thị ở bước báo giá.";
@@ -52,16 +61,38 @@ public class ChatService {
     private final KnowledgeRetriever retriever;
     private final ChatPromptBuilder builder;
     private final ObjectProvider<QwenChatModel> model;
+    private final AiDailyQuota quota;
 
+    @Autowired
     public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
-                       ObjectProvider<QwenChatModel> model) {
+                       ObjectProvider<QwenChatModel> model, AiDailyQuota quota) {
         this.knowledge = knowledge;
         this.retriever = retriever;
         this.builder = builder;
         this.model = model;
+        this.quota = quota;
+    }
+
+    /** No daily limit: unit tests and offline tools. */
+    public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
+                       ObjectProvider<QwenChatModel> model) {
+        this(knowledge, retriever, builder, model, AiDailyQuota.unlimited());
+    }
+
+    /**
+     * A renter's question. Refused input (400), a disabled assistant (503), a busy provider (429), provider
+     * errors and timeouts do not use the daily allowance; an answer given without the model does not either.
+     */
+    public Answer answer(Actor actor, String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline) {
+        actor.require("USER");
+        return answer(message, history, deadline, actor);
     }
 
     public Answer answer(String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline) {
+        return answer(message, history, deadline, null);
+    }
+
+    private Answer answer(String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline, Actor actor) {
         var passages = retriever.retrieve(message);
         var prompt = builder.build(message, history, passages); // 400 for blank, oversized or sensitive input
         boolean injection = looksLikeInjection(message);
@@ -72,7 +103,12 @@ public class ChatService {
         }
         var engine = model.getIfAvailable();
         if (engine == null) throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa bật trợ lý hỏi đáp.");
-        var drafted = engine.ask(prompt, deadline);
+        QwenChatModel.Reply drafted;
+        if (actor == null) drafted = engine.ask(prompt, deadline);
+        else try (var held = quota.reserve(actor)) {
+            drafted = engine.ask(prompt, deadline);
+            held.commit();
+        }
         return check(drafted, prompt, message, injection, guards);
     }
 
@@ -92,11 +128,18 @@ public class ChatService {
         }
         switch (intent) {
             case "OUT_OF_SCOPE" -> {
-                if (!isApprovedRefusal(reply)) {
+                String approved = approvedRefusal(reply);
+                boolean general = approved == null || approved.equals(refusal("K-G01"));
+                if (general && inDomain(message)) {
+                    // A rental question the knowledge does not cover is not off-topic: say we have no information.
+                    guards.add(Guard.OUT_OF_SCOPE_IN_DOMAIN);
+                    return done("ANSWER", knowledge.fallbackReply(), List.of(), guards);
+                }
+                if (approved == null) {
                     guards.add(Guard.REFUSAL_REWORDED);
-                    reply = refusal("K-G01");
-                } else reply = approvedRefusal(reply);
-                return done(intent, reply, List.of(), guards);
+                    approved = refusal("K-G01");
+                }
+                return done(intent, approved, List.of(), guards);
             }
             case "ANSWER" -> {
                 if (citations.isEmpty()) {
@@ -144,6 +187,10 @@ public class ChatService {
             return reply.replace(knowledge.hotline(), knowledge.hotline() + " (số mẫu dùng cho bản demo)");
         }
         return reply;
+    }
+
+    static boolean inDomain(String text) {
+        return DOMAIN.matcher(fold(text)).find();
     }
 
     static boolean looksLikeInjection(String text) {

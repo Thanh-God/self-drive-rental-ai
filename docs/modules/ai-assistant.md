@@ -20,6 +20,8 @@ API gợi ý xe mặc định tắt bằng `AI_RECOMMENDATION_ENABLED`. Phân t�
 
 
 POST `/api/v1/ai/criteria/parse` chỉ USER, body `{ "text": "..." }` tối đa1000ký tự. Backend từ chối một số mẫu email/số điện thoại/số giấy tờ phổ biến trước khi suy luận; đây không phải bộ phát hiện mọi dữ liệu cá nhân. Không gửi userID/token/hồ sơ hoặc lưu hội thoại cho model. Chỉ đối chiếu tên với điểm nhận/trả ACTIVE qua API nội bộ booking; tên không rõ hoặc nhiều kết quả phải chọn lại. Ngày phải xuất hiện đầy đủ trong câu nhập ở dạng YYYY-MM-DD hoặc ngày/tháng/năm; ngày thiếu năm không tự mặc định. Khi câu có đúng hai ngày đầy đủ theo thứ tự nhận rồi trả và không có từ lưỡng lự như “chưa”, “hoặc”, “khoảng”, backend xác nhận hai ngày đó dù model đánh dấu chưa rõ. Ưu tiên hộp số chỉ được điền khi câu nhập nêu rõ, không được biến dữ liệu thiếu thành mặc định tự động. READY_FOR_REVIEW trả bản nháp cần kiểm tra, NEEDS_CLARIFICATION yêu cầu bổ sung, OUT_OF_SCOPE không tạo bản nháp. Phản hồi có mâu thuẫn không được dùng để điền. Không hỗ trợ hội thoại nhiều lượt hoặc tự xác nhận nghiệp vụ.
+API hỏi đáp về dịch vụ KDrive (chưa nối vào chatbox) được mô tả tại [Hỏi đáp Trợ lý KDrive](ai-chat.md).
+
 ## Hạn mức câu hỏi AI mỗi ngày
 
 Mỗi tài khoản USER có 6 câu hỏi AI mỗi ngày theo lịch Việt Nam; lượt mới có từ 00:00 Asia/Ho_Chi_Minh. Một câu chỉ bị tính khi model đã trả lời, kể cả khi câu nằm ngoài phạm vi. Không tính câu bị từ chối trước khi suy luận (rỗng, quá dài, có email/số điện thoại/số giấy tờ), sai vai trò, parser chưa bật, model đang bận, lỗi hoặc hết thời gian chờ. Gợi ý xe bằng biểu mẫu và xem tuyến/hành trình không tính lượt. Lượt dùng được giữ trong bộ nhớ backend nên khởi động lại backend sẽ đếm lại; các câu đang xử lý cùng lúc vẫn không vượt hạn mức.
