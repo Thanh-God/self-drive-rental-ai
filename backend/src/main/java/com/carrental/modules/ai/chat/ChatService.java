@@ -63,6 +63,9 @@ public class ChatService {
     private static final Pattern DOMAIN = Pattern.compile(
         "\\b(?:xe|thue|kdrive|chuyen di|don thue|chi nhanh|gplx|bang lai|giay phep|coc|hoan tien|huy don|nhan xe|tra xe|"
         + "bao hiem|xang|nhien lieu|km|phat nguoi|hop dong|hoa don|su co|tai nan|chia khoa|lai xe|hotline)\\b");
+    /** At most this many approved entries make up one policy answer. */
+    static final int MAX_ANSWER_ENTRIES = 2;
+    static final String EXPERIMENTAL_NOTICE = "Lưu ý: đây là chính sách KDrive đang thử nghiệm.";
     private static final String ASK_WITHOUT_AMOUNT =
         "Bạn cho mình biết ngày nhận, ngày trả, điểm nhận/trả, số người và tổng ngân sách để mình gợi ý xe nhé. "
         + "Giá chính xác hiển thị ở bước báo giá.";
@@ -191,13 +194,9 @@ public class ChatService {
                     guards.add(Guard.UNGROUNDED_ANSWER);
                     return done(intent, knowledge.fallbackReply(), List.of(), guards);
                 }
-                var cited = new StringBuilder(message).append('\n');
-                for (String id : citations) cited.append(knowledge.find(id).orElseThrow().answer()).append('\n');
-                if (!amountsSupported(reply, cited.toString())) {
-                    guards.add(Guard.UNSUPPORTED_AMOUNT);
-                    reply = knowledge.find(citations.get(0)).orElseThrow().answer();
-                }
-                return done(intent, labelHotline(reply, guards), List.copyOf(citations), guards);
+                // D1: a policy answer is the approved entry text itself; the model only chose the entry.
+                var used = prompt.passageIds().stream().filter(citations::contains).limit(MAX_ANSWER_ENTRIES).toList();
+                return done(intent, approvedText(used), used, guards);
             }
             default -> { // SEARCH_VEHICLES, ASK_MISSING: no knowledge citation; amounts only from the customer
                 if (!amountsSupported(reply, message)) {
@@ -207,6 +206,16 @@ public class ChatService {
                 return done(intent, labelHotline(reply, guards), List.of(), guards);
             }
         }
+    }
+
+    /** Approved wording of the cited entries, in retrieval order; trial policies open with a fixed notice. */
+    String approvedText(List<String> ids) {
+        var parts = new ArrayList<String>();
+        for (String id : ids) {
+            var entry = knowledge.find(id).orElseThrow();
+            parts.add(entry.experimental() ? EXPERIMENTAL_NOTICE + " " + entry.answer() : entry.answer());
+        }
+        return String.join("\n\n", parts);
     }
 
     private Answer done(String intent, String reply, List<String> citations, List<Guard> guards) {

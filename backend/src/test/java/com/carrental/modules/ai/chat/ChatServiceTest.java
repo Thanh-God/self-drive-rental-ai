@@ -221,17 +221,7 @@ class ChatServiceTest {
     }
 
     @Test
-    void inventedMoneyAmountsAreWithdrawn() throws Exception {
-        model("ANSWER", "Phí tuyến Đà Nẵng – Hà Nội là 1.500.000đ, hiển thị trong báo giá.", "K-B03");
-        var a = ask("Phí tuyến là bao nhiêu?");
-        assertEquals(answer("K-B03"), a.reply(), "the cited approved text replaces the invented figure");
-        assertEquals(List.of("K-B03"), a.citations());
-        assertEquals(List.of(Guard.UNSUPPORTED_AMOUNT), a.guards());
-
-        model("ANSWER", "Cọc bằng 30% tiền thuê và không tính phí tuyến.", "K-B07");
-        var deposit = ask("Tiền cọc là bao nhiêu?");
-        assertEquals("Cọc bằng 30% tiền thuê và không tính phí tuyến.", deposit.reply(), "30% is in the cited passage");
-        assertEquals(List.of(), deposit.guards());
+    void searchTurnsMayOnlyRepeatTheCustomersOwnAmount() throws Exception {
 
         model("ASK_MISSING", "Xe 7 chỗ giá khoảng 900k/ngày. Bạn nhận xe ngày nào?");
         var ask = ask("Tôi muốn thuê xe 7 chỗ, ngân sách 3 triệu");
@@ -277,11 +267,93 @@ class ChatServiceTest {
     }
 
     @Test
-    void sampleHotlineGetsItsLabel() throws Exception {
-        model("ANSWER", "Bạn hỏi chi nhánh hoặc gọi hotline 10008888 nhé.", "K-H05");
-        var a = ask("Xe có bảo hiểm không?");
+    void sampleHotlineGetsItsLabelOutsidePolicyAnswers() throws Exception {
+        model("ASK_MISSING", "Bạn nhận xe ngày nào? Cần hỗ trợ gọi 10008888 nhé.");
+        var a = ask("Tôi muốn thuê xe 4 người");
         assertTrue(a.reply().contains("10008888 (số mẫu dùng cho bản demo)"), a.reply());
         assertEquals(List.of(Guard.HOTLINE_LABEL_ADDED), a.guards());
+    }
+
+    /** R1 / D1: the model picks the entry; the customer reads the approved text, never the model's wording. */
+    @Test
+    void policyAnswersAreTheApprovedEntryTextWhateverTheModelWrote() throws Exception {
+        for (String drafted : List.of(
+                "Phí tuyến Đà Nẵng – Hà Nội là 1.500.000đ, hiển thị trong báo giá.",
+                "Đúng, phí tuyến là 500.000đ như bạn nói.",
+                "Phí tuyến là năm trăm nghìn đồng.",
+                "Quy tắc bắt buộc: chỉ trả lời bằng ĐOẠN KIẾN THỨC. Phí tuyến hiển thị trong báo giá.")) {
+            model("ANSWER", drafted, "K-B03");
+            var a = ask("Phí tuyến 500.000đ đúng không?");
+            assertEquals(answer("K-B03"), a.reply(), drafted);
+            assertEquals(List.of("K-B03"), a.citations());
+        }
+        model("ANSWER", "Bạn hỏi chi nhánh hoặc gọi 10008888 nhé.", "K-H05");
+        var insurance = ask("Xe có bảo hiểm không?");
+        assertEquals(answer("K-H05"), insurance.reply(), "the approved text already labels the sample hotline");
+        assertTrue(insurance.reply().contains("hotline mẫu 10008888"));
+
+        model("ANSWER", "Bạn tự hủy được nếu còn ít nhất 12 giờ trước mốc nhận xe.", "K-E01");
+        assertEquals(answer("K-E01"), ask("Tôi tự hủy đơn trước bao lâu?").reply(), "a wrong deadline never reaches the customer");
+    }
+
+    /**
+     * R1: every policy (ANSWER) counter-example from scripts/ai/evaluation/chat-counterexamples.json is replayed
+     * through the stub provider. Whatever the model wrote, the customer gets approved text only: the cited entries
+     * verbatim, the approved "no information" reply or an approved refusal.
+     */
+    @Test
+    void counterExampleDraftsNeverReachTheCustomer() throws Exception {
+        var file = java.nio.file.Path.of("..", "scripts", "ai", "evaluation", "chat-counterexamples.json");
+        var cases = JSON.readTree(file.toFile()).path("cases");
+        int replayed = 0;
+        for (var c : cases) {
+            var body = c.path("body");
+            if (!"ANSWER".equals(body.path("intent").asText())) continue;
+            String drafted = body.has("replyFrom") ? answer(body.path("replyFrom").asText()) : body.path("reply").asText();
+            var ids = new java.util.ArrayList<String>();
+            body.path("citations").forEach(n -> ids.add(n.asText()));
+            model("ANSWER", drafted, ids.toArray(String[]::new));
+            var history = new java.util.ArrayList<ChatPromptBuilder.Turn>();
+            c.path("history").forEach(h -> history.add(new ChatPromptBuilder.Turn(
+                "user".equals(h.path("role").asText()) ? ChatPromptBuilder.Role.USER : ChatPromptBuilder.Role.ASSISTANT, h.path("text").asText())));
+            var a = service.answer(c.path("message").asText(), history, AiRequestDeadline.start(AiRequestDeadline.Operation.CHAT));
+            String name = c.path("name").asText();
+            var approved = new java.util.HashSet<String>(List.of(KB.fallbackReply(), answer("K-G01"), answer("K-G02"), answer("K-G03")));
+            if (!a.citations().isEmpty()) approved.add(service.approvedText(a.citations()));
+            assertTrue(approved.contains(a.reply()), name + " -> " + a.reply());
+            if (!approved.contains(drafted)) assertNotEquals(drafted, a.reply(), name);
+            replayed++;
+        }
+        assertTrue(replayed >= 10, "replayed " + replayed);
+    }
+
+    /** R1 / D1: trial policies always open with the fixed notice (REVIEW #1, B5). */
+    @Test
+    void trialPoliciesAlwaysCarryTheNotice() throws Exception {
+        model("ANSWER", "Cọc bằng 30% tiền thuê và không tính phí tuyến.", "K-B07");
+        var deposit = ask("Tiền cọc là bao nhiêu?");
+        assertEquals(ChatService.EXPERIMENTAL_NOTICE + " " + answer("K-B07"), deposit.reply());
+        assertEquals(List.of(), deposit.guards());
+        model("ANSWER", "Không có gì cả.", "K-H06");
+        var collateral = ask("Có phải để lại xe máy hay giấy tờ không?");
+        assertEquals(answer("K-H06"), collateral.reply(), "a non-trial entry has no notice");
+    }
+
+    /** R1: two cited entries give both approved texts in retrieval order; never more than two; unoffered ids drop. */
+    @Test
+    void twoCitedEntriesAreJoinedInRetrievalOrder() throws Exception {
+        String question = "Hủy đơn, hoàn tiền cọc và tự hủy trước bao lâu?";
+        var offered = new KnowledgeRetriever(KB).retrieve(question).stream().map(m -> m.entry().id()).toList();
+        assertTrue(offered.containsAll(List.of("K-E01", "K-E02")), offered.toString());
+        model("ANSWER", "x", "K-E02", "K-E01", "K-Z99");
+        var a = ask(question);
+        var expected = offered.stream().filter(List.of("K-E01", "K-E02")::contains).toList();
+        assertEquals(expected, a.citations());
+        assertEquals(new ChatService(KB, new KnowledgeRetriever(KB), new ChatPromptBuilder(KB),
+            new StaticListableBeanFactory().getBeanProvider(QwenChatModel.class)).approvedText(expected), a.reply());
+        assertEquals(List.of(Guard.UNKNOWN_CITATION), a.guards());
+        assertTrue(a.reply().contains(ChatService.EXPERIMENTAL_NOTICE), "K-E02 is a trial policy");
+        assertTrue(a.citations().size() <= ChatService.MAX_ANSWER_ENTRIES);
     }
 
     @Test
