@@ -80,7 +80,7 @@ class ScheduleProtectionHttpTest {
     }
     BookingService.View current(String id) { return bookings.view(bookings.require(user, id)); }
     void action(String id, String next, boolean maintenance) {
-        rental.apply(staff, id, new BookingService.Action(next, current(id).version(), "Synthetic test", "Synthetic condition", true, maintenance));
+        rental.apply(staff, id, TestActions.forNext(next, current(id).version(), "Synthetic test", "Synthetic condition", true, maintenance));
     }
     String nextBooking(boolean deposit) {
         ReflectionTestUtils.setField(bookings, "depositEnabled", deposit);

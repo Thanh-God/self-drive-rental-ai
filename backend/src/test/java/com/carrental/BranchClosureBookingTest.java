@@ -122,8 +122,10 @@ class BranchClosureBookingTest {
         assertTrue(response.getBody().toString().contains("Chi nhánh không hoạt động"), response.getBody().toString());
     }
     private ResponseEntity<Map> action(String id, String next, long version, String token, boolean licenseChecked) {
-        return request("/bookings/" + id + "/actions", Map.of("next", next, "version", version,
-            "condition", "Fixture vehicle condition", "reason", "Fixture workflow", "licenseChecked", licenseChecked), token);
+        var body = new java.util.HashMap<String, Object>(Map.of("next", next, "version", version,
+            "condition", "Fixture vehicle condition", "reason", "Fixture workflow", "licenseChecked", licenseChecked));
+        body.putAll(TestActions.readings(next));
+        return request("/bookings/" + id + "/actions", body, token);
     }
 
     @Test void closedPickupOrReturnRejectQuoteCreateAndStaleQuoteWithoutWrites() {

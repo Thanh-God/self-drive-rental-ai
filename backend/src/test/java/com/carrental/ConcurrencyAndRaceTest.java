@@ -259,8 +259,7 @@ class ConcurrencyAndRaceTest {
                 ready.countDown();
                 try {
                     start.await();
-                    rentalWorkflow.apply(staffHn, b1.id(), new BookingService.Action(
-                        "IN_PROGRESS", b1.version() + 1, null, "Bàn giao xe thực tế", true, false
+                    rentalWorkflow.apply(staffHn, b1.id(), TestActions.handover(b1.version() + 1, null, "Bàn giao xe thực tế", true, false
                     ));
                     successCount.incrementAndGet();
                 } catch (DomainException e) {
@@ -400,7 +399,7 @@ class ConcurrencyAndRaceTest {
 
         // Giao xe b1
         clock.value = b1Start.plus(Duration.ofHours(1));
-        rentalWorkflow.apply(staffHn, b1.id(), new BookingService.Action("IN_PROGRESS", b1.version() + 1, null, "Giao xe 1", true, false));
+        rentalWorkflow.apply(staffHn, b1.id(), TestActions.handover(b1.version() + 1, null, "Giao xe 1", true, false));
 
         CountDownLatch readerReady = new CountDownLatch(1);
         CountDownLatch writerCommitted = new CountDownLatch(1);
@@ -432,7 +431,7 @@ class ConcurrencyAndRaceTest {
 
                     // Reader tiếp tục giao xe b2 trong cùng transaction:
                     // BookingService.change khoá xe (select ... for update) phát hiện xe đã bị Writer chuyển sang MAINTENANCE -> 409 Conflict
-                    rentalWorkflow.apply(staffHn, b2.id(), new BookingService.Action("IN_PROGRESS", b2.version() + 1, null, "Giao xe 2", true, false));
+                    rentalWorkflow.apply(staffHn, b2.id(), TestActions.handover(b2.version() + 1, null, "Giao xe 2", true, false));
                     return null;
                 });
             } catch (DomainException de) {
@@ -449,7 +448,7 @@ class ConcurrencyAndRaceTest {
                     throw new RuntimeException("Reader ready latch timed out");
                 }
                 clock.value = b1End.minus(Duration.ofHours(1));
-                rentalWorkflow.apply(staffHn, b1.id(), new BookingService.Action("RETURNED", b1.version() + 2, null, "Xe bị hỏng cần bảo dưỡng", false, true));
+                rentalWorkflow.apply(staffHn, b1.id(), TestActions.returned(b1.version() + 2, null, "Xe bị hỏng cần bảo dưỡng", false, true));
                 writerCommitted.countDown();
             } catch (Throwable t) {
                 writerError.set(t);

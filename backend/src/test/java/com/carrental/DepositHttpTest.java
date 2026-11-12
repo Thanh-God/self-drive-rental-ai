@@ -123,7 +123,7 @@ class DepositHttpTest {
     }
     @Test void handedOverVehicleCannotBeCancelledAsNoShow(){
         var b=create();approve(b.id(),b.version());var p=payments.start(user,b.id(),"127.0.0.1");receipt(p.transactionId(),390000,"10014");var confirmed=bookings.list(user).getFirst();
-        clock.value=Instant.parse("2026-10-26T03:00:00Z");rental.apply(staff,b.id(),new BookingService.Action("IN_PROGRESS",confirmed.version(),null,"Synthetic handover",true,false));
+        clock.value=Instant.parse("2026-10-26T03:00:00Z");rental.apply(staff,b.id(),TestActions.handover(confirmed.version(),null,"Synthetic handover",true,false));
         var active=bookings.list(user).getFirst();clock.value=Instant.parse("2026-10-27T03:00:00Z");
         assertThrows(RuntimeException.class,()->workflow.noShow(staff,b.id(),active.version(),true,true,"Must refuse"));assertEquals("IN_PROGRESS",bookings.list(user).getFirst().status());assertTrue(repo.refundForPayment(p.transactionId()).isEmpty());
     }

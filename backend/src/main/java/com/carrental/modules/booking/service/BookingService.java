@@ -206,7 +206,7 @@ public class BookingService {
         var now = clock.instant();
         result.put("booking", view(b, scheduleWarnings(a, List.of(b), now).get(b.id), qrSummaries(List.of(b), now).get(b.id), now, a.is("STAFF") || a.is("ADMIN")));
         result.put("history", jdbc.queryForList("select previous_status,next_status,occurred_at,reason from booking_status_history where booking_id=? order by occurred_at", id));
-        result.put("records", jdbc.queryForList("select kind,occurred_at,condition_note,maintenance from vehicle_handover_records where booking_id=? order by occurred_at", id));
+        result.put("records", jdbc.queryForList("select kind,occurred_at,condition_note,maintenance,fuel_level,odometer_km from vehicle_handover_records where booking_id=? order by occurred_at", id));
         if (a.is("STAFF")) result.put("license", licenses.forBooking(b.userId));
         return result;
     }
@@ -319,8 +319,13 @@ public class BookingService {
         return view(b);
     }
 
+    /** fuelLevel (0–8 on an 8-step gauge) and odometerKm are the L5 handover/return readings; null where not applicable. */
     public record Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind,
-                         LocalDate returnPreviewDate, Long expectedLateAmount) {
+                         LocalDate returnPreviewDate, Long expectedLateAmount, Integer fuelLevel, Long odometerKm) {
+        public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind,
+                      LocalDate returnPreviewDate, Long expectedLateAmount) {
+            this(next, version, reason, condition, licenseChecked, maintenance, cancellationKind, returnPreviewDate, expectedLateAmount, null, null);
+        }
         public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind) {
             this(next, version, reason, condition, licenseChecked, maintenance, cancellationKind, null, null);
         }
@@ -407,6 +412,7 @@ public class BookingService {
                 if (rentalBalances.missing(b))
                     throw DomainException.bad("Cần ghi nhận phần tiền thuê còn lại (" + rentalBalances.due(b) + " đ) trước khi giao xe.");
                 if (!action.licenseChecked()) throw DomainException.bad("Staff phải kiểm tra GPLX thực tế trước giao.");
+                readings(action, true);
                 reason(action.condition());
                 licenses.verify(b.userId, a, vehicle.transmission, vehicle.seats, b.endAt);
             }
@@ -414,6 +420,12 @@ public class BookingService {
                 branches.requireStaff(a, b.returnBranchId);
                 if (!"IN_PROGRESS".equals(old)) throw DomainException.conflict("Đơn chưa ở trạng thái đang thuê.");
                 reason(action.condition());
+                var handoverReading = handoverReading(b.id);
+                if (handoverReading != null) {
+                    readings(action, true);
+                    if (action.odometerKm() < handoverReading)
+                        throw DomainException.bad("Số km lúc trả (" + action.odometerKm() + ") nhỏ hơn lúc giao (" + handoverReading + "). Kiểm tra lại đồng hồ.");
+                } else readings(action, false);
                 if (b.returnPolicyVersion != null) {
                     var assessment = assessReturn(b);
                     if (!assessment.actualReturnDate().equals(action.returnPreviewDate()) || action.expectedLateAmount() == null
@@ -460,6 +472,24 @@ public class BookingService {
         jdbc.update("update bookings set version=version+1 where id=?",id);
         entityManager.refresh(b);
         return view(b);
+    }
+
+    static final long MAX_ODOMETER_KM = 10_000_000L;
+
+    /** L5 (Q3): readings only, no fee. Required when the caller says so; otherwise both absent or both valid. */
+    private static void readings(Action action, boolean required) {
+        boolean none = action.fuelLevel() == null && action.odometerKm() == null;
+        if (none && !required) return;
+        if (action.fuelLevel() == null || action.odometerKm() == null)
+            throw DomainException.bad("Cần ghi mức nhiên liệu (0–8 vạch) và số km trên đồng hồ.");
+        if (action.fuelLevel() < 0 || action.fuelLevel() > 8) throw DomainException.bad("Mức nhiên liệu phải từ 0 đến 8 vạch.");
+        if (action.odometerKm() < 0 || action.odometerKm() > MAX_ODOMETER_KM) throw DomainException.bad("Số km phải là số nguyên không âm hợp lệ.");
+    }
+
+    /** Odometer recorded at handover, or null when the handover predates L5 (no readings). */
+    private Long handoverReading(String bookingId) {
+        var rows = jdbc.queryForList("select odometer_km from vehicle_handover_records where booking_id=? and kind='HANDOVER'", Long.class, bookingId);
+        return rows.isEmpty() ? null : rows.get(0);
     }
 
     private long appliedDeposit(String bookingId) {

@@ -519,7 +519,7 @@ class QrDemoHttpTest {
     @Test void wrongPickupAndNoShowAfterDeliveryAreRejected()throws Exception {
         var b=approve();var wrong=new Actor("demo-staff-hn","STAFF","Other");assertEquals(403,post(wrong,"/bookings/"+b.id()+"/deposit/verify",input(b.id(),"A",390000,clock.instant())).getStatus());
         verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-26T03:00:00Z");
-        rental.apply(staff,b.id(),new BookingService.Action("IN_PROGRESS",current(b.id()).version(),null,"Fixture handover",true,false));
+        rental.apply(staff,b.id(),TestActions.handover(current(b.id()).version(),null,"Fixture handover",true,false));
         clock.value=Instant.parse("2026-10-27T03:00:00Z");assertThrows(com.carrental.exception.DomainException.class,()->workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Must not cancel delivered car"));assertEquals("IN_PROGRESS",current(b.id()).status());
     }
     @Test void noShowRefundRemainsAdminDecisionIncludingZero()throws Exception {

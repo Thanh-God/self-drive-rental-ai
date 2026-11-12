@@ -133,7 +133,7 @@ class RentalBalanceHttpTest {
     }
 
     Reply handover(String id, long version) throws Exception {
-        return call("demo-staff-dn", id + "/actions", Map.of("next", "IN_PROGRESS", "version", version, "condition", "Synthetic handover", "licenseChecked", true));
+        return call("demo-staff-dn", id + "/actions", Map.of("next", "IN_PROGRESS", "version", version, "condition", "Synthetic handover", "licenseChecked", true, "fuelLevel", 6, "odometerKm", 12000));
     }
 
     @Test
@@ -225,7 +225,7 @@ class RentalBalanceHttpTest {
             Map.of("reason", "Lần hai", "idempotencyKey", "r2", "expectedVersion", afterReverse, "confirmed", true)).status(), "nothing left to reverse");
 
         clock.value = Instant.parse("2026-10-28T03:00:00Z");
-        assertEquals(200, call("demo-staff-dn", b.id() + "/actions", Map.of("next", "RETURNED", "version", afterReverse, "condition", "Synthetic return")).status());
+        assertEquals(200, call("demo-staff-dn", b.id() + "/actions", Map.of("next", "RETURNED", "version", afterReverse, "condition", "Synthetic return", "fuelLevel", 5, "odometerKm", 12150)).status());
         long returned = current(b.id()).version();
         var blocked = call("demo-staff-dn", b.id() + "/actions", Map.of("next", "COMPLETED", "version", returned));
         assertEquals(409, blocked.status(), "completion waits for a new record");

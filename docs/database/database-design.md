@@ -8,7 +8,7 @@ Không sửa migration đã áp dụng trong môi trường dùng chung. Kiểm 
 
 ## 1. Danh sách bảng và trạng thái sử dụng
 
-**Hiện hành (cập nhật 12/11/2026, sau V14):** 29 bảng nghiệp vụ + `flyway_schema_history` = **30/30 bảng**, 51 FK; các mục theo từng migration bên dưới là lịch sử tại thời điểm đó. Baseline V1–V5: **25 bảng nghiệp vụ** + **1 bảng kỹ thuật** (`flyway_schema_history`) = 26 bảng. V6 mở rộng cọc sandbox lên **28 bảng nghiệp vụ + history = 29 bảng**; chi tiết ở cuối tài liệu.
+**Hiện hành (cập nhật 12/11/2026, sau V15):** 29 bảng nghiệp vụ + `flyway_schema_history` = **30/30 bảng**, 51 FK; V15 thêm `fuel_level` (0–8 vạch) và `odometer_km` (≥ 0) cho phép rỗng vào `vehicle_handover_records`, có CHECK phạm vi và cùng có/cùng rỗng; các mục theo từng migration bên dưới là lịch sử tại thời điểm đó. Baseline V1–V5: **25 bảng nghiệp vụ** + **1 bảng kỹ thuật** (`flyway_schema_history`) = 26 bảng. V6 mở rộng cọc sandbox lên **28 bảng nghiệp vụ + history = 29 bảng**; chi tiết ở cuối tài liệu.
 Trong đó:
 - **15 bảng** có code nghiệp vụ đọc/ghi (Implementation thực tế qua Entity hoặc Sql qua JdbcTemplate).
 - **2 bảng** chỉ dùng để seed/đọc catalog.

@@ -91,7 +91,7 @@ class LicensePhotoHttpTest {
         assertEquals("PENDING",approved.path("status").asText()); // Not physical verification.
         var confirmed=call(post("/api/v1/bookings/"+id+"/actions"),staffToken,Map.of("next","CONFIRMED","version",0),200);
         clock.value=Instant.parse("2026-10-26T03:00:00Z");
-        var action=new HashMap<String,Object>();action.put("next","IN_PROGRESS");action.put("version",confirmed.path("version").asLong());action.put("condition","Synthetic vehicle condition");action.put("licenseChecked",false);
+        var action=new HashMap<String,Object>();action.put("next","IN_PROGRESS");action.putAll(TestActions.readings("IN_PROGRESS"));action.put("version",confirmed.path("version").asLong());action.put("condition","Synthetic vehicle condition");action.put("licenseChecked",false);
         call(post("/api/v1/bookings/"+id+"/actions"),staffToken,action,400);
         action.put("licenseChecked",true);
         assertEquals("IN_PROGRESS",call(post("/api/v1/bookings/"+id+"/actions"),staffToken,action,200).path("status").asText());

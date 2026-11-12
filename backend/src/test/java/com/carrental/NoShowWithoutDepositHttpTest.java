@@ -151,7 +151,7 @@ class NoShowWithoutDepositHttpTest {
     void aHandedOverBookingCannotBecomeANoShow() throws Exception {
         var b = confirmedWithoutDeposit();
         clock.value = Instant.parse("2026-10-26T03:00:00Z");
-        rental.apply(staff, b.id(), new BookingService.Action("IN_PROGRESS", b.version(), null, "Synthetic handover", true, false));
+        rental.apply(staff, b.id(), TestActions.handover(b.version(), null, "Synthetic handover", true, false));
         var active = current(b.id());
         clock.value = Instant.parse("2026-10-27T03:00:00Z");
         assertEquals(400, noShow("demo-staff-dn", b.id(), active.version(), true, true, "Synthetic: phải bị từ chối"));

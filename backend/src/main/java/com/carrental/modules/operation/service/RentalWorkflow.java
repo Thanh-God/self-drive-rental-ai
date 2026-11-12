@@ -32,7 +32,7 @@ import java.util.UUID;
    boolean handover="IN_PROGRESS".equals(b.status);String snapshot=null;
    try{if(handover)snapshot=json.writeValueAsString(licenses.forBooking(b.userId));}catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
    var occurredAt = !handover && b.returnAssessment != null ? bookings.view(b).returnAssessment().actualReturnedAt() : clock.instant();
-   jdbc.update("insert into vehicle_handover_records(id,booking_id,kind,actor_id,branch_id,occurred_at,condition_note,license_snapshot,maintenance) values(?,?,?,?,?,?,?,?,?)",UUID.randomUUID().toString(),b.id,handover?"HANDOVER":"RETURN",a.id(),handover?b.pickupBranchId:b.returnBranchId,java.sql.Timestamp.from(occurredAt),action.condition(),snapshot,action.maintenance());
+   jdbc.update("insert into vehicle_handover_records(id,booking_id,kind,actor_id,branch_id,occurred_at,condition_note,license_snapshot,maintenance,fuel_level,odometer_km) values(?,?,?,?,?,?,?,?,?,?,?)",UUID.randomUUID().toString(),b.id,handover?"HANDOVER":"RETURN",a.id(),handover?b.pickupBranchId:b.returnBranchId,java.sql.Timestamp.from(occurredAt),action.condition(),snapshot,action.maintenance(),action.fuelLevel(),action.odometerKm());
   }
   return bookings.view(b);
  }

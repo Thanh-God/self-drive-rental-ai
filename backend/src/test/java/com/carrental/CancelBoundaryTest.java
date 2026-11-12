@@ -633,7 +633,7 @@ class CancelBoundaryTest {
         var confirmed = castView(rentalWorkflow.apply(staffHn, pending.id(), new BookingService.Action("CONFIRMED", pending.version(), "Xác nhận", null, false, false)));
 
         clock.value = startAt.plusSeconds(1);
-        var handed = castView(rentalWorkflow.apply(staffHn, confirmed.id(), new BookingService.Action("IN_PROGRESS", getVersion(confirmed.id()), null, "Giao xe", true, false)));
+        var handed = castView(rentalWorkflow.apply(staffHn, confirmed.id(), TestActions.handover(getVersion(confirmed.id()), null, "Giao xe", true, false)));
 
         long currentVersion = getVersion(handed.id());
 
@@ -653,9 +653,9 @@ class CancelBoundaryTest {
         var pending = createPendingBooking(startAt, endAt, "v2");
         var confirmed = castView(rentalWorkflow.apply(staffHn, pending.id(), new BookingService.Action("CONFIRMED", pending.version(), "Xác nhận", null, false, false)));
         clock.value = startAt.plusSeconds(1);
-        var handed = castView(rentalWorkflow.apply(staffHn, confirmed.id(), new BookingService.Action("IN_PROGRESS", getVersion(confirmed.id()), null, "Giao xe", true, false)));
+        var handed = castView(rentalWorkflow.apply(staffHn, confirmed.id(), TestActions.handover(getVersion(confirmed.id()), null, "Giao xe", true, false)));
         clock.value = endAt.minusSeconds(1);
-        var returned = castView(rentalWorkflow.apply(staffHn, handed.id(), new BookingService.Action("RETURNED", getVersion(handed.id()), null, "Nhận xe", false, false)));
+        var returned = castView(rentalWorkflow.apply(staffHn, handed.id(), TestActions.returned(getVersion(handed.id()), null, "Nhận xe", false, false)));
 
         long currentVersion = getVersion(returned.id());
 
@@ -675,9 +675,9 @@ class CancelBoundaryTest {
         var pending = createPendingBooking(startAt, endAt, "v2");
         var confirmed = castView(rentalWorkflow.apply(staffHn, pending.id(), new BookingService.Action("CONFIRMED", pending.version(), "Xác nhận", null, false, false)));
         clock.value = startAt.plusSeconds(1);
-        var handed = castView(rentalWorkflow.apply(staffHn, confirmed.id(), new BookingService.Action("IN_PROGRESS", getVersion(confirmed.id()), null, "Giao xe", true, false)));
+        var handed = castView(rentalWorkflow.apply(staffHn, confirmed.id(), TestActions.handover(getVersion(confirmed.id()), null, "Giao xe", true, false)));
         clock.value = endAt.minusSeconds(1);
-        var returned = castView(rentalWorkflow.apply(staffHn, handed.id(), new BookingService.Action("RETURNED", getVersion(handed.id()), null, "Nhận xe", false, false)));
+        var returned = castView(rentalWorkflow.apply(staffHn, handed.id(), TestActions.returned(getVersion(handed.id()), null, "Nhận xe", false, false)));
         var completed = castView(rentalWorkflow.apply(staffHn, returned.id(), new BookingService.Action("COMPLETED", getVersion(returned.id()), null, null, false, false)));
 
         long currentVersion = getVersion(completed.id());

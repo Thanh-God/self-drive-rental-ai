@@ -34,6 +34,10 @@ Token màu/shadow nằm tại `frontend/src/index.css`. Nền trang `--color-pag
 
 Form có label/focus rõ, thao tác bàn phím và thông báo dễ hiểu. Chữ thông thường đặt mục tiêu tương phản tối thiểu 4.5:1, biên điều khiển 3:1 so với nền liền kề; đây là tiêu chí từng cặp màu, không tự chứng nhận toàn site đạt WCAG. Responsive web, không phát triển app mobile riêng. Kiểm tra bằng npm test/lint, build API/demo và browser với DB test cô lập; không test ghi trên dữ liệu vận hành.
 
+## Biên bản giao và nhận xe
+
+Form bàn giao (Staff chi nhánh nhận) và nhận trả (Staff chi nhánh trả, kể cả form nhận trả theo chính sách) có ô **Mức nhiên liệu / pin (thang 8 vạch)** và **Số km trên đồng hồ**. Khi giao: bắt buộc. Khi nhận trả: hiện số liệu lúc giao, bắt buộc nếu biên bản giao có số liệu và số km không được nhỏ hơn lúc giao; đơn giao trước khi có tính năng thì không bắt buộc nhưng nếu nhập phải đủ cả hai. Chi tiết đơn (mọi vai trò được đọc đơn) hiện số liệu trong mục Biên bản giao nhận và dòng "Đã chạy … km · nhiên liệu a/8 → b/8 vạch". Chỉ để đối chiếu, chưa tính phí. API: `POST /bookings/{id}/actions` nhận thêm `fuelLevel` (số nguyên 0–8) và `odometerKm` (số nguyên ≥ 0); `GET /bookings/{id}` trả `fuel_level`, `odometer_km` trong `records`.
+
 ## Hàng đợi đơn thuê trên website
 
 Danh sách đơn sắp theo thời điểm tạo mới nhất trước; API trả `createdAt` theo UTC, giao diện hiển thị giờ Việt Nam. Bộ lọc trạng thái dùng nhãn tiếng Việt và giữ nguyên mã gửi/nhận qua API.

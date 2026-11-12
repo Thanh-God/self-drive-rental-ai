@@ -84,7 +84,7 @@ class ScheduleWarningHttpTest {
         jdbc.update("update bookings set user_id=? where id=?",other.id(),a);
         clearInvocations(repo);
     }
-    void action(String id,String next){var current=bookings.view(bookings.require(admin,id));rental.apply(staff,id,new BookingService.Action(next,current.version(),"Synthetic","Synthetic condition",true,false));}
+    void action(String id,String next){var current=bookings.view(bookings.require(admin,id));rental.apply(staff,id,TestActions.forNext(next,current.version(),"Synthetic","Synthetic condition",true,false));}
     org.springframework.mock.web.MockHttpServletResponse response(Actor actor,String path)throws Exception{
         return mvc.perform(get("/api/v1/bookings"+path).header("Authorization","Bearer "+tokens.issue(accounts.require(actor.id())))).andReturn().getResponse();
     }

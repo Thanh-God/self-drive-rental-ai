@@ -6,6 +6,8 @@ import BookingDeposit from "../../components/user/BookingDeposit";
 import NoShowForm from "../../components/booking/NoShowForm";
 import RentalBalance, { rentalBalanceBlocksHandover } from "../../components/booking/RentalBalance";
 import PaymentSchedule from "../../components/booking/PaymentSchedule";
+import HandoverReadingsFields from "../../components/booking/HandoverReadingsFields";
+import { fuelLabel, handoverBaseline, km as kmLabel, readingsComparison, readingsInput } from "../../utils/handoverReadings";
 import { quoteRemainderSentence } from "../../utils/paymentSchedule";
 import { nearPickup } from "../../utils/pickupTiming";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
@@ -1704,6 +1706,8 @@ export function ApiBookingDetailPage({ area = "user" }) {
   const [condition, setCondition] = useState("");
   const [licenseChecked, setLicenseChecked] = useState(false);
   const [maintenance, setMaintenance] = useState(false);
+  const [fuelLevel, setFuelLevel] = useState("");
+  const [odometerKm, setOdometerKm] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -1748,6 +1752,12 @@ export function ApiBookingDetailPage({ area = "user" }) {
   async function submitAction(event) {
     event.preventDefault();
     setError("");
+    const needsReadings = next === "IN_PROGRESS" || next === "RETURNED";
+    const baseline = next === "RETURNED" ? handoverBaseline(detail.records) : null;
+    const readings = needsReadings
+      ? readingsInput({ fuel: fuelLevel, odometer: odometerKm, required: next === "IN_PROGRESS" || Boolean(baseline), baseline })
+      : { ok: true, payload: { fuelLevel: null, odometerKm: null } };
+    if (!readings.ok) { setError(readings.error); return; }
     setBusy(true);
     try {
       await applyBookingAction(booking.id, {
@@ -1758,12 +1768,15 @@ export function ApiBookingDetailPage({ area = "user" }) {
         licenseChecked,
         maintenance,
         cancellationKind: booking.deposit?.required && next === 'CANCELLED' ? cancellationKind : null,
+        ...(needsReadings && readings.payload.odometerKm !== null ? readings.payload : {}),
       });
       setNotice(next === "IN_PROGRESS" ? "Đã bàn giao xe thành công — đơn chuyển sang Đang thuê." : "Đã cập nhật trạng thái đơn.");
       setNext("");
       setReason("");
       setCancellationKind('');
       setCondition("");
+      setFuelLevel("");
+      setOdometerKm("");
       request.reload();
     } catch (actionError) {
       setError(getErrorMessage(actionError, "Không thể cập nhật đơn."));
@@ -1902,6 +1915,12 @@ export function ApiBookingDetailPage({ area = "user" }) {
                           <p className="mt-2 text-sm leading-6">
                             {record.condition_note}
                           </p>
+                          {record.odometer_km !== null && record.odometer_km !== undefined ? (
+                            <p className="mt-1 text-sm" data-testid={`readings-${record.kind}`}>
+                              Nhiên liệu {fuelLabel(record.fuel_level)} · đồng hồ {kmLabel(record.odometer_km)}
+                              {record.kind === "RETURN" && readingsComparison(detail.records) ? ` · ${readingsComparison(detail.records)}` : ""}
+                            </p>
+                          ) : null}
                           {record.maintenance ? (
                             <p className="mt-2 text-sm text-amber-800">
                               Đã chuyển tình trạng xe sang bảo trì.
@@ -2001,7 +2020,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                 {isStaff && license && assignedBranchIds.has(booking.pickupBranchId) && ["PENDING", "CONFIRMED"].includes(booking.status) ? (
                   <div className="panel"><LicensePhotos key={`${booking.id}-${license.version}`} license={license} bookingId={booking.id} onSaved={request.reload} /></div>
                 ) : null}
-                {availableActions.includes('RETURNED') && booking.returnPolicy ? <ReturnReceipt key={`${booking.id}-${booking.version}`} booking={booking} onSaved={request.reload} /> : null}
+                {availableActions.includes('RETURNED') && booking.returnPolicy ? <ReturnReceipt key={`${booking.id}-${booking.version}`} booking={booking} records={detail.records || []} onSaved={request.reload} /> : null}
                 {regularActions.length ? (
                   <form
                     className="panel h-fit space-y-4"
@@ -2051,6 +2070,18 @@ export function ApiBookingDetailPage({ area = "user" }) {
                         onChange={(event) => setCondition(event.target.value)}
                       />
                     </Field>
+                  ) : null}
+                  {["IN_PROGRESS", "RETURNED"].includes(next) ? (
+                    <HandoverReadingsFields
+                      kind={next === "IN_PROGRESS" ? "HANDOVER" : "RETURN"}
+                      fuel={fuelLevel}
+                      odometer={odometerKm}
+                      onFuel={setFuelLevel}
+                      onOdometer={setOdometerKm}
+                      required={next === "IN_PROGRESS" || Boolean(handoverBaseline(detail.records))}
+                      baseline={next === "RETURNED" ? handoverBaseline(detail.records) : null}
+                      disabled={busy}
+                    />
                   ) : null}
                   {next === "IN_PROGRESS" ? (
                     <label className="flex gap-3 text-sm">

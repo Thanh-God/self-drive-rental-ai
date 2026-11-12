@@ -122,7 +122,7 @@ class RentalBalanceDepositHttpTest {
         assertEquals(910000, recorded.rentalBalance().recorded().amount());
 
         clock.value = Instant.parse("2026-10-26T03:00:00Z");
-        rental.apply(staff, b.id(), new BookingService.Action("IN_PROGRESS", recorded.version(), null, "Synthetic handover", true, false));
+        rental.apply(staff, b.id(), TestActions.handover(recorded.version(), null, "Synthetic handover", true, false));
         assertEquals("IN_PROGRESS", bookings.list(user).getFirst().status());
         assertEquals(0, jdbc.queryForObject("select count(*) from payment_transactions where booking_id=? and amount=910000", Integer.class, b.id()),
             "the remaining rent never enters the deposit ledger");

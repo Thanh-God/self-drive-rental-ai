@@ -86,3 +86,15 @@ test('saved assessment uses current settlement wording for partial and resolved 
     assert.doesNotMatch(container.textContent,/Chưa thu —/);
   }
 });
+test('L5: after a handover with readings the policy return requires them and sends them with the preview values',async()=>{
+  container&&container.remove();requests=[];refreshes=0;
+  handler=c=>c.url.endsWith('/return-preview')?{version:3,assessment}:c.method==='post'?{}:{booking:{...booking,status:'RETURNED',returnAssessment:assessment}};
+  container=document.createElement('div');document.body.append(container);root=createRoot(container);
+  await act(async()=>root.render(createElement(Form,{booking,records:[{kind:'HANDOVER',fuel_level:6,odometer_km:12000}],onSaved:()=>{refreshes++;}})));
+  assert.match(container.textContent,/Lúc giao: nhiên liệu 6\/8 vạch · đồng hồ 12\.000 km/);
+  await note();await click('Xem trước nhận trả');assert.equal(requests.length,0,'readings required before preview');assert.equal(container.querySelector('select').required,true);
+  const set=async(el,v)=>act(async()=>{Object.getOwnPropertyDescriptor(Object.getPrototypeOf(el),'value').set.call(el,v);el.dispatchEvent(new dom.window.Event('input',{bubbles:true}));el.dispatchEvent(new dom.window.Event('change',{bubbles:true}));});
+  await set(container.querySelector('select'),'4');await set(container.querySelector('input[type="number"]'),'12210');
+  await click('Xem trước nhận trả');await click('Xác nhận đã nhận xe');
+  const post=requests.find(r=>r.method==='post');assert.equal(post.body.fuelLevel,4);assert.equal(post.body.odometerKm,12210);assert.equal(post.body.expectedLateAmount,1950000);
+});

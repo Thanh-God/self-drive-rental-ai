@@ -75,13 +75,13 @@ class ReturnSettlementHttpTest {
             policy && calendar && returnedBranch.equals("dn") ? true : null));
         assertEquals(200, post(staff, "/bookings/"+b.id()+"/actions", Map.of("next","CONFIRMED","version",b.version())).getStatus());
         clock.value=Instant.parse("2026-10-26T03:00:00Z"); b=current(b.id());
-        assertEquals(200, post(staff,"/bookings/"+b.id()+"/actions",Map.of("next","IN_PROGRESS","version",b.version(),"condition","Synthetic handover","licenseChecked",true)).getStatus());
+        assertEquals(200, post(staff,"/bookings/"+b.id()+"/actions",Map.of("fuelLevel",6,"odometerKm",12000L,"next","IN_PROGRESS","version",b.version(),"condition","Synthetic handover","licenseChecked",true)).getStatus());
         return current(b.id());
     }
     Map<String,Object> receipt(String id) throws Exception {
         var r=get(staff,"/bookings/"+id+"/return-preview"); assertEquals(200,r.getStatus(),r.getContentAsString());
         var q=body(r); return new LinkedHashMap<>(Map.of("next","RETURNED","version",q.get("version").asLong(),
-            "condition","Synthetic return","returnPreviewDate",q.at("/assessment/actualReturnDate").asText(),"expectedLateAmount",q.at("/assessment/amountVnd").asLong()));
+            "condition","Synthetic return","returnPreviewDate",q.at("/assessment/actualReturnDate").asText(),"expectedLateAmount",q.at("/assessment/amountVnd").asLong(),"fuelLevel",5,"odometerKm",12150L));
     }
     long returns(String id) { return jdbc.queryForObject("select count(*) from vehicle_handover_records where booking_id=? and kind='RETURN'",Long.class,id); }
     long invoices(String id) { return jdbc.queryForObject("select count(*) from invoices where booking_id=?",Long.class,id); }
