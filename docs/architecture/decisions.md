@@ -4,7 +4,11 @@ Các quy tắc dưới đây định hướng triển khai và vận hành. Ph�
 
 ## Mở rộng cọc giữ chỗ sandbox
 
-Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép VNPAY Sandbox, cọc 30% tiền thuê không gồm phí tuyến; Staff duyệt hồ sơ trước, backend xác nhận khi nhận đủ cọc trong hạn. Đơn cũ giữ quy trình cũ. Không thu tiền thật, cọc thiệt hại hoặc thu phần còn lại. Chính sách hủy/no-show/hoàn và cấu hình tại [cọc giữ chỗ](../modules/booking-deposit.md). Tích hợp thực cần merchant sandbox và nghiệm thu riêng; mặc định tắt.
+Quyết định mới thay giới hạn MVP chưa thanh toán online: cho phép VNPAY Sandbox, cọc 30% tiền thuê không gồm phí tuyến; Staff duyệt hồ sơ trước, backend xác nhận khi nhận đủ cọc trong hạn. Đơn cũ giữ quy trình cũ. Không thu tiền thật hoặc cọc thiệt hại; phần tiền thuê còn lại chỉ được ghi nhận thủ công (mô phỏng) theo mục bên dưới. Chính sách hủy/no-show/hoàn và cấu hình tại [cọc giữ chỗ](../modules/booking-deposit.md). Tích hợp thực cần merchant sandbox và nghiệm thu riêng; mặc định tắt.
+
+## Ghi nhận phần tiền thuê còn lại
+
+Chủ dự án duyệt ngày 12/11/2026: Staff chi nhánh nhận ghi nhận thủ công **một lần** phần tiền thuê còn lại (tổng − cọc; đơn không cọc là toàn bộ tổng), tiền mặt hoặc chuyển khoản (chuyển khoản bắt buộc tham chiếu), **bắt buộc trước bàn giao**. Ghi sai: Admin đảo toàn bộ một lần có lý do, Staff ghi lại. Chỉ đơn tạo khi cờ `RENTAL_BALANCE_ENABLED` bật (mặc định tắt); đơn cũ giữ quy trình. Mô phỏng, không thu tiền thật, hóa đơn không chứng minh thanh toán. Không thêm bảng (V14 thêm cột). Chi tiết [ghi nhận phần còn lại](../modules/rental-balance.md).
 
 ## Trợ lý hỏi đáp KDrive
 

@@ -22,6 +22,16 @@ import java.util.*;
   long total=settlement==null?b.total:Math.addExact(b.total,Math.subtractExact(settlement.originalAmount(),settlement.waivedAmount()));
   var snapshot=new LinkedHashMap<String,Object>(Map.of("customer",b.customerName,"vehicle",b.vehicleName,"pickup",b.pickupName,"return",b.returnName,"startAt",b.startAt,"endAt",b.endAt,"note","Tiền thuê và phí tuyến theo báo giá. Không xác nhận đã thanh toán; cọc, phụ phí hoặc sự cố theo hồ sơ riêng."));
   snapshot.put("policyVersion",b.policyVersion);snapshot.put("rentalDays",b.rentalDays);
+  if(b.rentalBalancePolicy!=null){
+   // L4: copy the remaining-rent record; it is a manual DEMO record, the invoice still does not prove payment.
+   if(b.rentalBalanceAmount==null && b.total-(b.depositRequired?Math.min(b.depositAmount,b.total):0)>0)
+    throw com.carrental.exception.DomainException.conflict("Phần tiền thuê còn lại chưa được ghi nhận.");
+   var balance=new LinkedHashMap<String,Object>();balance.put("policy",b.rentalBalancePolicy);
+   if(b.rentalBalanceAmount!=null){balance.put("amount",b.rentalBalanceAmount);balance.put("method",b.rentalBalanceMethod);
+    balance.put("reference",b.rentalBalanceReference);balance.put("recordedAt",b.rentalBalanceRecordedAt);balance.put("demo",b.rentalBalanceDemo);}
+   balance.put("note","Ghi nhận thủ công phần tiền thuê còn lại (mô phỏng); không chứng minh đã nhận tiền thật.");
+   snapshot.put("rentalBalance",balance);
+  }
   if(settlement!=null){snapshot.put("returnAssessment",assessment);snapshot.put("returnSettlement",settlement);snapshot.put("note","Thu khoản vượt hạn không xác nhận toàn bộ tiền thuê đã thanh toán. Cọc giữ chỗ theo hồ sơ riêng.");}
   try{jdbc.update("insert into invoices(id,booking_id,issued_at,total,snapshot) values(?,?,?,?,?)",id,b.id,java.sql.Timestamp.from(clock.instant()),total,json.writeValueAsString(snapshot));}
   catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}

@@ -60,7 +60,7 @@ Guest là actor không xác thực, không phải role tài khoản. Role tài k
 
 ### 4.3 Ngoài phạm vi bắt buộc
 
-- Thanh toán thật, thu phần tiền thuê còn lại và cọc bảo đảm thiệt hại; cọc giữ chỗ VNPAY Sandbox là phần mở rộng riêng.
+- Thanh toán thật và cọc bảo đảm thiệt hại; cọc giữ chỗ VNPAY Sandbox là phần mở rộng riêng. Phần tiền thuê còn lại chỉ được **ghi nhận thủ công một lần (mô phỏng)** trước bàn giao theo [ghi nhận phần còn lại](../modules/rental-balance.md), không thu tiền thật.
 - Thuê xe có tài xế.
 - Bảo hiểm tự động, GPS/IoT, quản lý bảo dưỡng nâng cao.
 - Huấn luyện LLM lớn từ đầu hoặc recommendation học từ dữ liệu lớn. Mô hình nhỏ tự train sẽ được đánh giá sau backend, chưa mặc định thuộc phần đã triển khai.

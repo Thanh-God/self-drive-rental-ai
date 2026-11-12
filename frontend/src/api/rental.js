@@ -111,3 +111,14 @@ export async function recordReturnSettlement(id, input) {
   const { data } = await apiClient.post(`/bookings/${encodeURIComponent(id)}/return-settlements`, input);
   return data;
 }
+
+// L4: one-time manual record of the remaining rent before handover (pickup Staff) and its reversal (Admin).
+export async function recordRentalBalance(id, input) {
+  const { data } = await apiClient.post(`/bookings/${encodeURIComponent(id)}/rental-balance`, input);
+  return data;
+}
+
+export async function reverseRentalBalance(id, input) {
+  const { data } = await apiClient.post(`/bookings/${encodeURIComponent(id)}/rental-balance/reverse`, input);
+  return data;
+}

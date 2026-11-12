@@ -31,6 +31,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 /**
@@ -99,6 +100,7 @@ class NoShowWithoutDepositHttpTest {
     BookingService.View confirmedWithoutDeposit() {
         var b = bookings.create(user, new BookingService.Input("v1", "dn", "dn", null, null, 1300000L, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 10, 28)));
         assertFalse(b.deposit().required(), "fixture must be a booking without a deposit");
+        assertNull(b.rentalBalance(), "rental-balance flag off: no remaining-rent policy, handover keeps the old flow");
         rental.apply(staff, b.id(), new BookingService.Action("CONFIRMED", b.version(), null, null, false, false));
         return current(b.id());
     }

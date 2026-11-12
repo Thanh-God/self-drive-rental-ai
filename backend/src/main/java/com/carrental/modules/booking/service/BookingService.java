@@ -23,6 +23,8 @@ public class BookingService {
     @org.springframework.beans.factory.annotation.Value("${app.deposit-enabled:false}") private boolean depositEnabled;
     @org.springframework.beans.factory.annotation.Value("${app.deposit-method:VNPAY_SANDBOX}") private String depositMethod;
     @org.springframework.beans.factory.annotation.Value("${app.return-policy-enabled:false}") private boolean returnPolicyEnabled;
+    @org.springframework.beans.factory.annotation.Value("${app.rental-balance-enabled:false}") private boolean rentalBalanceEnabled;
+    @org.springframework.beans.factory.annotation.Autowired private RentalBalanceService rentalBalances;
     private final ReturnPolicy returnPolicies;
     @org.springframework.beans.factory.annotation.Autowired private QrReconciliationReader qrReads;
     @org.springframework.beans.factory.annotation.Autowired private ReturnSettlementService settlements;
@@ -54,7 +56,9 @@ public class BookingService {
                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
                        ScheduleWarnings scheduleWarnings,
                        @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
-                       QrReconciliationPolicy.Summary qrReconciliation) {}
+                       QrReconciliationPolicy.Summary qrReconciliation,
+                       @com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
+                       RentalBalanceService.Summary rentalBalance) {}
 
     public record ScheduleWarnings(Instant checkedAt, List<ScheduleRiskPolicy.Risk> items) {}
 
@@ -72,6 +76,11 @@ public class BookingService {
     }
 
     private View view(Booking b, ScheduleWarnings warnings, QrReconciliationPolicy.Summary qr, Instant now) {
+        return view(b, warnings, qr, now, false);
+    }
+
+    /** staffView adds who recorded the remaining rent and the reversal log (Staff/Admin only). */
+    private View view(Booking b, ScheduleWarnings warnings, QrReconciliationPolicy.Summary qr, Instant now, boolean staffView) {
         long received = jdbc.queryForObject(
             "select coalesce(sum(amount),0) from payment_transactions where booking_id=? and status='SUCCEEDED'",
             Long.class, b.id
@@ -94,7 +103,8 @@ public class BookingService {
                 b.depositApprovedAt, b.paymentDueAt, b.reviewDueAt, b.originalHoldUntil,
                 b.reportedAt, b.depositReceiverSnapshot, b.depositTxnRef, b.cancellationKind,
                 applied, received, missing, excess
-            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment)), warnings, qr
+            ), returnPolicies.view(b.returnPolicyVersion, b.returnPolicySnapshot, b.returnPolicyAcceptedAt), returnPolicies.assessment(b.returnAssessment), settlements.summary(b.id, returnPolicies.assessment(b.returnAssessment)), warnings, qr,
+            rentalBalances.summary(b, staffView)
         );
     }
 
@@ -142,7 +152,8 @@ public class BookingService {
         var now = clock.instant();
         var warnings = scheduleWarnings(a, visible, now);
         var qr = qrSummaries(visible, now);
-        return visible.stream().map(b -> view(b, warnings.get(b.id), qr.get(b.id), now)).toList();
+        boolean staffView = a.is("STAFF") || a.is("ADMIN");
+        return visible.stream().map(b -> view(b, warnings.get(b.id), qr.get(b.id), now, staffView)).toList();
     }
 
     private Map<String, ScheduleWarnings> scheduleWarnings(Actor actor, List<Booking> visible, Instant now) {
@@ -193,7 +204,7 @@ public class BookingService {
         Booking b = require(a, id);
         var result = new LinkedHashMap<String, Object>();
         var now = clock.instant();
-        result.put("booking", view(b, scheduleWarnings(a, List.of(b), now).get(b.id), qrSummaries(List.of(b), now).get(b.id), now));
+        result.put("booking", view(b, scheduleWarnings(a, List.of(b), now).get(b.id), qrSummaries(List.of(b), now).get(b.id), now, a.is("STAFF") || a.is("ADMIN")));
         result.put("history", jdbc.queryForList("select previous_status,next_status,occurred_at,reason from booking_status_history where booking_id=? order by occurred_at", id));
         result.put("records", jdbc.queryForList("select kind,occurred_at,condition_note,maintenance from vehicle_handover_records where booking_id=? order by occurred_at", id));
         if (a.is("STAFF")) result.put("license", licenses.forBooking(b.userId));
@@ -270,6 +281,7 @@ public class BookingService {
             b.returnPolicyVersion = ReturnPolicy.VERSION;
             b.returnPolicySnapshot = returnPolicies.snapshot(b.dailyPrice);
         }
+        if (rentalBalanceEnabled) b.rentalBalancePolicy = RentalBalanceService.VERSION;
         if (depositEnabled) {
             b.depositRequired = true;
             b.depositAmount = DepositPolicy.amount(b.rentalTotal);
@@ -392,6 +404,8 @@ public class BookingService {
                     );
                     if (applied < b.depositAmount) throw DomainException.bad("Đơn chưa có cọc đã đối soát đủ.");
                 }
+                if (rentalBalances.missing(b))
+                    throw DomainException.bad("Cần ghi nhận phần tiền thuê còn lại (" + rentalBalances.due(b) + " đ) trước khi giao xe.");
                 if (!action.licenseChecked()) throw DomainException.bad("Staff phải kiểm tra GPLX thực tế trước giao.");
                 reason(action.condition());
                 licenses.verify(b.userId, a, vehicle.transmission, vehicle.seats, b.endAt);
@@ -417,6 +431,8 @@ public class BookingService {
                 var assessment = returnPolicies.assessment(b.returnAssessment);
                 if (assessment != null && settlements.summary(b.id, assessment).outstandingAmount() > 0)
                     throw DomainException.conflict("Khoản vượt hạn chưa thu. Chưa thể hoàn tất đơn; cần xử lý khoản còn phải thu.");
+                if (rentalBalances.missing(b))
+                    throw DomainException.conflict("Phần tiền thuê còn lại chưa được ghi nhận (bản ghi đã bị đảo). Ghi nhận lại trước khi hoàn tất.");
             }
             default -> throw DomainException.bad("Chuyển trạng thái không được hỗ trợ.");
         }
@@ -444,6 +460,46 @@ public class BookingService {
         jdbc.update("update bookings set version=version+1 where id=?",id);
         entityManager.refresh(b);
         return view(b);
+    }
+
+    private long appliedDeposit(String bookingId) {
+        return jdbc.queryForObject(
+            "select coalesce(sum(applied_amount),0) from payment_transactions where booking_id=? and status='SUCCEEDED'",
+            Long.class, bookingId);
+    }
+
+    private static final Set<String> RENTAL_BALANCE_STATES = Set.of("CONFIRMED", "IN_PROGRESS", "RETURNED");
+
+    /** L4: pickup-branch Staff records the remaining rent once (Q1, Q2). Returns the Staff view. */
+    @Transactional
+    public View recordRentalBalance(Actor actor, String id, RentalBalanceService.Input input) {
+        var b = lockDepositBooking(id);
+        branches.requireStaff(actor, b.pickupBranchId);
+        if (b.rentalBalancePolicy == null) throw DomainException.conflict("Đơn không áp dụng ghi nhận phần tiền thuê còn lại.");
+        if (rentalBalances.duplicateRecord(actor, b, input)) return view(b, null, null, clock.instant(), true);
+        if (!RENTAL_BALANCE_STATES.contains(effective(b)))
+            throw DomainException.conflict("Chỉ ghi nhận cho đơn đã xác nhận, đang thuê hoặc đã nhận trả, trước khi hoàn tất.");
+        if (b.version != input.expectedVersion()) throw DomainException.conflict("Đơn đã thay đổi. Tải lại trước khi ghi nhận.");
+        if (b.depositRequired && appliedDeposit(b.id) < b.depositAmount)
+            throw DomainException.conflict("Cọc chưa được áp dụng đủ; chưa ghi nhận phần còn lại.");
+        rentalBalances.record(actor, b, rentalBalances.due(b), input);
+        repo.flush();
+        return view(b, null, null, clock.instant(), true);
+    }
+
+    /** L4: Admin reverses the whole current record once, with a reason (Q1-b); pickup Staff then records again. */
+    @Transactional
+    public View reverseRentalBalance(Actor actor, String id, RentalBalanceService.ReverseInput input) {
+        actor.require("ADMIN");
+        var b = lockDepositBooking(id);
+        if (b.rentalBalancePolicy == null) throw DomainException.conflict("Đơn không áp dụng ghi nhận phần tiền thuê còn lại.");
+        if (rentalBalances.duplicateReverse(actor, b, input)) return view(b, null, null, clock.instant(), true);
+        if (!RENTAL_BALANCE_STATES.contains(effective(b)))
+            throw DomainException.conflict("Chỉ đảo bản ghi trước khi đơn hoàn tất.");
+        if (b.version != input.expectedVersion()) throw DomainException.conflict("Đơn đã thay đổi. Tải lại trước khi đảo.");
+        rentalBalances.reverse(actor, b, input);
+        repo.flush();
+        return view(b, null, null, clock.instant(), true);
     }
 
     public Booking lockDepositBooking(String id) {

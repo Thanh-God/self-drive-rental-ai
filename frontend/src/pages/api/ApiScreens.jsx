@@ -4,6 +4,7 @@ import ReturnReceipt, { ReturnAssessmentSummary } from '../../components/booking
 import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
 import NoShowForm from "../../components/booking/NoShowForm";
+import RentalBalance, { rentalBalanceBlocksHandover } from "../../components/booking/RentalBalance";
 import { nearPickup } from "../../utils/pickupTiming";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import ScheduleWarnings from "../../components/booking/ScheduleWarnings";
@@ -1835,6 +1836,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
             <ReturnPolicySummary policy={booking.returnPolicy} />
             <ReturnAssessmentSummary assessment={booking.returnAssessment} settlement={booking.returnSettlement} />
             <ReturnSettlement key={`settlement-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedReturn={assignedBranchIds.has(booking.returnBranchId)} onSaved={request.reload} />
+            <RentalBalance key={`rental-balance-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} onSaved={request.reload} />
             {booking.deposit?.required ? <BookingDeposit key={`deposit-${booking.id}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : (
               <NoShowForm key={`no-show-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} now={now} onDone={request.reload} standalone />
             )}
@@ -2059,6 +2061,9 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       Đã kiểm tra GPLX và xe phù hợp đến hết chuyến.
                     </label>
                   ) : null}
+                  {next === "IN_PROGRESS" && rentalBalanceBlocksHandover(booking) ? (
+                    <Notice error>{`Chưa giao xe được: cần ghi nhận phần tiền thuê còn lại (${money(booking.rentalBalance.dueAmount)}) ở khối "Phần tiền thuê còn lại" trước.`}</Notice>
+                  ) : null}
                   {next === "RETURNED" ? (
                     <label className="flex gap-3 text-sm">
                       <input
@@ -2072,7 +2077,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     </label>
                   ) : null}
                   {error ? <Notice error>{error}</Notice> : null}
-                  <button className="btn" disabled={busy || !next}>
+                  <button className="btn" disabled={busy || !next || (next === "IN_PROGRESS" && rentalBalanceBlocksHandover(booking))}>
                     {busy ? "Đang xử lý..." : next === "CANCELLED" ? "Xác nhận hủy đơn" : bookingActionLabels[next] || "Chọn thao tác"}
                   </button>
                   </form>

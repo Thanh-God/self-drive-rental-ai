@@ -28,6 +28,8 @@ spring:
 app:
   return-settlement-demo: ${RETURN_SETTLEMENT_DEMO:true}
   return-policy-enabled: ${RETURN_POLICY_ENABLED:false}
+  rental-balance-enabled: ${RENTAL_BALANCE_ENABLED:false}
+  rental-balance-demo: ${RENTAL_BALANCE_DEMO:true}
   deposit-method: ${DEPOSIT_METHOD:VNPAY_SANDBOX}
   deposit-enabled: ${DEPOSIT_ENABLED:false}
   vnpay-tmn-code: ${VNPAY_TMN_CODE:}

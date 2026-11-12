@@ -48,4 +48,15 @@ public class Booking {
     public Instant reviewDueAt;
     public Instant reportedAt;
     public String depositReceiverSnapshot;
+    /** L4 (V14): policy version when the remaining rent must be recorded before handover; null for older bookings. */
+    public String rentalBalancePolicy;
+    public Long rentalBalanceAmount;
+    public String rentalBalanceMethod;
+    public String rentalBalanceReference;
+    public String rentalBalanceRecordedBy;
+    public String rentalBalanceRecordedByName;
+    public Instant rentalBalanceRecordedAt;
+    public String rentalBalanceKey;
+    public Boolean rentalBalanceDemo;
+    @Column(columnDefinition = "TEXT") public String rentalBalanceLog;
 }
