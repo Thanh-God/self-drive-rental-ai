@@ -215,7 +215,7 @@ class MySqlMigrationTest {
   j.update("update bookings set return_assessment='{\"amountVnd\":1950000,\"collectionStatus\":\"UNPAID\"}'");
   var before=data(j);var history=j.queryForList("select version,checksum,success from flyway_schema_history order by installed_rank");
   var upgraded=flyway(schema,null);assertEquals(3,upgraded.migrate().migrationsExecuted);upgraded.validate();
-  assertEquals(before,data(j));assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where cast(version as unsigned)<=11 order by installed_rank"));
+  var afterV11=data(j);stripRentalBalanceColumns(afterV11);assertEquals(before,afterV11);assertEquals(history,j.queryForList("select version,checksum,success from flyway_schema_history where cast(version as unsigned)<=11 order by installed_rank"));
   assertEquals(0,j.queryForObject("select count(*) from booking_return_settlements",Integer.class));
   assertEquals(30,j.queryForObject("select count(*) from information_schema.tables where table_schema=database()",Integer.class));
   assertEquals(0,upgraded.migrate().migrationsExecuted);

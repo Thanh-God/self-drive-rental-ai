@@ -44,7 +44,8 @@ SUITES = ['ScheduleProtectionHttpTest','ScheduleWarningHttpTest','VehicleSearchT
           'ReviewIntegrationTest','ReviewHttpIntegrationTest','BackendRegressionTest','VehicleAdminHttpServerTest',
           'LicensePhotoHttpTest','ReturnPolicyHttpTest','ReturnReceiptHttpTest','ReturnSettlementHttpTest','DepositHttpTest','QrDemoHttpTest','RecommendationHttpTest','LocationRouteHttpServerTest','ItineraryStorageIntegrationTest','LocationPilotImporterMySqlTest',
           'AssistantReviewQuoteFlowHttpTest','AssistantReviewQuoteLiveIT','ItineraryLivePreviewIT',
-          'AiChatHttpTest','AiChatSearchHttpTest','AiChatMinimalSearchHttpTest','AiChatLiveIT']
+          'AiChatHttpTest','AiChatSearchHttpTest','AiChatMinimalSearchHttpTest','AiChatLiveIT',
+          'NoShowWithoutDepositHttpTest','RentalBalanceHttpTest','RentalBalanceDepositHttpTest']
 
 # Live local-Qwen suites never run by default and need an explicit caller opt-in.
 LIVE_QWEN_SUITES = ['AssistantReviewQuoteLiveIT','AiChatLiveIT']
