@@ -111,8 +111,8 @@ class NoShowWithoutDepositHttpTest {
 
     String bearer(String actorId) { return "Bearer " + tokens.issue(accounts.require(actorId)); }
 
-    int noShow(String actorId, String id, long version, boolean contacted, boolean notDelivered, String reason) throws Exception {
-        String body = "{\"expectedVersion\":" + version + ",\"contacted\":" + contacted + ",\"notDelivered\":" + notDelivered
+    int noShow(String actorId, String id, long version, boolean contacted, boolean customerDidNotCancel, boolean notDelivered, String reason) throws Exception {
+        String body = "{\"expectedVersion\":" + version + ",\"contacted\":" + contacted + ",\"customerDidNotCancel\":" + customerDidNotCancel + ",\"notDelivered\":" + notDelivered
             + ",\"reason\":" + (reason == null ? "null" : "\"" + reason + "\"") + "}";
         return mvc.perform(post("/api/v1/bookings/" + id + "/no-show").header("Authorization", bearer(actorId))
             .contentType("application/json").content(body)).andReturn().getResponse().getStatus();
@@ -124,26 +124,27 @@ class NoShowWithoutDepositHttpTest {
         assertEquals("CONFIRMED", b.status());
 
         clock.value = Instant.parse("2026-10-26T15:00:00Z"); // 22:00 on the pickup day in Vietnam: still the pickup day
-        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), true, true, "Synthetic: khách chưa đến"));
+        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), true, true, true, "Synthetic: khách chưa đến"));
 
         clock.value = Instant.parse("2026-10-27T03:00:00Z"); // the day after pickup
-        assertEquals(403, noShow("demo-staff-hn", b.id(), b.version(), true, true, "Synthetic: sai chi nhánh"));
-        assertEquals(403, noShow("demo-admin", b.id(), b.version(), true, true, "Synthetic: Admin không xử lý no-show"));
-        assertEquals(403, noShow("demo-user", b.id(), b.version(), true, true, "Synthetic: khách không tự ghi no-show"));
-        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), false, true, "Synthetic: chưa liên hệ"));
-        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), true, false, "Synthetic: chưa xác nhận chưa giao"));
-        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), true, true, " "));
-        assertEquals(409, noShow("demo-staff-dn", b.id(), b.version() + 1, true, true, "Synthetic: phiên bản cũ"));
+        assertEquals(403, noShow("demo-staff-hn", b.id(), b.version(), true, true, true, "Synthetic: sai chi nhánh"));
+        assertEquals(403, noShow("demo-admin", b.id(), b.version(), true, true, true, "Synthetic: Admin không xử lý no-show"));
+        assertEquals(403, noShow("demo-user", b.id(), b.version(), true, true, true, "Synthetic: khách không tự ghi no-show"));
+        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), false, true, true, "Synthetic: chưa liên hệ"));
+        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), true, true, false, "Synthetic: chưa xác nhận chưa giao"));
+        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), true, false, true, "Synthetic: khách đã báo hủy"), "L9: Staff confirms the customer did not cancel");
+        assertEquals(400, noShow("demo-staff-dn", b.id(), b.version(), true, true, true, " "));
+        assertEquals(409, noShow("demo-staff-dn", b.id(), b.version() + 1, true, true, true, "Synthetic: phiên bản cũ"));
         assertEquals("CONFIRMED", current(b.id()).status());
 
-        assertEquals(200, noShow("demo-staff-dn", b.id(), b.version(), true, true, "Synthetic: đã gọi hai lần, khách không đến"));
+        assertEquals(200, noShow("demo-staff-dn", b.id(), b.version(), true, true, true, "Synthetic: đã gọi hai lần, khách không đến"));
         assertEquals("CANCELLED", current(b.id()).status());
         assertEquals("NO_SHOW", jdbc.queryForObject("select cancellation_kind from bookings where id=?", String.class, b.id()));
-        assertEquals("Khách không đến nhận: Synthetic: đã gọi hai lần, khách không đến", jdbc.queryForObject(
+        assertEquals("Khách không đến nhận, không báo hủy trước khi hết ngày nhận: Synthetic: đã gọi hai lần, khách không đến", jdbc.queryForObject(
             "select reason from booking_status_history where booking_id=? and next_status='CANCELLED'", String.class, b.id()));
         assertEquals(0, jdbc.queryForObject("select count(*) from payment_refunds", Integer.class));
         assertEquals(0, jdbc.queryForObject("select count(*) from payment_events", Integer.class));
-        assertEquals(400, noShow("demo-staff-dn", b.id(), current(b.id()).version(), true, true, "Synthetic: ghi lặp"), "a cancelled booking is not CONFIRMED any more");
+        assertEquals(400, noShow("demo-staff-dn", b.id(), current(b.id()).version(), true, true, true, "Synthetic: ghi lặp"), "a cancelled booking is not CONFIRMED any more");
         assertEquals(1, jdbc.queryForObject("select count(*) from booking_status_history where booking_id=? and next_status='CANCELLED'", Integer.class, b.id()));
     }
 
@@ -154,7 +155,7 @@ class NoShowWithoutDepositHttpTest {
         rental.apply(staff, b.id(), TestActions.handover(b.version(), null, "Synthetic handover", true, false));
         var active = current(b.id());
         clock.value = Instant.parse("2026-10-27T03:00:00Z");
-        assertEquals(400, noShow("demo-staff-dn", b.id(), active.version(), true, true, "Synthetic: phải bị từ chối"));
+        assertEquals(400, noShow("demo-staff-dn", b.id(), active.version(), true, true, true, "Synthetic: phải bị từ chối"));
         assertEquals("IN_PROGRESS", current(b.id()).status());
         assertEquals(0, jdbc.queryForObject("select count(*) from payment_refunds", Integer.class));
     }

@@ -14,6 +14,7 @@ public class BookingController {
  @GetMapping("/{id}/return-preview") public Object returnPreview(@AuthenticationPrincipal Actor a,@PathVariable String id){return service.returnPreview(a,id);}
  @PostMapping("/{id}/return-settlements") public Object settleReturn(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody com.carrental.modules.booking.service.ReturnSettlementService.Input input){return service.settleReturn(a,id,input);}
  @PostMapping("/{id}/rental-balance") public Object recordRentalBalance(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody com.carrental.modules.booking.service.RentalBalanceService.Input input){return service.recordRentalBalance(a,id,input);}
+ @PostMapping("/{id}/rental-balance/refund") public Object refundRentalBalance(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody com.carrental.modules.booking.service.RentalBalanceService.RefundInput input){return service.refundRentalBalance(a,id,input);}
  @PostMapping("/{id}/rental-balance/reverse") public Object reverseRentalBalance(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody com.carrental.modules.booking.service.RentalBalanceService.ReverseInput input){return service.reverseRentalBalance(a,id,input);}
  public record PhotoReview(long version,boolean approve,String reason){}
  @PostMapping("/{id}/license-photo-review") public Object reviewPhotos(@AuthenticationPrincipal Actor a,@PathVariable String id,@RequestBody PhotoReview r){return service.reviewLicensePhotos(a,id,r.version(),r.approve(),r.reason());}

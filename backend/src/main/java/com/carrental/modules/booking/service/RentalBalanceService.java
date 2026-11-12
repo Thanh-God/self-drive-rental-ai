@@ -31,18 +31,23 @@ public class RentalBalanceService {
 
     public record Input(BigDecimal amountVnd, String method, String reference, String idempotencyKey, long expectedVersion, boolean confirmed) {}
     public record ReverseInput(String reason, String idempotencyKey, long expectedVersion, boolean confirmed) {}
+    /** L9 (Q8): Admin records the DEMO refund of the whole recorded rent after the booking was cancelled. */
+    public record RefundInput(BigDecimal amountVnd, String method, String reference, String idempotencyKey, long expectedVersion, boolean confirmed) {}
 
     /** Stored log line. actorId stays in the database for audit and is never sent to clients. */
     public record LogEntry(String kind, long amount, String method, String reference, String actorId, String actorName,
                            Instant at, String reason, String key) {}
 
     public record Recorded(long amount, String method, String reference, Instant recordedAt) {}
+    /** L9: the refund owed or done for a cancelled booking (amount = the recorded rent). */
+    public record Refund(long amount, String status, Instant dueSince, String method, String reference, Instant refundedAt) {}
     /** Log line as Staff/Admin see it: who (name), what and why, no internal ids or keys. */
     public record HistoryItem(String kind, long amount, String method, String reference, String actorName, Instant at, String reason) {}
 
     public record Summary(String policy, long dueAmount, String status, boolean demo, Recorded recorded,
                           @JsonInclude(JsonInclude.Include.NON_NULL) String recordedByName,
-                          @JsonInclude(JsonInclude.Include.NON_NULL) List<HistoryItem> history) {}
+                          @JsonInclude(JsonInclude.Include.NON_NULL) List<HistoryItem> history,
+                          @JsonInclude(JsonInclude.Include.NON_NULL) Refund refund) {}
 
     private final ObjectMapper json;
     private final Clock clock;
@@ -73,18 +78,68 @@ public class RentalBalanceService {
         long due = due(b);
         Recorded recorded = b.rentalBalanceAmount == null ? null
             : new Recorded(b.rentalBalanceAmount, b.rentalBalanceMethod, b.rentalBalanceReference, b.rentalBalanceRecordedAt);
-        String status = recorded != null ? "RECORDED" : due > 0 ? "DUE" : "NOT_DUE";
+        Refund refund = refund(b);
+        String status = refund != null ? refund.status() : recorded != null ? "RECORDED" : due > 0 ? "DUE" : "NOT_DUE";
         boolean demoMode = b.rentalBalanceDemo != null ? b.rentalBalanceDemo : demo;
         List<HistoryItem> history = staffView ? log(b).stream()
             .map(e -> new HistoryItem(e.kind(), e.amount(), e.method(), e.reference(), e.actorName(), e.at(), e.reason())).toList() : null;
         return new Summary(b.rentalBalancePolicy, due, status, demoMode, recorded,
-            staffView ? b.rentalBalanceRecordedByName : null, history);
+            staffView ? b.rentalBalanceRecordedByName : null, history, refund);
+    }
+
+    /** L9 (Q8): REFUND_DUE after a cancellation with a current record, REFUNDED once Admin recorded the refund; null otherwise. */
+    public Refund refund(Booking b) {
+        LogEntry due = null, done = null;
+        for (var e : log(b)) {
+            if ("REFUND_DUE".equals(e.kind())) due = e;
+            else if ("REFUNDED".equals(e.kind())) done = e;
+        }
+        if (due == null) return null;
+        return done == null ? new Refund(due.amount(), "REFUND_DUE", due.at(), null, null, null)
+            : new Refund(done.amount(), "REFUNDED", due.at(), done.method(), done.reference(), done.at());
+    }
+
+    /** L9 (Q8): a booking cancelled while the remaining rent is recorded owes the whole recorded amount back. */
+    public void markRefundDue(Actor actor, Booking b, String reason) {
+        if (b.rentalBalanceAmount == null || refund(b) != null) return;
+        append(b, new LogEntry("REFUND_DUE", b.rentalBalanceAmount, b.rentalBalanceMethod, b.rentalBalanceReference,
+            actor.id(), actor.fullName(), clock.instant().truncatedTo(ChronoUnit.MICROS), reason, null));
+    }
+
+    public boolean duplicateRefund(Actor actor, Booking b, RefundInput input) {
+        for (var e : log(b)) {
+            if (e.key() == null || !Objects.equals(e.key(), input.idempotencyKey())) continue;
+            if (!"REFUNDED".equals(e.kind()) || !e.actorId().equals(actor.id()) || !input.confirmed()
+                || input.amountVnd() == null || e.amount() != exact(input.amountVnd())
+                || !Objects.equals(e.method(), input.method()) || !Objects.equals(e.reference(), blankToNull(input.reference())))
+                throw DomainException.conflict("Mã thao tác đã dùng cho nội dung khác. Tải lại đơn để kiểm tra.");
+            return true;
+        }
+        return false;
+    }
+
+    public void refund(Actor admin, Booking b, RefundInput input) {
+        if (!input.confirmed()) throw DomainException.bad("Cần xác nhận đã hoàn đủ cho khách trước khi ghi nhận.");
+        required(input.idempotencyKey(), 80, "mã thao tác");
+        var state = refund(b);
+        if (state == null) throw DomainException.conflict("Đơn không có khoản tiền thuê cần hoàn. Tải lại đơn.");
+        if ("REFUNDED".equals(state.status())) throw DomainException.conflict("Khoản tiền thuê đã được ghi nhận hoàn. Tải lại đơn.");
+        if (input.amountVnd() == null) throw DomainException.bad("Nhập số tiền đã hoàn.");
+        if (exact(input.amountVnd()) != state.amount())
+            throw DomainException.conflict("Số tiền hoàn phải đúng bằng khoản đã ghi nhận " + state.amount() + " đ (hoàn toàn bộ). Tải lại đơn.");
+        if (!METHODS.contains(Objects.toString(input.method(), ""))) throw DomainException.bad("Chọn phương thức hoàn: tiền mặt hoặc chuyển khoản.");
+        String reference = blankToNull(input.reference());
+        if (reference != null) required(reference, 120, "tham chiếu");
+        if ("BANK_TRANSFER".equals(input.method()) && reference == null)
+            throw DomainException.bad("Chuyển khoản hoàn cần mã tham chiếu giao dịch.");
+        append(b, new LogEntry("REFUNDED", state.amount(), input.method(), reference, admin.id(), admin.fullName(),
+            clock.instant().truncatedTo(ChronoUnit.MICROS), null, input.idempotencyKey()));
     }
 
     /** Same key already used: same actor and content returns true (no second write), anything else is a conflict. */
     public boolean duplicateRecord(Actor actor, Booking b, Input input) {
         for (var e : log(b)) {
-            if (!Objects.equals(e.key(), input.idempotencyKey())) continue;
+            if (e.key() == null || !Objects.equals(e.key(), input.idempotencyKey())) continue;
             if (!"RECORDED".equals(e.kind()) || !e.actorId().equals(actor.id()) || !input.confirmed()
                 || input.amountVnd() == null || e.amount() != exact(input.amountVnd())
                 || !Objects.equals(e.method(), input.method()) || !Objects.equals(e.reference(), blankToNull(input.reference())))
@@ -96,7 +151,7 @@ public class RentalBalanceService {
 
     public boolean duplicateReverse(Actor actor, Booking b, ReverseInput input) {
         for (var e : log(b)) {
-            if (!Objects.equals(e.key(), input.idempotencyKey())) continue;
+            if (e.key() == null || !Objects.equals(e.key(), input.idempotencyKey())) continue;
             if (!"REVERSED".equals(e.kind()) || !e.actorId().equals(actor.id()) || !input.confirmed()
                 || !Objects.equals(e.reason(), input.reason()))
                 throw DomainException.conflict("Mã thao tác đã dùng cho nội dung khác. Tải lại đơn để kiểm tra.");

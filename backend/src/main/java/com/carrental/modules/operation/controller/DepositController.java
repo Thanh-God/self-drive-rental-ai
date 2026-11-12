@@ -33,7 +33,7 @@ public class DepositController {
     }
 
     public record Approval(long expectedVersion) {}
-    public record NoShow(long expectedVersion, boolean contacted, boolean notDelivered, String reason) {}
+    public record NoShow(long expectedVersion, boolean contacted, boolean customerDidNotCancel, boolean notDelivered, String reason) {}
     public record Decision(long expectedVersion,
         @com.fasterxml.jackson.databind.annotation.JsonDeserialize(using = WholeVnd.class) long amount, String reason, String customerNote) {}
     public record ReportInput(String transactionRef, java.time.Instant transferTime, String transferNote, String sourceAccount, String idempotencyKey) {}
@@ -129,7 +129,7 @@ public class DepositController {
 
     @PostMapping("/bookings/{id}/no-show")
     public Object noShow(@AuthenticationPrincipal Actor actor, @PathVariable String id, @RequestBody NoShow input) {
-        return workflow.noShow(actor, id, input.expectedVersion(), input.contacted(), input.notDelivered(), input.reason());
+        return workflow.noShow(actor, id, input.expectedVersion(), input.contacted(), input.customerDidNotCancel(), input.notDelivered(), input.reason());
     }
 
     @GetMapping("/admin/payments")

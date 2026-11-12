@@ -77,10 +77,10 @@ class DepositHttpTest {
     }
     @Test void noShowChecksTimeBranchAndDecisionBounds(){
         var b=create();approve(b.id(),b.version());var p=payments.start(user,b.id(),"127.0.0.1");receipt(p.transactionId(),390000,"10004");var confirmed=bookings.list(user).getFirst();
-        assertThrows(RuntimeException.class,()->workflow.noShow(staff,b.id(),confirmed.version(),true,true,"Synthetic no-show"));
+        assertThrows(RuntimeException.class,()->workflow.noShow(staff,b.id(),confirmed.version(),true,true,true,"Synthetic no-show"));
         clock.value=Instant.parse("2026-10-27T03:00:00Z");
-        assertThrows(RuntimeException.class,()->workflow.noShow(new Actor("demo-staff-hn","STAFF","Other"),b.id(),confirmed.version(),true,true,"Synthetic"));
-        workflow.noShow(staff,b.id(),confirmed.version(),true,true,"Synthetic no-show");var refund=repo.refundForPayment(p.transactionId()).orElseThrow();assertEquals("REQUESTED",refund.status());
+        assertThrows(RuntimeException.class,()->workflow.noShow(new Actor("demo-staff-hn","STAFF","Other"),b.id(),confirmed.version(),true,true,true,"Synthetic"));
+        workflow.noShow(staff,b.id(),confirmed.version(),true,true,true,"Synthetic no-show");var refund=repo.refundForPayment(p.transactionId()).orElseThrow();assertEquals("REQUESTED",refund.status());
         assertThrows(RuntimeException.class,()->payments.decide(staff,refund.id(),refund.version(),1,"Synthetic"));
         assertThrows(RuntimeException.class,()->payments.decide(admin,refund.id(),refund.version(),390001,"Synthetic"));
         payments.decide(admin,refund.id(),refund.version(),195000,"Synthetic partial refund");assertEquals("APPROVED",repo.refund(refund.id()).status());
@@ -125,7 +125,7 @@ class DepositHttpTest {
         var b=create();approve(b.id(),b.version());var p=payments.start(user,b.id(),"127.0.0.1");receipt(p.transactionId(),390000,"10014");var confirmed=bookings.list(user).getFirst();
         clock.value=Instant.parse("2026-10-26T03:00:00Z");rental.apply(staff,b.id(),TestActions.handover(confirmed.version(),null,"Synthetic handover",true,false));
         var active=bookings.list(user).getFirst();clock.value=Instant.parse("2026-10-27T03:00:00Z");
-        assertThrows(RuntimeException.class,()->workflow.noShow(staff,b.id(),active.version(),true,true,"Must refuse"));assertEquals("IN_PROGRESS",bookings.list(user).getFirst().status());assertTrue(repo.refundForPayment(p.transactionId()).isEmpty());
+        assertThrows(RuntimeException.class,()->workflow.noShow(staff,b.id(),active.version(),true,true,true,"Must refuse"));assertEquals("IN_PROGRESS",bookings.list(user).getFirst().status());assertTrue(repo.refundForPayment(p.transactionId()).isEmpty());
     }
     @Test void refundCompletionIsSeparateFromCancellationAndDoesNotResend(){
         var b=create();approve(b.id(),b.version());var p=payments.start(user,b.id(),"127.0.0.1");clock.value=p.expiresAt();receipt(p.transactionId(),390000,"10015");var r=repo.refundForPayment(p.transactionId()).orElseThrow();

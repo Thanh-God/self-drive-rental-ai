@@ -385,6 +385,8 @@ public class BookingService {
                     if ("LATE_CUSTOMER".equals(b.cancellationKind) && DepositPolicy.early(clock.instant(), b.startAt))
                         b.cancellationKind = "EARLY_USER";
                 }
+                // L9 (Q8): rent already recorded at the branch is owed back in full, whoever cancels.
+                rentalBalances.markRefundDue(a, b, "Đơn bị hủy: " + action.reason());
                 schedule(vehicle, null, b.id);
             }
             case "CONFIRMED", "REJECTED" -> {
@@ -544,6 +546,20 @@ public class BookingService {
         return view(b, null, null, clock.instant(), true);
     }
 
+    /** L9 (Q8): Admin records the DEMO refund of the whole recorded rent of a cancelled booking. Returns the Staff view. */
+    @Transactional
+    public View refundRentalBalance(Actor actor, String id, RentalBalanceService.RefundInput input) {
+        actor.require("ADMIN");
+        var b = lockDepositBooking(id);
+        if (b.rentalBalancePolicy == null) throw DomainException.conflict("Đơn không áp dụng ghi nhận phần tiền thuê còn lại.");
+        if (rentalBalances.duplicateRefund(actor, b, input)) return view(b, null, null, clock.instant(), true);
+        if (!"CANCELLED".equals(b.status)) throw DomainException.conflict("Chỉ ghi nhận hoàn tiền thuê cho đơn đã hủy.");
+        if (b.version != input.expectedVersion()) throw DomainException.conflict("Đơn đã thay đổi. Tải lại trước khi ghi nhận hoàn.");
+        rentalBalances.refund(actor, b, input);
+        repo.flush();
+        return view(b, null, null, clock.instant(), true);
+    }
+
     public Booking lockDepositBooking(String id) {
         vehicles.lock(repo.findVehicleIdById(id).orElseThrow(DomainException::missing));
         var b = repo.lock(id).orElseThrow(DomainException::missing);
@@ -679,21 +695,25 @@ public class BookingService {
     }
 
     @Transactional
-    public View noShow(Actor staff, String id, long expectedVersion, boolean contacted, boolean notDelivered, String note) {
+    public View noShow(Actor staff, String id, long expectedVersion, boolean contacted, boolean customerDidNotCancel, boolean notDelivered, String note) {
         var b = lockDepositBooking(id);
         branches.requireStaff(staff, b.pickupBranchId);
         reason(note);
         if (b.version != expectedVersion) throw DomainException.conflict("Đơn đã thay đổi.");
-        if (!contacted || !notDelivered || !"CONFIRMED".equals(b.status) ||
+        // L9 (Q9): "đã liên hệ" is not "khách không báo hủy"; Staff confirms both.
+        if (!contacted || !customerDidNotCancel || !notDelivered || !"CONFIRMED".equals(b.status) ||
             !clock.instant().atZone(RentalTerms.VIETNAM).toLocalDate().isAfter(b.startAt.atZone(RentalTerms.VIETNAM).toLocalDate()))
-            throw DomainException.bad("Chỉ ghi nhận sau hết ngày nhận; cần xác nhận đã liên hệ và chưa giao xe.");
+            throw DomainException.bad("Chỉ ghi nhận sau hết ngày nhận; cần xác nhận đã liên hệ, khách không báo hủy trước khi hết ngày nhận và chưa giao xe.");
+        // L9 (Q8): a customer who paid the remaining rent at the branch came; this is not a no-show.
+        if (b.rentalBalanceAmount != null)
+            throw DomainException.conflict("Đơn đã ghi nhận phần tiền thuê còn lại (khách đã thanh toán tại chi nhánh); không ghi nhận khách không đến nhận. Nếu không giao được xe, hủy đơn theo nguyên nhân phù hợp.");
         if (jdbc.queryForObject("select count(*) from vehicle_handover_records where booking_id=? and kind='HANDOVER'", Long.class, id) > 0)
             throw DomainException.conflict("Đã có biên bản giao xe; không xử lý no-show.");
         schedule(vehicles.lock(b.vehicleId), null, b.id);
         b.cancellationKind = "NO_SHOW";
         b.status = "CANCELLED";
         repo.flush();
-        history(b, "CONFIRMED", staff, "Khách không đến nhận: " + note);
+        history(b, "CONFIRMED", staff, "Khách không đến nhận, không báo hủy trước khi hết ngày nhận: " + note);
         return view(b);
     }
 

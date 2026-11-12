@@ -62,7 +62,7 @@ class ContractTermsTest {
     @Test
     void withoutDepositNothingIsRefundedAndTheTotalIsPaidAtTheBranch() {
         var a = ContractTerms.articles(facts(false, null, 1300000, true, false));
-        assertEquals("Đơn không có tiền cọc: hủy đơn không phát sinh khoản hoàn.", clauses(a, 3).get(0));
+        assertEquals("Đơn không có tiền cọc: hủy đơn khi chưa thanh toán không phát sinh khoản hoàn.", clauses(a, 3).get(0));
         assertTrue(clauses(a, 2).contains("Tổng tiền 1.300.000 đ được thanh toán tại chi nhánh nhận trước khi bàn giao xe; nhân viên ghi nhận khoản đã nhận trên hệ thống."),
             "R9: the remaining-rent policy needs the whole total before handover");
         var legacy = ContractTerms.articles(facts(false, null, 1300000, false, false));
@@ -70,6 +70,33 @@ class ContractTermsTest {
         assertTrue(clauses(legacy, 2).stream().noneMatch(c -> c.contains("trước khi bàn giao")));
         assertTrue(clauses(a, 2).stream().noneMatch(c -> c.contains("đặt cọc")));
         assertTrue(clauses(a, 9).get(1).contains("không phải trả khoản nào"));
+        assertEquals("Đơn không có tiền cọc: hủy đơn không phát sinh khoản hoàn.", clauses(legacy, 3).get(0), "bookings without L4 keep the old line");
+        assertEquals(2, clauses(legacy, 3).size());
+        assertFalse(clauses(legacy, 9).get(1).contains("tiền thuê đã thanh toán"));
+    }
+
+    /** L9 (Q8): with the remaining-rent policy, rent paid at the branch is refunded in full on any cancellation and blocks no-show. */
+    @Test
+    void paidRentIsRefundedInFullOnCancellationUnderTheRemainingRentPolicy() {
+        String paid = "Phần tiền thuê đã thanh toán tại chi nhánh trước khi bị hủy được hoàn toàn bộ, kể cả khi hủy sát giờ; đơn đã thanh toán khoản này không bị xử lý là không đến nhận xe.";
+        var noDeposit = ContractTerms.articles(facts(false, null, 1300000, true, false));
+        assertTrue(clauses(noDeposit, 3).contains(paid));
+        assertTrue(clauses(noDeposit, 3).contains("Khoản hoàn được ghi nhận trên hệ thống; trong chế độ thử nghiệm không chuyển tiền thật."));
+        assertTrue(clauses(noDeposit, 9).get(1).contains("hoàn toàn bộ tiền thuê đã thanh toán tại chi nhánh (nếu có)"));
+        var deposit = ContractTerms.articles(facts(true, DepositPolicy.QR_VERSION, 910000, true, false));
+        assertTrue(clauses(deposit, 3).contains(paid));
+        assertTrue(clauses(deposit, 9).get(1).endsWith("hoàn toàn bộ tiền cọc cùng phần tiền thuê đã thanh toán tại chi nhánh (nếu có)."));
+        var withoutPolicy = ContractTerms.articles(facts(true, DepositPolicy.QR_VERSION, 910000, false, false));
+        assertFalse(clauses(withoutPolicy, 3).contains(paid));
+        assertTrue(clauses(withoutPolicy, 9).get(1).endsWith("hoàn toàn bộ tiền cọc."));
+    }
+
+    /** L9 (Q9): the no-show rule says the customer did not cancel and how the branch records it. */
+    @Test
+    void noShowClauseNeedsTheCustomerNotToHaveCancelled() {
+        var cancel = clauses(ContractTerms.articles(facts(true, DepositPolicy.QR_VERSION, 910000, false, false)), 3);
+        assertTrue(cancel.stream().anyMatch(c -> c.startsWith("Không đến nhận xe và không báo hủy trước khi hết ngày nhận")
+            && c.contains("ghi kênh, thời điểm liên hệ") && c.contains("không được hoàn")));
     }
 
     @Test

@@ -50,9 +50,9 @@ public class DepositWorkflow {
         });
     }
 
-    public Object noShow(Actor staff, String id, long version, boolean contacted, boolean notDelivered, String reason) {
+    public Object noShow(Actor staff, String id, long version, boolean contacted, boolean customerDidNotCancel, boolean notDelivered, String reason) {
         return tx.execute(s -> {
-            var b = bookings.noShow(staff, id, version, contacted, notDelivered, reason);
+            var b = bookings.noShow(staff, id, version, contacted, customerDidNotCancel, notDelivered, reason);
             payments.cancellation(b);
             return b;
         });

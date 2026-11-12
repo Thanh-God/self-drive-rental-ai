@@ -73,8 +73,11 @@ public final class ContractTerms {
         add(list, "Trách nhiệm của Bên cho thuê",
             "Giao xe đúng thời gian, đúng chi nhánh, bảo đảm an toàn kỹ thuật; xe có giấy tờ hợp lệ và bảo hiểm bắt buộc còn hiệu lực.",
             f.depositRequired()
-                ? "Nếu không giao được xe (xe hỏng, không bảo đảm an toàn hoặc lý do từ phía doanh nghiệp), Bên cho thuê liên hệ báo Bên thuê, hủy đơn và hoàn toàn bộ tiền cọc."
-                : "Nếu không giao được xe (xe hỏng, không bảo đảm an toàn hoặc lý do từ phía doanh nghiệp), Bên cho thuê liên hệ báo Bên thuê và hủy đơn; Bên thuê không phải trả khoản nào.",
+                ? "Nếu không giao được xe (xe hỏng, không bảo đảm an toàn hoặc lý do từ phía doanh nghiệp), Bên cho thuê liên hệ báo Bên thuê, hủy đơn và hoàn toàn bộ tiền cọc"
+                    + (f.rentalBalancePolicy() ? " cùng phần tiền thuê đã thanh toán tại chi nhánh (nếu có)." : ".")
+                : f.rentalBalancePolicy()
+                    ? "Nếu không giao được xe (xe hỏng, không bảo đảm an toàn hoặc lý do từ phía doanh nghiệp), Bên cho thuê liên hệ báo Bên thuê, hủy đơn và hoàn toàn bộ tiền thuê đã thanh toán tại chi nhánh (nếu có); Bên thuê không phải trả khoản nào."
+                    : "Nếu không giao được xe (xe hỏng, không bảo đảm an toàn hoặc lý do từ phía doanh nghiệp), Bên cho thuê liên hệ báo Bên thuê và hủy đơn; Bên thuê không phải trả khoản nào.",
             "Hỗ trợ Bên thuê khi xe gặp sự cố kỹ thuật không do lỗi của Bên thuê.");
         add(list, "Dữ liệu cá nhân",
             "Thông tin cá nhân và ảnh GPLX chỉ dùng để xác minh điều kiện thuê, thực hiện hợp đồng và giải quyết sự cố, vi phạm liên quan đến đơn.",
@@ -113,7 +116,13 @@ public final class ContractTerms {
     }
 
     private static String[] cancellation(Facts f) {
-        if (!f.depositRequired()) return new String[] {
+        // L9 (Q8): rent already paid at the branch (remaining-rent policy) is refunded in full on any cancellation.
+        String paidRent = "Phần tiền thuê đã thanh toán tại chi nhánh trước khi bị hủy được hoàn toàn bộ, kể cả khi hủy sát giờ; đơn đã thanh toán khoản này không bị xử lý là không đến nhận xe.";
+        if (!f.depositRequired()) return f.rentalBalancePolicy() ? new String[] {
+            "Đơn không có tiền cọc: hủy đơn khi chưa thanh toán không phát sinh khoản hoàn.",
+            paidRent,
+            "Bên thuê tự hủy trên hệ thống khi còn ít nhất 24 giờ trước giờ nhận xe; sau mốc này, liên hệ chi nhánh nhận.",
+            "Khoản hoàn được ghi nhận trên hệ thống; trong chế độ thử nghiệm không chuyển tiền thật." } : new String[] {
             "Đơn không có tiền cọc: hủy đơn không phát sinh khoản hoàn.",
             "Bên thuê tự hủy trên hệ thống khi còn ít nhất 24 giờ trước giờ nhận xe; sau mốc này, liên hệ chi nhánh nhận." };
         var c = new ArrayList<String>(List.of(
@@ -121,10 +130,11 @@ public final class ContractTerms {
             "Bên cho thuê từ chối hoặc không giao được xe: hoàn toàn bộ cọc."));
         if (DepositPolicy.fixedCancellationRules(f.depositPolicy())) {
             c.add("Hủy dưới 24 giờ trước mốc nhận (liên hệ nhân viên chi nhánh nhận): hoàn toàn bộ cọc.");
-            c.add("Không đến nhận xe và không báo trước khi hết ngày nhận: cọc giữ chỗ không được hoàn; khoản chuyển ngoài cọc (nếu có) được hoàn toàn bộ.");
+            c.add("Không đến nhận xe và không báo hủy trước khi hết ngày nhận (nhân viên chi nhánh nhận xác nhận đã liên hệ và ghi kênh, thời điểm liên hệ): cọc giữ chỗ không được hoàn; khoản chuyển ngoài cọc (nếu có) được hoàn toàn bộ.");
         } else {
             c.add("Hủy dưới 24 giờ trước mốc nhận hoặc không đến nhận xe: quản trị viên quyết định mức hoàn 0–100%, có ghi lý do.");
         }
+        if (f.rentalBalancePolicy()) c.add(paidRent);
         c.add("Khoản hoàn được ghi nhận trên hệ thống; trong chế độ thử nghiệm không chuyển tiền thật.");
         return c.toArray(String[]::new);
     }

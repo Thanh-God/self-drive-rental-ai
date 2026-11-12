@@ -541,10 +541,10 @@ class QrDemoHttpTest {
         var b=approve();var wrong=new Actor("demo-staff-hn","STAFF","Other");assertEquals(403,post(wrong,"/bookings/"+b.id()+"/deposit/verify",input(b.id(),"A",390000,clock.instant())).getStatus());
         verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-26T03:00:00Z");
         rental.apply(staff,b.id(),TestActions.handover(current(b.id()).version(),null,"Fixture handover",true,false));
-        clock.value=Instant.parse("2026-10-27T03:00:00Z");assertThrows(com.carrental.exception.DomainException.class,()->workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Must not cancel delivered car"));assertEquals("IN_PROGRESS",current(b.id()).status());
+        clock.value=Instant.parse("2026-10-27T03:00:00Z");assertThrows(com.carrental.exception.DomainException.class,()->workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,true,"Must not cancel delivered car"));assertEquals("IN_PROGRESS",current(b.id()).status());
     }
     @Test void noShowRefundRemainsAdminDecisionIncludingZeroOnLegacyPolicy()throws Exception {
-        var b=approve();legacyPolicy(b.id());verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Contacted, not delivered");
+        var b=approve();legacyPolicy(b.id());verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,true,"Contacted, not delivered");
         var refund=repo.refunds(b.id()).getFirst();assertEquals("REQUESTED",refund.status());payments.decide(admin,refund.id(),refund.version(),0,"Admin decision, no refund");assertEquals("DECLINED",repo.refund(refund.id()).status());
     }
 
@@ -569,7 +569,7 @@ class QrDemoHttpTest {
         var b=approve();verify(b.id(),"V2-NOSHOW",500000); // 390000 applied, 110000 excess
         assertEquals("CONFIRMED",current(b.id()).status());
         var excess=repo.refunds(b.id());assertEquals(1,excess.size());assertEquals("EXCESS",excess.getFirst().kind());assertEquals(110000,excess.getFirst().amount());
-        clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Contacted, not delivered");
+        clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,true,"Contacted, not delivered");
         assertEquals("CANCELLED",current(b.id()).status());
         var noShow=repo.refunds(b.id()).stream().filter(r->"NO_SHOW".equals(r.kind())).toList();
         assertEquals(1,noShow.size());assertEquals("DECLINED",noShow.getFirst().status());assertEquals(0,noShow.getFirst().amount());
