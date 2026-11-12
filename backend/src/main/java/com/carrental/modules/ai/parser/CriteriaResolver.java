@@ -18,9 +18,12 @@ public final class CriteriaResolver {
     /** The ACTIVE branches the text names, and their distinct names in sorted order (for the model schema). */
     public record Mentioned(List<RentalBranchCatalog.Item> candidates, List<String> names) {}
 
-    public Mentioned mentioned(String text) {
+    public Mentioned mentioned(String text) { return mentioned(text, branches.active()); }
+
+    /** As above against a snapshot of the ACTIVE branches the caller already read. */
+    public Mentioned mentioned(String text, List<RentalBranchCatalog.Item> active) {
         String words = StatedCriteria.words(text);
-        var candidates = branches.active().stream().filter(branch -> StatedCriteria.mentioned(words, branch.name())).toList();
+        var candidates = active.stream().filter(branch -> StatedCriteria.mentioned(words, branch.name())).toList();
         return new Mentioned(candidates, candidates.stream().map(RentalBranchCatalog.Item::name).distinct().sorted().toList());
     }
 
@@ -138,8 +141,10 @@ public final class CriteriaResolver {
     public static boolean asksAboutOwnBooking(String text) { return OWN_BOOKING.matcher(StatedCriteria.words(text)).find(); }
 
     /** At least one search criterion can be read from the text without a model. */
-    public boolean statesCriterion(String text) {
-        return !fullDates(text).isEmpty() || !mentioned(text).candidates().isEmpty()
+    public boolean statesCriterion(String text) { return statesCriterion(text, branches.active()); }
+
+    public boolean statesCriterion(String text, List<RentalBranchCatalog.Item> active) {
+        return !fullDates(text).isEmpty() || !mentioned(text, active).candidates().isEmpty()
             || statedPassengers(text, false) != null || statedBudget(text, false) != null;
     }
 

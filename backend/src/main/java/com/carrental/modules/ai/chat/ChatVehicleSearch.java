@@ -60,18 +60,21 @@ public class ChatVehicleSearch {
         this.recommendations = recommendations;
     }
 
+    /** R7: the ACTIVE branches, read once per chat request and passed to every step below. */
+    public List<RentalBranchCatalog.Item> activeBranches() { return branches.active(); }
+
     /** Branch names the message mentions and the gearbox it states: all the model may fill in. */
-    public QwenChatModel.SearchHints hints(String message) {
-        return new QwenChatModel.SearchHints(resolver.mentioned(message).names(), CriteriaResolver.statedTransmission(message));
+    public QwenChatModel.SearchHints hints(String message, List<RentalBranchCatalog.Item> active) {
+        return new QwenChatModel.SearchHints(resolver.mentioned(message, active).names(), CriteriaResolver.statedTransmission(message));
     }
 
     /**
      * R3 (REVIEW #5): the model may only start or continue a vehicle search when the customer asks for one, states
      * at least one criterion the backend can read itself, or a search is already under way.
      */
-    public boolean searchRequested(String message, Session session) {
-        return CriteriaResolver.asksForVehicles(message) || resolver.statesCriterion(message)
-            || (session != null && sanitize(session, activeIds()).active());
+    public boolean searchRequested(String message, Session session, List<RentalBranchCatalog.Item> active) {
+        return CriteriaResolver.asksForVehicles(message) || resolver.statesCriterion(message, active)
+            || (session != null && sanitize(session, ids(active)).active());
     }
 
     /** "Xe tôi đặt hôm qua…": a question about the customer's own booking, which the assistant cannot read. */
@@ -82,9 +85,9 @@ public class ChatVehicleSearch {
      * itself (a full date, a branch name, "4 người", "3 triệu"), the criteria for this turn without any model call.
      * Null when the message does not answer the asked field that way.
      */
-    public QwenChatModel.Criteria answerToAskedField(String message, Session session) {
+    public QwenChatModel.Criteria answerToAskedField(String message, Session session, List<RentalBranchCatalog.Item> active) {
         if (session == null) return null;
-        var base = sanitize(session, activeIds());
+        var base = sanitize(session, ids(active));
         String asked = base.askedField();
         if (asked == null) return null;
         var dates = CriteriaResolver.fullDates(message);
@@ -94,7 +97,7 @@ public class ChatVehicleSearch {
             if ("returnDate".equals(asked)) end = dates.get(0);
             else if ("pickupDate".equals(asked)) start = dates.get(0);
         }
-        var names = resolver.mentioned(message).names();
+        var names = resolver.mentioned(message, active).names();
         String pickupName = null, returnName = null;
         if (names.size() == 1) {
             if ("pickupBranchId".equals(asked)) pickupName = names.get(0);
@@ -103,7 +106,7 @@ public class ChatVehicleSearch {
         var drafted = new QwenChatModel.Criteria(start, end, pickupName, returnName,
             CriteriaResolver.statedPassengers(message, "passengers".equals(asked)),
             CriteriaResolver.statedBudget(message, true), null, List.of());
-        var draft = resolve(message, drafted, base);
+        var draft = resolve(message, drafted, base, active);
         boolean answered = switch (asked) {
             case "pickupDate" -> draft.pickupDate() != null;
             case "returnDate" -> draft.returnDate() != null;
@@ -115,16 +118,17 @@ public class ChatVehicleSearch {
         return answered ? drafted : null;
     }
 
-    private List<String> activeIds() {
-        return branches.active().stream().map(RentalBranchCatalog.Item::id).toList();
+    private static List<String> ids(List<RentalBranchCatalog.Item> active) {
+        return active.stream().map(RentalBranchCatalog.Item::id).toList();
     }
 
     /** This turn's values that the customer's own text supports (dates and branches as the parser checks them). */
-    private CriteriaExtractionService.Draft resolve(String message, QwenChatModel.Criteria c, Session base) {
+    private CriteriaExtractionService.Draft resolve(String message, QwenChatModel.Criteria c, Session base,
+                                                     List<RentalBranchCatalog.Item> active) {
         var extraction = new CriteriaParser.Extraction("NEEDS_CLARIFICATION", c.pickupDate(), c.returnDate(),
             c.pickupBranchName(), c.returnBranchName(), c.passengers(), c.budgetVndTotal(), c.transmission(),
             c.unresolvedFields(), List.of());
-        var r = resolver.resolve(message, extraction, resolver.mentioned(message)).draft();
+        var r = resolver.resolve(message, extraction, resolver.mentioned(message, active)).draft();
         String asked = base == null ? null : base.askedField();
         // D8 (REVIEW #6): party size and budget only when the text states them; a model guess is asked again.
         // One plain amount without a daily rate counts as the budget; a lone number counts as people only when asked.
@@ -133,12 +137,11 @@ public class ChatVehicleSearch {
             CriteriaResolver.statedBudget(message, true), r.transmission());
     }
 
-    public Result run(Actor actor, String message, QwenChatModel.Criteria drafted, Session session) {
-        var active = branches.active();
-        var activeIds = active.stream().map(RentalBranchCatalog.Item::id).toList();
-        var base = sanitize(session, activeIds);
+    public Result run(Actor actor, String message, QwenChatModel.Criteria drafted, Session session,
+                      List<RentalBranchCatalog.Item> active) {
+        var base = sanitize(session, ids(active));
         var c = drafted == null ? new QwenChatModel.Criteria(null, null, null, null, null, null, null, List.of()) : drafted;
-        var resolved = resolve(message, c, base);
+        var resolved = resolve(message, c, base, active);
         var undecided = c.unresolvedFields();
 
         String pickupDate = pick(resolved.pickupDate(), base.pickupDate(), undecided.contains("pickupDate"));

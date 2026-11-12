@@ -44,3 +44,7 @@ Model chỉ soạn nháp; backend quyết định nội dung trả về:
 ## Lỗi và hạn mức
 
 Theo [hạn mức hằng ngày](ai-assistant.md#hạn-mức-câu-hỏi-ai-mỗi-ngày), một câu chỉ trừ lượt khi backend đã có câu trả lời hoàn chỉnh cho nó (model trả lời, hậu kiểm và tìm xe xong). Lỗi phía backend sau khi model trả lời (ví dụ bước tìm xe lỗi) hoàn lại lượt. Khách tự đóng, tải lại hoặc đăng xuất khi backend vẫn hoàn tất câu trả lời thì lượt vẫn bị trừ. Không trừ lượt: 400, 401, 403, 503 (tắt hoặc lỗi provider), 429 khi trợ lý đang bận (không có `code`), hết thời gian chờ, và câu backend tự trả lời không cần model. Hết lượt trả 429 `code: "AI_DAILY_LIMIT"`, không gọi model. Số lượt còn lại (`quota.remaining`) đã trừ cả câu đang được trả lời; hạn mức giữ trong bộ nhớ của một backend nên khởi động lại thì đếm lại, và nhiều backend sẽ đếm riêng.
+
+## Đo thời gian
+
+Mỗi câu chat ghi một dòng log `ai_chat_timing`: kết quả (`intent` hoặc mã lỗi), có gọi model hay backend tự trả lời, thời gian truy xuất, đọc danh mục chi nhánh (một lần mỗi câu), gọi model, tìm xe và tổng; kèm số liệu Ollama trả về nếu có (thời gian nạp model, số token và thời gian đọc prompt, sinh câu trả lời). Dòng log chỉ có thời lượng và số đếm, không có câu hỏi, câu trả lời, tiêu chí hay tài khoản. Bản chạy đánh giá live ghi các số này vào từng lượt và `scripts/ai/evaluation/chat_timing_summary.py` tóm tắt p50/p95 theo loại câu, tách lượt model đang nạp (cold).

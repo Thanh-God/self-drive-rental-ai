@@ -7,6 +7,7 @@ import com.carrental.security.Actor;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.carrental.modules.ai.knowledge.KnowledgeBase;
 import com.carrental.modules.ai.knowledge.KnowledgeRetriever;
+import com.carrental.modules.booking.service.RentalBranchCatalog;
 import java.text.Normalizer;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -78,13 +79,21 @@ public class ChatService {
     private final ObjectProvider<QwenChatModel> model;
     private final AiDailyQuota quota;
     private final ChatVehicleSearch search;
+    private final ChatTimings timings;
     /** Word runs of the system instructions that never occur in approved text: seeing one in a reply is a leak. */
     private final Set<String> instructionRuns;
     static final int LEAK_RUN = 8;
 
-    @Autowired
     public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
                        ObjectProvider<QwenChatModel> model, AiDailyQuota quota, ChatVehicleSearch search) {
+        this(knowledge, retriever, builder, model, quota, search, new ChatTimings());
+    }
+
+    @Autowired
+    public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
+                       ObjectProvider<QwenChatModel> model, AiDailyQuota quota, ChatVehicleSearch search,
+                       ChatTimings timings) {
+        this.timings = timings;
         this.knowledge = knowledge;
         this.retriever = retriever;
         this.builder = builder;
@@ -143,7 +152,26 @@ public class ChatService {
 
     private Answer answer(String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline, Actor actor,
                           ChatVehicleSearch.Session session) {
+        // R7: every question records where its time went, errors included; no content is recorded.
+        var clock = new ChatTimings.Clock();
+        try {
+            var answer = answer(message, history, deadline, actor, session, clock);
+            timings.add(clock.finish(answer.intent(), 200));
+            return answer;
+        } catch (DomainException e) {
+            timings.add(clock.finish(null, e.status.value()));
+            throw e;
+        } catch (RuntimeException | Error e) {
+            timings.add(clock.finish(null, 500));
+            throw e;
+        }
+    }
+
+    private Answer answer(String message, List<ChatPromptBuilder.Turn> history, AiRequestDeadline deadline, Actor actor,
+                          ChatVehicleSearch.Session session, ChatTimings.Clock clock) {
+        long t = System.nanoTime();
         var passages = retriever.retrieve(message);
+        clock.retrieveNanos = ChatTimings.Clock.since(t);
         var prompt = builder.build(message, history, passages); // 400 for blank, oversized or sensitive input
         boolean injection = looksLikeInjection(message);
         var guards = new ArrayList<Guard>();
@@ -151,43 +179,78 @@ public class ChatService {
             guards.add(Guard.INJECTION_NO_PASSAGE);
             return new Answer("OUT_OF_SCOPE", refusal("K-G01"), List.of(), knowledge.version(), List.copyOf(guards));
         }
-        if (actor != null && search != null && session != null && !injection) {
+        boolean searching = actor != null && search != null;
+        // R7: one read of the ACTIVE branches serves every step of this request.
+        List<RentalBranchCatalog.Item> active = List.of();
+        if (searching) {
+            t = System.nanoTime();
+            active = search.activeBranches();
+            clock.branchesNanos = ChatTimings.Clock.since(t);
+            clock.branchReads++;
+        }
+        if (searching && session != null && !injection) {
             // D2 (REVIEW #8): a plain answer to the field the backend asked for needs no model and uses no allowance.
-            var direct = search.answerToAskedField(message, session);
+            var direct = search.answerToAskedField(message, session, active);
             if (direct != null) {
                 guards.add(Guard.ANSWERED_WITHOUT_MODEL);
-                var found = search.run(actor, message, direct, session);
+                clock.answeredWithoutModel = true;
+                var found = run(actor, message, direct, session, active, clock);
                 return new Answer(found.intent(), found.reply(), List.of(), knowledge.version(), List.copyOf(guards),
                     found.criteria(), found.missing(), found.cards());
             }
         }
         var engine = model.getIfAvailable();
         if (engine == null) throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "Chưa bật trợ lý hỏi đáp.");
-        boolean searching = actor != null && search != null;
-        var hints = searching ? search.hints(message) : QwenChatModel.SearchHints.NONE;
-        if (actor == null) return finish(engine.ask(prompt, deadline, hints), prompt, message, injection, guards, null, session);
+        var hints = searching ? search.hints(message, active) : QwenChatModel.SearchHints.NONE;
+        if (actor == null)
+            return finish(ask(engine, prompt, deadline, hints, clock), prompt, message, injection, guards, null, session, active, clock);
         // D4: the question counts once the backend has a complete answer for it. A backend failure after the model
         // replied (checks, vehicle search) gives the question back; the customer leaving afterwards does not.
         try (var held = quota.reserve(actor)) {
-            var drafted = engine.ask(prompt, deadline, hints);
-            var answer = finish(drafted, prompt, message, injection, guards, actor, session);
+            var drafted = ask(engine, prompt, deadline, hints, clock);
+            var answer = finish(drafted, prompt, message, injection, guards, actor, session, active, clock);
             held.commit();
             return answer;
         }
     }
 
+    private static QwenChatModel.Reply ask(QwenChatModel engine, ChatPromptBuilder.Prompt prompt, AiRequestDeadline deadline,
+                                           QwenChatModel.SearchHints hints, ChatTimings.Clock clock) {
+        clock.modelCalled = true;
+        long t = System.nanoTime();
+        try {
+            var reply = engine.ask(prompt, deadline, hints);
+            clock.usage = reply.usage();
+            return reply;
+        } finally {
+            clock.modelNanos = ChatTimings.Clock.since(t);
+        }
+    }
+
+    private ChatVehicleSearch.Result run(Actor actor, String message, QwenChatModel.Criteria drafted,
+                                         ChatVehicleSearch.Session session, List<RentalBranchCatalog.Item> active,
+                                         ChatTimings.Clock clock) {
+        long t = System.nanoTime();
+        try {
+            return search.run(actor, message, drafted, session, active);
+        } finally {
+            clock.searchNanos = ChatTimings.Clock.since(t);
+        }
+    }
+
     private Answer finish(QwenChatModel.Reply drafted, ChatPromptBuilder.Prompt prompt, String message, boolean injection,
-                          List<Guard> guards, Actor actor, ChatVehicleSearch.Session session) {
+                          List<Guard> guards, Actor actor, ChatVehicleSearch.Session session,
+                          List<RentalBranchCatalog.Item> active, ChatTimings.Clock clock) {
         var checked = check(drafted, prompt, message, injection, guards);
         if (actor == null || search == null || !Set.of("SEARCH_VEHICLES", "ASK_MISSING").contains(checked.intent())) return checked;
-        if (!search.searchRequested(message, session)) {
+        if (!search.searchRequested(message, session, active)) {
             // REVIEW #5: "Xe có ghế trẻ em không?" is a question, not a search; the model's choice is not enough.
             guards.add(Guard.SEARCH_NOT_REQUESTED);
             if (search.asksAboutOwnBooking(message)) return done("OUT_OF_SCOPE", refusal("K-G03"), List.of(), guards);
             return done("ANSWER", knowledge.fallbackReply(), List.of(), guards);
         }
         // One model call per message: the same reply carries the criteria draft; the backend does the search.
-        var found = search.run(actor, message, drafted.criteria(), session);
+        var found = run(actor, message, drafted.criteria(), session, active, clock);
         return new Answer(found.intent(), found.reply(), List.of(), knowledge.version(), checked.guards(),
             found.criteria(), found.missing(), found.cards());
     }

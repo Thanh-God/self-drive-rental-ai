@@ -48,6 +48,7 @@ class AiChatEvaluationIT {
     @Autowired TokenService tokens;
     @Autowired AccountService accounts;
     @Autowired ObjectMapper json;
+    @Autowired com.carrental.modules.ai.chat.ChatTimings timings;
     final Path repo = Path.of("..").toAbsolutePath().normalize();
 
     HttpHeaders headers() {
@@ -62,6 +63,7 @@ class AiChatEvaluationIT {
         if (!history.isEmpty()) body.set("messages", history.deepCopy());
         if (criteria != null && !criteria.isNull()) body.set("criteria", criteria);
         var row = json.createObjectNode();
+        var before = latestTiming();
         long t = System.nanoTime();
         try {
             var r = http.exchange("/api/v1/ai/chat", HttpMethod.POST, new HttpEntity<>(body, headers()), JsonNode.class);
@@ -73,7 +75,15 @@ class AiChatEvaluationIT {
             row.put("error", e.getClass().getSimpleName());
         }
         row.put("elapsedMs", (System.nanoTime() - t) / 1_000_000);
+        // R7: the backend's per-stage figures for this turn (durations and counts only).
+        var after = latestTiming();
+        if (after != null && after != before) row.set("timing", json.valueToTree(after));
         return row;
+    }
+
+    com.carrental.modules.ai.chat.ChatTimings.Timing latestTiming() {
+        var recent = timings.recent();
+        return recent.isEmpty() ? null : recent.get(recent.size() - 1);
     }
 
     @Test void askEveryCaseOnceAgainstLocalQwen() throws Exception {

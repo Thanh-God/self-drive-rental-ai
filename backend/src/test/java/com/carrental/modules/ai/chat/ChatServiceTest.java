@@ -365,10 +365,12 @@ class ChatServiceTest {
     void aBackendFailureAfterTheModelRepliedDoesNotUseTheAllowance() throws Exception {
         var quota = new com.carrental.modules.ai.AiDailyQuota(1, "10008888", true, java.time.Clock.systemUTC());
         var search = org.mockito.Mockito.mock(ChatVehicleSearch.class);
-        org.mockito.Mockito.when(search.hints(org.mockito.ArgumentMatchers.anyString())).thenReturn(QwenChatModel.SearchHints.NONE);
-        org.mockito.Mockito.when(search.searchRequested(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any())).thenReturn(true);
+        org.mockito.Mockito.when(search.hints(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any()))
+            .thenReturn(QwenChatModel.SearchHints.NONE);
+        org.mockito.Mockito.when(search.searchRequested(org.mockito.ArgumentMatchers.anyString(), org.mockito.ArgumentMatchers.any(),
+            org.mockito.ArgumentMatchers.any())).thenReturn(true);
         org.mockito.Mockito.when(search.run(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.anyString(),
-                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
             .thenThrow(new IllegalStateException("recommendation down"))
             .thenReturn(new ChatVehicleSearch.Result("ASK_MISSING", "Bạn nhận xe ngày nào?", null, List.of("pickupDate"), List.of()));
         var beans = new StaticListableBeanFactory();

@@ -59,8 +59,33 @@ public class QwenChatModel {
                            Integer passengers, Long budgetVndTotal, String transmission, List<String> unresolvedFields) {}
 
     /** The model's answer after schema validation, before backend grounding checks. */
-    public record Reply(String intent, String reply, List<String> citations, Criteria criteria) {
-        public Reply(String intent, String reply, List<String> citations) { this(intent, reply, citations, null); }
+    public record Reply(String intent, String reply, List<String> citations, Criteria criteria, Usage usage) {
+        public Reply(String intent, String reply, List<String> citations) { this(intent, reply, citations, null, null); }
+        public Reply(String intent, String reply, List<String> citations, Criteria criteria) {
+            this(intent, reply, citations, criteria, null);
+        }
+        Reply withUsage(Usage u) { return new Reply(intent, reply, citations, criteria, u); }
+    }
+
+    /**
+     * R7: Ollama's own figures for one call (load, prompt evaluation, generation), in ms and tokens. Each is null
+     * when the envelope does not carry it as a non-negative integer.
+     */
+    public record Usage(Long totalMs, Long loadMs, Long promptTokens, Long promptMs, Long outputTokens, Long outputMs) {
+        static Usage from(JsonNode envelope) {
+            return new Usage(nanosToMs(envelope.get("total_duration")), nanosToMs(envelope.get("load_duration")),
+                count(envelope.get("prompt_eval_count")), nanosToMs(envelope.get("prompt_eval_duration")),
+                count(envelope.get("eval_count")), nanosToMs(envelope.get("eval_duration")));
+        }
+
+        private static Long count(JsonNode v) {
+            return v != null && v.isIntegralNumber() && v.canConvertToLong() && v.asLong() >= 0 ? v.asLong() : null;
+        }
+
+        private static Long nanosToMs(JsonNode v) {
+            Long n = count(v);
+            return n == null ? null : n / 1_000_000;
+        }
     }
 
     private final ObjectMapper json;
@@ -186,7 +211,7 @@ public class QwenChatModel {
             String content = message.path("content").textValue();
             if (content.length() > 8192) throw unavailable();
             cause = AiDiagnostics.Cause.SCHEMA_INVALID;
-            var reply = validate(json.readTree(content), prompt.passageIds(), hints);
+            var reply = validate(json.readTree(content), prompt.passageIds(), hints).withUsage(Usage.from(envelope));
             deadline.requireRemaining();
             cause = AiDiagnostics.Cause.SUCCESS;
             return reply;
