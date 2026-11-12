@@ -197,7 +197,7 @@ class RunnerGuards(unittest.TestCase):
     def test_chat_suites_stub_by_default_and_live_chat_opt_in(self):
         module=load('run-mysql')
         default=module.select_suites(None,{})
-        for suite in ('AiChatHttpTest','AiChatSearchHttpTest'):
+        for suite in ('AiChatHttpTest','AiChatSearchHttpTest','AiChatMinimalSearchHttpTest'):
             self.assertIn(suite,module.SUITES)
             self.assertIn(suite,default)
         self.assertIn('AiChatLiveIT',module.SUITES)
