@@ -163,6 +163,9 @@ test('booking detail disables handover and says why until the remaining rent is 
   const handoverButton = () => [...container.querySelectorAll('button')].find(b => /Giao xe|Bàn giao/.test(b.textContent));
   await mountDetail(base);
   assert.ok(container.querySelector('section[aria-label="Phần tiền thuê còn lại"]'));
+  const schedule = container.querySelector('section[aria-label="Lịch thanh toán"]');
+  assert.ok(schedule, 'L3: payment schedule summary on the booking detail');
+  assert.match(schedule.textContent, /2\. Phần còn lại — Thanh toán tại chi nhánh nhận trước khi nhận xe/);
   await selectNext();
   assert.match(container.textContent, /Chưa giao xe được: cần ghi nhận phần tiền thuê còn lại \(1\.300\.000/);
   assert.equal(handoverButton().disabled, true);

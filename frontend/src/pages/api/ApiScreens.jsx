@@ -5,6 +5,8 @@ import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
 import NoShowForm from "../../components/booking/NoShowForm";
 import RentalBalance, { rentalBalanceBlocksHandover } from "../../components/booking/RentalBalance";
+import PaymentSchedule from "../../components/booking/PaymentSchedule";
+import { quoteRemainderSentence } from "../../utils/paymentSchedule";
 import { nearPickup } from "../../utils/pickupTiming";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import ScheduleWarnings from "../../components/booking/ScheduleWarnings";
@@ -1247,6 +1249,7 @@ export function ApiNewBookingPage() {
                       {quote.deposit.method === "DEMO_QR_MANUAL" ? <p className="booking-quote-warning">QR DEMO · Mô phỏng — Không chuyển tiền thật.</p> : <p>Thanh toán cọc qua VNPAY Sandbox · Chỉ thử nghiệm.</p>}
                     </div>
                   ) : <p className="text-sm font-medium">Báo giá này không yêu cầu cọc giữ chỗ.</p>}
+                  <p className="text-sm" data-testid="quote-remainder">{quoteRemainderSentence(quote, money)}</p>
                   <p className="text-sm text-slate-600">
                     {quote.pickupName} → {quote.returnName}. Giá và khả dụng
                     được kiểm tra lại khi gửi; yêu cầu chỉ được tạo nếu báo giá
@@ -1836,6 +1839,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
             <ReturnPolicySummary policy={booking.returnPolicy} />
             <ReturnAssessmentSummary assessment={booking.returnAssessment} settlement={booking.returnSettlement} />
             <ReturnSettlement key={`settlement-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedReturn={assignedBranchIds.has(booking.returnBranchId)} onSaved={request.reload} />
+            <PaymentSchedule booking={booking} />
             <RentalBalance key={`rental-balance-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} onSaved={request.reload} />
             {booking.deposit?.required ? <BookingDeposit key={`deposit-${booking.id}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : (
               <NoShowForm key={`no-show-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} now={now} onDone={request.reload} standalone />

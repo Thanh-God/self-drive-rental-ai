@@ -110,3 +110,9 @@ test('pending chip label follows backend stage only for USER and keeps legacy te
   // CONFIRMED + stage chưa áp dụng: phản ánh stage backend, không tự suy đã đủ
   assert.equal(userQrDepositStatus({ ...qrBooking({ stage: 'RECEIVED_INCOMPLETE' }), status: 'CONFIRMED' }).label, 'Đã có khoản nhận — đang đối soát');
 });
+
+test('L3: an applied QR deposit points to the pickup branch and the payment schedule, not to vague branch guidance', () => {
+  const status = userQrDepositStatus({ status: 'CONFIRMED', deposit: { method: 'DEMO_QR_MANUAL', required: true }, qrReconciliation: { stage: 'APPLIED' } });
+  assert.match(status.message, /Phần còn lại thanh toán tại chi nhánh nhận; xem Lịch thanh toán của đơn\./);
+  assert.doesNotMatch(status.message, /theo hướng dẫn của chi nhánh/);
+});

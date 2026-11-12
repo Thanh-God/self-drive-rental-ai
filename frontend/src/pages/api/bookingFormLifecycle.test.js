@@ -186,6 +186,14 @@ test('quote renders backend deposit excluding fee and remaining without adding d
   assert.doesNotMatch(container.textContent, /chính sách cọc|số cọc/);
   assert.equal((container.textContent.match(/cọc/g) || []).length, 1);
 });
+test('quote tells where the remaining rent is paid, following the backend remaining-rent policy', async () => {
+  await mount('', c => c.url === '/bookings/quote' ? { ...quote, deposit: { required: false, amount: 0 }, rentalBalance: { policy: 'rental-balance-v1', dueAmount: 2500000, status: 'DUE', demo: true, recorded: null } } : defaults(c));
+  await getQuote();
+  assert.match(container.querySelector('[data-testid="quote-remainder"]').textContent, /Phần còn lại 2\.500\.000\s₫ thanh toán tại chi nhánh nhận trước khi nhận xe/);
+  assert.equal((container.textContent.match(/cọc/g) || []).length, 1, 'still one deposit message on a no-deposit quote');
+  await mount('&pickupBranchId=dn&returnBranchId=hn'); await getQuote();
+  assert.match(container.querySelector('[data-testid="quote-remainder"]').textContent, /không ghi nhận khoản này cho báo giá này/);
+});
 test('deposit quote keeps both amounts and says only the deposit amount is re-checked on submit', async () => {
   await mount('&pickupBranchId=dn&returnBranchId=hn'); await getQuote();
   assert.match(container.textContent, /số cọc được kiểm tra lại khi gửi yêu cầu/);

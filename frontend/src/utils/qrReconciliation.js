@@ -78,7 +78,7 @@ const userStageContent = Object.freeze({
   },
   APPLIED: {
     label: 'Đã ghi nhận cọc vào đơn',
-    message: 'Khoản cọc đã được áp dụng vào đơn. Phần còn lại thanh toán theo hướng dẫn của chi nhánh.',
+    message: 'Khoản cọc đã được áp dụng vào đơn. Phần còn lại thanh toán tại chi nhánh nhận; xem Lịch thanh toán của đơn.',
     nextAction: 'Không cần chuyển thêm cọc. Xem tiến trình đơn và hợp đồng khi đã phát hành.',
     transferOpen: false,
   },
