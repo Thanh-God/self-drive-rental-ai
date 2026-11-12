@@ -103,7 +103,10 @@ public final class ContractTerms {
                 ? "Phần tiền thuê còn lại " + vnd(f.remainingRent()) + " được thanh toán tại chi nhánh nhận trước khi bàn giao xe; nhân viên ghi nhận khoản đã nhận trên hệ thống."
                 : "Phần tiền thuê còn lại " + vnd(f.remainingRent()) + " được thanh toán tại chi nhánh theo hướng dẫn của nhân viên.");
         } else {
-            c.add("Tổng tiền được thanh toán tại chi nhánh theo hướng dẫn của nhân viên.");
+            // R9: a booking under the remaining-rent policy (L4) pays the whole total before handover, deposit or not.
+            c.add(f.rentalBalancePolicy()
+                ? "Tổng tiền " + vnd(f.remainingRent()) + " được thanh toán tại chi nhánh nhận trước khi bàn giao xe; nhân viên ghi nhận khoản đã nhận trên hệ thống."
+                : "Tổng tiền được thanh toán tại chi nhánh theo hướng dẫn của nhân viên.");
         }
         c.add("Hóa đơn được lập khi đơn hoàn tất và không phải chứng từ chứng minh đã thanh toán.");
         return c.toArray(String[]::new);

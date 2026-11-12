@@ -63,7 +63,11 @@ class ContractTermsTest {
     void withoutDepositNothingIsRefundedAndTheTotalIsPaidAtTheBranch() {
         var a = ContractTerms.articles(facts(false, null, 1300000, true, false));
         assertEquals("Đơn không có tiền cọc: hủy đơn không phát sinh khoản hoàn.", clauses(a, 3).get(0));
-        assertTrue(clauses(a, 2).contains("Tổng tiền được thanh toán tại chi nhánh theo hướng dẫn của nhân viên."));
+        assertTrue(clauses(a, 2).contains("Tổng tiền 1.300.000 đ được thanh toán tại chi nhánh nhận trước khi bàn giao xe; nhân viên ghi nhận khoản đã nhận trên hệ thống."),
+            "R9: the remaining-rent policy needs the whole total before handover");
+        var legacy = ContractTerms.articles(facts(false, null, 1300000, false, false));
+        assertTrue(clauses(legacy, 2).contains("Tổng tiền được thanh toán tại chi nhánh theo hướng dẫn của nhân viên."), "bookings without L4 keep the branch guidance");
+        assertTrue(clauses(legacy, 2).stream().noneMatch(c -> c.contains("trước khi bàn giao")));
         assertTrue(clauses(a, 2).stream().noneMatch(c -> c.contains("đặt cọc")));
         assertTrue(clauses(a, 9).get(1).contains("không phải trả khoản nào"));
     }
