@@ -26,5 +26,7 @@ export function pickupDayLabel(booking) {
 
 /** Staff chi nhánh nhận có thể ghi nhận khách không đến: đơn CONFIRMED và đã qua ngày nhận. Backend vẫn kiểm tra lại. */
 export function canRecordNoShow(booking, { role, assignedPickup, now }) {
-  return role === "STAFF" && Boolean(assignedPickup) && booking?.status === "CONFIRMED" && pickupDayPassed(booking, now);
+  // L9 (Q8): a customer whose remaining rent is recorded paid at the branch; that booking is not a no-show.
+  return role === "STAFF" && Boolean(assignedPickup) && booking?.status === "CONFIRMED" && booking?.rentalBalance?.status !== "RECORDED"
+    && pickupDayPassed(booking, now);
 }

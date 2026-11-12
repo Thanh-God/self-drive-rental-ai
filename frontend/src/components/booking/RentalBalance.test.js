@@ -178,3 +178,48 @@ test('booking detail disables handover and says why until the remaining rent is 
   assert.equal(handoverButton().disabled, false, 'older bookings keep the old handover');
   assert.equal(container.querySelector('section[aria-label="Phần tiền thuê còn lại"]'), null);
 });
+
+const refundForm = () => container.querySelector('form[aria-label="Ghi nhận hoàn tiền thuê"]');
+const refundDue = { ...recorded, status: 'REFUND_DUE', refund: { amount: 1300000, status: 'REFUND_DUE', dueSince: '2030-01-01T04:00:00Z' } };
+const refunded = { ...recorded, status: 'REFUNDED', refund: { amount: 1300000, status: 'REFUNDED', dueSince: '2030-01-01T04:00:00Z', method: 'BANK_TRANSFER', reference: 'HT-0001', refundedAt: '2030-01-02T03:00:00Z' } };
+
+test('L9: a cancelled booking with rent received tells the renter it is refunded in full; nothing shows when nothing was received', async () => {
+  handler = () => ({});
+  await mount(h(Balance, { booking: { ...base, status: 'CANCELLED', rentalBalance: refundDue }, role: 'USER' }));
+  assert.match(container.textContent, /Cần hoàn cho khách/);
+  assert.match(container.textContent, /khoản tiền thuê đã thanh toán 1\.300\.000.*được hoàn toàn bộ/);
+  assert.equal(refundForm(), null);
+  await mount(h(Balance, { booking: { ...base, status: 'CANCELLED', rentalBalance: refundDue }, role: 'STAFF', assignedPickup: true }));
+  assert.match(container.textContent, /chờ quản trị viên ghi nhận đã hoàn/);
+  assert.equal(refundForm(), null, 'Staff do not record the refund');
+  assert.equal(recordForm(), null);
+  await mount(h(Balance, { booking: { ...base, status: 'CANCELLED', rentalBalance: refunded }, role: 'USER' }));
+  assert.match(container.textContent, /Đã hoàn cho khách/);
+  assert.match(container.textContent, /đã hoàn 1\.300\.000.*Chuyển khoản · Tham chiếu HT-0001/);
+  await mount(h(Balance, { booking: { ...base, status: 'CANCELLED', rentalBalance: due }, role: 'USER' }));
+  assert.equal(container.textContent, '', 'closed booking with nothing received renders nothing');
+});
+
+test('L9: Admin records the whole refund once; transfer needs a reference; no reverse form on a cancelled booking', async () => {
+  let saved = 0;
+  handler = () => ({});
+  await mount(h(Balance, { booking: { ...base, status: 'CANCELLED', rentalBalance: refundDue }, role: 'ADMIN', onSaved() { saved++; } }));
+  assert.ok(refundForm());
+  assert.equal(reverseForm(), null);
+  assert.match(refundForm().textContent, /1\.300\.000.*toàn bộ khoản đã ghi nhận/);
+  await setValue(refundForm().querySelector('select'), 'BANK_TRANSFER');
+  await act(async () => { refundForm().querySelector('input[type="checkbox"]').click(); });
+  await act(async () => { refundForm().dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })); });
+  assert.match(container.textContent, /Chuyển khoản hoàn cần mã tham chiếu/);
+  assert.equal(posts().length, 0);
+  await setValue(refundForm().querySelector('input:not([type])'), 'HT-0001');
+  await act(async () => { refundForm().dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })); });
+  assert.equal(posts().length, 1);
+  assert.equal(posts()[0].url, '/bookings/b1/rental-balance/refund');
+  const body = JSON.parse(posts()[0].data);
+  assert.equal(body.amountVnd, 1300000); assert.equal(body.method, 'BANK_TRANSFER'); assert.equal(body.reference, 'HT-0001');
+  assert.equal(body.expectedVersion, 7); assert.equal(body.confirmed, true); assert.ok(body.idempotencyKey);
+  assert.equal(saved, 1);
+  await mount(h(Balance, { booking: { ...base, status: 'CANCELLED', rentalBalance: refunded }, role: 'ADMIN' }));
+  assert.equal(refundForm(), null, 'refunded once');
+});

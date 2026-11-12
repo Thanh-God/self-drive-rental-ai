@@ -17,7 +17,7 @@ export function cancellationRules(policy) {
     return [
       ...common,
       "Hủy dưới 24 giờ trước mốc nhận (liên hệ nhân viên chi nhánh nhận): hoàn toàn bộ cọc.",
-      "Không đến nhận xe và không báo trước khi hết ngày nhận: cọc giữ chỗ không được hoàn; khoản chuyển ngoài cọc (nếu có) được hoàn toàn bộ.",
+      "Không đến nhận xe và không báo hủy trước khi hết ngày nhận: cọc giữ chỗ không được hoàn; khoản chuyển ngoài cọc (nếu có) được hoàn toàn bộ.",
     ];
   }
   return [...common, "Hủy dưới 24 giờ trước mốc nhận hoặc không đến nhận xe: quản trị viên quyết định mức hoàn 0–100%, có lý do."];

@@ -87,7 +87,7 @@ test('L6: the deposit panel lists the cancellation and refund rules of the booki
   const render = (policy) => renderToStaticMarkup(React.createElement(Deposit, { booking: { ...baseBooking, deposit: { ...baseBooking.deposit, policy } }, role: 'USER', reload() {} }));
   const v2 = render('demo-qr-manual-30-v2');
   assert.match(v2, /Quy tắc hủy và hoàn cọc của đơn này/);
-  assert.match(v2, /Không đến nhận xe và không báo trước khi hết ngày nhận: cọc giữ chỗ không được hoàn/);
+  assert.match(v2, /Không đến nhận xe và không báo hủy trước khi hết ngày nhận: cọc giữ chỗ không được hoàn/);
   assert.match(v2, /Hủy dưới 24 giờ trước mốc nhận \(liên hệ nhân viên chi nhánh nhận\): hoàn toàn bộ cọc/);
   assert.doesNotMatch(v2, /0–100%/);
   const v1 = render('sandbox-deposit-30-v1');

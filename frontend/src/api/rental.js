@@ -122,3 +122,9 @@ export async function reverseRentalBalance(id, input) {
   const { data } = await apiClient.post(`/bookings/${encodeURIComponent(id)}/rental-balance/reverse`, input);
   return data;
 }
+
+// L9 (Q8): Admin records the DEMO refund of the whole recorded rent of a cancelled booking.
+export async function refundRentalBalance(id, input) {
+  const { data } = await apiClient.post(`/bookings/${encodeURIComponent(id)}/rental-balance/refund`, input);
+  return data;
+}

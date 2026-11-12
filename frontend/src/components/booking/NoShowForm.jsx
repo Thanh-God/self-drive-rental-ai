@@ -12,6 +12,7 @@ import { noShowDepositNote } from "../../utils/depositRules";
  */
 export default function NoShowForm({ booking, role, assignedPickup, now, onDone, depositNote = false, standalone = false }) {
   const [contacted, setContacted] = useState(false);
+  const [didNotCancel, setDidNotCancel] = useState(false);
   const [notDelivered, setNotDelivered] = useState(false);
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -27,7 +28,7 @@ export default function NoShowForm({ booking, role, assignedPickup, now, onDone,
     setError("");
     try {
       await apiClient.post(`/bookings/${encodeURIComponent(booking.id)}/no-show`, {
-        expectedVersion: booking.version, contacted, notDelivered, reason,
+        expectedVersion: booking.version, contacted, customerDidNotCancel: didNotCancel, notDelivered, reason,
       });
       onDone?.();
     } catch (requestError) {
@@ -46,8 +47,9 @@ export default function NoShowForm({ booking, role, assignedPickup, now, onDone,
         {depositNote ? noShowDepositNote(booking.deposit?.policy) : " Đơn này không có cọc nên không phát sinh hoàn tiền."}
       </p>
       <label className="block"><input type="checkbox" required checked={contacted} onChange={(e) => setContacted(e.target.checked)} /> Đã liên hệ khách</label>
+      <label className="block"><input type="checkbox" required checked={didNotCancel} onChange={(e) => setDidNotCancel(e.target.checked)} /> Khách không báo hủy trước khi hết ngày nhận</label>
       <label className="block"><input type="checkbox" required checked={notDelivered} onChange={(e) => setNotDelivered(e.target.checked)} /> Xe chưa thực sự được giao</label>
-      <Field label="Lý do"><textarea required maxLength={1000} rows={3} value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
+      <Field label="Lý do (ghi kênh và thời điểm đã liên hệ khách)"><textarea required maxLength={1000} rows={3} placeholder="Ví dụ: gọi điện 2 lần lúc 17:00 và 19:00, khách không nghe máy" value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       {error ? <Notice error>{error}</Notice> : null}
       <button className="btn-secondary" disabled={busy}>{busy ? "Đang ghi nhận…" : "Ghi nhận khách không đến nhận"}</button>
     </form>

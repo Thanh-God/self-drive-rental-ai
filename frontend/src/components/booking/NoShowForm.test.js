@@ -42,13 +42,13 @@ async function mount(element, entry = '/staff/bookings/b1') {
 const noShowForm = () => container.querySelector('form[aria-label="Ghi nhận khách không đến nhận"]');
 const checkbox = text => [...container.querySelectorAll('label')].find(e => e.textContent.includes(text))?.querySelector('input');
 async function fillAndSubmit(reason = 'Đã gọi hai lần, khách không đến') {
-  await act(async () => { checkbox('Đã liên hệ khách').click(); checkbox('Xe chưa thực sự được giao').click(); });
+  await act(async () => { checkbox('Đã liên hệ khách').click(); checkbox('Khách không báo hủy trước khi hết ngày nhận').click(); checkbox('Xe chưa thực sự được giao').click(); });
   const area = noShowForm().querySelector('textarea');
   await act(async () => { Object.getOwnPropertyDescriptor(dom.window.HTMLTextAreaElement.prototype, 'value').set.call(area, reason); area.dispatchEvent(new dom.window.Event('input', { bubbles: true })); });
   await act(async () => { noShowForm().dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })); noShowForm()?.dispatchEvent(new dom.window.Event('submit', { bubbles: true, cancelable: true })); });
 }
 
-test('form posts the expected version and both confirmations once, then asks the page to reload', async () => {
+test('form posts the expected version and the three confirmations once, then asks the page to reload', async () => {
   let done = 0, release;
   handler = () => new Promise(resolve => { release = resolve; });
   await mount(h(Form, { booking: base, role: 'STAFF', assignedPickup: true, now: Date.now(), onDone() { done++; } }));
@@ -59,7 +59,7 @@ test('form posts the expected version and both confirmations once, then asks the
   await fillAndSubmit();
   assert.equal(requests.length, 1, 'single flight');
   assert.equal(requests[0].method, 'post'); assert.equal(requests[0].url, '/bookings/b1/no-show');
-  assert.deepEqual(JSON.parse(requests[0].data), { expectedVersion: 4, contacted: true, notDelivered: true, reason: 'Đã gọi hai lần, khách không đến' });
+  assert.deepEqual(JSON.parse(requests[0].data), { expectedVersion: 4, contacted: true, customerDidNotCancel: true, notDelivered: true, reason: 'Đã gọi hai lần, khách không đến' });
   await act(async () => release({}));
   assert.equal(done, 1);
 });
@@ -86,6 +86,7 @@ test('deposit bookings keep the Admin refund note; nothing renders outside the a
     { booking: base, role: 'ADMIN', assignedPickup: true }, { booking: base, role: 'USER', assignedPickup: true },
     { booking: base, role: 'STAFF', assignedPickup: false }, { booking: { ...base, ...future }, role: 'STAFF', assignedPickup: true },
     { booking: { ...base, status: 'IN_PROGRESS' }, role: 'STAFF', assignedPickup: true },
+    { booking: { ...base, rentalBalance: { policy: 'rental-balance-v1', status: 'RECORDED', dueAmount: 1300000 } }, role: 'STAFF', assignedPickup: true },
   ]) {
     await mount(h(Form, { ...props, now: Date.now() }));
     assert.equal(noShowForm(), null, JSON.stringify({ role: props.role, assigned: props.assignedPickup, status: props.booking.status }));
@@ -133,4 +134,13 @@ test('the renter sees "pickup day passed" instead of "come to pick up" or "close
   await detail('USER', { ...base, ...future });
   assert.match(container.textContent, /đến chi nhánh nhận đúng thời gian/);
   assert.doesNotMatch(container.textContent, /Đã qua ngày nhận xe/);
+});
+
+test('L9: the customer-did-not-cancel confirmation is required and the reason asks for channel and time', async () => {
+  handler = () => ({});
+  await mount(h(Form, { booking: base, role: 'STAFF', assignedPickup: true, now: Date.now() }));
+  const box = checkbox('Khách không báo hủy trước khi hết ngày nhận');
+  assert.ok(box, 'confirmation shown');
+  assert.equal(box.required, true);
+  assert.match(noShowForm().textContent, /ghi kênh và thời điểm đã liên hệ khách/);
 });

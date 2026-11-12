@@ -35,5 +35,10 @@ test("only assigned pickup Staff on a confirmed booking past its pickup day may 
     [{ ...booking, status: "IN_PROGRESS" }, { role: "STAFF", assignedPickup: true, now: after }],
     [{ ...booking, status: "PENDING" }, { role: "STAFF", assignedPickup: true, now: after }],
     [{ ...booking, status: "CANCELLED" }, { role: "STAFF", assignedPickup: true, now: after }],
+    [{ ...booking, rentalBalance: { status: "RECORDED" } }, { role: "STAFF", assignedPickup: true, now: after }],
   ]) assert.equal(canRecordNoShow(value, options), false, JSON.stringify({ status: value.status, ...options }));
+});
+
+test("L9: a booking whose remaining rent is only due (not recorded) can still be a no-show", () => {
+  assert.equal(canRecordNoShow({ ...booking, rentalBalance: { status: "DUE" } }, { role: "STAFF", assignedPickup: true, now: at("2026-10-27T03:00:00Z") }), true);
 });
