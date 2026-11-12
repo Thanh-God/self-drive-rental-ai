@@ -24,7 +24,7 @@ public void issueDeposit(com.carrental.modules.booking.service.BookingService.Vi
     snapshot.put("startAt",b.startAt());snapshot.put("endAt",b.endAt());snapshot.put("rentalTotal",b.rentalTotal());snapshot.put("oneWayFee",b.oneWayFee());snapshot.put("total",b.total());
     snapshot.put("terms",TERMS);snapshot.put("policyVersion",b.policyVersion());snapshot.put("rentalDays",b.rentalDays());snapshot.put("deposit",b.deposit());
     if(b.returnPolicy()!=null)snapshot.put("returnPolicy",b.returnPolicy());
-    String termsVersion = DepositPolicy.isDemoQrMethod(b.deposit().method()) ? DepositPolicy.QR_VERSION : DepositPolicy.VNPAY_VERSION;
+    String termsVersion = b.deposit().policy() != null ? b.deposit().policy() : DepositPolicy.isDemoQrMethod(b.deposit().method()) ? DepositPolicy.QR_VERSION_V1 : DepositPolicy.VNPAY_VERSION;
     try{jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),b.id(),java.sql.Timestamp.from(clock.instant()),json.writeValueAsString(snapshot),termsVersion);}
     catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
   }

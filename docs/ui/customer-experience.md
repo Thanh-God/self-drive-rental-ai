@@ -34,6 +34,10 @@ Token màu/shadow nằm tại `frontend/src/index.css`. Nền trang `--color-pag
 
 Form có label/focus rõ, thao tác bàn phím và thông báo dễ hiểu. Chữ thông thường đặt mục tiêu tương phản tối thiểu 4.5:1, biên điều khiển 3:1 so với nền liền kề; đây là tiêu chí từng cặp màu, không tự chứng nhận toàn site đạt WCAG. Responsive web, không phát triển app mobile riêng. Kiểm tra bằng npm test/lint, build API/demo và browser với DB test cô lập; không test ghi trên dữ liệu vận hành.
 
+## Hủy đơn và quy tắc hoàn cọc
+
+Khối Cọc giữ chỗ trên chi tiết đơn có mục **Quy tắc hủy và hoàn cọc của đơn này**, đọc theo phiên bản chính sách đã lưu trên đơn (đơn mới: hủy sát giờ hoàn toàn bộ, không đến nhận thì cọc không được hoàn; đơn cũ: quản trị viên quyết định 0–100%). Staff/Admin hủy đơn phải chọn nguyên nhân (Doanh nghiệp không giao được xe / Khách yêu cầu hủy); chọn doanh nghiệp thì phải đánh dấu đã liên hệ báo khách. Staff chi nhánh nhận thấy thao tác hủy với đơn đã xác nhận cả trước ngày nhận; chi nhánh trả không thấy. Form khách không đến nhận và cảnh báo ghi nhận khoản sau khi hủy dùng câu đúng phiên bản. Bản ghi "Không hoàn" do chính sách hiện thông báo cho khách, không hiện lý do nội bộ. API: `POST /bookings/{id}/actions` nhận thêm `customerContacted` (boolean).
+
 ## Biên bản giao và nhận xe
 
 Form bàn giao (Staff chi nhánh nhận) và nhận trả (Staff chi nhánh trả, kể cả form nhận trả theo chính sách) có ô **Mức nhiên liệu / pin (thang 8 vạch)** và **Số km trên đồng hồ**. Khi giao: bắt buộc. Khi nhận trả: hiện số liệu lúc giao, bắt buộc nếu biên bản giao có số liệu và số km không được nhỏ hơn lúc giao; đơn giao trước khi có tính năng thì không bắt buộc nhưng nếu nhập phải đủ cả hai. Chi tiết đơn (mọi vai trò được đọc đơn) hiện số liệu trong mục Biên bản giao nhận và dòng "Đã chạy … km · nhiên liệu a/8 → b/8 vạch". Chỉ để đối chiếu, chưa tính phí. API: `POST /bookings/{id}/actions` nhận thêm `fuelLevel` (số nguyên 0–8) và `odometerKm` (số nguyên ≥ 0); `GET /bookings/{id}` trả `fuel_level`, `odometer_km` trong `records`.

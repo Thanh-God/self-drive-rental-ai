@@ -6,7 +6,7 @@ const statusContent = Object.freeze({
   UNKNOWN: { label: 'Đang đối soát kết quả hoàn', detail: 'Kết quả chuyển trả chưa được xác minh. Chưa xác nhận đã hoàn tiền.', pending: true },
   SUCCEEDED: { label: 'Đã hoàn', detail: 'Khoản hoàn đã được xác minh chuyển trả.', refunded: true },
   FAILED: { label: 'Hoàn chưa thành công', detail: 'Lần chuyển trả chưa thành công. Liên hệ chi nhánh nhận nếu cần hỗ trợ.' },
-  DECLINED: { label: 'Không hoàn', detail: 'Quản trị viên quyết định không hoàn khoản này. Xem lý do bên dưới.' },
+  DECLINED: { label: 'Không hoàn', detail: 'Khoản này không được hoàn theo quyết định hoặc chính sách của đơn. Xem thông báo bên dưới (nếu có).' },
 });
 
 const kindLabels = Object.freeze({
@@ -16,7 +16,7 @@ const kindLabels = Object.freeze({
   MANUAL_EXCESS: 'Tiền nhận vượt số cọc',
   CANCELLED: 'Hủy đơn',
   EARLY_USER: 'Khách hủy trước mốc nhận',
-  BUSINESS: 'Doanh nghiệp từ chối hoặc không cung cấp xe',
+  BUSINESS: 'Doanh nghiệp từ chối hoặc không giao được xe',
   LATE_CUSTOMER: 'Khách hủy sát giờ',
   NO_SHOW: 'Không đến nhận xe',
 });

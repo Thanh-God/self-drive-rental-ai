@@ -14,7 +14,10 @@ test('Calendar handover is permitted throughout pickup day only, while legacy ti
  const calendar={...booking,status:'CONFIRMED',policyVersion:'calendar-2026-10-17',startAt:'2026-10-16T17:00:00Z',endAt:'2026-10-21T16:59:59.999999Z'};
  const options={role:'STAFF',assignedBranchIds:new Set(['branch-pickup'])};
  assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-17T16:59:59Z')}),['IN_PROGRESS','CANCELLED']);
- assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-17T17:00:00Z')}),[]);assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-16T16:59:59Z')}),[]);
+ // L6/Q6: outside the pickup day the pickup branch can still cancel (no handover); after the rental end nothing is offered.
+ assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-17T17:00:00Z')}),['CANCELLED']);assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-16T16:59:59Z')}),['CANCELLED']);
+ assert.deepEqual(getBookingActions(calendar,{...options,now:Date.parse('2026-10-21T17:00:00Z')}),[]);
+ assert.deepEqual(getBookingActions(calendar,{...options,assignedBranchIds:new Set(['branch-return']),now:Date.parse('2026-10-16T18:00:00Z')}),[],'the return branch does not cancel');
 });
 
 test("Staff actions require API-backed assignment to the operational branch", () => {

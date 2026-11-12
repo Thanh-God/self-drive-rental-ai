@@ -120,5 +120,8 @@ AI4 MVP chỉ USER: hành trình một ngày, 2–4 điểm trong vùng graph hi
 ## Cọc QR DEMO thủ công
 Cho phép luồng giả lập QR cục bộ, Staff pickup xác minh khoản nhận và backend tự xác nhận khi đủ30% tiền thuê; Admin hoàn thủ công có tham chiếu. Không thu tiền thật. Quy tắc hạn/đối soát, snapshot và hoàn theo [booking-deposit](../modules/booking-deposit.md). VNPAY cũ giữ tương thích và không nhận bản ghi QR.
 
+## Hủy sát giờ, không đến nhận và doanh nghiệp không giao được xe
+Người dùng chốt 12/11/2026: khách hủy sát giờ (dưới 24 giờ) được hoàn 100% cọc; không đến nhận xe và không báo thì không hoàn cọc giữ chỗ đã áp dụng; doanh nghiệp không giao được xe đơn đã xác nhận thì Staff chi nhánh nhận hủy, bắt buộc lý do và xác nhận đã liên hệ khách, hoàn 100% cọc (đổi xe/dời lịch hoãn). Áp dụng cho đơn QR tạo sau cập nhật qua phiên bản chính sách `demo-qr-manual-30-v2`; đơn cũ giữ quy tắc đã lưu (Admin quyết định 0–100%). Chi tiết: [booking-deposit](../modules/booking-deposit.md).
+
 ### Xử lý khoản vượt hạn cùng chi nhánh
 Staff đúng chi nhánh trả ghi thu thủ công từng phần; Admin miễn/giảm hoặc đảo toàn bộ ghi nhận sai trước hoàn tất, có lý do/audit. Nhật ký thuộc booking, tách cọc; không tự khấu trừ/hoàn cọc. Số dư vượt hạn bằng0 mới cho Staff hoàn tất, hóa đơn lưu khoản ròng và snapshot giải thích. Ghi nhận DEMO mặc định; chưa rollout chính sách trả muộn cho môi trường sử dụng. Đã có cảnh báo Staff/Admin và kiểm tra bảo vệ đơn kế tiếp cùng chi nhánh; chưa tự hủy, đổi xe, dời lịch hoặc bồi thường cho đơn bị ảnh hưởng. Chi tiết [return-policy](../modules/return-policy.md).

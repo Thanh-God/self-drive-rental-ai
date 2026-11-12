@@ -72,6 +72,12 @@ test('a refused no-show shows the server reason and does not retry by itself', a
   assert.match(container.textContent, /Tải lại đơn để kiểm tra trước khi thử lại/);
   assert.equal(requests.length, 1); assert.equal(done, 0);
 });
+test('L6: under deposit policy v2 the form says the applied deposit is not refunded', async () => {
+  handler = () => ({});
+  await mount(h(Form, { booking: { ...base, deposit: { ...(base.deposit || {}), required: true, policy: 'demo-qr-manual-30-v2' } }, role: 'STAFF', assignedPickup: true, now: Date.now(), depositNote: true }));
+  assert.match(container.textContent, /Cọc giữ chỗ đã áp dụng không được hoàn/);
+  assert.doesNotMatch(container.textContent, /0–100%/);
+});
 test('deposit bookings keep the Admin refund note; nothing renders outside the allowed role, branch, status and day', async () => {
   handler = () => ({});
   await mount(h(Form, { booking: base, role: 'STAFF', assignedPickup: true, now: Date.now(), depositNote: true }));

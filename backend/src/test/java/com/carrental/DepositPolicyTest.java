@@ -53,4 +53,14 @@ class DepositPolicyTest {
         fields.put("vnp_SecureHash", g.sign(base)); assertFalse(g.authenticResponse(fields, "querydr", "a".repeat(32)));
         fields.put("vnp_Command", "refund"); fields.put("vnp_SecureHash", g.sign(base.replace("querydr", "refund"))); assertTrue(g.authenticResponse(fields, "refund", "a".repeat(32)));
     }
+    @Test void policyV2FixesLateCancellationAndNoShowWhileOlderPoliciesKeepTheAdminDecision(){
+        assertTrue(DepositPolicy.fixedCancellationRules("demo-qr-manual-30-v2"));
+        for (String old : new String[]{"demo-qr-manual-30-v1", "sandbox-deposit-30-v1", null, "unknown"}) {
+            assertFalse(DepositPolicy.fixedCancellationRules(old), String.valueOf(old));
+            assertTrue(DepositPolicy.adminDecides(old, "LATE_CUSTOMER")); assertTrue(DepositPolicy.adminDecides(old, "NO_SHOW"));
+            assertFalse(DepositPolicy.adminDecides(old, "BUSINESS")); assertFalse(DepositPolicy.adminDecides(old, "EARLY_USER"));
+        }
+        for (String kind : new String[]{"LATE_CUSTOMER", "NO_SHOW", "BUSINESS", "EARLY_USER", null})
+            assertFalse(DepositPolicy.adminDecides("demo-qr-manual-30-v2", kind), String.valueOf(kind));
+    }
 }

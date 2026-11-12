@@ -8,6 +8,7 @@ import { qrReconciliationStageLabel, qrReconciliationWarnings, userQrDepositStat
 import QrReceiptForm from './QrReceiptForm';
 import NoShowForm from '../booking/NoShowForm';
 import { userRefundKind, userRefundStatus, userRefundTotals } from '../../utils/userRefund';
+import { cancellationRules } from '../../utils/depositRules';
 
 export const paymentLabels = { PENDING: 'Đang xác minh', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã nhận', FAILED: 'Thất bại' };
 export const refundLabels = { REQUESTED: 'Chờ Admin quyết định', APPROVED: 'Đã duyệt hoàn', PROCESSING: 'Đang xử lý', UNKNOWN: 'Cần đối soát', SUCCEEDED: 'Đã hoàn', FAILED: 'Hoàn thất bại', DECLINED: 'Không hoàn' };
@@ -200,6 +201,10 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
         <div><dt>Hạn giữ lịch gốc</dt><dd>{date(deposit.originalHoldUntil)}</dd></div>
       </>}
     </dl>
+    <details className="mt-3 text-sm" aria-label="Quy tắc hủy và hoàn cọc">
+      <summary className="font-medium">Quy tắc hủy và hoàn cọc của đơn này</summary>
+      <ul className="mt-2 list-disc space-y-1 pl-5">{cancellationRules(deposit?.policy).map(rule => <li key={rule}>{rule}</li>)}</ul>
+    </details>
     {showStaffReconciliation && <section className="mt-4 border-t pt-3 text-sm" aria-label="Chi tiết đối soát cọc QR">
       <h3 className="font-medium">Đối soát cọc QR</h3>
       <dl className="mt-2 grid gap-2 sm:grid-cols-2">
@@ -314,7 +319,7 @@ export default function BookingDeposit({ booking, role, assignedPickup, reload, 
         <p className="font-medium">Hoàn {money(r.amount)} · {s.label}</p>
         <p className="text-sm">{s.detail}</p>
         <p className="text-sm">Nguyên nhân: {userRefundKind(r.kind)}</p>
-        {r.customerNote ? <p className="text-sm">Thông báo từ quản trị viên: {r.customerNote}</p> : null}
+        {r.customerNote ? <p className="text-sm">Thông báo: {r.customerNote}</p> : null}
       </div>; })}
     </section>}
     {role !== 'USER' && data?.refunds?.map(r => <div key={r.id} className="mt-2 panel">

@@ -319,9 +319,16 @@ public class BookingService {
         return view(b);
     }
 
-    /** fuelLevel (0–8 on an 8-step gauge) and odometerKm are the L5 handover/return readings; null where not applicable. */
+    /**
+     * fuelLevel (0–8 on an 8-step gauge) and odometerKm are the L5 handover/return readings; null where not applicable.
+     * customerContacted (L6/Q6): Staff/Admin confirm they told the customer before a BUSINESS cancellation.
+     */
     public record Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind,
-                         LocalDate returnPreviewDate, Long expectedLateAmount, Integer fuelLevel, Long odometerKm) {
+                         LocalDate returnPreviewDate, Long expectedLateAmount, Integer fuelLevel, Long odometerKm, boolean customerContacted) {
+        public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind,
+                      LocalDate returnPreviewDate, Long expectedLateAmount, Integer fuelLevel, Long odometerKm) {
+            this(next, version, reason, condition, licenseChecked, maintenance, cancellationKind, returnPreviewDate, expectedLateAmount, fuelLevel, odometerKm, false);
+        }
         public Action(String next, long version, String reason, String condition, boolean licenseChecked, boolean maintenance, String cancellationKind,
                       LocalDate returnPreviewDate, Long expectedLateAmount) {
             this(next, version, reason, condition, licenseChecked, maintenance, cancellationKind, returnPreviewDate, expectedLateAmount, null, null);
@@ -361,15 +368,20 @@ public class BookingService {
         switch (next) {
             case "CANCELLED" -> {
                 if (!Set.of("PENDING", "CONFIRMED").contains(old)) throw DomainException.conflict("Không thể hủy ở trạng thái này.");
+                // L6/Q6: only the pickup branch hands the car over, so only its Staff cancel (the return branch can read the booking).
+                if (a.is("STAFF")) branches.requireStaff(a, b.pickupBranchId);
                 if (a.is("USER") && Duration.between(clock.instant(), b.startAt).compareTo(Duration.ofHours(24)) < 0)
                     throw DomainException.bad("Cần liên hệ Staff khi còn dưới 24 giờ.");
                 reason(action.reason());
-                if (b.depositRequired) {
+                // L6/Q6: a deposit booking always needs the cause; a booking without deposit may record it (Staff/Admin only).
+                if (b.depositRequired || (!a.is("USER") && action.cancellationKind() != null)) {
                     b.cancellationKind = a.is("USER") ? "EARLY_USER" : action.cancellationKind();
                     if (!Set.of("EARLY_USER", "BUSINESS", "LATE_CUSTOMER").contains(b.cancellationKind == null ? "" : b.cancellationKind))
                         throw DomainException.bad("Chọn doanh nghiệp hủy hoặc khách hủy sát giờ để xử lý cọc.");
                     if (!a.is("USER") && "EARLY_USER".equals(b.cancellationKind))
                         throw DomainException.bad("Chọn đúng nguyên nhân khách hủy; hệ thống tự kiểm tra mốc 24 giờ.");
+                    if ("BUSINESS".equals(b.cancellationKind) && !action.customerContacted())
+                        throw DomainException.bad("Doanh nghiệp hủy: cần xác nhận đã liên hệ báo khách trước khi hủy.");
                     if ("LATE_CUSTOMER".equals(b.cancellationKind) && DepositPolicy.early(clock.instant(), b.startAt))
                         b.cancellationKind = "EARLY_USER";
                 }

@@ -4,13 +4,14 @@ import { money, Notice } from '../common/PageKit';
 import { toVietnamInstant } from '../../utils/calendarDate';
 import { matchesReceipt, validateReceipt, vietnamNowInput } from '../../utils/qrReceipt';
 import { getErrorMessage } from '../../utils/roles';
+import { closedReceiptRule } from '../../utils/depositRules';
 
 const emptyForm = () => ({ transactionRef: '', amountVnd: '', transferTime: '', sourceAccount: '' });
 
 // Mounted with booking.id as key so pending receipts never move between bookings.
 const lateWarning = 'Đơn đã hết hạn giữ chỗ. Chỉ ghi nhận khoản tiền đến muộn đã thực nhận: khoản này không xác nhận đơn, không giành lại lịch và được đưa vào hoàn theo chính sách.';
 
-const closedWarning = 'Đơn đã hủy hoặc bị từ chối; ghi nhận không khôi phục đơn. Khoản chuyển trước thời điểm hủy/từ chối được xử lý theo chính sách hủy của đơn (khách hủy sát giờ hoặc không đến nhận: Admin quyết định 0–100%). Khoản chuyển từ thời điểm đó trở đi được hoàn toàn bộ. Nhập đúng thời điểm chuyển trên chứng từ.';
+const closedWarningFor = (policy) => `Đơn đã hủy hoặc bị từ chối; ghi nhận không khôi phục đơn. ${closedReceiptRule(policy)} Nhập đúng thời điểm chuyển trên chứng từ.`;
 
 export default function QrReceiptForm({ booking, onRefresh, late = false, closed = false }) {
   const [form, setForm] = useState(emptyForm);
@@ -23,6 +24,7 @@ export default function QrReceiptForm({ booking, onRefresh, late = false, closed
   const alive = useRef(false), locked = useRef(false), pending = useRef(null);
   useEffect(() => { alive.current = true; return () => { alive.current = false; }; }, []);
   const base = `/bookings/${encodeURIComponent(booking.id)}`;
+  const closedWarning = closedWarningFor(booking.deposit?.policy);
 
   function edit(name, value) { setForm(current => ({ ...current, [name]: value })); setError(''); }
   function confirm() {

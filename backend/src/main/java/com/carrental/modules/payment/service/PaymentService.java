@@ -133,12 +133,35 @@ public class PaymentService {
     @Transactional(propagation = Propagation.MANDATORY)
     public void cancellation(BookingService.View b) {
         String kind = Objects.toString(b.deposit().cancellationKind(), "CANCELLED");
-        boolean discretionary = Set.of("NO_SHOW", "LATE_CUSTOMER").contains(kind);
+        String policy = b.deposit().policy();
+        boolean discretionary = DepositPolicy.adminDecides(policy, kind);
+        boolean fixed = DepositPolicy.fixedCancellationRules(policy);
         for (var found : repo.forBooking(b.id())) if ("SUCCEEDED".equals(found.status())) {
             var p = repo.lockPayment(found.id());
+            if (fixed && "NO_SHOW".equals(kind)) { forfeitNoShow(p); continue; }
             queue(p, true, Math.max(0, p.amount() - repo.reserved(p.id(), null)), kind,
-                discretionary ? "REQUESTED" : "APPROVED", discretionary ? "Admin quyết định 0–100%; cần lý do" : "Hoàn theo chính sách hủy");
+                discretionary ? "REQUESTED" : "APPROVED", discretionary ? "Admin quyết định 0–100%; cần lý do"
+                    : fixed && "LATE_CUSTOMER".equals(kind) ? "Khách hủy sát giờ: hoàn toàn bộ theo chính sách cọc " + policy
+                    : "Hoàn theo chính sách hủy");
         }
+    }
+
+    static final String NO_SHOW_CUSTOMER_NOTE =
+        "Bạn không đến nhận xe nên cọc giữ chỗ không được hoàn, theo chính sách đã áp dụng khi đặt xe. Khoản chuyển ngoài cọc (nếu có) được hoàn toàn bộ.";
+
+    /**
+     * L6 policy v2 no-show: the deposit applied to the booking is kept (a DECLINED 0 đ record explains it to the customer and
+     * cannot be decided again); money on the same receipt beyond the applied deposit is refunded in full.
+     */
+    private void forfeitNoShow(Payment p) {
+        boolean recorded = repo.refunds(p.bookingId()).stream().anyMatch(r -> r.paymentId().equals(p.id()) && r.kind().equals("NO_SHOW"));
+        if (!recorded && p.appliedAmount() > 0) {
+            String reason = "Không đến nhận xe: giữ " + p.appliedAmount() + " đ cọc đã áp dụng theo chính sách " + DepositPolicy.QR_VERSION;
+            repo.createRefund(id(), p, 0, "DECLINED", "NO_SHOW", reason, NO_SHOW_CUSTOMER_NOTE, clock.instant());
+            repo.event(p.bookingId(), p.id(), "REFUND_DECIDED", reason, null, clock.instant(), "refund:" + p.id() + ":NO_SHOW");
+        }
+        queue(p, true, Math.max(0, p.amount() - p.appliedAmount() - repo.reserved(p.id(), null)), "UNAPPLIED", "APPROVED",
+            "Không đến nhận xe: khoản ngoài cọc đã áp dụng được hoàn toàn bộ.");
     }
 
     private void queue(Payment p, boolean full, long amount, String kind, String status, String reason) {
@@ -156,11 +179,18 @@ public class PaymentService {
      */
     @Transactional
     public void receiptAfterClosure(String paymentId, String cancellationKind, Instant closedAt) {
+        receiptAfterClosure(paymentId, cancellationKind, closedAt, DepositPolicy.QR_VERSION_V1);
+    }
+
+    /** L6: under policy v2 nothing is left for an Admin decision; a receipt recorded after closure is never applied, so it is refunded in full. */
+    @Transactional
+    public void receiptAfterClosure(String paymentId, String cancellationKind, Instant closedAt, String policy) {
         var p = repo.lockPayment(paymentId);
         if (!"SUCCEEDED".equals(p.status())) return;
         if (closedAt != null && p.transferTime() != null && p.transferTime().isBefore(closedAt)) {
             String kind = Objects.toString(cancellationKind, "CANCELLED");
-            boolean discretionary = Set.of("NO_SHOW", "LATE_CUSTOMER").contains(kind);
+            if (DepositPolicy.fixedCancellationRules(policy) && "NO_SHOW".equals(kind)) kind = "UNAPPLIED";
+            boolean discretionary = DepositPolicy.adminDecides(policy, kind);
             queue(p, true, p.amount() - p.appliedAmount(), kind, discretionary ? "REQUESTED" : "APPROVED",
                 discretionary ? "Khoản chuyển trước thời điểm hủy, ghi nhận sau; Admin quyết định 0–100%; cần lý do"
                               : "Khoản chuyển trước thời điểm hủy/từ chối, ghi nhận sau; hoàn theo chính sách hủy");

@@ -41,6 +41,7 @@ class QrDemoHttpTest {
     @org.springframework.boot.test.mock.mockito.SpyBean VnpayGateway gateway;
     @Autowired TokenService tokens;@Autowired AccountService accounts;
     @Autowired com.carrental.modules.operation.service.RentalWorkflow rental;
+    @Autowired org.springframework.transaction.support.TransactionTemplate tx;
     final Actor user=new Actor("demo-user","USER","Synthetic"),staff=new Actor("demo-staff-dn","STAFF","Synthetic"),admin=new Actor("demo-admin","ADMIN","Synthetic");
     @org.springframework.boot.test.mock.mockito.SpyBean com.carrental.modules.contract.service.ContractService contracts;
     @BeforeEach void setup(){
@@ -170,8 +171,10 @@ class QrDemoHttpTest {
         assertEquals(206,count("payment_transactions",b.id()),"search is read-only");
     }
     /** Confirmed booking cancelled by Admin as a late customer cancellation (within 24h of the pickup day). */
+    /** L6: bookings created before policy v2 keep the Admin 0–100% decision; the legacy tests pin the saved v1 policy. */
+    void legacyPolicy(String id){assertEquals(1,jdbc.update("update bookings set deposit_policy=? where id=?",com.carrental.modules.booking.service.DepositPolicy.QR_VERSION_V1,id));}
     BookingService.View lateCustomerCancelled(String ref)throws Exception {
-        var b=approve();verify(b.id(),ref,390000);assertEquals("CONFIRMED",current(b.id()).status());
+        var b=approve();legacyPolicy(b.id());verify(b.id(),ref,390000);assertEquals("CONFIRMED",current(b.id()).status());
         clock.value=Instant.parse("2026-10-25T05:00:00Z"); // 12h before the start of the pickup day (Vietnam)
         var c=current(b.id());rental.apply(admin,b.id(),new BookingService.Action("CANCELLED",c.version(),"Synthetic late cancellation",null,false,false,"LATE_CUSTOMER"));
         assertEquals("CANCELLED",current(b.id()).status());
@@ -522,9 +525,65 @@ class QrDemoHttpTest {
         rental.apply(staff,b.id(),TestActions.handover(current(b.id()).version(),null,"Fixture handover",true,false));
         clock.value=Instant.parse("2026-10-27T03:00:00Z");assertThrows(com.carrental.exception.DomainException.class,()->workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Must not cancel delivered car"));assertEquals("IN_PROGRESS",current(b.id()).status());
     }
-    @Test void noShowRefundRemainsAdminDecisionIncludingZero()throws Exception {
-        var b=approve();verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Contacted, not delivered");
+    @Test void noShowRefundRemainsAdminDecisionIncludingZeroOnLegacyPolicy()throws Exception {
+        var b=approve();legacyPolicy(b.id());verify(b.id(),"A",390000);clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Contacted, not delivered");
         var refund=repo.refunds(b.id()).getFirst();assertEquals("REQUESTED",refund.status());payments.decide(admin,refund.id(),refund.version(),0,"Admin decision, no refund");assertEquals("DECLINED",repo.refund(refund.id()).status());
+    }
+
+
+    // L6: policy v2 for new QR bookings — late customer cancellation refunded in full, no-show keeps the applied deposit, Q6 business cancel.
+    @Test void newQrBookingsSavePolicyV2AndALateCustomerCancellationIsRefundedInFullWithoutAdmin()throws Exception {
+        var b=approve();assertEquals(com.carrental.modules.booking.service.DepositPolicy.QR_VERSION,b.deposit().policy());assertEquals("demo-qr-manual-30-v2",b.deposit().policy());
+        verify(b.id(),"V2-LATE",390000);assertEquals("CONFIRMED",current(b.id()).status());
+        clock.value=Instant.parse("2026-10-25T05:00:00Z"); // 12h before the pickup day (Vietnam)
+        rental.apply(admin,b.id(),new BookingService.Action("CANCELLED",current(b.id()).version(),"Synthetic late cancellation",null,false,false,"LATE_CUSTOMER"));
+        var refund=repo.refunds(b.id()).getFirst();
+        assertEquals(1,repo.refunds(b.id()).size());assertEquals("APPROVED",refund.status());assertEquals("LATE_CUSTOMER",refund.kind());assertEquals(390000,refund.amount());
+        var decide=new LinkedHashMap<String,Object>(Map.of("expectedVersion",refund.version(),"amount",0,"reason","Must not override the fixed policy"));
+        assertEquals(409,post(admin,"/admin/refunds/"+refund.id()+"/decide",decide).getStatus(),"nothing left for an Admin decision");
+        assertEquals("APPROVED",repo.refund(refund.id()).status());assertEquals(390000,repo.refund(refund.id()).amount());
+        // A receipt transferred before the closure but recorded afterwards is refunded in full as well.
+        Instant closed=closedAt(b.id());clock.value=closed.plusSeconds(600);
+        lateReceipt(b.id(),"V2-BEFORE",50000,closed.minusSeconds(60));
+        var before=refundOf(b.id(),"V2-BEFORE");assertEquals("APPROVED",before.status());assertEquals("LATE_CUSTOMER",before.kind());assertEquals(50000,before.amount());
+    }
+    @Test void noShowUnderPolicyV2KeepsTheAppliedDepositRefundsMoneyBeyondItAndTellsTheCustomer()throws Exception {
+        var b=approve();verify(b.id(),"V2-NOSHOW",500000); // 390000 applied, 110000 excess
+        assertEquals("CONFIRMED",current(b.id()).status());
+        var excess=repo.refunds(b.id());assertEquals(1,excess.size());assertEquals("EXCESS",excess.getFirst().kind());assertEquals(110000,excess.getFirst().amount());
+        clock.value=Instant.parse("2026-10-27T03:00:00Z");workflow.noShow(staff,b.id(),current(b.id()).version(),true,true,"Contacted, not delivered");
+        assertEquals("CANCELLED",current(b.id()).status());
+        var noShow=repo.refunds(b.id()).stream().filter(r->"NO_SHOW".equals(r.kind())).toList();
+        assertEquals(1,noShow.size());assertEquals("DECLINED",noShow.getFirst().status());assertEquals(0,noShow.getFirst().amount());
+        assertTrue(noShow.getFirst().customerNote().contains("không đến nhận xe"),noShow.getFirst().customerNote());
+        var payment=repo.forBooking(b.id()).getFirst();
+        assertEquals(110000,repo.reserved(payment.id(),null),"only the excess is refunded; the applied 390000 stays");
+        assertTrue(repo.refunds(b.id()).stream().noneMatch(r->"REQUESTED".equals(r.status())),"no Admin decision is queued");
+        var decide=new LinkedHashMap<String,Object>(Map.of("expectedVersion",noShow.getFirst().version(),"amount",390000,"reason","Must not refund a v2 no-show"));
+        assertEquals(409,post(admin,"/admin/refunds/"+noShow.getFirst().id()+"/decide",decide).getStatus());
+        assertEquals("DECLINED",repo.refund(noShow.getFirst().id()).status());
+        var customer=json.readTree(get(user,"/bookings/"+b.id()+"/deposit").getContentAsString()).get("refunds");
+        JsonNode declined=null;for(var r:customer) if("NO_SHOW".equals(r.path("kind").asText())) declined=r;
+        assertNotNull(declined);assertEquals("DECLINED",declined.get("status").asText());assertFalse(declined.has("reason"),"internal reason stays internal");
+        assertTrue(declined.get("customerNote").asText().contains("cọc giữ chỗ không được hoàn"));
+        // Money transferred before the no-show but recorded afterwards was never applied, so it is refunded in full.
+        Instant closed=closedAt(b.id());clock.value=closed.plusSeconds(600);
+        lateReceipt(b.id(),"V2-NS-BEFORE",70000,closed.minusSeconds(60));
+        var late=refundOf(b.id(),"V2-NS-BEFORE");assertEquals("APPROVED",late.status());assertEquals("UNAPPLIED",late.kind());assertEquals(70000,late.amount());
+        // Running the cancellation policy again does not add records.
+        int before=repo.refunds(b.id()).size();
+        tx.executeWithoutResult(s->payments.cancellation(current(b.id())));
+        assertEquals(before,repo.refunds(b.id()).size());
+    }
+    @Test void businessCancellationOfAConfirmedDepositBookingNeedsTheContactAndRefundsInFull()throws Exception {
+        var b=approve();verify(b.id(),"V2-BIZ",390000);var c=current(b.id());
+        var body=new LinkedHashMap<String,Object>(Map.of("next","CANCELLED","version",c.version(),"reason","Synthetic: xe hỏng","cancellationKind","BUSINESS"));
+        assertEquals(400,post(staff,"/bookings/"+b.id()+"/actions",body).getStatus(),"contact must be confirmed");
+        assertEquals("CONFIRMED",current(b.id()).status());assertTrue(repo.refunds(b.id()).isEmpty());
+        body.put("customerContacted",true);
+        var ok=post(staff,"/bookings/"+b.id()+"/actions",body);assertEquals(200,ok.getStatus(),ok.getContentAsString());
+        assertEquals("CANCELLED",current(b.id()).status());
+        var refund=repo.refunds(b.id()).getFirst();assertEquals("APPROVED",refund.status());assertEquals("BUSINESS",refund.kind());assertEquals(390000,refund.amount());
     }
 
 }

@@ -4,6 +4,7 @@ import ReturnReceipt, { ReturnAssessmentSummary } from '../../components/booking
 import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
 import NoShowForm from "../../components/booking/NoShowForm";
+import { cancellationCauses } from "../../utils/depositRules";
 import RentalBalance, { rentalBalanceBlocksHandover } from "../../components/booking/RentalBalance";
 import PaymentSchedule from "../../components/booking/PaymentSchedule";
 import HandoverReadingsFields from "../../components/booking/HandoverReadingsFields";
@@ -1703,6 +1704,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
   const [next, setNext] = useState("");
   const [reason, setReason] = useState("");
   const [cancellationKind, setCancellationKind] = useState('');
+  const [customerContacted, setCustomerContacted] = useState(false);
   const [condition, setCondition] = useState("");
   const [licenseChecked, setLicenseChecked] = useState(false);
   const [maintenance, setMaintenance] = useState(false);
@@ -1732,6 +1734,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
     setNext("");
     setReason("");
     setCancellationKind('');
+    setCustomerContacted(false);
     setCondition("");
     setLicenseChecked(false);
     setMaintenance(false);
@@ -1758,6 +1761,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
       ? readingsInput({ fuel: fuelLevel, odometer: odometerKm, required: next === "IN_PROGRESS" || Boolean(baseline), baseline })
       : { ok: true, payload: { fuelLevel: null, odometerKm: null } };
     if (!readings.ok) { setError(readings.error); return; }
+    const staffCancel = next === 'CANCELLED' && area !== 'user';
     setBusy(true);
     try {
       await applyBookingAction(booking.id, {
@@ -1767,13 +1771,15 @@ export function ApiBookingDetailPage({ area = "user" }) {
         condition: condition || null,
         licenseChecked,
         maintenance,
-        cancellationKind: booking.deposit?.required && next === 'CANCELLED' ? cancellationKind : null,
+        cancellationKind: staffCancel ? cancellationKind || null : null,
+        customerContacted: staffCancel && cancellationKind === 'BUSINESS' ? customerContacted : false,
         ...(needsReadings && readings.payload.odometerKm !== null ? readings.payload : {}),
       });
       setNotice(next === "IN_PROGRESS" ? "Đã bàn giao xe thành công — đơn chuyển sang Đang thuê." : "Đã cập nhật trạng thái đơn.");
       setNext("");
       setReason("");
       setCancellationKind('');
+      setCustomerContacted(false);
       setCondition("");
       setFuelLevel("");
       setOdometerKm("");
@@ -2054,13 +2060,21 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       />
                     </Field>
                   ) : null}
-                  {booking.deposit?.required && next === 'CANCELLED' && area !== 'user' ? <Field label="Nguyên nhân hủy và chính sách hoàn cọc">
-                    <select required value={cancellationKind} onChange={event => setCancellationKind(event.target.value)}>
+                  {next === 'CANCELLED' && area !== 'user' ? <Field label={booking.deposit?.required ? "Nguyên nhân hủy và chính sách hoàn cọc" : "Nguyên nhân hủy"}>
+                    <select required value={cancellationKind} onChange={event => { setCancellationKind(event.target.value); setCustomerContacted(false); }}>
                       <option value="">Chọn nguyên nhân</option>
-                      <option value="BUSINESS">Doanh nghiệp không cung cấp xe — hoàn toàn bộ</option>
-                      <option value="LATE_CUSTOMER">Khách hủy — Admin quyết định hoàn cọc</option>
+                      {cancellationCauses(booking).map(cause => <option key={cause.value} value={cause.value}>{cause.label}</option>)}
                     </select>
                   </Field> : null}
+                  {next === 'CANCELLED' && area !== 'user' && cancellationCauses(booking).find(cause => cause.value === cancellationKind)?.refund ? (
+                    <p className="text-sm text-muted" data-testid="cancel-refund-rule">{cancellationCauses(booking).find(cause => cause.value === cancellationKind).refund}</p>
+                  ) : null}
+                  {next === 'CANCELLED' && area !== 'user' && cancellationKind === 'BUSINESS' ? (
+                    <label className="flex gap-3 text-sm">
+                      <input type="checkbox" required checked={customerContacted} onChange={event => setCustomerContacted(event.target.checked)} />
+                      <span>Đã liên hệ báo khách rằng chi nhánh không giao được xe và ghi rõ lý do bên trên.</span>
+                    </label>
+                  ) : null}
                   {["IN_PROGRESS", "RETURNED"].includes(next) ? (
                     <Field label="Tình trạng xe / ghi chú">
                       <textarea

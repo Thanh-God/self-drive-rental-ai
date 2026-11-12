@@ -56,6 +56,28 @@ test('Cancellation uses Vietnamese action text, requires reason and preserves AP
  await change(select,'CANCELLED');const reason=c.querySelector('textarea');assert.equal(reason.required,true);assert.equal(reason.checkValidity(),false);assert.equal(posted,undefined);assert.match(c.textContent,/hệ thống xử lý thành công/);
  await change(reason,'Thay đổi kế hoạch');await act(async()=>button(c,'Xác nhận hủy đơn').click());assert.equal(posted.next,'CANCELLED');assert.equal(posted.version,7);assert.equal(posted.reason,'Thay đổi kế hoạch');assert.match(c.textContent,/Hiện tại: Đã hủy/);assert.equal(c.querySelector('select'),null);
 });
+test('L6/Q6: pickup Staff cancel a confirmed booking before the pickup day; a business cause needs the contact confirmation',async()=>{
+ let posted;handler=q=>{if(q.url==='/me/branches')return ['dn'];if(q.method==='post'&&q.url.includes('/actions')){posted=JSON.parse(q.data);return {};}if(q.url==='/bookings/'+id)return {...defaults(q),booking:{...booking,status:'CONFIRMED'}};return defaults(q);};
+ const c=await mount('/staff/bookings/'+id,'staff');const action=c.querySelector('select');
+ assert.deepEqual([...action.options].map(o=>o.value),['','CANCELLED'],'before the pickup day: cancel only, no handover');
+ await change(action,'CANCELLED');await change(c.querySelector('textarea'),'Xe hỏng hộp số, không kịp sửa');
+ const cause=[...c.querySelectorAll('label')].find(l=>l.textContent.includes('Nguyên nhân hủy')).querySelector('select');
+ assert.equal(cause.required,true);assert.deepEqual([...cause.options].map(o=>o.textContent),['Chọn nguyên nhân','Doanh nghiệp không giao được xe','Khách yêu cầu hủy']);
+ await act(async()=>button(c,'Xác nhận hủy đơn').click());assert.equal(posted,undefined,'cause required');
+ await change(cause,'BUSINESS');const contact=[...c.querySelectorAll('label')].find(l=>l.textContent.includes('Đã liên hệ báo khách')).querySelector('input');
+ assert.equal(contact.required,true);assert.equal(contact.checkValidity(),false);assert.equal(c.querySelector('[data-testid="cancel-refund-rule"]'),null,'no deposit: no refund line');
+ await act(async()=>button(c,'Xác nhận hủy đơn').click());assert.equal(posted,undefined,'contact must be confirmed');
+ await act(async()=>contact.click());await act(async()=>button(c,'Xác nhận hủy đơn').click());
+ assert.equal(posted.next,'CANCELLED');assert.equal(posted.cancellationKind,'BUSINESS');assert.equal(posted.customerContacted,true);assert.equal(posted.reason,'Xe hỏng hộp số, không kịp sửa');assert.equal(posted.version,7);
+});
+test('L6: a customer cause sends no contact flag and the return branch is offered no cancellation',async()=>{
+ let posted;let branchesFor=['dn'];handler=q=>{if(q.url==='/me/branches')return branchesFor;if(q.method==='post'&&q.url.includes('/actions')){posted=JSON.parse(q.data);return {};}if(q.url==='/bookings/'+id)return {...defaults(q),booking:{...booking,status:'CONFIRMED'}};return defaults(q);};
+ const c=await mount('/staff/bookings/'+id,'staff');await change(c.querySelector('select'),'CANCELLED');await change(c.querySelector('textarea'),'Khách gọi xin hủy');
+ const cause=[...c.querySelectorAll('label')].find(l=>l.textContent.includes('Nguyên nhân hủy')).querySelector('select');await change(cause,'LATE_CUSTOMER');
+ assert.equal([...c.querySelectorAll('label')].some(l=>l.textContent.includes('Đã liên hệ báo khách')),false);
+ await act(async()=>button(c,'Xác nhận hủy đơn').click());assert.equal(posted.cancellationKind,'LATE_CUSTOMER');assert.equal(posted.customerContacted,false);
+ branchesFor=['hn'];const d=await mount('/staff/bookings/'+id,'staff');assert.equal(d.querySelector('option[value="CANCELLED"]'),null);
+});
 test('Cancellation rejection retains current status and terminal orders expose no action',async()=>{
  handler=q=>{if(q.method==='post'&&q.url.includes('/actions'))throw new Error('Không đủ điều kiện hủy');return defaults(q);};
  const c=await mount('/user/bookings/'+id);await change(c.querySelector('select'),'CANCELLED');await change(c.querySelector('textarea'),'Đổi lịch');await act(async()=>button(c,'Xác nhận hủy đơn').click());assert.match(c.textContent,/Không đủ điều kiện hủy/);assert.doesNotMatch(c.textContent,/Đã hủy đơn thuê/);assert.match(c.textContent,/Chờ xác nhận/);assert.equal(button(c,'Xác nhận hủy đơn').disabled,false);

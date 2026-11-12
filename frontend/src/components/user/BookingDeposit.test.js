@@ -83,6 +83,18 @@ test('panel shows deposit and remaining total without promising payment', () => 
   assert.doesNotMatch(text, /Đã ghi nhận cọc cho đơn/);
 });
 
+test('L6: the deposit panel lists the cancellation and refund rules of the booking own policy', () => {
+  const render = (policy) => renderToStaticMarkup(React.createElement(Deposit, { booking: { ...baseBooking, deposit: { ...baseBooking.deposit, policy } }, role: 'USER', reload() {} }));
+  const v2 = render('demo-qr-manual-30-v2');
+  assert.match(v2, /Quy tắc hủy và hoàn cọc của đơn này/);
+  assert.match(v2, /Không đến nhận xe và không báo trước khi hết ngày nhận: cọc giữ chỗ không được hoàn/);
+  assert.match(v2, /Hủy dưới 24 giờ trước mốc nhận \(liên hệ nhân viên chi nhánh nhận\): hoàn toàn bộ cọc/);
+  assert.doesNotMatch(v2, /0–100%/);
+  const v1 = render('sandbox-deposit-30-v1');
+  assert.match(v1, /quản trị viên quyết định mức hoàn 0–100%/);
+  assert.doesNotMatch(v1, /cọc giữ chỗ không được hoàn/);
+});
+
 test('Staff pickup QR detail shows backend amounts/deadlines and careful reconciliation guidance only', () => {
   const booking = {
     ...baseBooking,

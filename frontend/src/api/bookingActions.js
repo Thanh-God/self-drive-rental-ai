@@ -17,14 +17,11 @@ export function getBookingActions(
     if (status === "PENDING" && assignedPickup) {
       return booking.deposit?.required ? ["REJECTED", "CANCELLED"] : ["CONFIRMED", "REJECTED", "CANCELLED"];
     }
-    if (
-      status === "CONFIRMED" &&
-      assignedPickup &&
-      now >= startAt &&
-      now < new Date(booking.endAt).getTime()
-      && (booking.policyVersion !== 'calendar-2026-10-17' || vietnamDay(now) === vietnamDay(booking.startAt))
-    ) {
-      return ["IN_PROGRESS", "CANCELLED"];
+    if (status === "CONFIRMED" && assignedPickup && now < new Date(booking.endAt).getTime()) {
+      const canHandOver = now >= startAt
+        && (booking.policyVersion !== 'calendar-2026-10-17' || vietnamDay(now) === vietnamDay(booking.startAt));
+      // L6/Q6: the pickup branch may cancel before the pickup day too (e.g. the car cannot be delivered).
+      return canHandOver ? ["IN_PROGRESS", "CANCELLED"] : ["CANCELLED"];
     }
     if (status === "IN_PROGRESS" && assignedReturn) {
       return ["RETURNED"];

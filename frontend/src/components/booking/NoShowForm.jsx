@@ -3,6 +3,7 @@ import apiClient from "../../api/client";
 import { Field, Notice } from "../common/PageKit";
 import { getErrorMessage } from "../../utils/roles";
 import { canRecordNoShow, pickupDayLabel } from "../../utils/pickupTiming";
+import { noShowDepositNote } from "../../utils/depositRules";
 
 /**
  * Staff chi nhánh nhận ghi nhận khách không đến nhận xe (POST /bookings/{id}/no-show).
@@ -42,7 +43,7 @@ export default function NoShowForm({ booking, role, assignedPickup, now, onDone,
       <p>Khách không đến nhận: chỉ xử lý sau hết ngày nhận ({pickupDayLabel(booking)}); nếu đã giao xe, chuyển xử lý ngoại lệ.</p>
       <p className="text-sm text-muted">
         Đơn sẽ chuyển sang Đã hủy (khách không đến nhận) và xe được trả lại lịch; thao tác không hoàn tác.
-        {depositNote ? " Khoản cọc đã nhận (nếu có) được đưa vào yêu cầu hoàn chờ Admin quyết định 0–100%." : " Đơn này không có cọc nên không phát sinh hoàn tiền."}
+        {depositNote ? noShowDepositNote(booking.deposit?.policy) : " Đơn này không có cọc nên không phát sinh hoàn tiền."}
       </p>
       <label className="block"><input type="checkbox" required checked={contacted} onChange={(e) => setContacted(e.target.checked)} /> Đã liên hệ khách</label>
       <label className="block"><input type="checkbox" required checked={notDelivered} onChange={(e) => setNotDelivered(e.target.checked)} /> Xe chưa thực sự được giao</label>
