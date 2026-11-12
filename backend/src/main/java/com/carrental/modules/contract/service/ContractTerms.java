@@ -10,12 +10,25 @@ import java.util.*;
  */
 public final class ContractTerms {
     private ContractTerms() {}
-    public static final String VERSION = "contract-2026-11-12";
+    /** L7 terms; contracts issued with it do not need the customer's acceptance on the website. */
+    public static final String VERSION_L7 = "contract-2026-11-12";
+    /** L8 (12/11/2026): the contract takes effect when the customer presses "Đồng ý" (article 12), and handover waits for it. */
+    public static final String VERSION = "contract-2026-11-12-v2";
+
+    public static boolean acceptanceRequired(String termsVersion) {
+        return VERSION.equals(termsVersion);
+    }
     public static final String NOTE = "Mẫu hợp đồng phục vụ đồ án, chưa được thẩm định pháp lý; thông tin bên cho thuê và số hotline là thông tin minh họa. Hệ thống đang ở chế độ thử nghiệm, không thu tiền thật.";
     public static final String LESSOR_NAME = "KDrive (dự án thử nghiệm, chưa đăng ký pháp nhân)";
 
     public record Facts(boolean depositRequired, long depositAmount, String depositPolicy, long remainingRent,
-                        boolean rentalBalancePolicy, boolean returnPolicy, String hotline) {}
+                        boolean rentalBalancePolicy, boolean returnPolicy, String hotline, boolean acceptanceRequired) {
+        /** Contracts without the website acceptance step (L7 terms). */
+        public Facts(boolean depositRequired, long depositAmount, String depositPolicy, long remainingRent,
+                     boolean rentalBalancePolicy, boolean returnPolicy, String hotline) {
+            this(depositRequired, depositAmount, depositPolicy, remainingRent, rentalBalancePolicy, returnPolicy, hotline, false);
+        }
+    }
     public record Article(int number, String title, List<String> clauses) {}
 
     public static String vnd(long amount) {
@@ -70,9 +83,14 @@ public final class ContractTerms {
             "Bên thuê gửi khiếu nại tới chi nhánh hoặc hotline " + f.hotline() + "; Bên cho thuê phản hồi trong 7 ngày làm việc.",
             "Hai bên thương lượng trên cơ sở hợp đồng, biên bản bàn giao, biên bản nhận trả và hồ sơ sự cố.",
             "Nếu không thương lượng được, mỗi bên có quyền yêu cầu Tòa án nhân dân có thẩm quyền giải quyết theo pháp luật Việt Nam.");
-        add(list, "Hiệu lực",
+        String unchanged = "Nội dung hợp đồng được lưu nguyên bản tại thời điểm lập và không chỉnh sửa sau đó; thay đổi (nếu có) được ghi nhận bằng biên bản hoặc thao tác riêng trên hệ thống.";
+        if (f.acceptanceRequired()) add(list, "Hiệu lực",
+            "Hợp đồng được lập khi đơn được xác nhận và có hiệu lực khi Bên thuê bấm \"Đồng ý\" trên hệ thống; Bên cho thuê chỉ bàn giao xe sau khi Bên thuê đã đồng ý.",
+            "Hợp đồng chấm dứt khi đơn hoàn tất hoặc bị hủy.",
+            unchanged);
+        else add(list, "Hiệu lực",
             "Hợp đồng có hiệu lực từ thời điểm lập (khi đơn được xác nhận) đến khi đơn hoàn tất hoặc bị hủy.",
-            "Nội dung hợp đồng được lưu nguyên bản tại thời điểm lập và không chỉnh sửa sau đó; thay đổi (nếu có) được ghi nhận bằng biên bản hoặc thao tác riêng trên hệ thống.");
+            unchanged);
         return List.copyOf(list);
     }
 

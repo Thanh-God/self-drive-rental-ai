@@ -30,7 +30,8 @@ class ContractTermsTest {
         assertEquals("Hiệu lực", articles.get(11).title());
         assertFalse(articles.toString().contains("đồ án"), "the disclaimer lives in the note");
         assertTrue(ContractTerms.NOTE.contains("đồ án"));
-        assertEquals("contract-2026-11-12", ContractTerms.VERSION);
+        assertEquals("contract-2026-11-12", ContractTerms.VERSION_L7);
+        assertEquals("contract-2026-11-12-v2", ContractTerms.VERSION);
         assertTrue(ContractTerms.VERSION.length() <= 30, "contracts.terms_version is VARCHAR(30)");
     }
 
@@ -74,6 +75,21 @@ class ContractTermsTest {
         assertTrue(clauses(a, 6).stream().anyMatch(c -> c.contains("chính sách trả xe đã lưu cùng đơn")));
         assertTrue(ContractTerms.articles(facts(false, null, 1, false, false)).get(5).clauses().stream()
             .anyMatch(c -> c.contains("chỉ có hiệu lực khi chi nhánh xác nhận")));
+    }
+
+    @Test
+    void withTheAcceptanceStepTheContractTakesEffectWhenTheCustomerAgrees() {
+        var withStep = ContractTerms.articles(new ContractTerms.Facts(false, 0, null, 1300000, false, false, "10008888", true));
+        assertEquals(12, withStep.size());
+        assertTrue(clauses(withStep, 12).get(0).contains("có hiệu lực khi Bên thuê bấm \"Đồng ý\""));
+        assertTrue(clauses(withStep, 12).get(0).contains("chỉ bàn giao xe sau khi Bên thuê đã đồng ý"));
+        var without = ContractTerms.articles(facts(false, null, 1300000, false, false));
+        assertTrue(clauses(without, 12).get(0).startsWith("Hợp đồng có hiệu lực từ thời điểm lập"));
+        assertEquals(withStep.subList(0, 11), without.subList(0, 11), "only article 12 differs");
+        assertTrue(ContractTerms.acceptanceRequired("contract-2026-11-12-v2"));
+        for (String older : List.of("contract-2026-11-12", "terms-2026-09-28", DepositPolicy.QR_VERSION_V1, DepositPolicy.VNPAY_VERSION))
+            assertFalse(ContractTerms.acceptanceRequired(older), older);
+        assertTrue(ContractTerms.VERSION.length() <= 30);
     }
 
     @Test

@@ -1,5 +1,6 @@
 package com.carrental.modules.contract.service;
 import com.carrental.modules.booking.entity.Booking;
+import com.carrental.exception.DomainException;
 import com.carrental.modules.booking.service.BookingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,8 @@ import java.util.*;
  private static final ZoneId VN=ZoneId.of("Asia/Ho_Chi_Minh");
  private final JdbcTemplate jdbc;private final ObjectMapper json;private final Clock clock;private final com.carrental.modules.booking.service.ReturnPolicy returnPolicies;
  private final ContractParties parties;private final String hotline;
+ /** L8: when on, new contracts use the terms that need the customer's "Đồng ý" before handover; off issues the L7 terms. */
+ @Value("${app.contract-acceptance-enabled:true}") boolean acceptanceEnabled=true;
  public ContractService(JdbcTemplate j,ObjectMapper m,Clock c,com.carrental.modules.booking.service.ReturnPolicy returnPolicies,ContractParties parties,
                         @Value("${app.ai-hotline:10008888}") String hotline){jdbc=j;json=m;clock=c;this.returnPolicies=returnPolicies;this.parties=parties;this.hotline=hotline;}
 
@@ -31,7 +34,23 @@ import java.util.*;
   write(new Source(b.id(),b.userId(),b.vehicleId(),b.pickupBranchId(),b.returnBranchId(),b.customerName(),b.vehicleName(),b.pickupName(),b.returnName(),b.startAt(),b.endAt(),
    b.rentalTotal(),b.oneWayFee(),b.total(),b.policyVersion(),b.rentalDays(),b.deposit().required(),b.deposit().amount(),b.deposit().policy(),b.deposit(),b.returnPolicy(),b.rentalBalance()!=null));
  }
- public Object get(String bookingId){return jdbc.queryForList("select id,issued_at,snapshot,terms_version from contracts where booking_id=?",bookingId);}
+ public Object get(String bookingId){return jdbc.queryForList("select id,issued_at,snapshot,terms_version,accepted_at from contracts where booking_id=?",bookingId);}
+
+ /** L8: the customer accepts the contract once; a repeated press keeps the first time. Older contracts do not take an acceptance. */
+ public void accept(String bookingId,Instant now){
+  var rows=jdbc.queryForList("select terms_version,accepted_at from contracts where booking_id=? for update",bookingId);
+  if(rows.isEmpty())throw DomainException.conflict("Hợp đồng chưa được phát hành.");
+  if(!ContractTerms.acceptanceRequired((String)rows.get(0).get("terms_version")))throw DomainException.conflict("Hợp đồng này lập trước khi có bước đồng ý trên hệ thống; không cần bấm đồng ý.");
+  if(rows.get(0).get("accepted_at")!=null)return;
+  jdbc.update("update contracts set accepted_at=? where booking_id=? and accepted_at is null",java.sql.Timestamp.from(now),bookingId);
+ }
+
+ /** L8: handover waits until the customer has accepted a contract that requires it. */
+ public void requireAcceptedForHandover(String bookingId){
+  var rows=jdbc.queryForList("select terms_version,accepted_at from contracts where booking_id=?",bookingId);
+  if(!rows.isEmpty()&&ContractTerms.acceptanceRequired((String)rows.get(0).get("terms_version"))&&rows.get(0).get("accepted_at")==null)
+   throw DomainException.conflict("Khách chưa bấm Đồng ý hợp đồng trên hệ thống; chưa thể bàn giao xe.");
+ }
 
  private void write(Source s){
   Instant issuedAt=clock.instant();
@@ -55,9 +74,9 @@ import java.util.*;
   snapshot.put("depositAmount",deposit);snapshot.put("remainingRent",remaining);
   snapshot.put("policyVersion",s.policyVersion());
   if(s.returnPolicy()!=null)snapshot.put("returnPolicy",s.returnPolicy());
-  snapshot.put("articles",ContractTerms.articles(new ContractTerms.Facts(s.depositRequired(),deposit,s.depositPolicy(),remaining,s.rentalBalancePolicy(),s.returnPolicy()!=null,hotline)));
+  snapshot.put("articles",ContractTerms.articles(new ContractTerms.Facts(s.depositRequired(),deposit,s.depositPolicy(),remaining,s.rentalBalancePolicy(),s.returnPolicy()!=null,hotline,acceptanceEnabled)));
   snapshot.put("termsNote",ContractTerms.NOTE);
-  try{jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),s.id(),java.sql.Timestamp.from(issuedAt),json.writeValueAsString(snapshot),ContractTerms.VERSION);}
+  try{jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),s.id(),java.sql.Timestamp.from(issuedAt),json.writeValueAsString(snapshot),acceptanceEnabled?ContractTerms.VERSION:ContractTerms.VERSION_L7);}
   catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
  }
 }

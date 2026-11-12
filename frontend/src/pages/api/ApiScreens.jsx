@@ -8,6 +8,8 @@ import { cancellationCauses } from "../../utils/depositRules";
 import RentalBalance, { rentalBalanceBlocksHandover } from "../../components/booking/RentalBalance";
 import PaymentSchedule from "../../components/booking/PaymentSchedule";
 import ContractDocument, { isNumberedContract } from "../../components/booking/ContractDocument";
+import ContractAcceptance from "../../components/booking/ContractAcceptance";
+import { contractAcceptance, handoverBlockedByContract } from "../../utils/contractAcceptance";
 import HandoverReadingsFields from "../../components/booking/HandoverReadingsFields";
 import { fuelLabel, handoverBaseline, km as kmLabel, readingsComparison, readingsInput } from "../../utils/handoverReadings";
 import { quoteRemainderSentence } from "../../utils/paymentSchedule";
@@ -1702,6 +1704,11 @@ export function ApiBookingDetailPage({ area = "user" }) {
   const { user: currentUser } = useAuth();
   const isStaff = currentUser?.role === "STAFF";
   const branchAssignmentsRequest = useApiData("/me/branches", isStaff);
+  // L8: a confirmed booking's contract tells whether the customer has accepted it (handover waits for it).
+  const contractRequest = useApiData(
+    `/bookings/${encodeURIComponent(bookingId)}/contract`,
+    request.data?.booking?.status === "CONFIRMED",
+  );
   const [next, setNext] = useState("");
   const [reason, setReason] = useState("");
   const [cancellationKind, setCancellationKind] = useState('');
@@ -1720,6 +1727,10 @@ export function ApiBookingDetailPage({ area = "user" }) {
   const detail = request.data || {};
   const booking = detail.booking;
   const license = detail.license;
+  const acceptance = booking?.status === "CONFIRMED" && !contractRequest.loading && !contractRequest.error
+    ? contractAcceptance(contractRequest.data)
+    : null;
+  const contractBlocksHandover = handoverBlockedByContract(acceptance);
   const assignedBranchIds = new Set(
     Array.isArray(branchAssignmentsRequest.data)
       ? branchAssignmentsRequest.data
@@ -1900,6 +1911,14 @@ export function ApiBookingDetailPage({ area = "user" }) {
                 </section>
                 <ScheduleWarnings booking={booking} area={area} />
                 <BookingProgress booking={booking} history={detail.history} role={currentUser?.role} actions={availableActions} area={area} now={now} />
+                {area === "user" && contractBlocksHandover ? (
+                  <div data-testid="user-contract-reminder">
+                    <Notice>
+                      Bạn cần đọc và bấm Đồng ý hợp đồng trước khi nhận xe.{" "}
+                      <Link className="font-semibold underline" to={`/user/bookings/${booking.id}/contract`}>Mở hợp đồng</Link>
+                    </Notice>
+                  </div>
+                ) : null}
                 {detail.records?.length ? (
                   <section className="panel">
                     <h2 className="mb-4 text-lg font-semibold">
@@ -2111,6 +2130,12 @@ export function ApiBookingDetailPage({ area = "user" }) {
                       Đã kiểm tra GPLX và xe phù hợp đến hết chuyến.
                     </label>
                   ) : null}
+                  {next === "IN_PROGRESS" && contractBlocksHandover ? (
+                    <div data-testid="handover-contract-block">
+                      <Notice error>Chưa giao xe được: khách chưa bấm Đồng ý hợp đồng. Nhờ khách mở hợp đồng trong tài khoản của mình và bấm Đồng ý, rồi tải lại trạng thái.</Notice>
+                      <button type="button" className="btn-secondary mt-2" onClick={() => contractRequest.reload()}>Tải lại trạng thái hợp đồng</button>
+                    </div>
+                  ) : null}
                   {next === "IN_PROGRESS" && rentalBalanceBlocksHandover(booking) ? (
                     <Notice error>{`Chưa giao xe được: cần ghi nhận phần tiền thuê còn lại (${money(booking.rentalBalance.dueAmount)}) ở khối "Phần tiền thuê còn lại" trước.`}</Notice>
                   ) : null}
@@ -2127,7 +2152,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                     </label>
                   ) : null}
                   {error ? <Notice error>{error}</Notice> : null}
-                  <button className="btn" disabled={busy || !next || (next === "IN_PROGRESS" && rentalBalanceBlocksHandover(booking))}>
+                  <button className="btn" disabled={busy || !next || (next === "IN_PROGRESS" && (rentalBalanceBlocksHandover(booking) || contractBlocksHandover))}>
                     {busy ? "Đang xử lý..." : next === "CANCELLED" ? "Xác nhận hủy đơn" : bookingActionLabels[next] || "Chọn thao tác"}
                   </button>
                   </form>
@@ -2158,6 +2183,11 @@ export function ApiDocumentPage({ kind, area }) {
   const { bookingId } = useParams();
   const request = useApiData(
     `/bookings/${encodeURIComponent(bookingId)}/${kind}`,
+  );
+  // L8: the customer may accept only while the booking is confirmed.
+  const ownBookingRequest = useApiData(
+    `/bookings/${encodeURIComponent(bookingId)}`,
+    kind === "contract" && area === "user",
   );
   const rawDocument = Array.isArray(request.data)
     ? request.data[0]
@@ -2252,9 +2282,18 @@ export function ApiDocumentPage({ kind, area }) {
             <ContractDocument doc={doc} formatDate={formatValue}>
               <ReturnPolicySummary policy={doc.returnPolicy} />
             </ContractDocument>
-            <p className="mt-5 text-sm text-slate-500">
-              Hợp đồng là bản ghi nhận thỏa thuận; chữ ký/duyệt thực hiện theo quy trình bên ngoài.
-            </p>
+            {contractAcceptance(rawDocument).required ? (
+              <ContractAcceptance
+                bookingId={bookingId}
+                acceptance={contractAcceptance(rawDocument)}
+                canAccept={area === "user" && ownBookingRequest.data?.booking?.status === "CONFIRMED"}
+                onAccepted={request.reload}
+              />
+            ) : (
+              <p className="mt-5 text-sm text-slate-500">
+                Hợp đồng là bản ghi nhận thỏa thuận; chữ ký/duyệt thực hiện theo quy trình bên ngoài.
+              </p>
+            )}
           </section>
           ) : (
           <section className="panel mx-auto max-w-3xl">

@@ -29,6 +29,8 @@ app:
   return-settlement-demo: ${RETURN_SETTLEMENT_DEMO:true}
   return-policy-enabled: ${RETURN_POLICY_ENABLED:false}
   rental-balance-enabled: ${RENTAL_BALANCE_ENABLED:false}
+  # L8: new contracts need the customer's "Đồng ý" on the website before handover (user decision 12/11/2026).
+  contract-acceptance-enabled: ${CONTRACT_ACCEPTANCE_ENABLED:true}
   rental-balance-demo: ${RENTAL_BALANCE_DEMO:true}
   deposit-method: ${DEPOSIT_METHOD:VNPAY_SANDBOX}
   deposit-enabled: ${DEPOSIT_ENABLED:false}

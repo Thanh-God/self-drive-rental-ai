@@ -25,6 +25,11 @@ public class RentalWorkflowController {
         return workflow.contract(a, id);
     }
 
+    @PostMapping("/{id}/contract/accept")
+    public Object acceptContract(@AuthenticationPrincipal Actor a, @PathVariable String id) {
+        return workflow.acceptContract(a, id);
+    }
+
     @GetMapping("/{id}/invoice")
     public Object invoice(@AuthenticationPrincipal Actor a, @PathVariable String id) {
         return workflow.invoice(a, id);
