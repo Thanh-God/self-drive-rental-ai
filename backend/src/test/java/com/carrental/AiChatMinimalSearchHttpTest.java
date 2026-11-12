@@ -59,7 +59,7 @@ class AiChatMinimalSearchHttpTest {
                 criteria.put("unresolvedFields", List.of());
                 byte[] reply = mapper.writeValueAsBytes(Map.of("model", "qwen3:8b", "done", true, "done_reason", "stop",
                     "message", Map.of("role", "assistant", "content", mapper.writeValueAsString(
-                        Map.of("intent", "ASK_MISSING", "reply", "Bạn nhận xe ngày nào?", "criteria", criteria)))));
+                        Map.of("intent", "ASK_MISSING", "criteria", criteria)))));
                 exchange.sendResponseHeaders(200, reply.length);
                 try (var out = exchange.getResponseBody()) { out.write(reply); }
             });

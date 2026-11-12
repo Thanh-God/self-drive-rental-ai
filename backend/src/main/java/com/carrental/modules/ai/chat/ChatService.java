@@ -16,10 +16,11 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
 /**
- * One grounded chat answer. The model only drafts; the backend decides what the customer sees:
- * citations must name passages that were offered, an answer without one becomes the approved "no
- * information" reply, refusals use the approved wording, money amounts the passages do not contain are
- * withdrawn, and suspected instruction injection without grounding gets the approved out-of-scope reply.
+ * One grounded chat answer. The model only classifies and picks; the customer never reads model wording:
+ * a policy answer is the text of the offered entries it cited, an answer without one becomes the approved "no
+ * information" reply, refusals use the approved wording, a vehicle-search turn carries criteria only and the
+ * backend asks and reports itself, and suspected instruction injection without grounding gets the approved
+ * out-of-scope reply.
  */
 @Service
 public class ChatService {
@@ -34,22 +35,16 @@ public class ChatService {
         REFUSAL_REWORDED,
         /** OUT_OF_SCOPE for a rental-related question the knowledge does not cover: the approved fallback instead. */
         OUT_OF_SCOPE_IN_DOMAIN,
-        /** A money amount not present in the cited passages or the question, withdrawn. */
-        UNSUPPORTED_AMOUNT,
         /** Injection pattern and the reply had no valid citation, replaced by the approved refusal. */
         INJECTION_UNGROUNDED,
         /** ANSWER whose reply is an approved refusal: labelled OUT_OF_SCOPE, sources dropped. */
         REFUSAL_RELABELLED,
         /** The approved "no information" reply came with citations; they were dropped. */
         FALLBACK_SOURCES_DROPPED,
-        /** Model wording repeated a run of the system instructions; replaced by the approved refusal. */
-        INSTRUCTION_LEAK,
         /** D2: the message answered the field the backend asked for; handled without the model and without quota. */
         ANSWERED_WITHOUT_MODEL,
         /** The model chose a vehicle search the customer did not ask for; answered without searching (REVIEW #5). */
-        SEARCH_NOT_REQUESTED,
-        /** Sample hotline mentioned without its sample label; the label was added. */
-        HOTLINE_LABEL_ADDED
+        SEARCH_NOT_REQUESTED
     }
 
     /** {@code criteria}, {@code missing} and {@code cards} are set only for a vehicle-search turn. */
@@ -60,8 +55,6 @@ public class ChatService {
         }
     }
 
-    private static final Pattern AMOUNT = Pattern.compile(
-        "\\d[\\d.,]*\\s*(?:%|d\\b|vnd\\b|dong\\b|nghin\\b|ngan\\b|k\\b|trieu\\b|tr\\b)");
     /** Folded words that place a question in the KDrive rental domain. */
     private static final Pattern DOMAIN = Pattern.compile(
         "\\b(?:xe|thue|kdrive|chuyen di|don thue|chi nhanh|gplx|bang lai|giay phep|coc|hoan tien|huy don|nhan xe|tra xe|"
@@ -69,7 +62,8 @@ public class ChatService {
     /** At most this many approved entries make up one policy answer. */
     static final int MAX_ANSWER_ENTRIES = 2;
     static final String EXPERIMENTAL_NOTICE = "Lưu ý: đây là chính sách KDrive đang thử nghiệm.";
-    private static final String ASK_WITHOUT_AMOUNT =
+    /** P1: a search turn without the vehicle-search service (offline tools) gets this backend wording. */
+    static final String ASK_SEARCH_DETAILS =
         "Bạn cho mình biết ngày nhận, ngày trả, điểm nhận/trả, số người và tổng ngân sách để mình gợi ý xe nhé. "
         + "Giá chính xác hiển thị ở bước báo giá.";
 
@@ -80,9 +74,6 @@ public class ChatService {
     private final AiDailyQuota quota;
     private final ChatVehicleSearch search;
     private final ChatTimings timings;
-    /** Word runs of the system instructions that never occur in approved text: seeing one in a reply is a leak. */
-    private final Set<String> instructionRuns;
-    static final int LEAK_RUN = 8;
 
     public ChatService(KnowledgeBase knowledge, KnowledgeRetriever retriever, ChatPromptBuilder builder,
                        ObjectProvider<QwenChatModel> model, AiDailyQuota quota, ChatVehicleSearch search) {
@@ -100,23 +91,6 @@ public class ChatService {
         this.model = model;
         this.quota = quota;
         this.search = search;
-        var runs = new HashSet<String>(runs(builder.rules() + " " + QwenChatModel.FORMAT_RULES));
-        runs.removeAll(runs(knowledge.fallbackReply()));
-        for (var e : knowledge.entries()) runs.removeAll(runs(e.answer()));
-        this.instructionRuns = Set.copyOf(runs);
-    }
-
-    /** Consecutive {@link #LEAK_RUN}-word sequences of the folded text. */
-    static Set<String> runs(String text) {
-        var w = wordsOnly(text).split(" ");
-        var out = new HashSet<String>();
-        for (int i = 0; i + LEAK_RUN <= w.length; i++) out.add(String.join(" ", java.util.Arrays.copyOfRange(w, i, i + LEAK_RUN)));
-        return out;
-    }
-
-    boolean leaksInstructions(String reply) {
-        for (String run : runs(reply)) if (instructionRuns.contains(run)) return true;
-        return false;
     }
 
     /** Question answering only (no vehicle search), with a daily limit. */
@@ -306,17 +280,8 @@ public class ChatService {
                 var used = prompt.passageIds().stream().filter(citations::contains).limit(MAX_ANSWER_ENTRIES).toList();
                 return done(intent, approvedText(used), used, guards);
             }
-            default -> { // SEARCH_VEHICLES, ASK_MISSING: no knowledge citation; amounts only from the customer
-                // R2: the only branch where model wording can still reach the customer.
-                if (leaksInstructions(reply)) {
-                    guards.add(Guard.INSTRUCTION_LEAK);
-                    return done("OUT_OF_SCOPE", refusal("K-G01"), List.of(), guards);
-                }
-                if (!amountsSupported(reply, message)) {
-                    guards.add(Guard.UNSUPPORTED_AMOUNT);
-                    reply = ASK_WITHOUT_AMOUNT;
-                }
-                return done(intent, labelHotline(reply, guards), List.of(), guards);
+            default -> { // SEARCH_VEHICLES, ASK_MISSING: the model wrote no wording (P1); the backend asks
+                return done(intent, ASK_SEARCH_DETAILS, List.of(), guards);
             }
         }
     }
@@ -340,18 +305,11 @@ public class ChatService {
     private boolean isApprovedRefusal(String reply) { return approvedRefusal(reply) != null; }
 
     private String approvedRefusal(String reply) {
+        if (reply == null) return null; // a search turn has no model wording
         String key = wordsOnly(reply);
         for (String id : List.of("K-G01", "K-G02", "K-G03"))
             if (key.equals(wordsOnly(refusal(id)))) return refusal(id);
         return null;
-    }
-
-    private String labelHotline(String reply, List<Guard> guards) {
-        if (knowledge.hotlineSample() && reply.contains(knowledge.hotline()) && !fold(reply).contains("mau")) {
-            guards.add(Guard.HOTLINE_LABEL_ADDED);
-            return reply.replace(knowledge.hotline(), knowledge.hotline() + " (số mẫu dùng cho bản demo)");
-        }
-        return reply;
     }
 
     static boolean inDomain(String text) {
@@ -360,21 +318,6 @@ public class ChatService {
 
     static boolean looksLikeInjection(String text) {
         return PromptInjection.matches(text);
-    }
-
-    /** Every money amount or percentage in {@code reply} also appears, digit for digit, in {@code source}. */
-    static boolean amountsSupported(String reply, String source) {
-        var allowed = new HashSet<String>();
-        var s = AMOUNT.matcher(fold(source));
-        while (s.find()) allowed.add(digits(s.group()));
-        var r = AMOUNT.matcher(fold(reply));
-        while (r.find()) if (!allowed.contains(digits(r.group()))) return false;
-        return true;
-    }
-
-    private static String digits(String amount) {
-        String unit = amount.replaceAll("[\\d.,\\s]", "");
-        return amount.replaceAll("\\D", "") + ":" + unit;
     }
 
     /** Folded words only, for comparing a reply with approved wording regardless of punctuation. */

@@ -79,7 +79,7 @@ class ChatTimingsTest {
         for (String k : List.of("pickupDate", "returnDate", "pickupBranchName", "returnBranchName", "passengers", "budgetVndTotal", "transmission"))
             criteria.put(k, null);
         criteria.put("unresolvedFields", List.of());
-        content.set(JSON.writeValueAsString(Map.of("intent", intent, "reply", "Bạn nhận xe ngày nào?", "criteria", criteria)));
+        content.set(JSON.writeValueAsString(Map.of("intent", intent, "criteria", criteria)));
     }
 
     AiRequestDeadline deadline() { return AiRequestDeadline.start(AiRequestDeadline.Operation.CHAT); }

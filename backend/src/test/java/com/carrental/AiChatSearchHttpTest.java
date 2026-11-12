@@ -106,7 +106,7 @@ class AiChatSearchHttpTest {
         c.put("budgetVndTotal", budget);
         c.put("transmission", transmission);
         c.put("unresolvedFields", List.of(unresolved));
-        SCRIPT.put(message, JSON.writeValueAsString(Map.of("intent", intent, "reply", "Model text the backend replaces 9.999.999đ", "criteria", c)));
+        SCRIPT.put(message, JSON.writeValueAsString(Map.of("intent", intent, "criteria", c)));
     }
 
     ResponseEntity<JsonNode> chat(String message, JsonNode criteria) {
@@ -123,7 +123,8 @@ class AiChatSearchHttpTest {
         assertEquals("ASK_MISSING", asked.path("intent").asText());
         assertEquals(List.of("returnDate", "returnBranchId", "passengers", "budgetVndTotal"), texts(asked.path("missing")));
         assertTrue(asked.path("reply").asText().contains("trả xe ngày nào"), asked.path("reply").asText());
-        assertFalse(asked.path("reply").asText().contains("9.999.999"), "model wording is never shown in a search turn");
+        // P1: the model writes no wording for a search turn; the schema offers it none.
+        assertFalse(PROVIDER_REQUESTS.get(0).path("format").path("oneOf").get(1).path("properties").has("reply"));
         assertEquals("2026-10-22", asked.path("criteria").path("pickupDate").asText());
         assertEquals("dn", asked.path("criteria").path("pickupBranchId").asText());
         assertEquals("AUTO", asked.path("criteria").path("transmission").asText());
@@ -160,7 +161,6 @@ class AiChatSearchHttpTest {
             assertTrue(cards.get(i).path("total").asLong() <= 3_000_000L);
         }
         assertTrue(found.path("reply").asText().contains("22/10/2026"));
-        assertFalse(found.path("reply").asText().contains("9.999.999"));
         flow.assertUnchangedSince(before);
     }
 
