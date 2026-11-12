@@ -1,6 +1,6 @@
 # Hướng dẫn thuê xe và tiến trình đơn
 
-Trang `/rental-guide` truy cập công khai qua liên kết Hướng dẫn thuê xe ở footer, giải thích chọn xe, báo giá, gửi yêu cầu, xác nhận, nhận/trả và hoàn tất. FAQ dùng quy tắc hiện hành về block 24 giờ, tuyến chi nhánh, GPLX, hủy và chứng từ. Chế độ demo có thông báo dữ liệu riêng.
+Trang `/rental-guide` truy cập công khai qua liên kết Hướng dẫn thuê xe ở footer, giải thích chọn xe, báo giá, gửi yêu cầu, xác nhận, nhận/trả và hoàn tất. FAQ dùng quy tắc hiện hành về block 24 giờ, tuyến chi nhánh, GPLX, hủy và chứng từ. Bước kiểm tra GPLX nêu việc tải đủ hai mặt ảnh trong Hồ sơ & GPLX. FAQ "Có phải đặt cọc không?" dùng nguyên văn mục kiến thức đã duyệt K-B07 (`backend/src/main/resources/ai/kdrive-knowledge.json`), thêm một câu: báo giá trước khi gửi yêu cầu cho biết đơn có cần cọc hay không; test frontend so khớp nguyên văn để hai nơi không lệch nhau. Chế độ demo có thông báo dữ liệu riêng.
 
 Chi tiết đơn hiển thị trạng thái hiện tại từ API và lịch sử các sự kiện đã ghi nhận theo giờ Việt Nam. Trạng thái hết hạn hiệu lực có thể xuất hiện trước khi lịch sử có sự kiện hết hạn; giao diện không tạo sự kiện hoặc chuyển trạng thái theo đồng hồ. Dùng **Tải lại đơn** để kiểm tra cập nhật; khi tải hoặc lỗi, nội dung cũ được ẩn theo cơ chế request hiện có.
 

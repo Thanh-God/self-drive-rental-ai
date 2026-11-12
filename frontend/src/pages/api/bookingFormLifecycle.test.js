@@ -49,7 +49,9 @@ after(async () => {
   dom?.window.close();
 });
 
+const license = { id: 'lic-1', status: 'PENDING', version: 3, photos: { front: true, back: true, status: 'PENDING' } };
 function defaults(config) {
+  if (config.url === '/me/license') return license;
   if (config.url === '/branches') return branches;
   if (config.url === '/branch-routes') return routes;
   if (config.url.startsWith('/vehicles/')) return vehicle;
@@ -177,9 +179,86 @@ test('quote renders backend deposit excluding fee and remaining without adding d
   await mount('', c => c.url === '/bookings/quote' ? { ...quote, deposit: { required: true, amount: 600001, method: 'DEMO_QR_MANUAL' } } : defaults(c));
   await getQuote(); assert.match(container.textContent, /600.001/); assert.match(container.textContent, /1.899.999/);
   await mount('', c => c.url === '/bookings/quote' ? { ...quote, deposit: { required: false, amount: 0 } } : defaults(c));
-  await getQuote(); assert.match(container.textContent, /Không yêu cầu cọc giữ chỗ/);
+  await getQuote(); assert.match(container.textContent, /Báo giá này không yêu cầu cọc giữ chỗ\./);
   assert.equal(container.querySelector('[aria-label="Cọc giữ chỗ dự kiến"]'), null);
   assert.doesNotMatch(container.textContent, /QR DEMO/);
+  // Only one deposit message on a no-deposit quote: the generic warning no longer says the deposit is re-checked.
+  assert.doesNotMatch(container.textContent, /chính sách cọc|số cọc/);
+  assert.equal((container.textContent.match(/cọc/g) || []).length, 1);
+});
+test('deposit quote keeps both amounts and says only the deposit amount is re-checked on submit', async () => {
+  await mount('&pickupBranchId=dn&returnBranchId=hn'); await getQuote();
+  assert.match(container.textContent, /số cọc được kiểm tra lại khi gửi yêu cầu/);
+  assert.doesNotMatch(container.textContent, /không yêu cầu cọc/);
+});
+
+function readinessBox() { return container.querySelector('[aria-label="Điều kiện GPLX"]'); }
+function linkTo(text) { return [...container.querySelectorAll('a')].find(a => a.textContent.trim() === text); }
+const withLicense = value => c => c.url === '/me/license' ? value : defaults(c);
+
+test('missing GPLX photos are shown before quoting; quote still works but sending is blocked with a reason', async () => {
+  await mount('&start=2030-11-10&end=2030-11-12&pickupBranchId=dn&returnBranchId=hn', withLicense({ ...license, photos: { front: true, back: false, status: 'MISSING' } }));
+  assert.equal(readinessBox().dataset.state, 'MISSING_PHOTOS');
+  assert.match(readinessBox().textContent, /GPLX còn thiếu ảnh hai mặt/);
+  const cta = linkTo('Bổ sung ảnh GPLX');
+  assert.ok(cta, 'CTA to add photos');
+  const returnTo = new URL(cta.href).searchParams.get('returnTo');
+  const back = new URL(returnTo, 'http://localhost');
+  assert.equal(back.pathname, '/user/bookings/new');
+  assert.deepEqual(['vehicleId', 'start', 'end', 'pickupBranchId', 'returnBranchId'].map(k => back.searchParams.get(k)), ['v1', '2030-11-10', '2030-11-12', 'dn', 'hn']);
+  await getQuote();
+  assert.ok(requests.some(c => c.url === '/bookings/quote'), 'quote is still allowed without photos');
+  await act(async () => checkbox('Tôi xác nhận thời gian').click());
+  assert.equal(button('Gửi yêu cầu thuê').disabled, true);
+  assert.match(container.textContent, /Chưa gửi được: Cần tải đủ hai mặt ảnh GPLX/);
+  await act(async () => button('Gửi yêu cầu thuê').click());
+  assert.equal(requests.some(c => c.url === '/bookings'), false);
+});
+test('return link follows the trip currently on the form, not the original URL', async () => {
+  await mount('&pickupBranchId=dn&returnBranchId=dn', withLicense({ ...license, photos: { front: false, back: false, status: 'MISSING' } }));
+  await change('Chi nhánh trả xe', 'hn');
+  await change('Ngày trả (giờ Việt Nam)', '2030-12-01');
+  const back = new URL(new URL(linkTo('Bổ sung ảnh GPLX').href).searchParams.get('returnTo'), 'http://localhost');
+  assert.equal(back.searchParams.get('returnBranchId'), 'hn');
+  assert.equal(back.searchParams.get('end'), '2030-12-01');
+});
+test('no saved licence blocks sending and offers to declare one', async () => {
+  for (const value of [null, '']) {
+    await mount('', withLicense(value));
+    assert.equal(readinessBox().dataset.state, 'NO_LICENSE');
+    assert.ok(linkTo('Khai báo GPLX'));
+    await getQuote(); await act(async () => checkbox('Tôi xác nhận thời gian').click());
+    assert.equal(button('Gửi yêu cầu thuê').disabled, true);
+  }
+});
+test('photos needing changes or awaiting review do not block sending; staff note is shown', async () => {
+  await mount('', withLicense({ ...license, photos: { front: true, back: true, status: 'NEEDS_CHANGES', reason: 'Ảnh mặt sau bị mờ' } }));
+  assert.equal(readinessBox().dataset.state, 'NEEDS_CHANGES');
+  assert.match(readinessBox().textContent, /Ảnh mặt sau bị mờ/);
+  assert.ok(linkTo('Thay ảnh GPLX'));
+  await getQuote(); await act(async () => checkbox('Tôi xác nhận thời gian').click());
+  assert.equal(button('Gửi yêu cầu thuê').disabled, false);
+  await mount('', withLicense({ ...license, photos: { front: true, back: true, status: 'APPROVED' } }));
+  assert.equal(readinessBox().dataset.state, 'APPROVED');
+  assert.doesNotMatch(container.textContent, /Chưa gửi được/);
+});
+test('licence load failure is reported without guessing, can be retried and does not block sending', async () => {
+  let fail = true;
+  await mount('', c => { if (c.url === '/me/license' && fail) throw Error('offline'); return defaults(c); });
+  assert.equal(readinessBox().dataset.state, 'ERROR');
+  assert.doesNotMatch(readinessBox().textContent, /thiếu ảnh|đủ ảnh/);
+  await getQuote(); await act(async () => checkbox('Tôi xác nhận thời gian').click());
+  assert.equal(button('Gửi yêu cầu thuê').disabled, false);
+  fail = false;
+  await act(async () => button('Tải lại hồ sơ GPLX').click());
+  assert.equal(readinessBox().dataset.state, 'PENDING_REVIEW');
+});
+test('backend GPLX refusal still links to the profile with the return path', async () => {
+  await mount('', c => { if (c.url === '/bookings') throw { response: { status: 400, data: { message: 'Vui lòng tải đủ ảnh hai mặt GPLX trong Hồ sơ & GPLX trước khi gửi yêu cầu thuê.' } } }; return defaults(c); });
+  await getQuote(); await act(async () => checkbox('Tôi xác nhận thời gian').click());
+  await act(async () => button('Gửi yêu cầu thuê').click());
+  const cta = linkTo('Cập nhật giấy phép lái xe');
+  assert.ok(cta); assert.match(new URL(cta.href).searchParams.get('returnTo'), /^\/user\/bookings\/new\?/);
 });
 test('changing route after quote clears acceptance and stale async quote cannot reappear', async () => {
   await mount(); await getQuote();

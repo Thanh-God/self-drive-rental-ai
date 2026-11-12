@@ -301,6 +301,11 @@ body {
 .rental-step { display: inline-grid; place-items: center; width: 1.75rem; height: 1.75rem; margin-right: .625rem; border-radius: 50%; background: var(--color-action-soft); color: #8c3d12; font-size: .875rem; }
 .rental-send-heading { border-top: 1px solid var(--color-surface-border); padding-top: 1.25rem; }
 .booking-quote-warning { border-left: 3px solid #b45309; padding: .875rem 1rem; background: #fffbeb; color: #78350f; font-size: .875rem; line-height: 1.7; }
+.license-readiness { line-height: 1.6; }
+.license-readiness-info { border-color: var(--color-surface-border); background: var(--color-surface); color: var(--color-ink-700); }
+.license-readiness-success { border-color: #99f6e4; background: #f0fdfa; color: #134e4a; }
+.license-readiness-warning { border-color: #fcd34d; background: #fffbeb; color: #78350f; }
+.license-readiness-error { border-color: #fecdd3; background: #fff1f2; color: #9f1239; }
 .booking-identity { display: flex; flex-wrap: wrap; align-items: center; gap: .75rem; margin-bottom: 1.25rem; font-size: .8125rem; color: var(--color-readable-muted); }
 .booking-identity code { font: inherit; overflow-wrap: anywhere; user-select: all; }
 .booking-identity p { flex-basis: 100%; }

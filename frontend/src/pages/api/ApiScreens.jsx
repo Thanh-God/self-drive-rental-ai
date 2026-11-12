@@ -17,6 +17,7 @@ import TripSearchForm from "../../components/vehicle/TripSearchForm";
 import CompareTray, { CompareToggle, CompareLink } from "../../components/vehicle/CompareControls";
 import { searchParams, searchSuffix, tripSearch } from "../../utils/vehicleSearch";
 import PasswordField from "../../components/common/PasswordField";
+import { bookingReturnPath, licenseReadiness, profilePathWithReturn, safeReturnTo } from "../../utils/licenseReadiness";
 import { passwordError, passwordHint } from "../../utils/passwordPolicy";
 import {
   useEffect,
@@ -910,6 +911,7 @@ export function ApiNewBookingPage() {
   );
   const branchesRequest = useApiData("/branches");
   const routesRequest = useApiData("/branch-routes");
+  const licenseRequest = useApiData("/me/license");
   const [start, setStart] = useState(
     () => (params.get("start") || toVietnamInput(3)).slice(0,10),
   );
@@ -1025,7 +1027,7 @@ export function ApiNewBookingPage() {
   }
 
   async function submitBooking() {
-    if (!quote || !accepted || busy || (quote.returnPolicy && !returnPolicyAccepted)) return;
+    if (!quote || !accepted || busy || !readiness.canSubmit || (quote.returnPolicy && !returnPolicyAccepted)) return;
     if (inputChanged(getCurrentInput())) {
       setError("Thông tin đã thay đổi. Vui lòng kiểm tra lại báo giá.");
       setQuote(null);
@@ -1064,6 +1066,14 @@ export function ApiNewBookingPage() {
     vehicleRequest.loading || branchesRequest.loading || routesRequest.loading;
   const loadError =
     vehicleRequest.error || branchesRequest.error || routesRequest.error;
+  const readiness = licenseReadiness({
+    loading: licenseRequest.loading,
+    error: licenseRequest.error,
+    license: licenseRequest.data,
+  });
+  const profileLink = profilePathWithReturn(bookingReturnPath(params, {
+    vehicleId, start, end, pickupBranchId: pickup, returnBranchId: dropoff,
+  }));
   return (
     <Page
       title="Chuyến đi của bạn"
@@ -1172,7 +1182,23 @@ export function ApiNewBookingPage() {
                 {pickup && !dropoff && routes.length ? (
                   <Notice>Chưa có điểm trả hợp lệ được chọn. Vui lòng chủ động chọn chi nhánh trả; hệ thống không tự chọn tuyến có phí.</Notice>
                 ) : null}
-                <p className="text-sm text-muted">Cần giấy phép lái xe phù hợp và còn hạn đến hết chuyến. <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p>
+                <section
+                  className={`license-readiness license-readiness-${readiness.tone} rounded-lg border p-3 text-sm`}
+                  aria-label="Điều kiện GPLX"
+                  role="status"
+                  data-state={readiness.state}
+                >
+                  <p className="font-semibold">{readiness.title}</p>
+                  {readiness.detail ? <p className="mt-1">{readiness.detail}</p> : null}
+                  <p className="mt-1 text-muted">GPLX cần phù hợp với xe và còn hạn đến hết chuyến; báo giá kiểm tra điều này.</p>
+                  {readiness.state === "ERROR" ? (
+                    <button type="button" className="btn-secondary mt-2" onClick={licenseRequest.reload}>Tải lại hồ sơ GPLX</button>
+                  ) : readiness.action ? (
+                    <Link className="btn-secondary mt-2 inline-flex" to={profileLink}>{readiness.action}</Link>
+                  ) : readiness.state !== "LOADING" ? (
+                    <Link className="mt-2 inline-block underline" to={profileLink}>Xem hồ sơ GPLX</Link>
+                  ) : null}
+                </section>
                 {!routes.length ? (
                   <Notice error>
                     Không có tuyến trả xe đang mở từ chi nhánh nhận đã chọn.
@@ -1181,7 +1207,7 @@ export function ApiNewBookingPage() {
                 ) : null}
                 {error ? <Notice error>{error}</Notice> : null}
                 {error.toLocaleLowerCase("vi").includes("gplx") ? (
-                  <Link className="btn-secondary" to="/user/profile">
+                  <Link className="btn-secondary" to={profileLink}>
                     Cập nhật giấy phép lái xe
                   </Link>
                 ) : null}
@@ -1217,14 +1243,16 @@ export function ApiNewBookingPage() {
                       <p>Cọc được tính vào tiền thuê xe, không phải cọc bảo đảm hư hỏng. Chỉ đóng cọc sau khi nhân viên kiểm tra hồ sơ và mở yêu cầu thanh toán.</p>
                       {quote.deposit.method === "DEMO_QR_MANUAL" ? <p className="booking-quote-warning">QR DEMO · Mô phỏng — Không chuyển tiền thật.</p> : <p>Thanh toán cọc qua VNPAY Sandbox · Chỉ thử nghiệm.</p>}
                     </div>
-                  ) : <p className="text-sm text-muted">Không yêu cầu cọc giữ chỗ theo báo giá hiện tại.</p>}
+                  ) : <p className="text-sm font-medium">Báo giá này không yêu cầu cọc giữ chỗ.</p>}
                   <p className="text-sm text-slate-600">
                     {quote.pickupName} → {quote.returnName}. Giá và khả dụng
                     được kiểm tra lại khi gửi; yêu cầu chỉ được tạo nếu báo giá
                     còn khớp.
                   </p>
                   <p className="booking-quote-warning">
-                    Báo giá không giữ chỗ và không xác nhận đã thanh toán. Giá, lịch xe và chính sách cọc được kiểm tra lại khi gửi yêu cầu.
+                    {quote.deposit?.required
+                      ? "Báo giá không giữ chỗ và không xác nhận đã thanh toán. Giá, lịch xe và số cọc được kiểm tra lại khi gửi yêu cầu."
+                      : "Báo giá không giữ chỗ và không xác nhận đã thanh toán. Giá và lịch xe được kiểm tra lại khi gửi yêu cầu."}
                   </p>
                   <ReturnPolicySummary policy={quote.returnPolicy} />
                   {quote.returnPolicy && <label className="flex items-start gap-3 text-sm">
@@ -1241,9 +1269,15 @@ export function ApiNewBookingPage() {
                     Tôi xác nhận thời gian, chi nhánh và tổng báo giá.
                   </label>
                   <p className="text-sm text-muted">Xác nhận báo giá không phải ký hợp đồng. Hợp đồng được phát hành khi yêu cầu được xác nhận.</p>
+                  {!readiness.canSubmit ? (
+                    <p className="text-sm font-medium" role="note">
+                      Chưa gửi được: {readiness.blockReason}{" "}
+                      {readiness.action ? <Link className="underline" to={profileLink}>{readiness.action}</Link> : null}
+                    </p>
+                  ) : null}
                   <button
                     className="btn"
-                    disabled={!accepted || busy || Boolean(quote.returnPolicy && !returnPolicyAccepted)}
+                    disabled={!accepted || busy || !readiness.canSubmit || Boolean(quote.returnPolicy && !returnPolicyAccepted)}
                     onClick={submitBooking}
                   >
                     {busy ? "Đang gửi..." : "Gửi yêu cầu thuê"}
@@ -2212,6 +2246,8 @@ export function ApiProfilePage() {
   const writeInFlight = useRef(false);
   const profileRequest = useApiData("/auth/me");
   const licenseRequest = useApiData("/me/license");
+  const [profileParams] = useSearchParams();
+  const returnTo = safeReturnTo(profileParams.get("returnTo"));
   const navigate = useNavigate();
   const { logout, refreshUser, token } = useAuth();
   const [licenseScheme, setLicenseScheme] = useState("VN_2025");
@@ -2356,6 +2392,17 @@ export function ApiProfilePage() {
           licenseRequest.reload();
         }}
       >
+        {returnTo ? (
+          <section className="panel mb-5 space-y-2 text-sm" aria-label="Quay lại đặt xe" role="status">
+            <p className="font-semibold">
+              {license?.photos?.front && license?.photos?.back
+                ? "Hồ sơ GPLX đã đủ ảnh hai mặt."
+                : "Bạn đang đặt xe dở. Khai báo GPLX và tải đủ hai mặt ảnh bên dưới."}
+            </p>
+            <p>Quay lại để kiểm tra lại báo giá và xác nhận trước khi gửi yêu cầu; xe, ngày và chi nhánh đã chọn được giữ nguyên.</p>
+            <Link className="btn mt-1 inline-flex" to={returnTo}>Quay lại báo giá</Link>
+          </section>
+        ) : null}
         {message ? <Notice>{message}</Notice> : null}
         {error ? <Notice error>{error}</Notice> : null}
         <div className="grid gap-5 lg:grid-cols-2">
@@ -2466,7 +2513,8 @@ export function ApiProfilePage() {
             </label>
             {license ? (
               <p className="text-sm text-slate-600">
-                Trạng thái xác minh: {licenseStatusLabels[license.status] || "Chưa xác định"}
+                Đối chiếu bản gốc tại chi nhánh: {licenseStatusLabels[license.status] || "Chưa xác định"}.
+                {" "}Kết quả kiểm tra ảnh GPLX nằm ở mục ảnh bên dưới.
               </p>
             ) : null}
             <button className="btn" disabled={busy}>
