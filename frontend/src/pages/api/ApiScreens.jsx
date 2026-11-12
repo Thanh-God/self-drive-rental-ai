@@ -3,6 +3,8 @@ import ReturnPolicySummary from '../../components/booking/ReturnPolicySummary';
 import ReturnReceipt, { ReturnAssessmentSummary } from '../../components/booking/ReturnReceipt';
 import LicensePhotos from "../../components/user/LicensePhotos";
 import BookingDeposit from "../../components/user/BookingDeposit";
+import NoShowForm from "../../components/booking/NoShowForm";
+import { nearPickup } from "../../utils/pickupTiming";
 import AdminBookingTable from "../../components/booking/AdminBookingTable";
 import ScheduleWarnings from "../../components/booking/ScheduleWarnings";
 import { bookingStatusLabels, bookingActionLabels, licenseStatusLabels, licenseSchemeLabels, incidentKindLabels, incidentStatusLabels } from "../../utils/uiLabels";
@@ -1833,7 +1835,9 @@ export function ApiBookingDetailPage({ area = "user" }) {
             <ReturnPolicySummary policy={booking.returnPolicy} />
             <ReturnAssessmentSummary assessment={booking.returnAssessment} settlement={booking.returnSettlement} />
             <ReturnSettlement key={`settlement-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedReturn={assignedBranchIds.has(booking.returnBranchId)} onSaved={request.reload} />
-            {booking.deposit?.required ? <BookingDeposit key={`deposit-${booking.id}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : null}
+            {booking.deposit?.required ? <BookingDeposit key={`deposit-${booking.id}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} reload={request.reload} now={now} /> : (
+              <NoShowForm key={`no-show-${booking.id}-${booking.version}`} booking={booking} role={currentUser?.role} assignedPickup={assignedBranchIds.has(booking.pickupBranchId)} now={now} onDone={request.reload} standalone />
+            )}
             <div className="grid gap-6 lg:grid-cols-[1fr_330px]">
               <div className="space-y-5">
                 <section className="panel">
@@ -1869,7 +1873,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                   </p>
                 </section>
                 <ScheduleWarnings booking={booking} area={area} />
-                <BookingProgress booking={booking} history={detail.history} role={currentUser?.role} actions={availableActions} area={area} />
+                <BookingProgress booking={booking} history={detail.history} role={currentUser?.role} actions={availableActions} area={area} now={now} />
                 {detail.records?.length ? (
                   <section className="panel">
                     <h2 className="mb-4 text-lg font-semibold">
@@ -2075,7 +2079,7 @@ export function ApiBookingDetailPage({ area = "user" }) {
                 ) : null}
                 {currentUser?.role === "USER" &&
                 ["PENDING", "CONFIRMED"].includes(booking.status) &&
-                new Date(booking.startAt).getTime() - now < 86400000 ? (
+                nearPickup(booking, now) ? (
                   <Notice>
                     Đã sát giờ nhận xe (dưới 24 giờ). Vui lòng liên hệ nhân viên để được hỗ trợ hủy.
                   </Notice>

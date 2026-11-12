@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { dateTime } from "../common/PageKit";
 import { adminDateFormat } from "../../utils/bookingQueue";
 import { depositPendingLabel, userQrDepositStatus } from "../../utils/qrReconciliation";
+import { pickupDayLabel, pickupDayPassed } from "../../utils/pickupTiming";
 
 import { bookingStatusLabels as bookingStageLabels } from "../../utils/uiLabels";
 export { bookingStageLabels };
@@ -15,22 +16,25 @@ const explanations = {
   REJECTED: "Yêu cầu đã bị từ chối. Xem lý do trong lịch sử trước khi chọn chuyến khác.",
   EXPIRED: "Thời hạn giữ lịch đã hết theo phản hồi hệ thống. Tìm và báo giá lại nếu vẫn cần thuê xe.",
 };
-export default function BookingProgress({ booking, history = [], role, actions = [], area = "user" }) {
+export default function BookingProgress({ booking, history = [], role, actions = [], area = "user", now = null }) {
   const events = Array.isArray(history) ? history : [];
   const contract = ["CONFIRMED", "IN_PROGRESS", "RETURNED", "COMPLETED"].includes(booking.status) || events.some(event => event.next_status === "CONFIRMED");
   const invoice = booking.status === "COMPLETED" || events.some(event => event.next_status === "COMPLETED");
   const label = status => bookingStageLabels[status] || "Trạng thái chưa xác định";
   const depositPending = booking.status === 'PENDING' && booking.deposit?.required;
   const userQr = depositPending && role === "USER" ? userQrDepositStatus(booking) : null;
+  // CONFIRMED nhưng đã hết ngày nhận mà chưa có bàn giao: không hướng dẫn "đến nhận xe", không tự kết luận no-show.
+  const overdueForUser = role === "USER" && booking.status === "CONFIRMED" && now != null && pickupDayPassed(booking, now);
+  const overdueExplanation = `Đã qua ngày nhận xe (${pickupDayLabel(booking)}) nhưng hệ thống chưa ghi nhận bàn giao xe. Liên hệ chi nhánh nhận${booking.pickupName ? ` ${booking.pickupName}` : ""} để biết cách xử lý; hệ thống không tự hủy đơn.`;
   const currentLabel = depositPending ? depositPendingLabel(booking, role) : label(booking.status);
-  const explanation = userQr?.stage ? userQr.message : depositPending ? (booking.deposit.reportedAt ? 'Khách đã báo chuyển khoản. Đơn vẫn chờ xử lý; chỉ xác nhận sau khi nhân viên đối soát đủ cọc. Xem hạn đối soát trong phần cọc giữ chỗ.' : booking.deposit.approvedAt ? 'Hồ sơ đã được duyệt. Thanh toán cọc trong thời hạn hiển thị; hệ thống xác nhận đơn sau khi xác minh khoản cọc.' : 'Nhân viên chi nhánh nhận kiểm tra hồ sơ trước khi mở bước đóng cọc.') : explanations[booking.status];
+  const explanation = userQr?.stage ? userQr.message : depositPending ? (booking.deposit.reportedAt ? 'Khách đã báo chuyển khoản. Đơn vẫn chờ xử lý; chỉ xác nhận sau khi nhân viên đối soát đủ cọc. Xem hạn đối soát trong phần cọc giữ chỗ.' : booking.deposit.approvedAt ? 'Hồ sơ đã được duyệt. Thanh toán cọc trong thời hạn hiển thị; hệ thống xác nhận đơn sau khi xác minh khoản cọc.' : 'Nhân viên chi nhánh nhận kiểm tra hồ sơ trước khi mở bước đóng cọc.') : overdueForUser ? overdueExplanation : explanations[booking.status];
   return <section className="panel" aria-label="Tiến trình đơn thuê">
     <h2 className="text-lg font-semibold">Tiến trình đơn thuê</h2>
     <p className="mt-3 font-semibold" aria-live="polite">Hiện tại: {currentLabel}</p>
     <p className="mt-2 text-sm leading-6">{explanation || "Tải lại đơn để kiểm tra trạng thái hiện tại."}</p>
     {role === "STAFF" ? <p className="mt-2 text-sm">Nhận/xác nhận và giao xe thuộc chi nhánh nhận; nhận trả và hoàn tất thuộc chi nhánh trả. {actions.length ? "Chỉ sử dụng các thao tác được phép bên dưới." : "Hiện không có thao tác khả dụng theo phân công, trạng thái hoặc thời gian thuê."}</p> : null}
     {role === "ADMIN" ? <p className="mt-2 text-sm">Quản trị viên không thực hiện giao hoặc nhận trả xe. Theo dõi đơn và các thao tác được phép bên dưới.</p> : null}
-    {role === "USER" && ["PENDING", "CONFIRMED"].includes(booking.status) ? <p className="mt-2 text-sm">{actions.includes("CANCELLED") ? "Có thể yêu cầu hủy tại phần thao tác bên dưới, kèm lý do." : "Nếu cần hủy sát giờ nhận, hãy liên hệ nhân viên chi nhánh nhận."} <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p> : null}
+    {role === "USER" && ["PENDING", "CONFIRMED"].includes(booking.status) && !overdueForUser ? <p className="mt-2 text-sm">{actions.includes("CANCELLED") ? "Có thể yêu cầu hủy tại phần thao tác bên dưới, kèm lý do." : "Nếu cần hủy sát giờ nhận, hãy liên hệ nhân viên chi nhánh nhận."} <Link className="underline" to="/user/profile">Kiểm tra GPLX</Link></p> : null}
     <p className="mt-3 text-xs text-muted">Giờ Việt Nam · Dùng nút Tải lại đơn để kiểm tra cập nhật mới nhất.</p>
     <details className="booking-history mt-5">
     <summary>Lịch sử trạng thái</summary>
