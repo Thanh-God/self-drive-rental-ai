@@ -207,7 +207,8 @@ class ChatServiceTest {
     /** C5.2-F2: "no information" with a citation (seen live for the deposit question citing K-H06). */
     @Test
     void theNoInformationReplyCarriesNoSources() throws Exception {
-        model("ANSWER", KB.fallbackReply(), "K-H06");
+        // The cited entry is one the retriever returned (K-B07), so only the fallback rule can drop it.
+        model("ANSWER", KB.fallbackReply(), "K-B07");
         var a = ask("Thuê xe có phải đóng tiền cọc không, bao nhiêu?");
         assertEquals("ANSWER", a.intent());
         assertEquals(KB.fallbackReply(), a.reply());

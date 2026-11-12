@@ -17,7 +17,7 @@ POST `/api/v1/ai/chat` chỉ dành cho USER đã đăng nhập (chưa đăng nh�
 
 ```json
 { "intent": "ANSWER", "reply": "…", "citations": [ { "id": "K-B04", "title": "Đơn chờ xác nhận được giữ bao lâu?" } ],
-  "knowledgeVersion": "2026-11-11-v1", "criteria": null, "missing": [], "cards": [],
+  "knowledgeVersion": "2026-11-12-v2", "criteria": null, "missing": [], "cards": [],
   "quota": { "limit": 6, "used": 1, "remaining": 5, "resetAt": "2026-11-11T17:00:00Z", "hotline": { "number": "10008888", "sample": true } } }
 ```
 

@@ -5,6 +5,7 @@ Trợ lý chỉ được trả lời câu hỏi về dịch vụ KDrive từ cá
 ## Cấu trúc
 
 - `version`, `approvedOn` (YYYY-MM-DD): phiên bản và ngày duyệt. Backend tính thêm SHA-256 của file để truy vết câu trả lời theo đúng nội dung đã nạp.
+- `answersUnchangedSince` (tùy chọn): phiên bản gần nhất có cùng nội dung `answer`, khi lần đổi chỉ thêm câu hỏi mẫu. Backend không dùng trường này; công cụ chấm điểm chat chấp nhận bộ câu hỏi đánh giá viết cho phiên bản đó. Đổi bất kỳ `answer` nào thì bỏ hoặc cập nhật trường này.
 - `hotline`: `number` (chỉ chữ số) và `sample`. Khi `sample` là true, mọi câu trả lời nhắc số này phải ghi rõ là số mẫu.
 - `fallbackReply`: câu trả lời khi kho không có thông tin cho câu hỏi.
 - `entries`: mỗi mục có `id` dạng `K-[A-H]NN` (không trùng, chữ cái khớp `group`), `kind` (`ANSWER` hoặc `REFUSAL` cho câu ngoài phạm vi), `status` (`APPROVED` hoặc `DRAFT`), `experimental`, `questions` (câu hỏi mẫu dùng để tìm mục, không phải nội dung trả lời), `answer` (tối đa 1200 ký tự) và `sources`.

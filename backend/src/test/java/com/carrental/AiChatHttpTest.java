@@ -128,7 +128,7 @@ class AiChatHttpTest {
         assertTrue(body.path("reply").asText().contains("2 giờ"));
         assertEquals("K-B04", body.path("citations").get(0).path("id").asText());
         assertEquals("Đơn chờ xác nhận được giữ bao lâu?", body.path("citations").get(0).path("title").asText());
-        assertEquals("2026-11-11-v1", body.path("knowledgeVersion").asText());
+        assertEquals("2026-11-12-v2", body.path("knowledgeVersion").asText());
         assertEquals(6, body.path("quota").path("limit").asInt());
         assertEquals(5, body.path("quota").path("remaining").asInt());
         assertEquals("2026-11-11T17:00:00Z", body.path("quota").path("resetAt").asText());

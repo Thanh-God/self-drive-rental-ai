@@ -64,8 +64,9 @@ class RetrievalMetricsTest {
         v1.addAll(chat("chat-v1", "heldout"));
         sets.put("chat-v1(regression)", v1);
         sets.put("chat-v2-dev", chat("chat-v2", "dev"));
-        // Baseline measured at 54cf623 before any R6 change: name -> minimum recall@4.
-        var baseline = Map.of("c22-dev", 34, "c22-heldout(regression)", 31, "chat-v1(regression)", 32, "chat-v2-dev", 4);
+        // Minimum recall@4. Baseline at 54cf623 was 34 / 31 / 32 / 4; knowledge 2026-11-12-v2 (owner-approved sample
+        // questions, R6) reaches 34 / 34 / 34 / 10 on these already-seen sets and may not fall below that.
+        var baseline = Map.of("c22-dev", 34, "c22-heldout(regression)", 34, "chat-v1(regression)", 34, "chat-v2-dev", 10);
         var report = new StringBuilder();
         for (var e : sets.entrySet()) {
             var m = measure(retriever, e.getValue());

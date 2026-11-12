@@ -57,7 +57,9 @@ def load_knowledge(path=KNOWLEDGE):
     doc = json.loads(Path(path).read_text(encoding='utf-8'))
     entries = {e['id']: e for e in doc['entries'] if e['status'] == 'APPROVED'}
     replies = {'fallback': doc['fallbackReply'], **{k: entries['K-' + k]['answer'] for k in ('G01', 'G02', 'G03')}}
-    return {'version': doc['version'], 'entries': entries, 'replies': replies, 'hotline': doc['hotline']}
+    # A dataset written for an older version still applies while the approved answers are unchanged since it.
+    versions = {doc['version'], doc.get('answersUnchangedSince', doc['version'])}
+    return {'version': doc['version'], 'versions': versions, 'entries': entries, 'replies': replies, 'hotline': doc['hotline']}
 
 
 def validate_case(case, kb):
@@ -91,7 +93,7 @@ def validate_case(case, kb):
 def load_split(path, kb):
     doc = json.loads(Path(path).read_text(encoding='utf-8'))
     require(doc.get('version') in ('chat-v1', 'chat-v2') and doc.get('split') in ('dev', 'heldout'), 'dataset header')
-    require(doc.get('knowledgeVersion') == kb['version'], 'dataset written for another knowledge version')
+    require(doc.get('knowledgeVersion') in kb.get('versions', {kb['version']}), 'dataset written for another knowledge version')
     ids = [c['id'] for c in doc['cases']]
     require(len(ids) == len(set(ids)), 'duplicate case id')
     for c in doc['cases']:

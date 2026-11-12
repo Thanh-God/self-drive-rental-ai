@@ -19,7 +19,7 @@ class KnowledgeBaseTest {
     @Test
     void approvedFileLoadsEveryGroupAThroughHWithSampleHotline() {
         var kb = new KnowledgeBase(json);
-        assertEquals("2026-11-11-v1", kb.version());
+        assertEquals("2026-11-12-v2", kb.version());
         assertEquals("2026-11-11", kb.approvedOn().toString());
         assertEquals(37, kb.entries().size());
         Map<String, Long> perGroup = kb.entries().stream()

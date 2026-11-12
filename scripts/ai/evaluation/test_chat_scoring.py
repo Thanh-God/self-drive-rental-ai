@@ -251,6 +251,27 @@ class ChatV2DatasetTests(unittest.TestCase):
         self.v1 = [cs.load_split(base / 'chat-v1' / f'{s}.json', KB) for s in ('dev', 'heldout')]
         self.cases = [c for d in self.v2 for c in d['cases']]
 
+    def test_datasets_follow_the_knowledge_version_only_while_answers_are_unchanged(self):
+        import tempfile
+        self.assertIn(KB['version'], KB['versions'])
+        doc = json.loads((Path(__file__).resolve().parent / 'chat-v2' / 'dev.json').read_text(encoding='utf-8'))
+        with tempfile.TemporaryDirectory() as tmp:
+            for version, accepted in ((KB['version'], True), ('2026-11-11-v1', True), ('2026-10-01-v0', False)):
+                doc['knowledgeVersion'] = version
+                path = Path(tmp) / 'dev.json'
+                path.write_text(json.dumps(doc, ensure_ascii=False), encoding='utf-8')
+                if accepted:
+                    cs.load_split(path, KB)
+                else:
+                    with self.assertRaises(cs.DatasetError):
+                        cs.load_split(path, KB)
+            # Without the field, only the exact version is accepted.
+            strict = dict(KB, versions={KB['version']})
+            doc['knowledgeVersion'] = '2026-11-11-v1'
+            path.write_text(json.dumps(doc, ensure_ascii=False), encoding='utf-8')
+            with self.assertRaises(cs.DatasetError):
+                cs.load_split(path, strict)
+
     def test_header_size_and_every_category_in_both_splits(self):
         self.assertEqual(57, len(self.cases))
         self.assertTrue(all(d['version'] == 'chat-v2' for d in self.v2))
