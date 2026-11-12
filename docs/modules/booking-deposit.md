@@ -23,7 +23,7 @@ Hoàn có vòng đời REQUESTED → APPROVED → PROCESSING → SUCCEEDED/FAILE
 
 ## Cấu hình
 
-V6 thêm payment_transactions, payment_refunds, payment_events; tổng 29 bảng gồm Flyway history. Không sửa migration cũ. Biến môi trường backend: DEPOSIT_ENABLED, VNPAY_TMN_CODE, VNPAY_HASH_SECRET, VNPAY_RETURN_URL. Spring không tự đọc .env.local. Không đưa secret vào Git/log/frontend.
+V6 thêm payment_transactions, payment_refunds, payment_events; tại V6 tổng 29 bảng gồm Flyway history (hiện 30 bảng sau V12, xem [thiết kế cơ sở dữ liệu](../database/database-design.md)). Không sửa migration cũ. Biến môi trường backend: DEPOSIT_ENABLED, VNPAY_TMN_CODE, VNPAY_HASH_SECRET, VNPAY_RETURN_URL. Spring không tự đọc .env.local. Không đưa secret vào Git/log/frontend.
 
 Tắt nhận thanh toán mới vẫn xử lý IPN/đối soát/hoàn cũ. HTTPS tunnel chỉ chuyển endpoint IPN, không mở DB/Admin. Chưa có merchant không nghiệm thu tích hợp sandbox thật; kiểm thử giao thức nội bộ không thay thế kiểm thử nhà cung cấp.
 
@@ -55,7 +55,7 @@ Admin xem lại khoản/đơn/số tiền/lý do trước khi gửi; hoàn DEMO 
 
 Khi POST lỗi mạng hoặc tải lại sau POST thành công bị lỗi, giao diện khóa thao tác và chỉ kiểm tra GET, không tự POST lại hay tạo yêu cầu thay thế. Đối chiếu theo ID yêu cầu, khoản nhận, version và dữ liệu thao tác; hoàn thành còn phải khớp tham chiếu/thời điểm/nguồn tiền. Dữ liệu chưa khớp cần đối soát, không báo hoàn thành. Không lưu thông tin nguồn tiền hoặc hàng đợi retry trong localStorage.
 
-Migration V7/V8 bổ sung trường và guard trong ba bảng payment hiện có. V9 là migration Java Flyway nhỏ trong `backend/src/main/java/db/migration/`, chỉ xử lý tên UNIQUE(payment_id) do từng DB tự sinh, giữ FK và index tra cứu; tất cả dùng chung namespace `classpath:db/migration` và history Flyway, không có DDL chạy riêng. Tổng vẫn29 bảng gồm history; không đổi V1–V6. Không dùng V7 thử nghiệm cũ để nâng DB đã áp dụng checksum khác; cần kiểm kê history trước. Java migration có checksum tường minh và được kiểm thử MySQL/H2.
+Migration V7/V8 bổ sung trường và guard trong ba bảng payment hiện có. V9 là migration Java Flyway nhỏ trong `backend/src/main/java/db/migration/`, chỉ xử lý tên UNIQUE(payment_id) do từng DB tự sinh, giữ FK và index tra cứu; tất cả dùng chung namespace `classpath:db/migration` và history Flyway, không có DDL chạy riêng. Tại V9 vẫn 29 bảng gồm history (hiện 30 sau V12); không đổi V1–V6. Không dùng V7 thử nghiệm cũ để nâng DB đã áp dụng checksum khác; cần kiểm kê history trước. Java migration có checksum tường minh và được kiểm thử MySQL/H2.
 
 ## Contract tóm tắt đối soát QR — API đọc
 

@@ -253,7 +253,7 @@ Admin không được xem mật khẩu dạng rõ. Hệ thống chỉ lưu hash 
 - Backend là nguồn sự thật cho availability, giá và state transition.
 - AI và map là tích hợp bên ngoài qua backend adapter.
 - Tách chi nhánh giao nhận (`branch`) và điểm tham quan (`location`); baseline hiện hỗ trợ nhận/trả khác chi nhánh, nhân viên được phân công.
-- Guest AI, mô hình/provider, Map provider, cọc, phụ phí, gia hạn/no-show vẫn còn mở; GPLX, tính thuê theo ngày cho đơn mới/giữ chính sách cũ, hold tối đa 2 giờ và thời điểm phát hành đã chốt tại [sổ quyết định](../architecture/decisions.md).
+- Guest AI, Map provider, phụ phí và gia hạn vẫn còn mở; GPLX, tính thuê theo ngày cho đơn mới/giữ chính sách cũ, hold tối đa 2 giờ, thời điểm phát hành và (cập nhật 12/11/2026) cọc giữ chỗ thử nghiệm 30%, no-show do Staff chi nhánh nhận ghi nhận, ghi nhận thủ công phần tiền thuê còn lại đã chốt tại [sổ quyết định](../architecture/decisions.md). Mô hình AI hiện hành ghi tại sổ quyết định.
 - Backend tổ chức theo nghiệp vụ, không có module dữ liệu riêng `staff`/`admin`; các quyền và use case của hai actor vẫn được giữ. Xem [ranh giới module](../architecture/module-boundaries.md).
 
 ## 12. Sự cố và trách nhiệm
