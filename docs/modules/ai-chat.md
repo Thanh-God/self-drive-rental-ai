@@ -27,19 +27,19 @@ POST `/api/v1/ai/chat` chỉ dành cho USER đã đăng nhập (chưa đăng nh�
 
 Model chỉ được bắt đầu hoặc tiếp tục tìm xe khi khách yêu cầu tìm/thuê/gợi ý xe, nêu ít nhất một tiêu chí backend tự đọc được (ngày đủ năm, tên chi nhánh, “4 người”, số tiền), hoặc đang có phiên tìm xe; nếu không, câu hỏi về đơn của khách nhận câu “không xem được đơn”, câu khác nhận câu “chưa có thông tin”. Backend chỉ giữ giá trị câu của khách hỗ trợ: ngày phải ghi đủ năm, chi nhánh phải được nhắc tên và đang hoạt động, số người cần có số kèm “người/khách” và ngân sách là số tiền khách nêu (không phải giá theo ngày, không phải nhiều lựa chọn); số người hoặc ngân sách model tự điền bị bỏ và được hỏi lại. “Loại số nào cũng được” hoặc “không cần số tự động” bỏ ưu tiên hộp số trước đó. Giá trị mới thay giá trị trong `criteria` gửi lên; trường khách vừa để ngỏ được hỏi lại.
 
-Thiếu thông tin thì `intent` là `ASK_MISSING`, `missing` liệt kê các trường còn thiếu theo thứ tự, `reply` hỏi một trường bằng câu do backend soạn và `criteria.askedField` ghi trường đang hỏi. Khi tin nhắn tiếp theo trả lời đúng trường đó ở dạng backend tự đọc được (một ngày đủ năm, một tên chi nhánh, “4”, “3 triệu”…), backend xử lý **không gọi model và không trừ lượt**; nếu không đọc được thì đi qua model như thường. Đủ thông tin thì backend tìm bằng [gợi ý xe](ai-recommendation.md) (cần bật `AI_RECOMMENDATION_ENABLED`) và trả tối đa 3 thẻ `cards`: `{vehicleId, vehicleName, seats, transmission, rentalDays, rentalTotal, oneWayFee, total, reasonCodes}`; tổng tiền gồm phí tuyến do backend tính. Không có xe phù hợp thì không có thẻ và `reply` gợi ý sửa tiêu chí. Ở lượt tìm xe model chỉ trả `intent` và tiêu chí nháp, không viết câu trả lời; mọi câu hỏi và kết quả do backend soạn. Không giữ chỗ hay tạo đơn; giá và lịch được kiểm tra lại khi đặt.
+Thiếu thông tin thì `intent` là `ASK_MISSING`, `missing` liệt kê các trường còn thiếu theo thứ tự, `reply` hỏi một trường bằng câu do backend soạn và `criteria.askedField` ghi trường đang hỏi. Khi tin nhắn tiếp theo trả lời đúng trường đó ở dạng backend tự đọc được (một ngày đủ năm, một tên chi nhánh, “4”, “3 triệu”…), backend xử lý **không gọi model và không trừ lượt**; nếu không đọc được thì đi qua model như thường. Đủ thông tin thì backend tìm bằng [gợi ý xe](ai-recommendation.md) (cần bật `AI_RECOMMENDATION_ENABLED`) và trả tối đa 3 thẻ `cards`: `{vehicleId, vehicleName, seats, transmission, rentalDays, rentalTotal, oneWayFee, total, reasonCodes}`; tổng tiền gồm phí tuyến do backend tính. Không có xe phù hợp thì không có thẻ và `reply` gợi ý sửa tiêu chí. Câu trả lời ở lượt tìm xe không dùng chữ của model. Không giữ chỗ hay tạo đơn; giá và lịch được kiểm tra lại khi đặt.
 
 ## Kiểm soát ở backend
 
-Model chỉ phân loại, chọn mục và điền tiêu chí; khách không bao giờ đọc chữ do model viết:
+Model chỉ soạn nháp; backend quyết định nội dung trả về:
 - Câu trả lời từ kho (`ANSWER` có nguồn) là **nguyên văn** mục kiến thức đã duyệt — tối đa hai mục theo thứ tự liên quan; model chỉ chọn mục, chữ của model không được hiển thị. Mục là chính sách thử nghiệm luôn mở đầu bằng “Lưu ý: đây là chính sách KDrive đang thử nghiệm.”
 - Trích dẫn phải là mục đã cấp cho model; câu trả lời không có trích dẫn hợp lệ được thay bằng câu “chưa có thông tin” đã duyệt.
 - Câu từ chối đã duyệt luôn có `intent` `OUT_OF_SCOPE` và không kèm nguồn; câu “chưa có thông tin” cũng không kèm nguồn.
 - Câu ngoài phạm vi dùng đúng câu từ chối đã duyệt; câu thuộc lĩnh vực thuê xe mà kho không có thông tin nhận câu “chưa có thông tin” thay vì từ chối.
-- Ở lượt tìm xe, câu do backend soạn. Giá, phí và lịch xe chỉ lấy từ hệ thống.
+- Ở lượt tìm xe, câu do backend soạn; số tiền chỉ được nhắc lại từ ngân sách khách nêu. Giá, phí và lịch xe chỉ lấy từ hệ thống.
 - Tin nhắn có dấu hiệu chèn lệnh mà không có mục liên quan được trả lời bằng câu từ chối, không gọi model; trả lời không có trích dẫn cho tin nhắn như vậy cũng bị thay bằng câu từ chối.
-- Lịch sử do trình duyệt gửi lên không được tin là lời trợ lý thật: lượt (kể cả vai `assistant`) có dấu hiệu đổi hướng dẫn bị bỏ khỏi yêu cầu gửi model. Vì chữ của model không được hiển thị, model lặp lại hướng dẫn hệ thống cũng không tới được khách. Các dấu hiệu này là lớp bảo vệ bổ sung, không bảo đảm nhận ra mọi cách chèn lệnh.
-- Hotline mẫu luôn được ghi rõ là số mẫu (trong mục kiến thức và câu “chưa có thông tin” đã duyệt).
+- Lịch sử do trình duyệt gửi lên không được tin là lời trợ lý thật: lượt (kể cả vai `assistant`) có dấu hiệu đổi hướng dẫn bị bỏ khỏi yêu cầu gửi model. Chữ của model lặp lại một đoạn hướng dẫn hệ thống bị thay bằng câu từ chối. Các dấu hiệu này là lớp bảo vệ bổ sung, không bảo đảm nhận ra mọi cách chèn lệnh.
+- Hotline mẫu luôn được ghi rõ là số mẫu.
 
 ## Lỗi và hạn mức
 

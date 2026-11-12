@@ -36,8 +36,7 @@ public class QwenChatModel {
 
         Chọn intent: ANSWER khi trả lời câu hỏi về KDrive (kể cả khi trả lời đúng câu "chưa có thông tin");
         SEARCH_VEHICLES khi khách muốn tìm/gợi ý xe và đã nêu nhu cầu; ASK_MISSING khi khách muốn tìm xe nhưng còn thiếu
-        ngày nhận/trả, điểm nhận/trả, số người hoặc ngân sách; OUT_OF_SCOPE khi không liên quan KDrive.
-        Với SEARCH_VEHICLES/ASK_MISSING chỉ trả intent và criteria, không viết câu trả lời; hệ thống tự hỏi và tự báo kết quả.
+        ngày nhận/trả, điểm nhận/trả, số người hoặc ngân sách (reply hỏi phần còn thiếu); OUT_OF_SCOPE khi không liên quan KDrive.
         citations chỉ gồm ID đoạn kiến thức đã dùng; để [] nếu không dùng đoạn nào.
         Nếu lịch sử cho thấy khách đang tìm xe và tin nhắn bổ sung ngày, chi nhánh, số người hoặc ngân sách thì chọn
         ASK_MISSING hoặc SEARCH_VEHICLES.
@@ -59,10 +58,7 @@ public class QwenChatModel {
     public record Criteria(String pickupDate, String returnDate, String pickupBranchName, String returnBranchName,
                            Integer passengers, Long budgetVndTotal, String transmission, List<String> unresolvedFields) {}
 
-    /**
-     * The model's answer after schema validation, before backend grounding checks. A vehicle-search turn has no
-     * {@code reply} (P1, R7): the backend words every search question and result itself.
-     */
+    /** The model's answer after schema validation, before backend grounding checks. */
     public record Reply(String intent, String reply, List<String> citations, Criteria criteria, Usage usage) {
         public Reply(String intent, String reply, List<String> citations) { this(intent, reply, citations, null, null); }
         public Reply(String intent, String reply, List<String> citations, Criteria criteria) {
@@ -147,6 +143,7 @@ public class QwenChatModel {
             "items", Map.of("type", "string", "enum", CRITERIA_FIELDS)));
         var search = new LinkedHashMap<String, Object>();
         search.put("intent", Map.of("type", "string", "enum", List.of("SEARCH_VEHICLES", "ASK_MISSING")));
+        search.put("reply", Map.of("type", "string", "minLength", 1, "maxLength", MAX_REPLY));
         search.put("criteria", Map.of("type", "object", "properties", criteria, "required", List.copyOf(criteria.keySet()),
             "additionalProperties", false));
         return Map.of("oneOf", List.of(answer, Map.of("type", "object", "properties", search,
@@ -240,17 +237,15 @@ public class QwenChatModel {
     static Reply validate(JsonNode node, List<String> offered) { return validate(node, offered, SearchHints.NONE); }
 
     static Reply validate(JsonNode node, List<String> offered, SearchHints hints) {
-        if (node == null || !node.isObject()) throw unavailable();
+        if (node == null || !node.isObject() || node.size() != 3) throw unavailable();
         var intent = node.path("intent");
-        if (!intent.isTextual() || !INTENTS.contains(intent.textValue())) throw unavailable();
-        if (Set.of("SEARCH_VEHICLES", "ASK_MISSING").contains(intent.textValue())) {
-            // P1: exactly intent + criteria; a reply (or anything else) is outside the schema.
-            if (node.size() != 2 || !node.has("criteria")) throw unavailable();
-            return new Reply(intent.textValue(), null, List.of(), criteria(node.get("criteria"), hints));
-        }
         var reply = node.path("reply");
-        if (node.size() != 3 || !node.has("citations")) throw unavailable();
+        if (!intent.isTextual() || !INTENTS.contains(intent.textValue())) throw unavailable();
         if (!reply.isTextual() || reply.textValue().isBlank() || reply.textValue().length() > MAX_REPLY) throw unavailable();
+        if (Set.of("SEARCH_VEHICLES", "ASK_MISSING").contains(intent.textValue())) {
+            if (!node.has("criteria")) throw unavailable();
+            return new Reply(intent.textValue(), reply.textValue().strip(), List.of(), criteria(node.get("criteria"), hints));
+        }
         var citations = node.path("citations");
         if (!citations.isArray() || citations.size() > Math.max(4, offered.size())) throw unavailable();
         var ids = new ArrayList<String>();
