@@ -7,6 +7,7 @@ import NoShowForm from "../../components/booking/NoShowForm";
 import { cancellationCauses } from "../../utils/depositRules";
 import RentalBalance, { rentalBalanceBlocksHandover } from "../../components/booking/RentalBalance";
 import PaymentSchedule from "../../components/booking/PaymentSchedule";
+import ContractDocument, { isNumberedContract } from "../../components/booking/ContractDocument";
 import HandoverReadingsFields from "../../components/booking/HandoverReadingsFields";
 import { fuelLabel, handoverBaseline, km as kmLabel, readingsComparison, readingsInput } from "../../utils/handoverReadings";
 import { quoteRemainderSentence } from "../../utils/paymentSchedule";
@@ -2246,6 +2247,16 @@ export function ApiDocumentPage({ kind, area }) {
             }
           />
         ) : (
+          kind === "contract" && isNumberedContract(doc) ? (
+          <section className="panel mx-auto max-w-3xl">
+            <ContractDocument doc={doc} formatDate={formatValue}>
+              <ReturnPolicySummary policy={doc.returnPolicy} />
+            </ContractDocument>
+            <p className="mt-5 text-sm text-slate-500">
+              Hợp đồng là bản ghi nhận thỏa thuận; chữ ký/duyệt thực hiện theo quy trình bên ngoài.
+            </p>
+          </section>
+          ) : (
           <section className="panel mx-auto max-w-3xl">
             <div className="mb-5 flex flex-wrap justify-between gap-3 border-b pb-4">
               <strong className="text-2xl text-teal-800">KDrive</strong>
@@ -2294,6 +2305,7 @@ export function ApiDocumentPage({ kind, area }) {
                 : "Hợp đồng là bản ghi nhận thỏa thuận; chữ ký/duyệt thực hiện theo quy trình bên ngoài."}
             </p>
           </section>
+          )
         )}
       </RequestState>
     </Page>

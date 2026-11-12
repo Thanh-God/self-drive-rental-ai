@@ -1,31 +1,63 @@
 package com.carrental.modules.contract.service;
 import com.carrental.modules.booking.entity.Booking;
-import com.carrental.modules.booking.service.DepositPolicy;
+import com.carrental.modules.booking.service.BookingService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.time.*;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 @Service public class ContractService {
+ /** Terms saved by contracts issued before L7 (terms_version terms-2026-09-28 or the deposit policy); kept for reference only. */
  public static final String TERMS="Người thuê chịu trách nhiệm đối với vi phạm và thiệt hại thuộc trách nhiệm của mình trong thời gian thuê, theo chứng cứ, căn cứ xử lý và thỏa thuận phù hợp. Yêu cầu bồi thường phải nêu thiệt hại, căn cứ trách nhiệm và khoản được bảo hiểm/bên khác chi trả. Không tự động khấu trừ cọc. Hợp đồng phục vụ đồ án, chưa là mẫu được thẩm định pháp lý.";
- private final JdbcTemplate jdbc;private final ObjectMapper json;private final java.time.Clock clock;private final com.carrental.modules.booking.service.ReturnPolicy returnPolicies;
- public ContractService(JdbcTemplate j,ObjectMapper m,java.time.Clock c,com.carrental.modules.booking.service.ReturnPolicy returnPolicies){jdbc=j;json=m;clock=c;this.returnPolicies=returnPolicies;}
+ private static final ZoneId VN=ZoneId.of("Asia/Ho_Chi_Minh");
+ private final JdbcTemplate jdbc;private final ObjectMapper json;private final Clock clock;private final com.carrental.modules.booking.service.ReturnPolicy returnPolicies;
+ private final ContractParties parties;private final String hotline;
+ public ContractService(JdbcTemplate j,ObjectMapper m,Clock c,com.carrental.modules.booking.service.ReturnPolicy returnPolicies,ContractParties parties,
+                        @Value("${app.ai-hotline:10008888}") String hotline){jdbc=j;json=m;clock=c;this.returnPolicies=returnPolicies;this.parties=parties;this.hotline=hotline;}
+
+ /** Common facts of a booking at the moment the contract is issued. */
+ private record Source(String id,String userId,String vehicleId,String pickupBranchId,String returnBranchId,String customer,String vehicle,String pickup,String returnName,
+                       Instant startAt,Instant endAt,long rentalTotal,long oneWayFee,long total,String policyVersion,int rentalDays,
+                       boolean depositRequired,long depositAmount,String depositPolicy,Object deposit,Object returnPolicy,boolean rentalBalancePolicy){}
+
  public void issue(Booking b){
-  var snapshot=new LinkedHashMap<String,Object>(Map.of("customer",b.customerName,"vehicle",b.vehicleName,"pickup",b.pickupName,"return",b.returnName,"startAt",b.startAt,"endAt",b.endAt,"rentalTotal",b.rentalTotal,"oneWayFee",b.oneWayFee,"total",b.total,"terms",TERMS));
-  snapshot.put("policyVersion",b.policyVersion);snapshot.put("rentalDays",b.rentalDays);
-  if(b.returnPolicyVersion!=null)snapshot.put("returnPolicy",returnPolicies.view(b.returnPolicyVersion,b.returnPolicySnapshot,b.returnPolicyAcceptedAt));
-  try{
-   jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),b.id,java.sql.Timestamp.from(clock.instant()),json.writeValueAsString(snapshot),"terms-2026-09-28");
-  }catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
+  write(new Source(b.id,b.userId,b.vehicleId,b.pickupBranchId,b.returnBranchId,b.customerName,b.vehicleName,b.pickupName,b.returnName,b.startAt,b.endAt,
+   b.rentalTotal,b.oneWayFee,b.total,b.policyVersion,b.rentalDays,b.depositRequired,b.depositAmount,b.depositPolicy,null,
+   b.returnPolicyVersion!=null?returnPolicies.view(b.returnPolicyVersion,b.returnPolicySnapshot,b.returnPolicyAcceptedAt):null,b.rentalBalancePolicy!=null));
+ }
+ public void issueDeposit(BookingService.View b){
+  write(new Source(b.id(),b.userId(),b.vehicleId(),b.pickupBranchId(),b.returnBranchId(),b.customerName(),b.vehicleName(),b.pickupName(),b.returnName(),b.startAt(),b.endAt(),
+   b.rentalTotal(),b.oneWayFee(),b.total(),b.policyVersion(),b.rentalDays(),b.deposit().required(),b.deposit().amount(),b.deposit().policy(),b.deposit(),b.returnPolicy(),b.rentalBalance()!=null));
  }
  public Object get(String bookingId){return jdbc.queryForList("select id,issued_at,snapshot,terms_version from contracts where booking_id=?",bookingId);}
-public void issueDeposit(com.carrental.modules.booking.service.BookingService.View b){
-    var snapshot=new LinkedHashMap<String,Object>();
-    snapshot.put("customer",b.customerName());snapshot.put("vehicle",b.vehicleName());snapshot.put("pickup",b.pickupName());snapshot.put("return",b.returnName());
-    snapshot.put("startAt",b.startAt());snapshot.put("endAt",b.endAt());snapshot.put("rentalTotal",b.rentalTotal());snapshot.put("oneWayFee",b.oneWayFee());snapshot.put("total",b.total());
-    snapshot.put("terms",TERMS);snapshot.put("policyVersion",b.policyVersion());snapshot.put("rentalDays",b.rentalDays());snapshot.put("deposit",b.deposit());
-    if(b.returnPolicy()!=null)snapshot.put("returnPolicy",b.returnPolicy());
-    String termsVersion = b.deposit().policy() != null ? b.deposit().policy() : DepositPolicy.isDemoQrMethod(b.deposit().method()) ? DepositPolicy.QR_VERSION_V1 : DepositPolicy.VNPAY_VERSION;
-    try{jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),b.id(),java.sql.Timestamp.from(clock.instant()),json.writeValueAsString(snapshot),termsVersion);}
-    catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
-  }
+
+ private void write(Source s){
+  Instant issuedAt=clock.instant();
+  var p=parties.find(s.userId(),s.vehicleId(),s.pickupBranchId(),s.returnBranchId());
+  long deposit=s.depositRequired()?Math.max(0,Math.min(s.depositAmount(),s.total())):0;
+  long remaining=s.depositRequired()?s.total()-deposit:s.total();
+  var snapshot=new LinkedHashMap<String,Object>();
+  snapshot.put("contractNumber","HĐ-"+issuedAt.atZone(VN).format(DateTimeFormatter.ofPattern("yyyyMMdd"))+"-"+s.id().replace("-","").substring(0,8).toUpperCase(Locale.ROOT));
+  snapshot.put("issuedAt",issuedAt);
+  var lessor=new LinkedHashMap<String,Object>();
+  lessor.put("name",ContractTerms.LESSOR_NAME);lessor.put("representative","Nhân viên chi nhánh nhận xe");lessor.put("address",s.pickup()+(p.pickupAddress()!=null?" — "+p.pickupAddress():""));
+  lessor.put("hotline",hotline);lessor.put("sample",true);
+  snapshot.put("lessor",lessor);
+  snapshot.put("customer",s.customer());snapshot.put("customerPhone",p.customerPhone());snapshot.put("customerEmail",p.customerEmail());
+  if(p.licenseNumber()!=null){var l=new LinkedHashMap<String,Object>();l.put("number",p.licenseNumber());l.put("licenseClass",p.licenseClass());l.put("scheme",p.licenseScheme());snapshot.put("license",l);}
+  snapshot.put("vehicle",s.vehicle());snapshot.put("vehiclePlate",p.vehiclePlate());snapshot.put("vehicleSeats",p.vehicleSeats());snapshot.put("vehicleTransmission",p.vehicleTransmission());
+  snapshot.put("pickup",s.pickup());snapshot.put("pickupAddress",p.pickupAddress());snapshot.put("return",s.returnName());snapshot.put("returnAddress",p.returnAddress());
+  snapshot.put("startAt",s.startAt());snapshot.put("endAt",s.endAt());snapshot.put("rentalDays",s.rentalDays());
+  snapshot.put("rentalTotal",s.rentalTotal());snapshot.put("oneWayFee",s.oneWayFee());snapshot.put("total",s.total());
+  if(s.depositRequired())snapshot.put("deposit",s.deposit()!=null?s.deposit():Map.of("required",true,"amount",s.depositAmount(),"policy",String.valueOf(s.depositPolicy())));
+  snapshot.put("depositAmount",deposit);snapshot.put("remainingRent",remaining);
+  snapshot.put("policyVersion",s.policyVersion());
+  if(s.returnPolicy()!=null)snapshot.put("returnPolicy",s.returnPolicy());
+  snapshot.put("articles",ContractTerms.articles(new ContractTerms.Facts(s.depositRequired(),deposit,s.depositPolicy(),remaining,s.rentalBalancePolicy(),s.returnPolicy()!=null,hotline)));
+  snapshot.put("termsNote",ContractTerms.NOTE);
+  try{jdbc.update("insert into contracts(id,booking_id,issued_at,snapshot,terms_version) values(?,?,?,?,?)",UUID.randomUUID().toString(),s.id(),java.sql.Timestamp.from(issuedAt),json.writeValueAsString(snapshot),ContractTerms.VERSION);}
+  catch(com.fasterxml.jackson.core.JsonProcessingException e){throw new IllegalStateException(e);}
+ }
 }

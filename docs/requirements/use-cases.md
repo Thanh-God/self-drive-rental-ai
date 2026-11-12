@@ -272,7 +272,7 @@ Tên rút gọn không bỏ nghiệp vụ đã có: U04 vẫn có chi tiết đ�
 | U01 | User xem/cập nhật hồ sơ của mình; đổi mật khẩu theo hợp đồng auth; dữ liệu được lưu và đọc lại đúng | Input sai, mật khẩu hiện tại sai, phiên hết hạn, tác động tài khoản khác |
 | U02 | Chọn xe, thời gian, tuyến; backend trả giá và khả dụng; quote là thông tin để đặt, chưa tạo đơn | Thời gian/tuyến sai, xe không khả dụng, response cũ không ghi đè lựa chọn mới |
 | U03 | Xác nhận thông tin và quote mới nhất; backend kiểm tra lại, tạo đơn hợp lệ; mở chi tiết đơn | GPLX thiếu/không phù hợp, quote hết hiệu lực hoặc xung đột, gửi lặp; không tạo đơn sai |
-| U04 | Xem danh sách và chi tiết đơn của mình; đọc hợp đồng khi xác nhận, hóa đơn khi hoàn tất | Đơn/tài liệu của User khác; tài liệu chưa phát hành; lỗi API không đổi sang demo |
+| U04 | Xem danh sách và chi tiết đơn của mình; đọc hợp đồng khi xác nhận (hợp đồng mới có số hợp đồng, thông tin hai bên, xe, địa chỉ chi nhánh, cọc và 12 điều khoản đánh số; hợp đồng cũ giữ nguyên bản), hóa đơn khi hoàn tất | Đơn/tài liệu của User khác; tài liệu chưa phát hành; lỗi API không đổi sang demo |
 | U05 | Hủy đơn của mình trong trạng thái và thời hạn chính sách đã duyệt; đọc lại trạng thái | Đơn người khác, trạng thái/thời hạn không cho phép; backend quyết định |
 | U06 | Đánh giá chuyến đủ điều kiện; đọc lại kết quả theo chính sách kiểm duyệt | Chưa COMPLETED, không sở hữu, đánh giá trùng hoặc input sai |
 | U07 | Lập và lưu hành trình gắn chuyến hợp lệ, tuyến/thời gian được kiểm chứng; đọc lại hành trình | Không sở hữu, dữ liệu sai, provider lỗi hoặc tuyến không kiểm chứng; AI/Map còn cần quyết định |

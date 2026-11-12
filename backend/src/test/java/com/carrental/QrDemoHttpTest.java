@@ -135,6 +135,24 @@ class QrDemoHttpTest {
         report(b.id());verify(b.id(),"A",390000);verify(b.id(),"A",390000);
         assertEquals("CONFIRMED",current(b.id()).status());assertEquals(390000,current(b.id()).deposit().appliedAmount());assertEquals(1,count("contracts",b.id()));assertEquals(1,count("payment_transactions",b.id()));
     }
+    /** L7: a deposit contract uses the numbered terms, states the deposit and the remaining rent, and follows the booking's own policy. */
+    @Test void depositContractStatesTheDepositRemainingRentAndTheBookingsOwnCancellationRules()throws Exception {
+        var b=approve();verify(b.id(),"A",390000);assertEquals("CONFIRMED",current(b.id()).status());
+        var row=json.readTree(get(user,"/bookings/"+b.id()+"/contract").getContentAsString()).get(0);
+        assertEquals("contract-2026-11-12",row.path("terms_version").asText());
+        var s=json.readTree(row.path("snapshot").asText());
+        assertEquals(com.carrental.modules.booking.service.DepositPolicy.QR_VERSION,s.at("/deposit/policy").asText());
+        assertEquals(390000,s.path("depositAmount").asLong());assertEquals(910000,s.path("remainingRent").asLong());
+        var pay=s.at("/articles/1/clauses").toString();var cancel=s.at("/articles/2/clauses").toString();
+        assertTrue(pay.contains("390.000 đ")&&pay.contains("910.000 đ"),pay);
+        assertTrue(cancel.contains("Hủy dưới 24 giờ trước mốc nhận (liên hệ nhân viên chi nhánh nhận): hoàn toàn bộ cọc.")&&cancel.contains("cọc giữ chỗ không được hoàn"),cancel);
+        assertFalse(cancel.contains("0–100%"),cancel);
+
+        setup();var legacy=approve();legacyPolicy(legacy.id());verify(legacy.id(),"B",390000);
+        var old=json.readTree(json.readTree(get(user,"/bookings/"+legacy.id()+"/contract").getContentAsString()).get(0).path("snapshot").asText());
+        assertTrue(old.at("/articles/2/clauses").toString().contains("quản trị viên quyết định mức hoàn 0–100%"));
+        assertEquals(com.carrental.modules.booking.service.DepositPolicy.QR_VERSION_V1,old.at("/deposit/policy").asText());
+    }
     @Test void partialReceiptsAccumulateWithoutDoubleAllocation()throws Exception {
         var b=approve();verify(b.id(),"A",200000);assertEquals("PENDING",current(b.id()).status());assertEquals(190000,current(b.id()).deposit().missingAmount());
         verify(b.id(),"B",190000);assertEquals("CONFIRMED",current(b.id()).status());assertEquals(390000,current(b.id()).deposit().appliedAmount());assertEquals(1,count("contracts",b.id()));

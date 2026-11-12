@@ -15,6 +15,8 @@ import java.util.*;
  public record RouteView(String id,String pickupBranchId,String returnBranchId,long fee,boolean enabled,long version){}
  public List<BranchView> list(){return branches.findAll().stream().map(b->new BranchView(b.id,b.name,b.address,b.status,b.version)).toList();}
  public List<RouteView> routes(){return routes.findAll().stream().map(r->new RouteView(r.id,r.pickupBranchId,r.returnBranchId,r.fee,r.enabled,r.version)).toList();}
+ /** One branch by id, whatever its status (contracts copy the address of a branch that may be closed later). */
+ public BranchView view(String id){var b=branches.findById(id).orElseThrow(DomainException::missing);return new BranchView(b.id,b.name,b.address,b.status,b.version);}
  public Branch active(String id){var b=branches.findById(id).orElseThrow(DomainException::missing);if(!"ACTIVE".equals(b.status))throw DomainException.conflict("Chi nhánh không hoạt động.");return b;}
  public long fee(String pickup,String destination){
   active(pickup);active(destination);

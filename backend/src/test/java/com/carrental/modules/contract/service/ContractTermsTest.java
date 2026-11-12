@@ -1,0 +1,84 @@
+package com.carrental.modules.contract.service;
+
+import com.carrental.modules.booking.service.DepositPolicy;
+import org.junit.jupiter.api.Test;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+/** L7: the numbered terms follow each booking's own facts. */
+class ContractTermsTest {
+    static ContractTerms.Facts facts(boolean deposit, String policy, long remaining, boolean balance, boolean returnPolicy) {
+        return new ContractTerms.Facts(deposit, deposit ? 390000 : 0, policy, remaining, balance, returnPolicy, "10008888");
+    }
+
+    static List<String> clauses(List<ContractTerms.Article> articles, int number) {
+        var a = articles.get(number - 1);
+        assertEquals(number, a.number());
+        return a.clauses();
+    }
+
+    @Test
+    void twelveNumberedArticlesInAFixedOrder() {
+        var articles = ContractTerms.articles(facts(false, null, 1300000, false, false));
+        assertEquals(12, articles.size());
+        for (int i = 0; i < articles.size(); i++) {
+            assertEquals(i + 1, articles.get(i).number());
+            assertFalse(articles.get(i).clauses().isEmpty());
+        }
+        assertEquals("Hiệu lực", articles.get(11).title());
+        assertFalse(articles.toString().contains("đồ án"), "the disclaimer lives in the note");
+        assertTrue(ContractTerms.NOTE.contains("đồ án"));
+        assertEquals("contract-2026-11-12", ContractTerms.VERSION);
+        assertTrue(ContractTerms.VERSION.length() <= 30, "contracts.terms_version is VARCHAR(30)");
+    }
+
+    @Test
+    void depositPolicyV2StatesTheFixedRules() {
+        var a = ContractTerms.articles(facts(true, DepositPolicy.QR_VERSION, 910000, true, false));
+        var cancel = clauses(a, 3);
+        assertTrue(cancel.contains("Hủy dưới 24 giờ trước mốc nhận (liên hệ nhân viên chi nhánh nhận): hoàn toàn bộ cọc."));
+        assertTrue(cancel.stream().anyMatch(c -> c.startsWith("Không đến nhận xe") && c.contains("không được hoàn")));
+        assertTrue(cancel.stream().noneMatch(c -> c.contains("0–100%")));
+        var pay = clauses(a, 2);
+        assertTrue(pay.contains("Bên thuê đã đặt cọc giữ chỗ 390.000 đ (30% tiền thuê); khoản cọc được trừ vào tổng tiền."));
+        assertTrue(pay.stream().anyMatch(c -> c.startsWith("Phần tiền thuê còn lại 910.000 đ") && c.contains("trước khi bàn giao xe")));
+        assertTrue(clauses(a, 9).get(1).contains("hoàn toàn bộ tiền cọc"));
+    }
+
+    @Test
+    void olderDepositPoliciesKeepTheAdminDecision() {
+        for (String policy : List.of(DepositPolicy.QR_VERSION_V1, DepositPolicy.VNPAY_VERSION)) {
+            var cancel = clauses(ContractTerms.articles(facts(true, policy, 910000, false, false)), 3);
+            assertTrue(cancel.stream().anyMatch(c -> c.contains("quản trị viên quyết định mức hoàn 0–100%")), policy);
+            assertTrue(cancel.stream().noneMatch(c -> c.startsWith("Không đến nhận xe")), policy);
+            var pay = clauses(ContractTerms.articles(facts(true, policy, 910000, false, false)), 2);
+            assertTrue(pay.stream().anyMatch(c -> c.equals("Phần tiền thuê còn lại 910.000 đ được thanh toán tại chi nhánh theo hướng dẫn của nhân viên.")));
+        }
+    }
+
+    @Test
+    void withoutDepositNothingIsRefundedAndTheTotalIsPaidAtTheBranch() {
+        var a = ContractTerms.articles(facts(false, null, 1300000, true, false));
+        assertEquals("Đơn không có tiền cọc: hủy đơn không phát sinh khoản hoàn.", clauses(a, 3).get(0));
+        assertTrue(clauses(a, 2).contains("Tổng tiền được thanh toán tại chi nhánh theo hướng dẫn của nhân viên."));
+        assertTrue(clauses(a, 2).stream().noneMatch(c -> c.contains("đặt cọc")));
+        assertTrue(clauses(a, 9).get(1).contains("không phải trả khoản nào"));
+    }
+
+    @Test
+    void fullyPaidDepositHasNoRemainingRentLineAndReturnPolicyIsReferenced() {
+        var a = ContractTerms.articles(facts(true, DepositPolicy.QR_VERSION, 0, true, true));
+        assertTrue(clauses(a, 2).stream().noneMatch(c -> c.contains("còn lại")));
+        assertTrue(clauses(a, 6).stream().anyMatch(c -> c.contains("chính sách trả xe đã lưu cùng đơn")));
+        assertTrue(ContractTerms.articles(facts(false, null, 1, false, false)).get(5).clauses().stream()
+            .anyMatch(c -> c.contains("chỉ có hiệu lực khi chi nhánh xác nhận")));
+    }
+
+    @Test
+    void amountsUseVietnameseGrouping() {
+        assertEquals("1.300.000 đ", ContractTerms.vnd(1300000));
+        assertEquals("0 đ", ContractTerms.vnd(0));
+    }
+}
