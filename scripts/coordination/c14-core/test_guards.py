@@ -211,7 +211,7 @@ class RunnerGuards(unittest.TestCase):
         # L2/L4: booking-flow suites without live providers are part of the default native set.
         module=load('run-mysql')
         default=module.select_suites(None,{})
-        for suite in ('NoShowWithoutDepositHttpTest','RentalBalanceHttpTest','RentalBalanceDepositHttpTest','HandoverReadingsHttpTest','BusinessCancellationHttpTest','ContractContentHttpTest','ContractAcceptanceHttpTest'):
+        for suite in ('NoShowWithoutDepositHttpTest','RentalBalanceHttpTest','RentalBalanceDepositHttpTest','HandoverReadingsHttpTest','BusinessCancellationHttpTest','ContractContentHttpTest','ContractAcceptanceHttpTest','ContractAcceptanceRaceTest','ContractRentalBalanceFlowHttpTest'):
             self.assertIn(suite,module.SUITES)
             self.assertIn(suite,default)
             self.assertNotIn(suite,module.LIVE_QWEN_SUITES)

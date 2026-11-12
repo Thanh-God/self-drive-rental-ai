@@ -41,7 +41,10 @@ import java.util.UUID;
  /** L8: only the booking's own customer accepts, while the booking is confirmed and not yet handed over. */
  public Object acceptContract(Actor a,String id){
   return new TransactionTemplate(transactionManager).execute(status->{
-   var b=bookings.require(a,id);
+   // R9: lock vehicle -> booking like every status change, so a cancellation or handover in flight is either seen or waits.
+   // Lock before loading the booking: an entity read earlier in this transaction would carry a stale version.
+   bookings.lockDepositBooking(id);
+   var b=bookings.require(a,id); // 404 for bookings the actor cannot read
    if(!"USER".equals(a.role())||!a.id().equals(b.userId))throw com.carrental.exception.DomainException.forbidden();
    if(!"CONFIRMED".equals(b.status))throw com.carrental.exception.DomainException.conflict("Chỉ đồng ý hợp đồng khi đơn đã xác nhận và chưa giao xe.");
    contracts.accept(id,clock.instant());

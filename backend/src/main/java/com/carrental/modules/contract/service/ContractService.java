@@ -47,7 +47,8 @@ import java.util.*;
 
  /** L8: handover waits until the customer has accepted a contract that requires it. */
  public void requireAcceptedForHandover(String bookingId){
-  var rows=jdbc.queryForList("select terms_version,accepted_at from contracts where booking_id=?",bookingId);
+  // R9: locking read so a handover that waited behind an acceptance sees the committed time, not its older snapshot.
+  var rows=jdbc.queryForList("select terms_version,accepted_at from contracts where booking_id=? for update",bookingId);
   if(!rows.isEmpty()&&ContractTerms.acceptanceRequired((String)rows.get(0).get("terms_version"))&&rows.get(0).get("accepted_at")==null)
    throw DomainException.conflict("Khách chưa bấm Đồng ý hợp đồng trên hệ thống; chưa thể bàn giao xe.");
  }
